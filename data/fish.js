@@ -54,7 +54,7 @@ G.data.fish = [
 
 // Schema check (V5). Returns a list of problems; empty means valid.
 // ref: {locations, windows, bases, parts} to check cross-references against.
-// TODO(P8.5): tools/balance.js --validate calls this along with its other checks.
+// tools/balance.js --validate runs this along with its other checks.
 G.data.validateFish = function (fish, ref) {
   var errs = [], seen = {}, rar = G.data.rarity;
   function num(v) { return typeof v === 'number' && isFinite(v); }

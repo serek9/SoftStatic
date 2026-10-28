@@ -106,7 +106,7 @@ G.core.debug = (function () {
     // dbg.land() wins the current fight on the next step.
     // (tired, so an un-reeled step cannot push D back up before the win check)
     land: function () { var F = G.state.run.fight; if (!F.active) return false; F.D = 0; F.mode = 'tired'; F.modeT = 9; return true; },
-    // dbg.rod(kg) sets the rod's mass limit (D4) until gear exists.   TODO(P8.1)
+    // dbg.rod(kg) overrides the rod's mass limit (D4) for testing; dbg.rod(0) restores it.
     rod: function (kg) { return G.scene.sailing.setRodMax(kg); },
     // dbg.money(n) adds n coins (negative takes them); returns the balance.
     money: function (n) { G.state.save.coins = Math.max(0, G.state.save.coins + (n || 0)); return G.state.save.coins; },
