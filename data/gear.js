@@ -30,13 +30,13 @@ G.data.gear = {
     { id: 'line_3', name: 'Wire Leader', cost: 950, strength: 2.0 },
     { id: 'line_4', name: 'Hair-Fine Line', cost: 3200, strength: 2.6 }
   ],
-  // cost is per bait; 0 with unlimited: true never runs out. label false: the shelf item
-  // with no label and a strange price (V10.7); it is a real rare bait.
+  // cost is per bait and the shop sells `pack` at a time; 0 with unlimited: true never runs
+  // out. label false: the shelf item with no label and a strange price (V10.7); it is a real rare bait.
   baits: [
     { id: 'worm', name: 'Nightcrawlers', cost: 0, unlimited: true, attract: 1.0, rareBoost: 1.0 },
-    { id: 'cricket', name: 'Crickets', cost: 3, attract: 1.25, rareBoost: 1.0 },
-    { id: 'minnow', name: 'Minnows', cost: 6, attract: 1.4, rareBoost: 1.3 },
-    { id: 'unlabelled', name: '', label: false, cost: 47, attract: 1.1, rareBoost: 3.0 }
+    { id: 'cricket', name: 'Crickets', cost: 3, pack: 10, attract: 1.25, rareBoost: 1.0 },
+    { id: 'minnow', name: 'Minnows', cost: 6, pack: 10, attract: 1.4, rareBoost: 1.3 },
+    { id: 'unlabelled', name: '', label: false, cost: 47, pack: 1, attract: 1.1, rareBoost: 3.0 }
   ],
   lantern: { id: 'lantern', name: 'Storm Lantern', cost: 250, nightDepth: 999 },     // px: no night silhouettes
   depthFinder: { id: 'depth_finder', name: 'Depth Finder', cost: 180, bands: 4 },  // m between bands on the HUD
@@ -54,13 +54,24 @@ G.data.gear = {
   // Prices (V8): base × rarityMult × sizeFactor, sizeFactor from sizeMin to sizeMax.
   economy: { rarityMult: { common: 1, uncommon: 2.5, rare: 8, legendary: 40 }, sizeMin: 0.7, sizeMax: 1.5 },
 
-  // Location unlocks (V6). TODO(P11.1): each location file carries its own cost.
+  // Location unlocks (V6), in map order. name is what the map shows before the location
+  // has data. TODO(P11.1): each location file carries its own cost and name.
   unlocks: {
-    fog: { cost: 0 },
-    creek: { cost: 300 },
-    pines: { cost: 1500 },
-    red: { cost: 6000, windowCatch: true } // plus a catch made during a clock window
+    fog: { cost: 0, name: 'Fogbound Lake' },
+    creek: { cost: 300, name: 'Blackwater Creek' },
+    pines: { cost: 1500, name: 'The Pines' },
+    red: { cost: 6000, name: 'Red Room Reservoir', windowCatch: true } // plus a catch made during a clock window
   },
+
+  // Cabin restoration (V9), one stage after another; cabinLevel is the index reached.
+  // plaques: how many kept fish can be mounted at that stage.
+  cabin: [
+    { name: 'Derelict', cost: 0, plaques: 2 },
+    { name: 'Patched Roof', cost: 150, plaques: 4 },
+    { name: 'Stove Lit', cost: 400, plaques: 6 },
+    { name: 'Rug and Lamp', cost: 900, plaques: 8 },
+    { name: 'Restored', cost: 2000, plaques: 10 }
+  ],
 
   // Passive mode earns this share of active income (D5). The only place it is set.
   passive: { incomeMult: 0.6 }

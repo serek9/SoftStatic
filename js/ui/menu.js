@@ -1,0 +1,173 @@
+var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
+
+// Overlays and the pause menu (9.2).
+// An overlay (pause, journal, map) sits over whatever scene is up. While one is open the
+// boot loop gives it the input and the scene does not update, so the world waits: no
+// clock, no fish, no fight. P (or Esc on the water) pauses, J opens the journal anywhere,
+// M opens the map from the boat when no line is out. An overlay is
+//   {open(), update(dt) -> true while it stays open, draw(ctx)}.
+// The pause menu holds the settings (volume, mute) and moving a save (export/import).
+G.ui = G.ui || {};
+G.ui.menu = (function () {
+  var S = G.gfx.sprites, P = S.PALETTE;
+  var cur = null, curName = '';
+
+  // ---- Shared drawing helpers (journal, map, shop, cabin) ----------------------------
+
+  function dim(ctx, a) {
+    ctx.globalAlpha = a; ctx.fillStyle = P.night_ink; ctx.fillRect(0, 0, 320, 180); ctx.globalAlpha = 1;
+  }
+
+  // A box with a 1 px border.
+  function panel(ctx, x, y, w, h, border, fill) {
+    ctx.fillStyle = P[border]; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+    ctx.fillStyle = P[fill]; ctx.fillRect(x, y, w, h);
+  }
+
+  function centre(ctx, s, cx, y, key, jitter, seed) { S.drawText(ctx, s, cx - (S.measure(s) >> 1), y, key, jitter, seed); }
+
+  // -1, 0 or 1 from a pair of actions pressed this step.
+  function axis(neg, pos) { var i = G.core.input; return (i.pressed(pos) ? 1 : 0) - (i.pressed(neg) ? 1 : 0); }
+
+  // ---- Overlay manager -----------------------------------------------------------------
+
+  function open(name) {
+    var o = name === 'pause' ? pause : (name === 'journal' ? G.ui.journal : (name === 'map' ? G.ui.map : null));
+    if (!o) return false;
+    cur = o; curName = name;
+    o.open();
+    return true;
+  }
+
+  function mapAllowed() { return G.core.state.sceneName() === 'sailing' && G.state.run.fsm === 'sailing'; }
+
+  // Called each step before the scene. Returns true when an overlay has the step (the scene
+  // must not update), false to let the scene run.
+  function update(dt) {
+    var inp = G.core.input, scene = G.core.state.sceneName();
+    if (cur) {
+      if (!cur.update(dt)) { cur = null; curName = ''; }
+      return true;
+    }
+    if (scene === 'gallery') return false;
+    if (inp.pressed('pause') || (scene === 'sailing' && inp.pressed('back'))) return open('pause');
+    if (inp.pressed('journal')) return open('journal');
+    if (inp.pressed('map') && mapAllowed()) return open('map');
+    return false;
+  }
+
+  function draw(ctx) { if (cur) cur.draw(ctx); }
+
+  // ---- Pause menu ------------------------------------------------------------------------
+
+  var ITEMS = ['Resume', 'Volume', 'Sound', 'Export save', 'Import save'];
+  var PX = 70, PY = 34, PW = 180, PH = 112;
+  var sel = 0, msg = '', msgKey = 'fog_light', dirty = false, lastExport = '';
+
+  // Volume as tenths so the shown bar and the stored value always agree.
+  function volume(d) {
+    var st = G.state.save.settings, v = Math.round(st.volume * 10) + d;
+    st.volume = (v < 0 ? 0 : (v > 10 ? 10 : v)) / 10;
+    dirty = true;
+  }
+
+  function say(s, key) { msg = s; msgKey = key || 'fog_light'; }
+
+  // Saves first (so lastSeen and the RNG are current), then copies the string. Without
+  // clipboard access the browser's own prompt shows it for copying.
+  function exportSave() {
+    var save = G.state.save;
+    G.core.save.persist(save);
+    lastExport = G.core.save.exportString(save);
+    var done = function () { say('Copied to the clipboard.'); };
+    var manual = function () {
+      window.prompt('Your SoftStatic save. Copy it:', lastExport);
+      G.core.input.releaseAll();
+      say('Save shown for copying.');
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(lastExport).then(done, manual);
+      else manual();
+    } catch (e) { manual(); }
+    return lastExport;
+  }
+
+  // Replaces the save with str (an exported string) and restarts the run at its location.
+  // Only between casts, so no card, fight or lure is left pointing at the old save.
+  function importSave(str) {
+    if (G.state.run.fsm !== 'sailing') { say('Reel in first.', 'signal_amber'); return false; }
+    var r = G.core.save.importString(str);
+    if (!r.ok) { say('Not loaded: ' + r.error, 'neon_red'); return false; }
+    G.state.save = r.save;
+    if (r.save.rng !== null) G.rng.setState(r.save.rng);
+    G.core.save.persist(r.save);
+    G.state.run = G.core.state.newRun();
+    G.core.state.change('sailing'); // enter() builds the run at save.loc
+    say('Save restored.', 'neon_teal');
+    return true;
+  }
+
+  function askImport() {
+    if (G.state.run.fsm !== 'sailing') { say('Reel in first.', 'signal_amber'); return; }
+    var str = window.prompt('Paste a SoftStatic save:', '');
+    G.core.input.releaseAll();
+    if (str) importSave(str);
+  }
+
+  var pause = {
+    open: function () { sel = 0; msg = ''; dirty = false; },
+    update: function () {
+      var inp = G.core.input, st = G.state.save.settings;
+      if (inp.pressed('pause') || inp.pressed('back')) { pause.close(); return false; }
+      sel = (sel + axis('up', 'down') + ITEMS.length) % ITEMS.length;
+      var lr = axis('left', 'right');
+      if (ITEMS[sel] === 'Volume' && lr) volume(lr);
+      if (ITEMS[sel] === 'Sound' && lr) { st.mute = !st.mute; dirty = true; }
+      if (!inp.pressed('action')) return true;
+      switch (ITEMS[sel]) {
+        case 'Resume': pause.close(); return false;
+        case 'Sound': st.mute = !st.mute; dirty = true; break;
+        case 'Export save': exportSave(); break;
+        case 'Import save': askImport(); break;
+      }
+      return true;
+    },
+    // TODO(P13.1): the audio engine reads save.settings.volume and mute.
+    close: function () { if (dirty) G.core.save.autosave('settings'); dirty = false; },
+    draw: function (ctx) {
+      var st = G.state.save.settings;
+      dim(ctx, 0.6);
+      panel(ctx, PX, PY, PW, PH, 'stone', 'ink');
+      centre(ctx, 'PAUSED', PX + PW / 2, PY + 6, 'bone');
+      for (var i = 0; i < ITEMS.length; i++) {
+        var y = PY + 22 + i * 12, on = i === sel, key = on ? 'signal_amber' : 'fog_light';
+        if (on) S.drawText(ctx, '>', PX + 8, y, key);
+        S.drawText(ctx, ITEMS[i], PX + 16, y, key);
+        if (ITEMS[i] === 'Volume') {
+          for (var k = 0; k < 10; k++) {
+            ctx.fillStyle = P[k < Math.round(st.volume * 10) && !st.mute ? (on ? 'signal_amber' : 'fog_light') : 'fog_dark'];
+            ctx.fillRect(PX + 70 + k * 6, y + 1, 4, 4);
+          }
+        } else if (ITEMS[i] === 'Sound') S.drawText(ctx, st.mute ? 'off' : 'on', PX + 70, y, key);
+      }
+      if (msg) centre(ctx, msg, PX + PW / 2, PY + PH - 26, msgKey);
+      centre(ctx, 'W/S choose  A/D change', PX + PW / 2, PY + PH - 14, 'fog_mid');
+    }
+  };
+
+  return {
+    open: open, update: update, draw: draw, mapAllowed: mapAllowed,
+    isOpen: function () { return cur !== null; },
+    current: function () { return curName; },
+    exportSave: exportSave, importSave: importSave,
+    lastExport: function () { return lastExport; },
+    message: function () { return msg; },
+    dim: dim, panel: panel, centre: centre, axis: axis
+  };
+})();
+
+if (G.core.debug) G.core.debug.addLine(function () {
+  var st = G.state.save && G.state.save.settings;
+  return 'ui ' + (G.ui.menu.current() || '-') + (st ? '  volume ' + st.volume.toFixed(1) + (st.mute ? ' muted' : '') : '') +
+    (G.ui.menu.message() ? '  msg "' + G.ui.menu.message() + '"' : '');
+});

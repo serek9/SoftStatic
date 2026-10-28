@@ -2,7 +2,7 @@
 
 > **FOR THE CODING AGENT:** Read **§0 Shared Conventions** first, then ONLY the task or section named in your assignment. Implement nothing that is not named in the task.
 
-**Status:** Plan final and approved. **Phases 1–8 are done (Milestone A reached).** The next task is **9.1 HUD**; each phase starts only after explicit authorization. Progress, architecture as built, decisions, known issues and the exact next task are in **§8 Project Status**, which is updated at the end of every phase.
+**Status:** Plan final and approved. **Phases 1–9 are done (Milestone A reached).** The next task is **10.1 Anomaly scheduler**; each phase starts only after explicit authorization. Progress, architecture as built, decisions, known issues and the exact next task are in **§8 Project Status**, which is updated at the end of every phase.
 
 ---
 
@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-10-28, after the GitHub setup (commit `d9e9a45` plus the commit that added this section). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-10-28, after Phase 9 (Interface). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -386,14 +386,14 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 6 Fish, clock, unease | Done | `87206cb` | 4 placeholder species; the full roster is task 14.1 |
 | 7 Bite, fight, landing | Done | `1b6ab97` | **Milestone A reached** |
 | 8 Economy, save, balance | Done | `855d35a`, `ead0edf` | `tools/balance.js` in place |
-| 9 Interface | **Next** | | Start with task 9.1 (see 8.6) |
-| 10 Anomalies | Not started | | Milestone B |
+| 9 Interface | Done | `Phase 9: Interface` | HUD, pause menu, journal, shop, map, cabin; save v3 |
+| 10 Anomalies | **Next** | | Milestone B. Start with task 10.1 (see 8.6) |
 | 11 Locations 2–4 | Not started | | |
 | 12 Passive and the tape | Not started | | |
 | 13 Audio | Not started | | May run alongside any phase from 7 on |
 | 14 Content and polish | Not started | | Milestone C |
 
-Every task in Phases 1–8 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
+Every task in Phases 1–9 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
 
 ### 8.2 Architecture as built
 
@@ -404,21 +404,23 @@ index.html          canvas, whole-pixel scaling, script tags in load order, boot
 js/core/  debug.js  ?debug overlay (page text), red error box, dbg.* API, ?gallery scene
           rng.js    mulberry32: G.rng (sim), G.vrng (visual), seedAll
           state.js  fishing state machine table, scene manager, G.state = {save, run}
-          input.js  keys/mouse -> actions (left, right, action, pause, journal, map, passive)
-          save.js   save v2, migrations, SS1.<base64>.<checksum> format, autosave
-          loop.js   fixed 1/60 step, 0.1 s frame cap, P toggles pause
+          input.js  keys/mouse -> actions (left, right, action, pause, journal, map, passive, up, down, back)
+          save.js   save v3, migrations, SS1.<base64>.<checksum> format, autosave
+          loop.js   fixed 1/60 step, 0.1 s frame cap (setPaused is a debug freeze; P is the pause menu)
 data/     loc_fog.js   Fogbound: layers, landmarks, underwater settings, spots, maxDepth 96 px (24 m)
           fish.js      clock windows, rarity weights, 4 species, validateFish()
-          gear.js      rod/reel/line tiers, baits, lantern, depth finder, fight constants,
-                       economy constants, unlock costs, passive.incomeMult (D5)
+          gear.js      rod/reel/line tiers, baits (with shop pack sizes), lantern, depth finder, fight
+                       constants, economy constants, unlock costs and names, cabin stages,
+                       passive.incomeMult (D5)
+          dialogue.js  the shopkeeper: small talk and the special lines (hints, repeated, reversed)
 js/sim/   clock.js     hour advance, grey/night, windows, per-cast latch
           unease.js    per location 0..1
           fish_ai.js   speciesWeights/pickSpecies, the school (max 8) and its states
           bite.js      2 s hook window, a missed fish may return once
           fight.js     the V4 tension model and autoPlayer(skill)
-          economy.js   price, sizeFactor, gear effects, purchases, bait use, catches, unlocks
+          economy.js   price, sizeFactor, gear effects, purchases, bait use, catches, unlocks, cabin restoration
 js/gfx/   bake.js      offscreen canvases, layers, flipped copies, lazy cache
-          sprites.js   palette (only hex in the code), sprite DSL, bitmap font, hash
+          sprites.js   palette (only hex in the code), sprite DSL, bitmap font, wrap, hash
           fx.js        particle pool (256) and ripple pool (32), splash
           water.js     mirror reflection with a slot for reflection deltas (P10.2)
           fishgen.js   8 bases × 15 parts, wrongness, asymmetry, shimmer; ?gallery combinations
@@ -427,18 +429,27 @@ js/scene/ boat.js      boat physics, rod geometry and bend
           underwater.js  cross-section, lure sink/stop/reel, fish drawing, bite -> hook -> fight -> landing,
                          heavy-fish shadow
           sailing.js   the scene in play: location loading, parallax, camera, sky, cast, the step order below
-js/ui/    hud.js       depth readout, tension tint, depth-finder bands
+js/ui/    hud.js       clock, coins, bait in use; depth readout, tension tint, depth-finder bands
           card.js      catch card, sell/keep
+          menu.js      overlay manager (pause, journal, map), pause menu with settings and export/import,
+                       shared panel helpers
+          journal.js   overlay: filters, species grid, entry page, discovered hints, unease handwriting,
+                       heavy-fish margin note
+          shop.js      scene: baked interior, shelf grid, purchases, the shopkeeper's line per visit
+          map.js       overlay: baked chart, travel with a fade, unlocks, the way into the shop and cabin
+          cabin.js     scene: restoration stages, mounted trophies, facing decided in enter()
 tools/    balance.js   --validate [--strict], --replay <seed> [min], --pacing (Node; loads the scripts listed in index.html)
 ```
 
+**Scenes and overlays:** the scene manager holds `sailing`, `shop`, `cabin` and `gallery`. Each boot-loop step first calls `G.ui.menu.update(dt)`; while an overlay (pause, journal, map) is open it takes the step and the scene does not update, and `G.ui.menu.draw` draws it over the scene.
+
 **One update step** (`sailing.update`): gear effects → clock → unease → cast steps (charge, flight, or the lure under water) → fish school → `underwater.catchStep` (bite, hook, fight, landing, card) → card input → boat → dog → camera → underwater view (fade, vertical camera) → particles.
 
-**Drawing order** (`sailing.draw`): sky and layers → mirror (only when the camera is at the surface) or the cross-section → waterline glints → particles → boat and dog → hooked fish → line and lure → HUD → card.
+**Drawing order** (`sailing.draw`): sky and layers → mirror (only when the camera is at the surface) or the cross-section → waterline glints → particles → boat and dog → hooked fish → line and lure → HUD → card; then any overlay.
 
 **Run state** (`G.state.run`, never saved): `fsm`, `loc`, `boat`, `dog`, `cam {x, y}`, `uw {alpha}`, `cast` (charge, landing x, lure position, seed, `latched` windows, bait), `school`, `lureIn`, `bite`, `fight`, `hook`, `heavy`, `gearFx`, `dogIn`, `uneaseIn`.
 
-**Save** (`G.state.save`, version 2): `coins`, `gear {rod, reel, line, lantern, depthFinder, bait}`, `baits {id: count}`, `journal {id: {caught, bestLen, bestW, hints, seen, phantom}}`, `kept [{id, len, w}]`, `unlocks {fog: true}`, `unease {loc: 0..1}`, `clock` (a new game starts at 19:00), `flags.windowCatch {windowId: true}`, `lastSeen`, `rng`, plus `cabinLevel`, `tapes`, `settings`, which are reserved for later phases.
+**Save** (`G.state.save`, version 3): `coins`, `gear {rod, reel, line, lantern, depthFinder, bait}`, `baits {id: count}`, `journal {id: {caught, bestLen, bestW, hints, seen, phantom, read}}` (`read` is set when the entry is looked at; absent means NEW), `kept [{id, len, w}]`, `cabinLevel`, `unlocks {fog: true}`, `loc` (where the game resumes), `unease {loc: 0..1}`, `clock` (a new game starts at 19:00), `flags {windowCatch {windowId: true}, lines {lineId: visit said on}, shopVisits, heavy {loc: true}}`, `settings {volume, mute}`, `lastSeen`, `rng`, plus `tapes` (P12). Migrations v1 → v2 → v3 exist.
 
 ### 8.3 Technical decisions
 
@@ -460,6 +471,15 @@ These are interpretations and additions made while building, where the spec abov
 14. **Unlock costs** are in `data/gear.js` `unlocks` until each location file carries its own (11.1). The Red Room's condition is any landed catch whose cast was latched in a window (`flags.windowCatch`); 11.3 may narrow it to a specific fish.
 15. **Pacing model** (`tools/balance.js`): an active player at depth 8 m, hooking 90% of bites, fight skill 0.85, buying in the order `PLAN` (line, reel, rod, lantern, depth finder, creek, …). It fishes the Fogbound roster for the whole run, because no other location has fish yet.
 16. **Run state is built by `sailing.load()`**, not by `state.newRun()` (which only creates `fsm`, `fsmPrev` and `fsmT`).
+17. **Overlays and scenes (9.2):** pause, journal and map are overlays over the current scene; shop and cabin are scenes. While an overlay is open the world waits (no clock, fish or fight). P pauses anywhere, and Esc pauses on the water; J opens the journal anywhere; M opens the map only from the boat with no line out. In the shop and cabin, Esc or M leaves.
+18. **New input actions:** `up` (W, ↑), `down` (S, ↓) and `back` (Esc) for menus; Enter also counts as `action`. Menus are keyboard-only until touch (14.6).
+19. **The map is the hub (9.5):** it lists the four waters plus the Bait Shop and the Cabin (both on the Fogbound shore). Choosing one fades out, switches at full black, then fades in. `sailing.load` bakes everything a location draws, its underwater cross-section included, and sets `save.loc`; travel autosaves. Paying to open a location autosaves as a purchase. Locations without data show their name (from `gear.unlocks`) and "Not charted yet".
+20. **Export and import (9.2):** export saves first, then copies the `SS1` string to the clipboard, falling back to the browser's own prompt to show it. Import reads it with the browser's prompt, a DOM dialog like the debug text (decision 1). Import works only between casts, then rebuilds the run at the save's `loc`. A damaged string is refused and changes nothing. Settings changes autosave when the pause menu closes.
+21. **Journal (9.3):** hints are discovered by catching: the species' `hintRefs` on the first catch, the baits it takes on the second, its depth and hours on the third. Headings and filters are printed; entries are handwritten with jitter equal to the current location's unease. The handwriting is stable frame to frame (hashed, never random). The D4 margin note shows when `flags.heavy[loc]` is set (sailing sets it while a too-heavy fish is near) and some species there is still heavier than the rod holds.
+22. **Shopkeeper (9.4):** one line per visit, chosen without RNG. A special line is said once per save, no sooner than its `after` visit, at least `gap` (2) visits after the last special, and `night` lines only outside the grey hours. `flags.lines[id]` stores the visit it was said on. Kind `repeat` is said twice; kind `reverse` is shown with its characters reversed. Otherwise small talk rotates.
+23. **Shop purchases:** gear and equipment buy the next tier. Baits sell in `pack`s (`data/gear.js`). Choosing a bait you have in stock but are not using equips it first; choosing it again buys a pack. Buying a bait also equips it, and Nightcrawlers simply equip. The shop runs the clock and drains the current location's unease (`atShop`).
+24. **Cabin (9.6):** stages and plaque counts live in `data/gear.js` `cabin`, and `economy.restoreCabin` pays for the next stage. Kept fish are mounted heaviest first, and those without a plaque are counted as "in the icebox". In `enter()` only, `round(unease × mounted)` trophies are turned to face the door. Unease is the run's location's; which trophies turn is picked with `G.vrng`. A restoration bought inside adds empty plaques, which are filled on the next entry, so the wall never changes while visible. The cabin runs the clock but leaves unease alone.
+25. **HUD (9.1):** clock, coins and bait (with count, except worms) in the top-left over the sky, with a 1 px ink shadow; depth stays in the top-right while underwater. Hidden while the card is open. Strings are rebuilt only when their value changes.
 
 ### 8.4 Known bugs and pending issues
 
@@ -467,18 +487,18 @@ No crashes or failing checks are known. Open items, roughly by importance:
 
 | # | Issue | Where | Owner |
 |---|---|---|---|
-| 1 | No coins or clock on screen, and no shop: gear can only be bought with `dbg.buy`/`dbg.money` | `js/ui/hud.js` | **9.1**, 9.4 |
-| 2 | "Fog thickens in grey hours" (§0.8) is not built; only the sky follows the clock | `js/scene/sailing.js` | Not assigned to a task; suggest 9.x or 14 |
-| 3 | `tooHeavyNear` is recomputed only when a fish spawns, so after a rod upgrade it can stay stale until the next spawn | `js/sim/fish_ai.js` | Minor; fix when touched (7.6/7.7 behaviour) |
-| 4 | P toggles pause inside `loop.js`; nothing is drawn to show it | `js/core/loop.js` | 9.2 |
-| 5 | Nothing sets `atShop`, so unease never drains at a shop | `js/sim/unease.js` | 9.4 |
-| 6 | The game always starts at Fogbound | `js/scene/sailing.js` `enter()` | 9.5 |
-| 7 | Pacing: location 2 median is 32 min, low in the 30–50 band. Hollow pike (an unease fish, about 150 coins each) make early income jumpy. Escapes are about 0% in fight sims. | `data/fish.js`, `data/gear.js` | 14.5 |
-| 8 | Hollow pike lands only ~51% at skill 0.8 with the starter line, by design (strength 1.6 > line 1.0) | `data/fish.js` | Review in 14.5 |
-| 9 | No sound: the slip sound and the heavy-fish line hum are marked | `js/scene/underwater.js` | 13.3 |
-| 10 | Outdated comments: `js/core/state.js` lines 25–26 (run fields are built in `sailing.load`); `js/core/debug.js` line 123 ("the clock does not advance": it does); `data/loc_fog.js` line 51 `species: []` with `TODO(P6.3)` (species list their locations in `data/fish.js`; the field is unused) | as listed | Delete when the file is next touched |
-| 11 | The per-phase Node checks for Phases 1, 6, 7 and 8 were not committed (they lived in a temporary folder). `tools/balance.js` covers validation, replay and pacing; the rest can be rebuilt from the §4 "Done when" column | — | Optional |
-| 12 | Testing note: many `getImageData` reads on the game canvas make Chrome move it off the GPU, and the page drops to 16–40 fps until reloaded. This only affects pixel-reading tests; the game never reads pixels back | — | Keep pixel tests short, or reload after them |
+| 1 | "Fog thickens in grey hours" (§0.8) is not built; only the sky follows the clock | `js/scene/sailing.js` | Not assigned to a task; suggest 14 |
+| 2 | Only Fogbound has data. The map shows the other three as "Not charted yet". Travel was checked against a stand-in location injected in the browser | `js/ui/map.js` | 11.1 |
+| 3 | The journal's heavy-fish margin note cannot appear with today's roster: no Fogbound fish is heavier than the starter rod's 3 kg. It was checked with a lowered rod limit | `data/fish.js` | 14.1 |
+| 4 | Volume and mute are saved and shown in the pause menu, but there is no audio yet | `js/ui/menu.js` | 13.1 |
+| 5 | `tooHeavyNear` is recomputed only when a fish spawns, so after a rod upgrade it can stay stale until the next spawn | `js/sim/fish_ai.js` | Minor; fix when touched (7.6/7.7 behaviour) |
+| 6 | Pacing: location 2 median is 32 min, low in the 30–50 band. Hollow pike (an unease fish, about 150 coins each) make early income jumpy. Escapes are about 0% in fight sims. Cabin costs are not in the pacing model yet | `data/fish.js`, `data/gear.js` | 14.5 |
+| 7 | Hollow pike lands only ~51% at skill 0.8 with the starter line, by design (strength 1.6 > line 1.0) | `data/fish.js` | Review in 14.5 |
+| 8 | No sound: the slip sound and the heavy-fish line hum are marked | `js/scene/underwater.js` | 13.3 |
+| 9 | Outdated comments: `js/core/state.js` lines 25–26 (run fields are built in `sailing.load`); `data/loc_fog.js` line 51 `species: []` with `TODO(P6.3)` (species list their locations in `data/fish.js`; the field is unused) | as listed | Delete when the file is next touched |
+| 10 | The per-phase Node and browser checks were not committed. Phases 1, 6, 7 and 8 used Node scripts in a temporary folder. Phase 9 used a headless-Brave DevTools driver plus a Node check of the shop lines, in the session scratchpad. `tools/balance.js` covers validation, replay and pacing; the rest can be rebuilt from the §4 "Done when" column | — | Optional: a `tools/` browser check |
+| 11 | Testing note: many `getImageData` reads on the game canvas make Chrome move it off the GPU, and the page drops to 16–40 fps until reloaded. This only affects pixel-reading tests; the game never reads pixels back. (The 9.3 check reads offscreen canvases from `journal.render()` instead.) | — | Keep pixel tests short, or reload after them |
+| 12 | Menus are keyboard-only: the mouse only casts | `js/core/input.js` | 14.6 (touch and on-screen buttons) |
 
 The remaining `TODO(Px.y)` markers in the code are listed in [HANDOFF.md](HANDOFF.md#pending-work).
 
@@ -492,28 +512,35 @@ Run these after any change. A different result means something changed.
 | `node tools/balance.js --replay 12345` | `hash 2265718513 / 2265718513, 16 catches, 18 casts`, then `PASS: identical` |
 | `node tools/balance.js --pacing` | All PASS. Medians: first upgrade 6.0 catches, creek 32.3 min, red 324.4 min |
 
-The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
+The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here. Phase 9 left all three unchanged.
+
+Phase 9 browser checks (headless, 320×180 at scale 1, `?debug&seed=N`): HUD strings match the save after `dbg.money`, `dbg.hour` and `dbg.buy('bait','minnow',5)`. P freezes the clock, and export then import through the menu restores coins, journal and clock. The journal at `dbg.unease(0)` vs `dbg.unease(1)` differs in 2510 px (1975 at 0.5; 0 between two renders at the same unease). Every special shop line is said exactly once in 200 visits (Node). Travel's switch at black takes 4 ms and its longest frame is 16.8 ms. Trophy facing is unchanged inside the cabin after `dbg.unease(1)` plus a restoration, and cabin level and kept fish persist across a reload.
 
 ### 8.6 Next task
 
-**Task 9.1 HUD**, in the §7 template:
+**Task 10.1 Anomaly scheduler**, in the §7 template:
 
 ```
-Read: §0 Shared Conventions, then §4 Task 9.1 only, and V9 for context. Also 8.3 and 8.4 above.
-Files you may touch: js/ui/hud.js (and js/scene/sailing.js only if the HUD's draw call or
-  inputs must change; it already calls G.ui.hud.draw(ctx, run, waterY) last before the card).
-Do: A small HUD at the internal 320×180 resolution: coins, the clock (HH:MM), depth (it
-  exists; keep it underwater only) and the bait in use with its count (worms are unlimited).
-  Use the bitmap font (G.gfx.sprites.drawText) and palette keys only. Read values from
-  G.state.save and G.state.run.gearFx; change no state. Build strings only when a value
-  changes (see hud.depthText), never per frame. Keep it out of the way of the
-  boat, the sky and the catch card; hide it while the card is open.
-Done when: readable at 1× (check at a 320×180 viewport and in a screenshot at scale 1),
-  and the values match G.state.save after dbg.money(n), dbg.hour(h) and dbg.buy('bait', 'minnow', 5).
+Read: §0 Shared Conventions, then §4 Task 10.1 only, plus §2 (anomaly data and each element's
+  fishing job) and V10. Also 8.3 and 8.4 above.
+Files you may touch: js/sim/unease.js, data/anomalies.js (new; add it to index.html after
+  data/dialogue.js), js/core/state.js and js/scene/sailing.js only to hold and step the active
+  anomaly in run state (TODO(P10.1) markers are there), js/core/debug.js for dbg hooks.
+Do: data/anomalies.js holds {id, locations, uneaseMin, hours, cooldown, kind, params, effect?}.
+  In sim/unease.js (pure; G.rng only): which anomalies are eligible (location, unease, hours,
+  cooldown), scheduling with at most one active, a duration after which it ends by itself,
+  and effects: spotBoost (raises the rare weight for a cast at its spot) and revealHint
+  (adds a true hint to the journal). Anomalies are quiet, short and optional; nothing
+  blocks input or takes control (§0.14). Cooldowns that must survive a reload go in
+  save.flags (add a v3 -> v4 migration if the save shape changes).
+  Drawing anomalies is 10.2; leave TODO(P10.2) stubs where they would be drawn.
+Done when: forced anomalies (a dbg hook) end on their own, at most one is ever active,
+  input is never blocked while one runs, and node tools/balance.js --validate and --replay
+  still pass (record the new replay hash if sim changes move it).
 Report: what changed, the check output, any TODO stubs left; then update §8 (8.1, 8.4, 8.6).
 ```
 
-After 9.1, the rest of Phase 9 follows §4 in order: 9.2 menu, 9.3 journal, 9.4 shop, 9.5 map, 9.6 cabin.
+After 10.1, the rest of Phase 10 follows §4 in order: 10.2 reflection deltas, 10.3 dog stare and bark, 10.4 owl cry and window bites, 10.5 journal pages that gain hints.
 
 ---
 

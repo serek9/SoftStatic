@@ -160,10 +160,14 @@ G.scene.sailing = (function () {
     };
   }
 
-  // Loads a location from G.data.locations and bakes its layers (cached per location).
+  // Loads a location from G.data.locations and bakes everything it draws (cached per
+  // location): layers, glints and the underwater cross-section, so travel (9.5) does all
+  // its baking at once, behind the map's fade, and nothing bakes later on the first cast.
+  // The save remembers it as the place to resume (save.loc).
   function load(id) {
     loc = G.data.locations[id];
     if (!loc) throw new Error('unknown location: ' + id);
+    G.state.save.loc = id;
     layers.length = 0;
     for (var i = 0; i < loc.layers.length; i++) layers.push(bakeLayer(loc.layers[i], i));
     var rng = new G.core.rng.Rng(loc.seed * 31 + 99);
@@ -188,6 +192,7 @@ G.scene.sailing = (function () {
     run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, latched: {} };
     run.school = G.sim.fish_ai.createSchool(G.data);
     run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
+    G.scene.underwater.bottomAt(loc, 0); // bakes the cross-section now
     run.lureIn = { active: false, x: 0, y: 0, bait: '' };
     run.uneaseIn = { loc: id, still: true, atShop: false };
     run.bite = G.sim.bite.create();
@@ -499,8 +504,10 @@ G.scene.sailing = (function () {
 
   // ---- Scene -------------------------------------------------------------------
 
+  // Resumes at the saved location; coming back from the shop or cabin keeps the run as it was.
   function enter() {
-    if (!G.state.run.boat) load('fog'); // TODO(P9.5): start at the saved location
+    var at = G.state.save.loc;
+    if (!G.state.run.boat) load(G.data.locations[at] ? at : 'fog');
   }
 
   function exit() {}
@@ -525,6 +532,7 @@ G.scene.sailing = (function () {
     var fishing = FISHING[run.fsm] === 1;
     run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' ? 0.5 : 0);
     run.dogIn.tooHeavyNear = fishing && run.school.ctx.tooHeavyNear;
+    if (run.dogIn.tooHeavyNear) save.flags.heavy[loc.id] = true; // the journal's margin note (D4)
     dog.step(run.dog, dt, run.dogIn);
     camStep(run, dt);
     G.scene.underwater.viewStep(run, dt, loc);

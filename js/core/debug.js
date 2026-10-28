@@ -120,7 +120,7 @@ G.core.debug = (function () {
     // dbg.save() saves now; dbg.wipe() deletes the save (reload for a new game).
     save: function () { return G.core.save.autosave('dbg'); },
     wipe: function () { localStorage.removeItem(G.core.save.KEY); return 'save deleted; reload'; },
-    // dbg.hour(h) sets the game clock (0..24); dbg.hour() reads it. TODO(P6.1): the clock does not advance yet.
+    // dbg.hour(h) sets the game clock (0..24); dbg.hour() reads it.
     hour: function (h) {
       if (h === undefined) return G.state.save.clock;
       G.state.save.clock = ((h % 24) + 24) % 24;
@@ -164,6 +164,25 @@ G.core.debug = (function () {
       }
       return Object.keys(save.journal).length;
     },
+    // dbg.ui(name) opens 'pause' | 'journal' | 'map' over the scene, or goes into 'shop' | 'cabin'
+    // (from the boat, between casts); dbg.ui() closes nothing and returns what is open.
+    ui: function (name) {
+      if (name === 'shop' || name === 'cabin') {
+        if (G.state.run.fsm !== 'sailing') return 'reel in first';
+        G.core.state.change(name);
+        return name;
+      }
+      if (name) G.ui.menu.open(name);
+      return G.ui.menu.current() || G.core.state.sceneName();
+    },
+    // dbg.travel(id) travels to a location (or 'shop' / 'cabin') through the map, fade and all.
+    travel: function (id) {
+      if (!G.ui.menu.mapAllowed() && G.ui.menu.current() !== 'map') return 'only from the boat, between casts';
+      if (G.ui.menu.current() !== 'map') G.ui.menu.open('map');
+      return G.ui.map.travel(id) ? 'travelling' : G.ui.map.info().status;
+    },
+    // dbg.restore() pays for the next cabin stage; returns the level.
+    restore: function () { G.sim.economy.restoreCabin(G.state.save, G.data); G.core.save.autosave('purchase'); return G.state.save.cabinLevel; },
     // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).
     sprite: function (name) { return G.gfx.sprites.verify(name || 'test'); },
     // dbg.fx(kind, n, x, y) emits particles; they show wherever a scene draws fx (the gallery's fx page).

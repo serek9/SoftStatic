@@ -10,16 +10,6 @@ G.ui.card = (function () {
   var cur = null, sel = 0, t = 0;
   var txt = { len: '', wt: '', sellOn: '', sellOff: '', rarity: '', lines: [] }; // built once per card, not per frame
 
-  function wrap(text, width) {
-    var words = text.split(' '), out = [], line = '';
-    for (var i = 0; i < words.length; i++) {
-      var next = line ? line + ' ' + words[i] : words[i];
-      if (S.measure(next) > width && line) { out.push(line); line = words[i]; } else line = next;
-    }
-    if (line) out.push(line);
-    return out;
-  }
-
   // Builds the card for species spIdx from a hooked fish {len, w, q}, reading the journal for
   // NEW/RECORD. latched: the cast's clock windows; the first one marks this as a window catch.
   function build(spIdx, h, save, latched) {
@@ -39,7 +29,7 @@ G.ui.card = (function () {
     txt.sellOn = '[SELL ' + info.price + ']';
     txt.sellOff = ' SELL ' + info.price + ' ';
     txt.rarity = info.rarity;
-    txt.lines = wrap(info.desc, W - 16);
+    txt.lines = S.wrap(info.desc, W - 16);
   }
 
   function isOpen() { return cur !== null; }

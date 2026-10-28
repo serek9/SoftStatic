@@ -2,7 +2,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // Fixed-timestep loop (1/60) with an accumulator. Real time beyond MAX_FRAME in one
 // frame is dropped instead of simulated, so a stall or a hidden tab never causes a
-// catch-up spiral.
+// catch-up spiral. P opens the pause menu (G.ui.menu); setPaused is a hard freeze for debugging.
 G.core = G.core || {};
 G.core.loop = (function () {
   var DT = 1 / 60;
@@ -12,10 +12,8 @@ G.core.loop = (function () {
   var secT = 0, secFrames = 0, secSteps = 0;
 
   function step() {
-    var input = G.core.input;
-    if (input.pressed('pause')) paused = !paused; // TODO(P9.2): the pause menu takes this over
     if (!paused) hooks.update(DT);
-    input.endStep();
+    G.core.input.endStep();
   }
 
   function frame(now) {

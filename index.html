@@ -29,6 +29,7 @@
 <script src="data/loc_fog.js"></script>
 <script src="data/fish.js"></script>
 <script src="data/gear.js"></script>
+<script src="data/dialogue.js"></script>
 <!-- sim -->
 <script src="js/sim/clock.js"></script>
 <script src="js/sim/unease.js"></script>
@@ -50,6 +51,11 @@
 <!-- ui -->
 <script src="js/ui/hud.js"></script>
 <script src="js/ui/card.js"></script>
+<script src="js/ui/menu.js"></script>
+<script src="js/ui/journal.js"></script>
+<script src="js/ui/shop.js"></script>
+<script src="js/ui/map.js"></script>
+<script src="js/ui/cabin.js"></script>
 <!-- audio: TODO(P13.1) -->
 
 <!-- boot -->
@@ -86,12 +92,15 @@
   G.core.input.attach(canvas);
 
   G.core.state.register('sailing', G.scene.sailing);
+  G.core.state.register('shop', G.ui.shop);
+  G.core.state.register('cabin', G.ui.cabin);
   G.core.state.register('gallery', G.core.debug.gallery);
   G.core.state.change(q.has('gallery') ? 'gallery' : 'sailing');
 
+  // An open overlay (pause, journal, map) takes the step and the scene waits (9.2).
   G.core.loop.start({
-    update: function (dt) { G.core.state.update(dt); },
-    draw: function (ctx) { G.core.state.draw(ctx); }
+    update: function (dt) { if (!G.ui.menu.update(dt)) G.core.state.update(dt); },
+    draw: function (ctx) { G.core.state.draw(ctx); G.ui.menu.draw(ctx); }
   }, ctx);
 })();
 </script>

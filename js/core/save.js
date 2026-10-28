@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 2;
+  var VERSION = 3;
   var PREFIX = 'SS1';
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
@@ -21,6 +21,16 @@ G.core.save = (function () {
       s.flags = s.flags || {};
       s.flags.windowCatch = s.flags.windowCatch || {};
       return s;
+    },
+    // v2 -> v3: the location you were at, settings, and the shop and journal flags (P9).
+    2: function (s) {
+      var d = defaults();
+      s.loc = s.loc || 'fog';
+      s.settings = s.settings || {};
+      for (var k in d.settings) if (!(k in s.settings)) s.settings[k] = d.settings[k];
+      s.flags = s.flags || {};
+      for (k in d.flags) if (!(k in s.flags)) s.flags[k] = d.flags[k];
+      return s;
     }
   };
 
@@ -33,14 +43,19 @@ G.core.save = (function () {
       baits: {},             // bait id -> count left
       journal: {},           // species id -> {caught, bestLen, bestW, hints, seen, phantom}
       kept: [],              // {id, len, w}
-      cabinLevel: 0,
+      cabinLevel: 0,         // restoration stage (data/gear.js cabin)
       unlocks: { fog: true },
+      loc: 'fog',            // the location the game resumes at
       unease: {},            // location id -> 0..1
       clock: 19,             // a new game starts at dusk
       lastSeen: 0,           // ms timestamp of the last save (offline time, P12.3)
-      flags: { windowCatch: {} }, // windowCatch: window id -> true once a fish was landed on a cast latched in it
+      // windowCatch: window id -> true once a fish was landed on a cast latched in it.
+      // lines: special shopkeeper line id -> true once said (each is said once per save).
+      // shopVisits: times the shop was entered. heavy: location id -> true once a fish too
+      // heavy for the rod was near (the journal's margin note, D4).
+      flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {} },
       tapes: [],
-      settings: {},
+      settings: { volume: 0.8, mute: false },
       rng: null              // G.rng state, restored on load unless ?seed is given
     };
   }

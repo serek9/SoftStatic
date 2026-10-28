@@ -276,10 +276,21 @@ G.gfx.sprites = (function () {
     return best > 0 ? best - 1 : 0;
   }
 
+  // Splits text into lines no wider than width px, breaking between words.
+  function wrap(text, width) {
+    var words = text.split(' '), out = [], line = '';
+    for (var i = 0; i < words.length; i++) {
+      var next = line ? line + ' ' + words[i] : words[i];
+      if (measure(next) > width && line) { out.push(line); line = words[i]; } else line = next;
+    }
+    if (line) out.push(line);
+    return out;
+  }
+
   return {
     PALETTE: PALETTE, RGB: RGB, CEILING_KEY: CEILING_KEY, CEILING: CEILING, SKY_WATER: SKY_WATER,
     lum: lum, skySafe: skySafe,
     def: def, get: get, draw: draw, verify: verify, names: names,
-    FONT_H: FONT_H, LINE_H: LINE_H, drawText: drawText, measure: measure, hash: hash
+    FONT_H: FONT_H, LINE_H: LINE_H, drawText: drawText, measure: measure, wrap: wrap, hash: hash
   };
 })();

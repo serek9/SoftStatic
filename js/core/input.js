@@ -4,12 +4,15 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // `pressed` and `released` last for exactly one fixed update step: the loop calls endStep() after each.
 G.core = G.core || {};
 G.core.input = (function () {
-  var NAMES = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive'];
+  // up, down and back move through menus (P9); sailing uses only left and right.
+  var NAMES = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back'];
   var KEYS = {
     KeyA: 'left', ArrowLeft: 'left',
     KeyD: 'right', ArrowRight: 'right',
-    Space: 'action',
-    KeyP: 'pause', KeyJ: 'journal', KeyM: 'map', Tab: 'passive'
+    KeyW: 'up', ArrowUp: 'up',
+    KeyS: 'down', ArrowDown: 'down',
+    Space: 'action', Enter: 'action',
+    KeyP: 'pause', KeyJ: 'journal', KeyM: 'map', Tab: 'passive', Escape: 'back'
   };
 
   var acts = {};

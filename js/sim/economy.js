@@ -1,8 +1,8 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
-// Economy (V8): prices, gear effects, purchases, bait use, catches into the save, and
-// location unlock checks. Gear tiers are linear upgrades: save.gear.rod = 2 means the
-// Graphite Rod is owned and in use.
+// Economy (V8): prices, gear effects, purchases, bait use, catches into the save,
+// location unlock checks and cabin restoration. Gear tiers are linear upgrades:
+// save.gear.rod = 2 means the Graphite Rod is owned and in use.
 // Pure: no DOM, no Math.random, no Date. Runs in Node through vm.
 G.sim = G.sim || {};
 G.sim.economy = (function () {
@@ -113,10 +113,20 @@ G.sim.economy = (function () {
     return OK;
   }
 
+  // The next cabin restoration stage (V9): OK, MAXED or POOR.
+  function restoreCabin(save, data) {
+    var next = data.gear.cabin[save.cabinLevel + 1];
+    if (!next) return MAXED;
+    if (save.coins < next.cost) return POOR;
+    save.coins -= next.cost;
+    save.cabinLevel++;
+    return OK;
+  }
+
   return {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
     sizeFactor: sizeFactor, price: price, baitById: baitById, baitInUse: baitInUse, effects: effects,
     nextItem: nextItem, buy: buy, buyBait: buyBait, useBait: useBait, recordCatch: recordCatch,
-    canUnlock: canUnlock, unlock: unlock
+    canUnlock: canUnlock, unlock: unlock, restoreCabin: restoreCabin
   };
 })();

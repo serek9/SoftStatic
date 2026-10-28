@@ -11,7 +11,7 @@ G.sim.unease = (function () {
     stillNight: 1 / 600,   // still at night: 0 -> 1 in 10 game hours (from 17:00, full by about 03:00)
     movingNight: 1 / 2400, // sailing at night
     grey: -1 / 300,        // grey hours: 1 -> 0 in 5 game hours
-    shop: -1 / 40          // at the shop: 1 -> 0 in 40 s   TODO(P9.4): the shop sets atShop
+    shop: -1 / 40          // at the shop (ui/shop.js sets atShop): 1 -> 0 in 40 s
   };
 
   function get(save, loc) { return (save.unease && save.unease[loc]) || 0; }
