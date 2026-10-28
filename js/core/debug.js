@@ -99,6 +99,8 @@ G.core.debug = (function () {
       return ok;
     },
     unease: todo('unease', 'TODO(P6.2)'), // TODO(P6.2)
+    // dbg.cast(charge) casts at once with charge 0..1 (default 0.3); returns the landing x.
+    cast: function (charge) { return G.scene.sailing.forceCast(charge === undefined ? 0.3 : charge); },
     // dbg.tp(x) moves the boat to world x, stops it and snaps the camera.
     tp: function (x) { return G.scene.sailing.tp(x); },
     caught: todo('caught', 'TODO(P8.3)'), // TODO(P8.3)

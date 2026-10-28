@@ -108,10 +108,18 @@ G.gfx.fx = (function () {
     ctx.globalAlpha = 1;
   }
 
+  // A lure landing (V3.2): droplets thrown up and out, then two flat elliptical rings,
+  // a quick small one and a slow wide one. y is the waterline; power 0..1 scales it.
+  function splash(px, y, power) {
+    emit('splash', px, y - 1, 8 + Math.round(10 * power));
+    ripple(px, y + 2, 1, 7, 0.7);
+    ripple(px, y + 3, 3, 12 + 8 * power, 1.6);
+  }
+
   function clear() { n = 0; rn = 0; }
 
   return {
-    MAX: MAX, RMAX: RMAX, emit: emit, ripple: ripple, update: update, draw: draw, clear: clear,
+    MAX: MAX, RMAX: RMAX, emit: emit, ripple: ripple, splash: splash, update: update, draw: draw, clear: clear,
     count: function () { return n; },
     ripples: function () { return rn; },
     dropped: function () { return dropped; }

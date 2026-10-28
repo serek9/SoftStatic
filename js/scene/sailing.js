@@ -18,6 +18,19 @@ G.scene.sailing = (function () {
   var camPx = 0;                 // rounded camera x for this frame's drawing
   var wakeDist = 0, rippleT = 0;
 
+  // Casting (V3.2). Distance follows sqrt(charge), so a short hold still reaches mid-range.
+  var CAST = {
+    chargeTime: 1.0, // s from empty to full; a full charge simply holds
+    minD: 20,        // px beyond the rod reach at zero charge   TODO(P8.1): rod tiers set these
+    maxD: 110,       // px beyond the rod reach at full charge
+    reach: 12,       // px from the boat centre to where the cast distance starts
+    flick: 0.12,     // s the rod takes to whip forward before the lure leaves
+    flickAngle: 20, restAngle: 50, waitAngle: 40, backAngle: 70
+  };
+  var tip = [0, 0], pose = [0, 0];
+
+  S.def('lure', { r: 'rust_hi', b: 'bone' }, ['.r.', 'rbr', '.r.']);
+
   // ---- Layer painters ------------------------------------------------------
   // Each paints one baked layer of height waterY; rng is a private, seeded stream, so a
   // location always bakes the same picture without touching G.rng or G.vrng.
@@ -170,7 +183,155 @@ G.scene.sailing = (function () {
     run.dog = dog.create();
     run.cam = { x: 0 };
     run.cam.x = camTarget(run);
+    // One cast at a time. seed is drawn from G.rng on release and is the cast's own seed (§3).
+    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0 };
     fx.clear();
+  }
+
+  // ---- Cast ------------------------------------------------------------------------
+
+  // World x where a cast at this charge lands. The marker and the release both use this.
+  function landingX(b, charge) {
+    var dist = CAST.minD + (CAST.maxD - CAST.minD) * Math.sqrt(charge);
+    return clamp(Math.round(b.x + b.facing * (CAST.reach + dist)), 8, loc.width - 8);
+  }
+
+  function release(run) {
+    var c = run.cast, b = run.boat;
+    c.x1 = landingX(b, c.charge);
+    c.dist = Math.abs(c.x1 - b.x);
+    c.seed = G.rng.int(1, 0x7fffffff);
+    c.n++;
+    c.t = 0;
+    c.flying = false;
+    G.core.state.go(run, 'casting');
+    if (G.core.debug) G.core.debug.log('cast #' + c.n + ' charge ' + c.charge.toFixed(2) + ' -> x ' + c.x1 + ' seed ' + c.seed);
+  }
+
+  // The lure rides the rod tip during the flick, then flies a parabola from the tip that
+  // ends exactly on (x1, waterY): x is linear in u and the arc term is zero at u = 1.
+  function flight(run, dt) {
+    var c = run.cast, wy = loc.waterY;
+    c.t += dt;
+    if (c.t < CAST.flick) return;
+    if (!c.flying) {
+      boat.rodTip(run.boat, run.boat.x, wy, CAST.flickAngle, tip);
+      c.x0 = tip[0]; c.y0 = tip[1];
+      c.T = 0.45 + Math.abs(c.x1 - c.x0) / 260;
+      c.h = 10 + c.dist * 0.18;
+      c.flying = true;
+    }
+    var u = Math.min(1, (c.t - CAST.flick) / c.T);
+    c.lx = c.x0 + (c.x1 - c.x0) * u;
+    c.ly = c.y0 + (wy - c.y0) * u - 4 * c.h * u * (1 - u);
+    if (u >= 1) {
+      c.lx = c.x1; c.ly = wy;
+      fx.splash(c.x1, wy, Math.min(1, c.dist / 100));
+      G.core.state.go(run, 'sinking');
+    }
+  }
+
+  function reelIn(run) {
+    run.cast.flying = false;
+    G.core.state.go(run, 'sailing');
+  }
+
+  // Debug: casts straight away at the given charge. Returns the landing x, or false if not sailing.
+  function forceCast(charge) {
+    var run = G.state.run;
+    if (run.fsm !== 'sailing') return false;
+    run.cast.charge = clamp(charge, 0, 1);
+    G.core.state.go(run, 'charging');
+    release(run);
+    return run.cast.x1;
+  }
+
+  function castStep(run, dt) {
+    var c = run.cast, inp = G.core.input;
+    switch (run.fsm) {
+      case 'sailing':
+        if (inp.pressed('action') && run.boat.stopped) { c.charge = 0; G.core.state.go(run, 'charging'); }
+        break;
+      case 'charging':
+        if (inp.move() !== 0) { G.core.state.go(run, 'sailing'); break; } // steering cancels the charge
+        // Release before charging further, so the cast uses exactly the charge the marker last showed.
+        if (!inp.held('action')) release(run);
+        else c.charge = Math.min(1, c.charge + dt / CAST.chargeTime);
+        break;
+      case 'casting':
+        flight(run, dt);
+        break;
+      case 'sinking':
+        // TODO(P5.4): the lure sinks through the underwater view. For now it floats until reeled in.
+        if (inp.pressed('action')) reelIn(run);
+        break;
+    }
+  }
+
+  // Rod angle and bend for the current state, written into out.
+  function rodPose(run, out) {
+    var c = run.cast, back = CAST.restAngle + CAST.backAngle * Math.sqrt(c.charge), u;
+    switch (run.fsm) {
+      case 'charging':
+        out[0] = back; out[1] = 3 * Math.sqrt(c.charge);
+        break;
+      case 'casting':
+        if (c.t < CAST.flick) {
+          u = c.t / CAST.flick;
+          out[0] = back + (CAST.flickAngle - back) * u; out[1] = -3 * u;
+        } else {
+          u = Math.min(1, (c.t - CAST.flick) / 0.3);
+          out[0] = CAST.flickAngle + (CAST.waitAngle - CAST.flickAngle) * u; out[1] = -3 * (1 - u);
+        }
+        break;
+      case 'sailing':
+        out[0] = CAST.restAngle; out[1] = 0;
+        break;
+      default:
+        out[0] = CAST.waitAngle; out[1] = 1;
+    }
+    return out;
+  }
+
+  // 1 px line between two screen points (Bresenham).
+  function line(ctx, x0, y0, x1, y1) {
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+    for (;;) {
+      ctx.fillRect(x0, y0, 1, 1);
+      if (x0 === x1 && y0 === y1) break;
+      var e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  }
+
+  // Marker, line and lure, in screen space.
+  function drawCast(ctx) {
+    var run = G.state.run, c = run.cast, b = run.boat, wy = loc.waterY, fsm = run.fsm;
+    if (fsm === 'charging') {
+      var mx = landingX(b, c.charge) - camPx;
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = P.fog_light;
+      ctx.fillRect(mx - 2, wy + 1, 5, 1);
+      ctx.fillRect(mx - 3, wy + 2, 1, 1); ctx.fillRect(mx + 3, wy + 2, 1, 1);
+      ctx.fillRect(mx - 2, wy + 3, 5, 1);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    if (fsm !== 'casting' && fsm !== 'sinking') return;
+    rodPose(run, pose);
+    var sx = Math.round(b.x - run.cam.x);
+    boat.rodTip(b, sx, wy, pose[0], tip);
+    var lx, ly;
+    if (fsm === 'casting' && !c.flying) { lx = tip[0]; ly = tip[1]; }
+    else if (fsm === 'sinking') { lx = c.x1 - camPx; ly = wy - 1 + Math.round(Math.sin(b.t * 2.3) * 0.6); }
+    else { lx = c.lx - camPx; ly = c.ly; }
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = P.fog_light;
+    line(ctx, tip[0], tip[1], lx, ly);
+    ctx.globalAlpha = 1;
+    S.draw(ctx, 'lure', Math.round(lx) - 1, Math.round(ly) - 1, 0, false);
   }
 
   // ---- Camera ----------------------------------------------------------------
@@ -249,6 +410,7 @@ G.scene.sailing = (function () {
 
   function update(dt) {
     var run = G.state.run, b = run.boat;
+    castStep(run, dt);
     var move = run.fsm === 'sailing' ? G.core.input.move() : 0;
     boat.step(b, move, dt, loc.width);
     dog.step(run.dog, dt);
@@ -284,7 +446,8 @@ G.scene.sailing = (function () {
 
   function drawBoat(c) {
     var run = G.state.run;
-    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY, true, drawDog);
+    rodPose(run, pose);
+    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY, true, drawDog, pose[0], pose[1]);
   }
 
   function drawAbove(c) { drawBackdrop(c); drawBoat(c); }
@@ -298,10 +461,12 @@ G.scene.sailing = (function () {
     ctx.drawImage(glint, camPx, 0, VIEW_W, 1, 0, wy, VIEW_W, 1);
     fx.draw(ctx, camPx, 0);
     drawBoat(ctx);
+    drawCast(ctx);
   }
 
   return {
     load: load, tp: tp, enter: enter, exit: exit, update: update, draw: draw,
+    CAST: CAST, landingX: landingX, forceCast: forceCast,
     skyColor: skyColor, hourNow: hourNow,
     loc: function () { return loc; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },
@@ -317,4 +482,11 @@ if (G.core.debug) G.core.debug.addLine(function () {
     '  sky lum ' + sc.skyLum().toFixed(0) + '/' + G.gfx.sprites.CEILING.toFixed(0) + '\n' +
     'boat x ' + b.x.toFixed(1) + '  vx ' + b.vx.toFixed(2) + '  stopped ' + (b.stopped ? 'Y' : 'n') +
     '  facing ' + (b.facing > 0 ? 'R' : 'L') + '  dog ' + run.dog.pose;
+});
+
+if (G.core.debug) G.core.debug.addLine(function () {
+  var c = G.state.run.cast;
+  if (!c) return 'cast: none';
+  return 'cast #' + c.n + '  charge ' + c.charge.toFixed(2) + '  -> x ' + c.x1 + ' (dist ' + c.dist + ')  seed ' + c.seed +
+    (c.flying ? '  lure ' + c.lx.toFixed(1) + ',' + c.ly.toFixed(1) : '');
 });

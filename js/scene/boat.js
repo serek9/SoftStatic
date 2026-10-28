@@ -60,18 +60,47 @@ G.scene.boat = (function () {
 
   function bob(b) { return Math.round(Math.sin(b.t * 1.9) * 0.8); }
 
+  // The rod: a straight 16 px pole from the fisher's hands. angle is in degrees up from
+  // the facing direction (90 = straight up, above 90 leans back over the stern).
+  var ROD = { len: 16, baseX: -1, baseY: -5 };
+
+  // Writes the rod tip into out for a boat centred at cx (world or screen) with waterline wy.
+  function rodTip(b, cx, wy, angle, out) {
+    var a = angle * Math.PI / 180, f = b.facing;
+    out[0] = cx + f * ROD.baseX + f * Math.cos(a) * ROD.len;
+    out[1] = wy + bob(b) + ROD.baseY - Math.sin(a) * ROD.len;
+    return out;
+  }
+
+  // Draws the rod as a quadratic curve. bend > 0 bows its middle forward and down
+  // (loaded), bend < 0 bows it back (the whip of a cast). The tip stays where rodTip says.
+  function drawRod(ctx, b, sx, wy, angle, bend) {
+    var a = angle * Math.PI / 180, f = b.facing;
+    var bx = sx + f * ROD.baseX, by = wy + bob(b) + ROD.baseY;
+    var tx = bx + f * Math.cos(a) * ROD.len, ty = by - Math.sin(a) * ROD.len;
+    var mx = (bx + tx) / 2 + f * Math.sin(a) * bend, my = (by + ty) / 2 + Math.cos(a) * bend;
+    var steps = ROD.len + 4;
+    ctx.fillStyle = S.PALETTE.stone_hi;
+    for (var i = 0; i <= steps; i++) {
+      var u = i / steps, v = 1 - u;
+      ctx.fillRect(Math.round(v * v * bx + 2 * u * v * mx + u * u * tx), Math.round(v * v * by + 2 * u * v * my + u * u * ty), 1, 1);
+    }
+  }
+
   // sx is the boat centre on screen, wy the waterline. Passengers sit behind the hull's
-  // gunwale, so they are drawn first. withFisher false leaves the boat empty (P10.2).
-  function draw(ctx, b, sx, wy, withFisher, drawDog) {
+  // gunwale, so they are drawn first. withFisher false leaves the boat empty, rod and all (P10.2).
+  function draw(ctx, b, sx, wy, withFisher, drawDog, rodAngle, rodBend) {
     var flip = b.facing < 0, y = wy + bob(b);
-    if (withFisher) S.draw(ctx, 'fisher', flip ? sx : sx - 7, y - 8, 0, flip);
+    if (withFisher) {
+      S.draw(ctx, 'fisher', flip ? sx : sx - 7, y - 8, 0, flip);
+      drawRod(ctx, b, sx, wy, rodAngle, rodBend);
+    }
     if (drawDog) drawDog(ctx, flip ? sx - 14 : sx + 3, y - 8, flip);
     S.draw(ctx, 'boat_hull', sx - 13, y - 4, 0, flip);
-    // TODO(P4.1): rod and its bend.
   }
 
   // World x of the stern, where the wake starts.
   function stern(b) { return b.x - b.facing * 12; }
 
-  return { P: P, create: create, step: step, draw: draw, bob: bob, stern: stern };
+  return { P: P, ROD: ROD, create: create, step: step, draw: draw, bob: bob, stern: stern, rodTip: rodTip };
 })();
