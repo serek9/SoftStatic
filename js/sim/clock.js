@@ -36,6 +36,17 @@ G.sim.clock = (function () {
   // A window's fish can bite if the cast latched it or the window is open now.
   function eligible(latched, hour, w) { return latched[w.id] === true || inWindow(hour, w); }
 
+  // 10.4: the index of a window whose cue (the owl's cry) falls in (prev, now], or -1.
+  // A step that wraps past midnight checks both halves.
+  function cueCrossed(prev, now, windows) {
+    for (var i = 0; i < windows.length; i++) {
+      var c = windows[i].cue;
+      if (c === undefined) continue;
+      if (prev <= now ? (c > prev && c <= now) : (c > prev || c <= now)) return i;
+    }
+    return -1;
+  }
+
   function windowById(windows, id) {
     for (var i = 0; i < windows.length; i++) if (windows[i].id === id) return windows[i];
     return null;
@@ -57,7 +68,7 @@ G.sim.clock = (function () {
   return {
     RATE: RATE, GREY_FROM: GREY_FROM, GREY_TO: GREY_TO, MIN_WINDOW: MIN_WINDOW,
     wrap: wrap, advance: advance, step: step, isGrey: isGrey, inWindow: inWindow,
-    latch: latch, clearLatch: clearLatch, eligible: eligible, windowById: windowById,
+    latch: latch, clearLatch: clearLatch, eligible: eligible, cueCrossed: cueCrossed, windowById: windowById,
     validateWindows: validateWindows
   };
 })();

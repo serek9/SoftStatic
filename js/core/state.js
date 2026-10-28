@@ -21,9 +21,9 @@ G.core.state = (function () {
     card:     ['sailing']
   };
 
+  // The rest of the run (camera, cast and its latched windows, fish, fight, the active
+  // anomaly, the owl) is built by sailing.load() for the location being fished.
   function newRun() {
-    // TODO(P3.2) camera, TODO(P6.7) live fish, TODO(P7.2) fight,
-    // TODO(P10.1) active anomaly, TODO(P4.2) cast seed, TODO(P6.1) latched windows.
     return { fsm: 'sailing', fsmPrev: null, fsmT: 0 };
   }
 

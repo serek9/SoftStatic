@@ -8,6 +8,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // records them), the baits it takes on the second, its depth and hours on the third.
 // The margin note "something heavier circles here" (D4) shows while a fish too heavy for
 // the rod has been near at that location and the rod still cannot hold it.
+// Pages also gain text after you leave them (10.5, V10.8): closing the journal lets
+// sim/unease.js lateHint write one true hint you never found. Those notes are in blue pen,
+// even on pages of fish not caught yet, and a page with a new one is marked in the grid.
 G.ui = G.ui || {};
 G.ui.journal = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, M = G.ui.menu;
@@ -71,7 +74,7 @@ G.ui.journal = (function () {
     select(sel);
   }
 
-  function hintText(ref) {
+  function hintText(ref, sp) {
     var p = ref.split(':');
     if (p[0] === 'hour' && p[1] === 'grey') return 'Bites best in the grey hours, 07 to 17.';
     if (p[0] === 'window') {
@@ -79,6 +82,8 @@ G.ui.journal = (function () {
       if (w) return 'Only between ' + hhmm(w.from) + ' and ' + hhmm(w.to) + '. The owl calls at ' + hhmm(w.cue) + '.';
     }
     if (p[0] === 'unease') return 'Comes only after sitting still a long while at night.';
+    if (ref === 'bait') return 'Takes ' + baitNames(sp) + '.';
+    if (ref === 'depth') return 'Found ' + sp.habitat.depthMin + ' to ' + sp.habitat.depthMax + ' m down. ' + hoursText(sp);
     return ref;
   }
 
@@ -106,10 +111,14 @@ G.ui.journal = (function () {
     var sp = G.data.fish[list[sel]], j = G.state.save.journal[sp.id], y = 0;
     function add(s, key, hand, gap) { y += gap || 0; entry.push({ s: s, key: key, hand: hand, y: y }); y += S.LINE_H; }
     function para(s, key, gap) { var ls = S.wrap(s, 132); for (var k = 0; k < ls.length; k++) add(ls[k], key, true, k ? 0 : gap); }
+    var notes = 0, h;
+    function note(ref) { para(hintText(ref, sp), j.late && j.late[ref] ? 'night_blue' : 'ink', notes++ ? 0 : 4); }
+    if (j) j.lateNew = false;
     if (!j || !j.caught) {
       add('???', 'ink', true);
       add(sp.rarity, 'wood', false);
       add('Not caught yet.', 'wood', true, 4);
+      if (j) for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
       return;
     }
     selIsNew = !j.read;
@@ -119,10 +128,9 @@ G.ui.journal = (function () {
     add('Caught ' + j.caught + (j.caught === 1 ? ' time' : ' times'), 'ink', true, 4);
     add('Best ' + j.bestLen.toFixed(1) + ' cm, ' + j.bestW.toFixed(2) + ' kg', 'ink', true);
     para(sp.desc, 'rust', 4);
-    var notes = 0;
-    for (var h = 0; h < j.hints.length; h++) { para(hintText(j.hints[h]), 'ink', notes++ ? 0 : 4); }
-    if (j.caught >= 2) para('Takes ' + baitNames(sp) + '.', 'ink', notes++ ? 0 : 4);
-    if (j.caught >= 3) para('Found ' + sp.habitat.depthMin + ' to ' + sp.habitat.depthMax + ' m down. ' + hoursText(sp), 'ink', notes++ ? 0 : 4);
+    for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
+    if (j.caught >= 2 && j.hints.indexOf('bait') < 0) note('bait');
+    if (j.caught >= 3 && j.hints.indexOf('depth') < 0) note('depth');
   }
 
   function open() {
@@ -133,9 +141,18 @@ G.ui.journal = (function () {
     filter();
   }
 
+  // Leaving the journal: a page may gain a hint you never found, read next time (10.5).
+  var lastLate = null;
+  function close() {
+    var run = G.state.run;
+    if (!run.loc) return;
+    lastLate = G.sim.unease.lateHint(G.state.save, run.loc, G.data, false);
+    if (lastLate && G.core.debug) G.core.debug.log('a journal page gained a line: ' + lastLate.id + ' ' + lastLate.ref);
+  }
+
   function update() {
     var inp = G.core.input;
-    if (inp.pressed('journal') || inp.pressed('back')) return false;
+    if (inp.pressed('journal') || inp.pressed('back')) { close(); return false; }
     var lr = M.axis('left', 'right'), ud = M.axis('up', 'down');
     if (focus < 2) {
       if (lr && focus === 0) { locIdx = (locIdx + lr + locs.length) % locs.length; sel = 0; top = 0; filter(); }
@@ -160,6 +177,7 @@ G.ui.journal = (function () {
     if (d.w > CW - 2) { ctx.save(); ctx.beginPath(); ctx.rect(x + 1, y + 1, CW - 2, CH - 2); ctx.clip(); S.draw(ctx, name, sx, sy, 0, false); ctx.restore(); }
     else S.draw(ctx, name, sx, sy, 0, false);
     if (got && !j.read) S.drawText(ctx, 'NEW', x + 2, y + 2, 'crimson');
+    if (j && j.lateNew) S.drawText(ctx, '*', x + CW - 6, y + 2, 'night_blue'); // a page that gained a line
   }
 
   function draw(ctx) {
@@ -209,7 +227,8 @@ G.ui.journal = (function () {
   }
 
   return {
-    open: open, update: update, draw: draw, render: render, jitter: jitter, HEAVY_NOTE: HEAVY_NOTE,
+    open: open, update: update, draw: draw, render: render, jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close,
+    lastLate: function () { return lastLate; },
     state: function () { return { loc: locs[locIdx], rarity: RARITIES[rarIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, entry: entry.map(function (e) { return e.s; }) }; }
   };
 })();

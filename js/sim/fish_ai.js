@@ -47,7 +47,8 @@ G.sim.fish_ai = (function () {
     }
     var v = ctx.rarity[f.rarity];
     if (f.baitLikes.length) v *= f.baitLikes.indexOf(ctx.bait) >= 0 ? W.baitLiked : W.baitOther;
-    if (f.rarity === 'rare' || f.rarity === 'legendary') v *= ctx.rareBoost || 1; // bait (V8)
+    if (f.rarity === 'rare' || f.rarity === 'legendary') v *= ctx.rareBoost || 1; // bait (V8), cast spot (§2)
+    if (f.rarity === 'legendary') v *= ctx.legendBoost || 1;                        // a legendary spot (10.3)
     if (ctx.depthM !== null) {
       var h = f.habitat, out = ctx.depthM < h.depthMin ? h.depthMin - ctx.depthM : (ctx.depthM > h.depthMax ? ctx.depthM - h.depthMax : 0);
       if (out > 0) v *= Math.max(W.depthFloor, 1 - out / W.depthFalloff);
@@ -85,7 +86,7 @@ G.sim.fish_ai = (function () {
       ctx: {
         species: data.fish, rarity: data.rarity, windows: data.windows, loc: '', depthM: null, hour: 0,
         unease: 0, bait: '', latched: {}, rodMaxMass: 0, weights: null, tooHeavyNear: false,
-        attract: 1, rareBoost: 1, // gear (V8): attract shortens the wait between arrivals
+        attract: 1, rareBoost: 1, legendBoost: 1, // gear and cast spot: attract shortens the wait between arrivals
         maxDepthPx: 0, floorAt: null // floorAt(x) -> bottom depth in px; null uses maxDepthPx
       }
     };

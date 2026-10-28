@@ -49,6 +49,8 @@ function validate(G, opts) {
   const ref = { locations: d.locations, windows: d.windows, bases: G.gfx.fishgen.BASE_NAMES, parts: G.gfx.fishgen.PARTS };
   d.validateFish(d.fish, ref).forEach(e => err('fish ' + e));
   G.sim.clock.validateWindows(d.windows).forEach(e => err('window ' + e));
+  if (d.anomalies) d.validateAnomalies(d.anomalies, { locations: d.locations }).forEach(e => err('anomaly ' + e));
+  else err('anomalies: data/anomalies.js is not loaded');
   d.fish.forEach(f => { try { G.gfx.fishgen.generate(f.look); } catch (e) { err('fish ' + f.id + ': look does not generate: ' + e.message); } });
 
   // Roster counts per location.

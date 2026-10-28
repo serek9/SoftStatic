@@ -4,6 +4,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Each frame the scene above the waterline is drawn once more, mirrored, into a small
 // buffer; the buffer is then copied onto the water row by row at alpha 0.35 with a
 // 1–2 px sine shift, and a baked overlay darkens it with depth.
+// Reflection deltas (10.2) are things the shore does not have: they are drawn into the
+// mirror buffer only (setDeltas + drawDelta), so they never appear above the waterline.
 G.gfx = G.gfx || {};
 G.gfx.water = (function () {
   var VIEW_W = 320, PAD = 2, ALPHA = 0.35;
@@ -57,7 +59,39 @@ G.gfx.water = (function () {
     stats.ms = performance.now() - t0;
   }
 
-  return { ALPHA: ALPHA, draw: draw, setDeltas: setDeltas, stats: stats };
+  // One reflection delta, in normal screen coordinates (the buffer's transform mirrors it).
+  // what: figure | window | pier (empty_boat is the boat drawn without its fisher, which
+  // the scene does in its mirror pass). sx: screen x of its centre; wy: the waterline.
+  // alpha 0..1 fades it in and out. Light stays at the dusk ceiling (§0.9).
+  function drawDelta(ctx, what, sx, wy, alpha) {
+    var P = G.gfx.sprites.PALETTE, x;
+    if (alpha <= 0 || what === 'empty_boat') return;
+    ctx.globalAlpha = alpha;
+    if (what === 'figure') {
+      // Someone standing at the water's edge, quite still.
+      ctx.fillStyle = P.fog_light;
+      ctx.fillRect(sx - 1, wy - 17, 3, 3);                       // head
+      ctx.fillRect(sx - 2, wy - 13, 5, 7);                       // coat
+      ctx.fillRect(sx - 2, wy - 6, 2, 6); ctx.fillRect(sx + 1, wy - 6, 2, 6); // legs
+      ctx.fillStyle = P.bone; ctx.fillRect(sx, wy - 16, 1, 1);
+    } else if (what === 'window') {
+      // A cabin on the shore with one lit window.
+      ctx.fillStyle = P.night_ink;
+      ctx.fillRect(sx - 8, wy - 12, 17, 12);
+      for (var r = 0; r < 5; r++) ctx.fillRect(sx - 9 + r, wy - 13 - r, 19 - r * 2, 1);
+      ctx.fillStyle = P.dusk_high; ctx.fillRect(sx - 4, wy - 9, 4, 3);
+      ctx.fillStyle = P.dusk_amber; ctx.fillRect(sx - 4, wy - 6, 4, 1);
+    } else if (what === 'pier') {
+      // A second pier, like the real one, where there is none.
+      ctx.fillStyle = P.wood_dark;
+      for (x = sx - 30; x <= sx + 30; x += 8) ctx.fillRect(x, wy - 5, 2, 5);
+      ctx.fillStyle = P.wood; ctx.fillRect(sx - 32, wy - 7, 65, 2);
+      ctx.fillStyle = P.stone; ctx.fillRect(sx + 28, wy - 20, 1, 13);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  return { ALPHA: ALPHA, draw: draw, setDeltas: setDeltas, drawDelta: drawDelta, stats: stats };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {

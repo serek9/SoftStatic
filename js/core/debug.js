@@ -181,6 +181,15 @@ G.core.debug = (function () {
       if (G.ui.menu.current() !== 'map') G.ui.menu.open('map');
       return G.ui.map.travel(id) ? 'travelling' : G.ui.map.info().status;
     },
+    // dbg.anomaly(id) forces that anomaly now, near the boat (refused while one is active);
+    // dbg.anomaly() returns the active one, or null.
+    anomaly: function (id) {
+      var A = G.state.run.anom;
+      if (id === undefined) return A.on ? { id: A.id, x: Math.round(A.x), t: +A.t.toFixed(2), dur: +A.dur.toFixed(2) } : null;
+      if (A.on) return 'one is active already: ' + A.id;
+      if (!G.scene.sailing.forceAnomaly(id)) return 'anomalies: ' + G.data.anomalies.list.map(function (a) { return a.id; }).join(', ');
+      return dbg.anomaly();
+    },
     // dbg.restore() pays for the next cabin stage; returns the level.
     restore: function () { G.sim.economy.restoreCabin(G.state.save, G.data); G.core.save.autosave('purchase'); return G.state.save.cabinLevel; },
     // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).

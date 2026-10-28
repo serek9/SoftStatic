@@ -1,7 +1,8 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
-// The dog in the bow (V3.8). Phase 3 only draws its poses; deciding when to point,
-// look down, stare or bark comes later (P7.6, P10.3). Never harmed, never threatened.
+// The dog in the bow (V3.8): points at interested fish, looks down when a too-heavy fish
+// is about (7.6), stares once per location at a real hidden spot and barks toward a spot
+// that holds a legendary (10.3, V10.4). Never harmed, never threatened.
 G.scene = G.scene || {};
 G.scene.dog = (function () {
   var S = G.gfx.sprites;
@@ -85,7 +86,11 @@ G.scene.dog = (function () {
   // closer), look down whenever a too-heavy fish is about (D4). A pose holds at least HOLD s.
   var T = { alert: 0.5, point: 0.7 }, HOLD = 0.6;
 
-  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0 }; }
+  // 10.3: px from the boat at which the dog notices its hidden spot or a legendary spot,
+  // how long it stares or barks (s), and how far the boat must go before it barks again.
+  var CUE = { stareR: 110, stare: 4, barkR: 80, bark: 2.5, rearm: 160 };
+
+  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0, barkArmed: true, cue: '' }; }
 
   // Returns false for an unknown pose. manual (s) keeps the pose against step() (debug).
   function setPose(d, pose, manual) {
@@ -95,7 +100,39 @@ G.scene.dog = (function () {
     return true;
   }
 
-  // info: {interest 0..1, tooHeavyNear}. TODO(P10.3): stare and bark.
+  // True when a legendary species lives at location id (the bark never points at nothing).
+  function legendHere(id, fish) {
+    for (var i = 0; i < fish.length; i++) if (fish[i].rarity === 'legendary' && fish[i].locations.indexOf(id) >= 0) return true;
+    return false;
+  }
+
+  // 10.3: the stare (once per location, saved in flags.dogStare) and the bark (each time
+  // the boat comes near a legendary spot, after it has been away). Returns the spot id
+  // that set off a cue this step, or ''.
+  function cues(d, save, loc, boatX, data) {
+    var spots = loc.spots || [], far = true, i, s;
+    for (i = 0; i < spots.length; i++) {
+      s = spots[i];
+      var dist = Math.abs(boatX - s.x);
+      if (s.kind === 'hidden' && !save.flags.dogStare[loc.id] && dist <= CUE.stareR) {
+        save.flags.dogStare[loc.id] = true;
+        setPose(d, 'stare', CUE.stare); d.cue = s.id;
+        return s.id;
+      }
+      if (s.kind === 'legendary') {
+        if (dist <= CUE.rearm) far = false;
+        if (d.barkArmed && dist <= CUE.barkR && legendHere(loc.id, data.fish)) {
+          d.barkArmed = false;
+          setPose(d, 'bark', CUE.bark); d.cue = s.id;
+          return s.id;
+        }
+      }
+    }
+    if (far) d.barkArmed = true;
+    return '';
+  }
+
+  // info: {interest 0..1, tooHeavyNear}.
   function want(info) {
     if (!info) return 'idle';
     if (info.tooHeavyNear) return 'look_down';
@@ -114,5 +151,5 @@ G.scene.dog = (function () {
 
   function draw(ctx, d, x, y, flip) { S.draw(ctx, SPRITE[d.pose], x, y, Math.floor(d.t * 5), flip); }
 
-  return { POSES: POSES, T: T, create: create, setPose: setPose, want: want, step: step, draw: draw };
+  return { POSES: POSES, T: T, CUE: CUE, create: create, setPose: setPose, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
 })();

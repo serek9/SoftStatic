@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 3;
+  var VERSION = 4;
   var PREFIX = 'SS1';
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
@@ -31,6 +31,12 @@ G.core.save = (function () {
       s.flags = s.flags || {};
       for (k in d.flags) if (!(k in s.flags)) s.flags[k] = d.flags[k];
       return s;
+    },
+    // v3 -> v4: anomaly, dog and late-hint flags (P10).
+    3: function (s) {
+      var d = defaults();
+      for (var k in d.flags) if (!(k in s.flags)) s.flags[k] = d.flags[k];
+      return s;
     }
   };
 
@@ -53,7 +59,10 @@ G.core.save = (function () {
       // lines: special shopkeeper line id -> true once said (each is said once per save).
       // shopVisits: times the shop was entered. heavy: location id -> true once a fish too
       // heavy for the rod was near (the journal's margin note, D4).
-      flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {} },
+      // anomalies: anomaly id -> times seen. dogStare: location id -> true once the dog has
+      // stared at its hidden spot (10.3). lateAt: total catches when a journal page last
+      // gained a late hint (10.5).
+      flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 },
       tapes: [],
       settings: { volume: 0.8, mute: false },
       rng: null              // G.rng state, restored on load unless ?seed is given

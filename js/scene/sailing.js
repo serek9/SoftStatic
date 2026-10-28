@@ -29,6 +29,13 @@ G.scene.sailing = (function () {
   var tip = [0, 0], pose = [0, 0];
 
   S.def('lure', { r: 'rust_hi', b: 'bone' }, ['.r.', 'rbr', '.r.']);
+  // 10.4: the owl that calls at a clock window's cue. Its eyes are open in frame 1.
+  S.def('owl', { o: 'stone', d: 'stone_dark', e: 'signal_amber', k: 'ink' }, [
+    ['o...o', 'ooooo', 'okook', 'ooooo', 'odddo', '.ddd.', '.k.k.'],
+    ['o...o', 'ooooo', 'oeooe', 'ooooo', 'odddo', '.ddd.', '.k.k.']
+  ]);
+  var OWL = { show: 7, cry: 1.5, ring: 2.5, fade: 1 }; // s on screen, cry at, rings last, fade in/out
+  var ANOM_FADE = 2;                                   // s an anomaly takes to fade in or out
 
   // ---- Layer painters ------------------------------------------------------
   // Each paints one baked layer of height waterY; rng is a private, seeded stream, so a
@@ -189,7 +196,9 @@ G.scene.sailing = (function () {
     run.uw = { alpha: 0 }; // how far the underwater cross-section has faded in
     // One cast at a time. seed is drawn from G.rng on release and is the cast's own seed (§3).
     // latched: clock windows open when the lure landed (D1), cleared when it is reeled in.
-    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, latched: {} };
+    // boost: what the landing spot is worth for this cast (anomaly and spots, 10.1/10.3).
+    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, latched: {},
+      boost: { attract: 1, rare: 1, legend: 1 } };
     run.school = G.sim.fish_ai.createSchool(G.data);
     run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
     G.scene.underwater.bottomAt(loc, 0); // bakes the cross-section now
@@ -202,6 +211,10 @@ G.scene.sailing = (function () {
     run.heavy = cc.heavy;
     run.dogIn = { interest: 0, tooHeavyNear: false };
     run.gearFx = G.sim.economy.effects(G.state.save, G.data, {});
+    run.anom = G.sim.unease.createAnomalies(); // the one active anomaly (10.1); never saved
+    run.anomIn = { loc: id, hour: 0, unease: 0, boatX: 0, reach: 0, width: loc.width };
+    run.owl = { on: false, t: 0, x: 0, win: -1 };
+    G.gfx.water.setDeltas(drawDeltas);
     fx.clear();
   }
 
@@ -223,8 +236,9 @@ G.scene.sailing = (function () {
     ctx.bait = li.bait;
     ctx.latched = c.latched;
     ctx.rodMaxMass = rodMaxOverride || gx.maxMass;
-    ctx.attract = gx.attract;
-    ctx.rareBoost = gx.rareBoost;
+    ctx.attract = gx.attract * c.boost.attract;
+    ctx.rareBoost = gx.rareBoost * c.boost.rare;
+    ctx.legendBoost = c.boost.legend;
     ctx.maxDepthPx = loc.maxDepth;
     G.sim.fish_ai.stepSchool(run.school, li, dt, G.rng, G.data);
     var n = G.sim.fish_ai.interested(run.school);
@@ -273,6 +287,7 @@ G.scene.sailing = (function () {
       c.lx = c.x1; c.ly = wy;
       fx.splash(c.x1, wy, Math.min(1, c.dist / 100));
       G.sim.clock.latch(c.latched, G.state.save.clock, G.data.windows);
+      G.sim.unease.castBoost(run.anom, loc, c.x1, G.data, c.boost); // casting at a delta or a spot counts now
       c.bait = G.sim.economy.useBait(G.state.save, G.data); // one bait goes on per cast
       G.core.state.go(run, 'sinking');
     }
@@ -282,23 +297,28 @@ G.scene.sailing = (function () {
   function forceCast(charge) {
     var run = G.state.run;
     if (run.fsm !== 'sailing') return false;
+    startCharge(run);
     run.cast.charge = clamp(charge, 0, 1);
-    G.core.state.go(run, 'charging');
     release(run);
     return run.cast.x1;
+  }
+
+  // A new cast begins: the last one is out of the water, so nothing of it carries over.
+  function startCharge(run) {
+    var c = run.cast;
+    c.charge = 0;
+    c.bait = '';
+    G.sim.clock.clearLatch(c.latched);
+    c.boost.attract = 1; c.boost.rare = 1; c.boost.legend = 1;
+    G.scene.underwater.resetHeavy(run);
+    G.core.state.go(run, 'charging');
   }
 
   function castStep(run, dt) {
     var c = run.cast, inp = G.core.input;
     switch (run.fsm) {
       case 'sailing':
-        if (inp.pressed('action') && run.boat.stopped) {
-          c.charge = 0;
-          c.bait = '';
-          G.sim.clock.clearLatch(c.latched); // the last cast is out of the water
-          G.scene.underwater.resetHeavy(run);
-          G.core.state.go(run, 'charging');
-        }
+        if (inp.pressed('action') && run.boat.stopped) startCharge(run);
         break;
       case 'charging':
         if (inp.move() !== 0) { G.core.state.go(run, 'sailing'); break; } // steering cancels the charge
@@ -502,6 +522,95 @@ G.scene.sailing = (function () {
     }
   }
 
+  // ---- Anomalies and the owl (10.1, 10.2, 10.4) ------------------------------
+
+  function anomalyStep(run, save, dt) {
+    var A = run.anom, ai = run.anomIn, U = G.sim.unease;
+    ai.loc = loc.id; ai.hour = save.clock; ai.unease = U.get(save, loc.id);
+    ai.boatX = run.boat.x; ai.reach = run.gearFx.castMax;
+    var r = U.anomalyStep(A, ai, dt, G.rng, G.data);
+    if (r === U.STARTED) anomalyStarted(run, save);
+    else if (r === U.ENDED) {
+      var a = G.data.anomalies.list[A.idx];
+      if (a.effect === 'revealHint') {
+        var h = U.lateHint(save, loc.id, G.data, true);
+        if (G.core.debug) G.core.debug.log('revealHint: ' + (h ? h.id + ' ' + h.ref : 'nothing left to write'));
+      }
+    }
+  }
+
+  function anomalyStarted(run, save) {
+    var A = run.anom;
+    save.flags.anomalies[A.id] = (save.flags.anomalies[A.id] || 0) + 1;
+    if (G.core.debug) G.core.debug.log('anomaly ' + A.id + ' at x ' + Math.round(A.x) + ' for ' + A.dur.toFixed(1) + ' s');
+  }
+
+  // Debug: starts anomaly id now (refused while one is active: at most one at a time).
+  function forceAnomaly(id) {
+    var run = G.state.run, list = G.data.anomalies.list, U = G.sim.unease;
+    if (run.anom.on) return false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id !== id) continue;
+      run.anomIn.boatX = run.boat.x; run.anomIn.reach = run.gearFx.castMax;
+      U.startAnomaly(run.anom, i, run.anomIn, G.rng, G.data);
+      anomalyStarted(run, G.state.save);
+      return true;
+    }
+    return false;
+  }
+
+  function anomalyAlpha(A) { return A.on ? Math.max(0, Math.min(1, A.t / ANOM_FADE, (A.dur - A.t) / ANOM_FADE)) : 0; }
+
+  // The water's delta slot (P10.2): runs only inside the mirror pass.
+  function drawDeltas(c) {
+    var A = G.state.run.anom;
+    if (A && A.on) G.gfx.water.drawDelta(c, A.what, Math.round(A.x - camPx), loc.waterY - camPy, anomalyAlpha(A));
+  }
+
+  // The boat in the reflection has no fisher while the empty_boat anomaly is mostly shown.
+  function mirrorFisher() { var A = G.state.run.anom; return !(A.on && A.what === 'empty_boat' && anomalyAlpha(A) > 0.5); }
+
+  // 10.4: when the clock passes a window's cue, an owl calls from a snag on the shore in
+  // view, and the dog looks up. TODO(P13.3): the owl cry sound.
+  function owlStep(run, save, hour0, dt) {
+    var o = run.owl, k = G.sim.clock.cueCrossed(hour0, save.clock, G.data.windows);
+    if (k >= 0) {
+      o.on = true; o.t = 0; o.win = k;
+      o.x = clamp(run.cam.x + 250, 20, loc.width - 20);
+      if (G.core.debug) G.core.debug.log('the owl calls (' + G.data.windows[k].id + ')');
+    }
+    if (!o.on) return;
+    var before = o.t;
+    o.t += dt;
+    if (before < OWL.cry && o.t >= OWL.cry) dog.setPose(run.dog, 'alert', 2);
+    if (o.t >= OWL.show) o.on = false;
+  }
+
+  function drawOwl(c) {
+    var o = G.state.run.owl;
+    if (!o || !o.on) return;
+    var sx = Math.round(o.x - camPx), wy = loc.waterY - camPy, a = Math.max(0, Math.min(1, o.t / OWL.fade, (OWL.show - o.t) / OWL.fade));
+    c.globalAlpha = a;
+    c.fillStyle = P.wood_dark;
+    c.fillRect(sx, wy - 22, 1, 22); c.fillRect(sx - 4, wy - 15, 4, 1); c.fillRect(sx + 1, wy - 19, 3, 1);
+    S.draw(c, 'owl', sx - 2, wy - 29, o.t >= OWL.cry ? 1 : 0, false);
+    var u = (o.t - OWL.cry) / OWL.ring;
+    if (u > 0 && u < 1) {
+      // The call, as two soft rings spreading from the owl.
+      c.fillStyle = P.fog_light;
+      for (var ring = 0; ring < 2; ring++) {
+        var rr = (u - ring * 0.25) * 30;
+        if (rr <= 2) continue;
+        c.globalAlpha = a * (1 - u) * 0.6;
+        for (var q = 0; q < 16; q++) {
+          var ang = q / 16 * 6.283;
+          c.fillRect(Math.round(sx + Math.cos(ang) * rr), Math.round(wy - 26 + Math.sin(ang) * rr * 0.6), 1, 1);
+        }
+      }
+    }
+    c.globalAlpha = 1;
+  }
+
   // ---- Scene -------------------------------------------------------------------
 
   // Resumes at the saved location; coming back from the shop or cabin keeps the run as it was.
@@ -515,10 +624,13 @@ G.scene.sailing = (function () {
   function update(dt) {
     var run = G.state.run, b = run.boat, save = G.state.save;
     G.sim.economy.effects(save, G.data, run.gearFx);
+    var hour0 = save.clock;
     G.sim.clock.step(save, null, dt, G.rng, G.data);
     run.uneaseIn.loc = loc.id;
     run.uneaseIn.still = b.stopped;
     G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);
+    anomalyStep(run, save, dt);
+    owlStep(run, save, hour0, dt);
     castStep(run, dt);
     fishStep(run, dt);
     G.scene.underwater.catchStep(run, dt, loc);
@@ -533,6 +645,8 @@ G.scene.sailing = (function () {
     run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' ? 0.5 : 0);
     run.dogIn.tooHeavyNear = fishing && run.school.ctx.tooHeavyNear;
     if (run.dogIn.tooHeavyNear) save.flags.heavy[loc.id] = true; // the journal's margin note (D4)
+    var cue = dog.cues(run.dog, save, loc, b.x, G.data);
+    if (cue && G.core.debug) G.core.debug.log('the dog ' + (run.dog.pose === 'stare' ? 'stares at' : 'barks toward') + ' ' + cue);
     dog.step(run.dog, dt, run.dogIn);
     camStep(run, dt);
     G.scene.underwater.viewStep(run, dt, loc);
@@ -561,17 +675,19 @@ G.scene.sailing = (function () {
       var L = layers[i];
       c.drawImage(L.cv, Math.round(camPx * L.p), 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
     }
+    drawOwl(c);
   }
 
   function drawDog(c, x, y, flip) { dog.draw(c, G.state.run.dog, x, y, flip); }
 
-  function drawBoat(c) {
+  function drawBoat(c, fisher) {
     var run = G.state.run;
     rodPose(run, pose);
-    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, true, drawDog, pose[0], pose[1]);
+    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, fisher !== false, drawDog, pose[0], pose[1]);
   }
 
-  function drawAbove(c) { drawBackdrop(c); drawBoat(c); }
+  // The mirror pass (gfx/water.js): the scene above the waterline, mirrored.
+  function drawAbove(c) { drawBackdrop(c); drawBoat(c, mirrorFisher()); }
 
   function draw(ctx) {
     var run = G.state.run, wy = loc.waterY;
@@ -593,7 +709,7 @@ G.scene.sailing = (function () {
   }
 
   return {
-    load: load, tp: tp, enter: enter, exit: exit, update: update, draw: draw,
+    load: load, tp: tp, enter: enter, exit: exit, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
     skyColor: skyColor, hourNow: hourNow,
@@ -631,6 +747,14 @@ if (G.core.debug) G.core.debug.addLine(function () {
   return 'coins ' + s.coins + '  rod ' + g.rod + ' reel ' + g.reel + ' line ' + g.line + '  bait ' + fx.bait +
     (fx.bait !== 'worm' ? ' x' + (s.baits[fx.bait] || 0) : '') + (g.lantern ? '  lantern' : '') + (g.depthFinder ? '  finder' : '') +
     '  open ' + Object.keys(s.unlocks).join(',') + '  caught ' + Object.keys(s.journal).length;
+});
+
+if (G.core.debug) G.core.debug.addLine(function () {
+  var run = G.state.run, A = run.anom, b = run.cast && run.cast.boost;
+  if (!A) return 'anomaly: -';
+  return 'anomaly ' + (A.on ? A.id + ' x ' + Math.round(A.x) + ' ' + A.t.toFixed(1) + '/' + A.dur.toFixed(1) + 's' : 'none' + (A.gap > 0 ? ' (gap ' + A.gap.toFixed(0) + 's)' : '')) +
+    '  cast boost a' + b.attract.toFixed(2) + ' r' + b.rare.toFixed(2) + ' l' + b.legend.toFixed(2) +
+    (run.owl.on ? '  owl ' + run.owl.t.toFixed(1) + 's' : '') + '  dog cue ' + (run.dog.cue || '-');
 });
 
 if (G.core.debug) G.core.debug.addLine(function () {
