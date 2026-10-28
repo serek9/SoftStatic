@@ -191,8 +191,17 @@ G.scene.sailing = (function () {
     run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
     run.lureIn = { active: false, x: 0, y: 0, bait: '' };
     run.uneaseIn = { loc: id, still: true, atShop: false };
+    run.bite = G.sim.bite.create();
+    run.fight = G.sim.fight.create();
+    var cc = G.scene.underwater.createCatch();
+    run.hook = cc.hook;
+    run.heavy = cc.heavy;
+    run.dogIn = { interest: 0, tooHeavyNear: false };
     fx.clear();
   }
+
+  // The lure is fishing (fish can spawn, notice and bite) only in these states.
+  var FISHING = { sinking: 1, waiting: 1, interest: 1 };
 
   // Inputs for the sim modules that are not the player's keys.
   var BAIT = 'worm';       // TODO(P8.1): the equipped bait
@@ -200,7 +209,7 @@ G.scene.sailing = (function () {
 
   function fishStep(run, dt) {
     var save = G.state.save, c = run.cast, li = run.lureIn, ctx = run.school.ctx;
-    li.active = G.scene.underwater.UNDER[run.fsm] === 1;
+    li.active = FISHING[run.fsm] === 1;
     li.x = c.x1;
     li.y = c.ly - loc.waterY;
     li.bait = BAIT;
@@ -279,6 +288,7 @@ G.scene.sailing = (function () {
         if (inp.pressed('action') && run.boat.stopped) {
           c.charge = 0;
           G.sim.clock.clearLatch(c.latched); // the last cast is out of the water
+          G.scene.underwater.resetHeavy(run);
           G.core.state.go(run, 'charging');
         }
         break;
@@ -316,10 +326,23 @@ G.scene.sailing = (function () {
         }
         break;
       case 'sailing':
+      case 'card':
         out[0] = CAST.restAngle; out[1] = 0;
+        break;
+      case 'hooked':
+      case 'fighting':
+        // Pull: bent hard toward the fish. Tired: relaxed. Both deepen with tension.
+        var F = run.fight;
+        out[0] = CAST.waitAngle + 8 - 10 * F.T;
+        out[1] = F.mode === 'pull' ? 4 + 5 * F.T : 1 + 2 * F.T;
+        break;
+      case 'landing':
+        out[0] = 70; out[1] = 2;
         break;
       default:
         out[0] = CAST.waitAngle; out[1] = 1;
+        // Bite cue (7.1): the rod tip bobs while a fish is on the bite.
+        if (run.bite.slot >= 0) out[0] -= 5 * Math.abs(Math.sin(run.bite.t * 12));
     }
     return out;
   }
@@ -355,6 +378,7 @@ G.scene.sailing = (function () {
     rodPose(run, pose);
     var sx = Math.round(b.x - run.cam.x);
     boat.rodTip(b, sx, wy, pose[0], tip);
+    if (fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') { drawFightLine(ctx, run); return; }
     var lx, ly;
     ctx.globalAlpha = 0.6;
     ctx.fillStyle = P.fog_light;
@@ -363,14 +387,42 @@ G.scene.sailing = (function () {
       line(ctx, tip[0], tip[1], lx, ly, false);
     } else {
       // Above the water the line runs to where the lure went in; below it drops dotted to the lure.
-      var ex = c.x1 - camPx;
+      var ex = c.x1 - camPx, hum = run.heavy.hum > 0 ? Math.round(Math.sin(b.t * 90)) : 0;
       lx = ex; ly = c.ly - camPy;
-      if (fsm === 'waiting') lx += Math.round(Math.sin(b.t * 1.3) * 1.5); // the lure sways once it stops
+      if (fsm !== 'sinking') lx += Math.round(Math.sin(b.t * 1.3) * 1.5);      // the lure sways once it stops
+      if (run.bite.slot >= 0) ly += 2 + Math.round(Math.sin(run.bite.t * 18)); // bite cue: the line dips
+      else if (G.sim.fish_ai.interestLevel(run.school) >= 0.85) lx += Math.round(Math.sin(b.t * 40)); // nibbles
       line(ctx, tip[0], tip[1], ex, wy, false);
-      line(ctx, ex, wy, lx, ly, true);
+      line(ctx, ex + hum, wy, lx + hum, ly, true); // hum: the line shivers once for a heavy fish
     }
     ctx.globalAlpha = 1;
     S.draw(ctx, 'lure', Math.round(lx) - 1, Math.round(ly) - 1, 0, false);
+  }
+
+  // 7.4: pulling, the line runs straight and shakes; tired, it sags. The tint warms with
+  // tension (amber, then red) but the shape carries the meaning.
+  var mouthPt = [0, 0];
+  function drawFightLine(ctx, run) {
+    var F = run.fight, pull = run.fsm !== 'landing' && F.mode === 'pull';
+    G.scene.underwater.mouth(loc, camPx, camPy, mouthPt);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = P[G.ui.hud.tensionKey(run.fsm === 'landing' ? 0 : F.T)];
+    var mx = (tip[0] + mouthPt[0]) / 2, my = (tip[1] + mouthPt[1]) / 2;
+    if (pull) {
+      var shake = Math.round(Math.sin(run.boat.t * 47));
+      line(ctx, tip[0], tip[1], mx + shake, my, false);
+      line(ctx, mx + shake, my, mouthPt[0], mouthPt[1], false);
+    } else {
+      var sag = 3 + 12 * (1 - F.T), steps = 24, px = tip[0], py = tip[1];
+      for (var i = 1; i <= steps; i++) {
+        var u = i / steps, v = 1 - u;
+        var qx = v * v * tip[0] + 2 * u * v * mx + u * u * mouthPt[0];
+        var qy = v * v * tip[1] + 2 * u * v * (my + sag) + u * u * mouthPt[1];
+        line(ctx, px, py, qx, qy, false);
+        px = qx; py = qy;
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   // ---- Camera ----------------------------------------------------------------
@@ -379,7 +431,13 @@ G.scene.sailing = (function () {
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
+  var FRAMED = { hooked: 1, fighting: 1, landing: 1 };
+
   function camTarget(run) {
+    if (FRAMED[run.fsm] && run.hook) {
+      // During a fight, centre between boat and fish (they are at most ~152 px apart).
+      return clamp((run.boat.x + run.hook.x) / 2 - VIEW_W / 2, 0, loc.width - VIEW_W);
+    }
     var look = clamp(run.boat.vx * CAM.look, -CAM.lookMax, CAM.lookMax);
     return clamp(run.boat.x - VIEW_W / 2 + look, 0, loc.width - VIEW_W);
   }
@@ -452,9 +510,18 @@ G.scene.sailing = (function () {
     G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);
     castStep(run, dt);
     fishStep(run, dt);
+    G.scene.underwater.catchStep(run, dt, loc);
+    if (run.fsm === 'card') {
+      var choice = G.ui.card.update(dt);
+      if (choice) { G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing'); }
+    }
     var move = run.fsm === 'sailing' ? G.core.input.move() : 0;
     boat.step(b, move, dt, loc.width);
-    dog.step(run.dog, dt);
+    // 7.6: the dog reads interest and the heavy-fish flag only while the lure is fishing.
+    var fishing = FISHING[run.fsm] === 1;
+    run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' ? 0.5 : 0);
+    run.dogIn.tooHeavyNear = fishing && run.school.ctx.tooHeavyNear;
+    dog.step(run.dog, dt, run.dogIn);
     camStep(run, dt);
     G.scene.underwater.viewStep(run, dt, loc);
 
@@ -507,13 +574,16 @@ G.scene.sailing = (function () {
     ctx.drawImage(glint, camPx, 0, VIEW_W, 1, 0, wy - camPy, VIEW_W, 1);
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
+    G.scene.underwater.drawHooked(ctx, loc, camPx, camPy, run.boat.t);
     drawCast(ctx);
     G.ui.hud.draw(ctx, run, wy);
+    G.ui.card.draw(ctx);
   }
 
   return {
     load: load, tp: tp, enter: enter, exit: exit, update: update, draw: draw,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
+    setRodMax: function (kg) { ROD_MAX_MASS = kg; return kg; }, // debug   TODO(P8.1)
     skyColor: skyColor, hourNow: hourNow,
     loc: function () { return loc; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },

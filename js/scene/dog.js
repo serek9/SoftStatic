@@ -81,18 +81,38 @@ G.scene.dog = (function () {
     S.def(SPRITE[POSES[i]], MAP, FRAMES[POSES[i]]);
   }
 
-  function create() { return { pose: 'idle', t: 0 }; }
+  // 7.6: alert from 0.5 interest (a fish approaching), point from 0.7 (circling the lure or
+  // closer), look down whenever a too-heavy fish is about (D4). A pose holds at least HOLD s.
+  var T = { alert: 0.5, point: 0.7 }, HOLD = 0.6;
 
-  // Returns false for an unknown pose.
-  function setPose(d, pose) {
+  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0 }; }
+
+  // Returns false for an unknown pose. manual (s) keeps the pose against step() (debug).
+  function setPose(d, pose, manual) {
     if (!SPRITE[pose]) return false;
     if (d.pose !== pose) { d.pose = pose; d.t = 0; }
+    if (manual) d.manual = manual;
     return true;
   }
 
-  function step(d, dt) { d.t += dt; } // TODO(P7.6): choose poses from fish interest
+  // info: {interest 0..1, tooHeavyNear}. TODO(P10.3): stare and bark.
+  function want(info) {
+    if (!info) return 'idle';
+    if (info.tooHeavyNear) return 'look_down';
+    if (info.interest >= T.point) return 'point';
+    if (info.interest >= T.alert) return 'alert';
+    return 'idle';
+  }
+
+  function step(d, dt, info) {
+    d.t += dt;
+    d.hold -= dt;
+    if (d.manual > 0) { d.manual -= dt; return; }
+    var w = want(info);
+    if (w !== d.pose && d.hold <= 0) { setPose(d, w); d.hold = HOLD; }
+  }
 
   function draw(ctx, d, x, y, flip) { S.draw(ctx, SPRITE[d.pose], x, y, Math.floor(d.t * 5), flip); }
 
-  return { POSES: POSES, create: create, setPose: setPose, step: step, draw: draw };
+  return { POSES: POSES, T: T, create: create, setPose: setPose, want: want, step: step, draw: draw };
 })();

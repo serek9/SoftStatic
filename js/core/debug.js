@@ -84,7 +84,30 @@ G.core.debug = (function () {
       console.log(ok ? 'fsm -> ' + name : 'refused: ' + run.fsm + ' -> ' + name);
       return ok;
     },
-    give: todo('give', 'TODO(P7.5)'),     // TODO(P7.5)
+    // dbg.give(id) puts a fish of that species on the bite (the lure must be in the water).
+    // dbg.give(id, true) also hooks it and lands it at once, straight to its card.
+    give: function (id, quick) {
+      var run = G.state.run, sp = -1;
+      for (var i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === id) sp = i;
+      if (sp < 0) { console.log('species: ' + G.data.fish.map(function (f) { return f.id; }).join(', ')); return false; }
+      if (!run.lureIn.active) { console.log('cast first: the lure must be in the water'); return false; }
+      if (run.fsm === 'sinking') G.core.state.go(run, 'waiting');
+      var f = G.sim.fish_ai.spawn(run.school, sp, run.lureIn.x - 5, run.lureIn.y, 1, G.rng, G.data);
+      if (!f) return false;
+      f.state = 'bite'; f.t = 0;
+      if (run.fsm === 'waiting') G.core.state.go(run, 'interest');
+      if (quick) {
+        G.core.input.inject('action', true);
+        setTimeout(function () { G.core.input.inject('action', false); }, 120);
+        setTimeout(function () { dbg.land(); }, 600); // after the 0.3 s hooked beat
+      }
+      return true;
+    },
+    // dbg.land() wins the current fight on the next step.
+    // (tired, so an un-reeled step cannot push D back up before the win check)
+    land: function () { var F = G.state.run.fight; if (!F.active) return false; F.D = 0; F.mode = 'tired'; F.modeT = 9; return true; },
+    // dbg.rod(kg) sets the rod's mass limit (D4) until gear exists.   TODO(P8.1)
+    rod: function (kg) { return G.scene.sailing.setRodMax(kg); },
     money: todo('money', 'TODO(P8.2)'),   // TODO(P8.2)
     // dbg.hour(h) sets the game clock (0..24); dbg.hour() reads it. TODO(P6.1): the clock does not advance yet.
     hour: function (h) {
@@ -94,7 +117,7 @@ G.core.debug = (function () {
     },
     // dbg.dog(pose) switches the dog's pose; returns false for an unknown pose.
     dog: function (pose) {
-      var ok = G.scene.dog.setPose(G.state.run.dog, pose);
+      var ok = G.scene.dog.setPose(G.state.run.dog, pose, 5);
       if (!ok) console.log('poses: ' + G.scene.dog.POSES.join(', '));
       return ok;
     },

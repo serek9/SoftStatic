@@ -23,9 +23,12 @@ G.sim.fish_ai = (function () {
     despawn: 180,                 // px from the lure at which a leaving fish is gone
     noticePause: 0.6,             // s
     inspectR: 10,                 // px circle radius around the lure
-    biteHold: 2                   // s a biting fish waits before leaving   TODO(P7.1): the hook window
+    biteHold: 2.5,                // s; only if nothing resolves the bite (sim/bite.js does, in 2 s)
+    swimPx: 10                    // px/s per unit of species speed (speed is in fight units, V4)
   };
   var INTERESTED = { notice: 1, approach: 1, inspect: 1, nibble: 1, bite: 1 };
+  // How interested a fish in each state is, for the dog (V3.8): 0..1.
+  var INTEREST = { notice: 0.4, approach: 0.5, inspect: 0.7, nibble: 0.85, bite: 1 };
 
   // ---- Species selection ------------------------------------------------------------
 
@@ -84,7 +87,7 @@ G.sim.fish_ai = (function () {
     };
     for (var i = 0; i < MAX; i++) {
       s.fish.push({ active: false, uid: 0, sp: -1, x: 0, y: 0, vx: 0, vy: 0, home: 0, dir: 1,
-        state: 'wander', t: 0, turnT: 0, circles: 0, ang: 0, swept: 0, nibbles: 0, nibbleN: 0, nibbleT: 0 });
+        state: 'wander', t: 0, turnT: 0, circles: 0, ang: 0, swept: 0, nibbles: 0, nibbleN: 0, nibbleT: 0, missed: 0 });
     }
     return s;
   }
@@ -110,7 +113,7 @@ G.sim.fish_ai = (function () {
       f.active = true; f.uid = ++school.uid; f.sp = sp;
       f.x = x; f.y = y; f.vx = 0; f.vy = 0; f.dir = dir;
       f.home = clampDepth(school, f, rng.range(h.depthMin, h.depthMax) * 4);
-      f.turnT = rng.range(2, 6); f.circles = 0; f.ang = 0; f.swept = 0; f.nibbles = 0; f.nibbleN = 0; f.nibbleT = 0;
+      f.turnT = rng.range(2, 6); f.circles = 0; f.ang = 0; f.swept = 0; f.nibbles = 0; f.nibbleN = 0; f.nibbleT = 0; f.missed = 0;
       setState(f, 'wander');
       return f;
     }
@@ -123,7 +126,7 @@ G.sim.fish_ai = (function () {
 
   // One fish, one fixed step. lure: {active, x, y (depth px), bait}.
   function stepFish(f, lure, dt, rng, data, school) {
-    var sp = data.fish[f.sp], speed = sp.speed;
+    var sp = data.fish[f.sp], speed = sp.speed * A.swimPx;
     var dx = lure.x - f.x, dy = lure.y - f.y, dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
     f.t += dt;
     if (!lure.active && f.state !== 'leave') setState(f, 'leave'); // reeled in: everyone drifts off
@@ -187,7 +190,7 @@ G.sim.fish_ai = (function () {
 
       case 'bite':
         f.vx = (lure.x - f.dir * 5 - f.x) * 5; f.vy = (lure.y - f.y) * 5;
-        if (f.t >= A.biteHold) setState(f, 'leave'); // TODO(P7.1): hooking replaces this
+        if (f.t >= A.biteHold) setState(f, 'leave');
         break;
 
       case 'leave':
@@ -236,12 +239,27 @@ G.sim.fish_ai = (function () {
     return n;
   }
 
+  // The interest of the most interested fish (0 when none), for the dog's point (V3.8).
+  function interestLevel(school) {
+    var best = 0;
+    for (var i = 0; i < MAX; i++) {
+      var f = school.fish[i], v = f.active ? (INTEREST[f.state] || 0) : 0;
+      if (v > best) best = v;
+    }
+    return best;
+  }
+
+  // Every active fish swims off (a hooked fish's school scatters).
+  function scatter(school) {
+    for (var i = 0; i < MAX; i++) if (school.fish[i].active) setState(school.fish[i], 'leave');
+  }
+
   function clear(school) { for (var i = 0; i < MAX; i++) school.fish[i].active = false; school.spawnT = 0; }
 
   return {
     MAX: MAX, W: W, A: A,
     weightOf: weightOf, speciesWeights: speciesWeights, pickSpecies: pickSpecies,
     createSchool: createSchool, spawn: spawn, stepFish: stepFish, stepSchool: stepSchool,
-    count: count, interested: interested, clear: clear
+    count: count, interested: interested, interestLevel: interestLevel, scatter: scatter, clear: clear
   };
 })();

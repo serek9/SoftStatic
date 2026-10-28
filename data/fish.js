@@ -1,7 +1,8 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // Fish data (V5), clock windows (§0.8) and rarity weights.
-// Units: habitat depths in metres (px = m × 4), speed in px/s, awareness in px,
+// Units: habitat depths in metres (px = m × 4), speed in fight units (V4: D grows by speed × 0.03/s;
+// the swimming AI moves at speed × 10 px/s), awareness in px,
 // caution 0..1 (chance to back off after nibbling), mass in kg (typical weight;
 // the rod's mass limit is checked against it, D4).
 G.data = G.data || {};
@@ -17,7 +18,7 @@ G.data.rarity = { common: 62, uncommon: 26, rare: 10, legendary: 2 };
 G.data.fish = [
   {
     id: 'gloam_perch', name: 'Gloam Perch', rarity: 'common', locations: ['fog'],
-    habitat: { depthMin: 1, depthMax: 10 }, speed: 14, strength: 0.6, fatigue: 0.12, mass: 0.35,
+    habitat: { depthMin: 1, depthMax: 10 }, speed: 1.4, strength: 0.6, fatigue: 0.12, mass: 0.35,
     lengthCm: [14, 26], weightKg: [0.15, 0.5], awareness: 46, caution: 0.35,
     baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 6,
     desc: 'It had a human tooth. The others were normal.', hintRefs: [],
@@ -25,7 +26,7 @@ G.data.fish = [
   },
   {
     id: 'mist_carp', name: 'Mist Carp', rarity: 'uncommon', locations: ['fog'],
-    habitat: { depthMin: 6, depthMax: 20 }, speed: 10, strength: 1.0, fatigue: 0.07, mass: 2.2,
+    habitat: { depthMin: 6, depthMax: 20 }, speed: 1.0, strength: 1.0, fatigue: 0.07, mass: 2.2,
     lengthCm: [40, 70], weightKg: [1.2, 3.0], awareness: 38, caution: 0.5,
     baitLikes: ['worm'], timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], windows: [], uneaseMin: 0, price: 22,
     desc: 'Heavier in the grey hours, when the fog sits low on the water.', hintRefs: ['hour:grey'],
@@ -34,7 +35,7 @@ G.data.fish = [
   {
     // Window-only: bites only on a cast latched in the 02:47 window.
     id: 'owl_eel', name: 'Two-Forty-Seven', rarity: 'rare', locations: ['fog'],
-    habitat: { depthMin: 12, depthMax: 24 }, speed: 16, strength: 1.3, fatigue: 0.09, mass: 1.4,
+    habitat: { depthMin: 12, depthMax: 24 }, speed: 1.6, strength: 1.3, fatigue: 0.09, mass: 1.4,
     lengthCm: [60, 110], weightKg: [0.8, 2.2], awareness: 60, caution: 0.55,
     baitLikes: ['minnow', 'worm'], timeLikes: [], windows: ['owl_247'], uneaseMin: 0, price: 90,
     desc: 'Its eyes were already open when the owl called.', hintRefs: ['window:owl_247'],
@@ -43,7 +44,7 @@ G.data.fish = [
   {
     // Needs high unease: only after sitting still a long while at night.
     id: 'hollow_pike', name: 'Hollow Pike', rarity: 'uncommon', locations: ['fog'],
-    habitat: { depthMin: 4, depthMax: 16 }, speed: 22, strength: 1.6, fatigue: 0.08, mass: 2.8,
+    habitat: { depthMin: 4, depthMax: 16 }, speed: 2.2, strength: 1.6, fatigue: 0.08, mass: 2.8,
     lengthCm: [55, 95], weightKg: [1.6, 4.0], awareness: 70, caution: 0.6,
     baitLikes: ['minnow', 'worm'], timeLikes: [22, 23, 0, 1, 2, 3, 4], windows: [], uneaseMin: 0.6, price: 60,
     desc: 'It only comes once you have waited. It knows you waited.', hintRefs: ['unease'],

@@ -152,7 +152,7 @@ G.scene.underwater = (function () {
       c.bubT = (c.bubT || 0) - dt;
       if (c.bubT <= 0) { c.bubT = 0.4; fx.emit('bubbles', c.lx, c.ly - 2, 1); }
     } else if (run.fsm === 'waiting' || run.fsm === 'interest') {
-      if (inp.held('action')) {
+      if (inp.held('action') && run.bite.slot < 0) { // with a fish on the bite, holding means hook, not reel
         var b = run.boat, home = b.x + b.facing * UW.reach;
         c.x1 += clamp(home - c.x1, -UW.reelIn * dt, UW.reelIn * dt);
         c.lx = c.x1;
@@ -240,6 +240,7 @@ G.scene.underwater = (function () {
     ctx.globalAlpha = alpha;
     ctx.drawImage(set.bottom, camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
     ctx.drawImage(set.weeds[WEED_SEQ[Math.floor(t * 1.5) % 4]], camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
+    drawHeavy(ctx, loc, camPx, camPy, alpha);
     drawFish(ctx, loc, camPx, camPy, t);
 
     ctx.globalAlpha = alpha * 0.5;
@@ -250,6 +251,157 @@ G.scene.underwater = (function () {
     }
     ctx.globalAlpha = 1;
     stats.ms = performance.now() - t0;
+  }
+
+  // ---- Bite, hook, fight, landing (7.1-7.5) --------------------------------------------
+  var GEAR = { lineStrength: 1, reelSpeed: 0.12 }; // TODO(P8.1): the equipped line and reel
+  var HOOKED_BEAT = 0.3;  // s between the hook-set and the fight
+  var LAND_TIME = 0.9;    // s to lift the fish out beside the boat
+  var biteIn = { reel: false, auto: false }, fightIn = { reel: false };
+
+  function createCatch() {
+    return {
+      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0 },
+      heavy: { state: 0, t: 0, x: 0, y: 0, dir: 1, hum: 0 } // 7.7: 0 none yet this cast, 1 passing, 2 done
+    };
+  }
+
+  // The fish on the bite is hooked: roll its size, start the fight, scatter the rest.
+  function hook(run) {
+    var b = run.bite, f = run.school.fish[b.slot], sp = G.data.fish[f.sp], h = run.hook, boatB = run.boat;
+    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0;
+    h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
+    h.depth = f.y;
+    h.q = G.rng.next();
+    h.len = Math.round((sp.lengthCm[0] + (sp.lengthCm[1] - sp.lengthCm[0]) * h.q) * 10) / 10;
+    h.w = Math.round((sp.weightKg[0] + (sp.weightKg[1] - sp.weightKg[0]) * Math.pow(h.q, 1.3)) * 100) / 100;
+    G.sim.fight.start(run.fight, f.sp, sp, GEAR, G.rng);
+    f.active = false;
+    G.sim.fish_ai.scatter(run.school);
+    G.sim.bite.reset(b);
+    G.core.state.go(run, 'hooked');
+    if (G.core.debug) G.core.debug.log('hooked ' + sp.id + ' ' + h.len + ' cm ' + h.w + ' kg');
+  }
+
+  // Where the hooked fish is: D sets how far out (0 at the boat), it rises toward the surface
+  // as it comes in, and thrashes while pulling. The line and camera follow cast.x1/ly.
+  function hookPos(run, dt, loc) {
+    var F = run.fight, h = run.hook, b = run.boat, tx, ty;
+    if (run.fsm === 'landing') {
+      h.lift = Math.min(1, h.lift + dt / LAND_TIME);
+      var u = h.lift * h.lift * (3 - 2 * h.lift);
+      tx = b.x + b.facing * 18; ty = -12;
+      h.x = h.x0 + (tx - h.x0) * u;
+      h.y = h.y0 + (ty - h.y0) * u;
+      h.face = b.x > h.x ? 1 : -1;
+    } else {
+      var frac = F.D / F.D0;
+      tx = b.x + b.facing * (UW.reach + Math.min(frac * h.dist, 140)); // 140 px: boat and fish share the screen
+      ty = h.depth * Math.min(1, frac);
+      if (F.mode === 'pull') { h.thrash += dt * 14; tx += Math.sin(h.thrash) * 3; ty += Math.cos(h.thrash * 1.3) * 2; }
+      h.x += (tx - h.x) * Math.min(1, 5 * dt);
+      h.y += (ty - h.y) * Math.min(1, 4 * dt);
+      h.y = clamp(h.y, 2, bottomAt(loc, h.x) - 2);
+      var away = h.x >= b.x ? 1 : -1;
+      h.face = F.mode === 'pull' ? away : -away;
+    }
+    var c = run.cast;
+    c.x1 = c.lx = h.x;
+    c.ly = loc.waterY + h.y;
+  }
+
+  // Lets a lost fish (snap or escape) swim off as an ordinary fish.
+  function release(run) {
+    var h = run.hook, f = G.sim.fish_ai.spawn(run.school, h.sp, h.x, h.y, h.face, G.rng, G.data);
+    if (f) { f.state = 'leave'; f.t = 0; f.missed = 1; }
+  }
+
+  function catchStep(run, dt, loc) {
+    var inp = G.core.input, fsm = run.fsm, F = G.sim.fight;
+    if (fsm === 'waiting' || fsm === 'interest') {
+      biteIn.reel = inp.held('action');
+      biteIn.auto = false; // TODO(P12.2): passive mode hooks automatically
+      if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
+    } else if (fsm === 'hooked') {
+      run.hook.t += dt;
+      if (run.hook.t >= HOOKED_BEAT) G.core.state.go(run, 'fighting');
+    } else if (fsm === 'fighting') {
+      fightIn.reel = inp.held('action');
+      var res = F.step(run.fight, fightIn, dt, G.rng, G.data);
+      if (run.fight.slipped) fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); // TODO(P13.3): the soft slip sound
+      if (res === F.WIN) {
+        run.hook.x0 = run.hook.x; run.hook.y0 = run.hook.y;
+        G.core.state.go(run, 'landing');
+      } else if (res === F.SNAP || res === F.ESCAPE) {
+        release(run);
+        fx.splash(run.hook.x, loc.waterY, 0.3);
+        if (G.core.debug) G.core.debug.log(res === F.SNAP ? 'the line snapped' : 'it slipped away');
+        G.core.state.go(run, 'sailing');
+        return;
+      }
+    } else if (fsm === 'landing') {
+      if (run.hook.lift >= 1) {
+        fx.splash(run.hook.x, loc.waterY, 0.4);
+        G.ui.card.open(G.ui.card.build(run.hook.sp, run.hook, G.state.save));
+        G.core.state.go(run, 'card');
+        return;
+      }
+    }
+    if (fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') hookPos(run, dt, loc);
+    heavyStep(run, dt);
+  }
+
+  // 7.7: when a species too heavy for the rod would be here (fish_ai sets tooHeavyNear), a
+  // large shadow passes once below the lure and the line hums once. No UI, ever.
+  function heavyStep(run, dt) {
+    var hv = run.heavy, fsm = run.fsm;
+    if (hv.state === 0 && run.school.ctx.tooHeavyNear && (fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest')) {
+      hv.state = 1; hv.t = 0; hv.dir = G.vrng.next() < 0.5 ? -1 : 1;
+      hv.x = run.cast.x1 - hv.dir * 200; hv.y = run.cast.ly - G.scene.sailing.loc().waterY + 14; hv.hum = 0.6;
+      if (G.core.debug) G.core.debug.log('something heavier circles here');
+      // TODO(P13.3): the single line hum sound.
+    }
+    if (hv.state === 1) {
+      hv.t += dt; hv.x += hv.dir * 40 * dt; hv.hum = Math.max(0, hv.hum - dt);
+      if (hv.t > 10) hv.state = 2;
+    }
+  }
+
+  function resetHeavy(run) { run.heavy.state = 0; run.heavy.hum = 0; }
+
+  function drawHeavy(ctx, loc, camPx, camPy, alpha) {
+    var hv = G.state.run.heavy;
+    if (!hv || hv.state !== 1) return;
+    var fade = Math.min(1, hv.t / 1.5, (10 - hv.t) / 1.5), d = S.get('fishsil_base_catfish');
+    ctx.globalAlpha = alpha * 0.55 * Math.max(0, fade);
+    ctx.save();
+    ctx.translate(Math.round(hv.x - camPx - d.w), Math.round(loc.waterY - camPy + hv.y - d.h));
+    ctx.scale(2, 2);
+    S.draw(ctx, 'fishsil_base_catfish', 0, 0, Math.floor(hv.t * 1.5) & 1, hv.dir < 0);
+    ctx.restore();
+    ctx.globalAlpha = alpha;
+  }
+
+  // The hooked (or lifted) fish. Drawn after the boat so the lift shows above the water.
+  function drawHooked(ctx, loc, camPx, camPy, t) {
+    var run = G.state.run, fsm = run.fsm;
+    if (fsm !== 'hooked' && fsm !== 'fighting' && fsm !== 'landing') return;
+    var h = run.hook, name = G.gfx.fishgen.sprite(h.sp), d = S.get(name), w = G.data.fish[h.sp].look.wrongness;
+    var pull = fsm !== 'landing' && run.fight.mode === 'pull';
+    var hh = S.hash(h.uid, Math.floor(t * 8)), jx = 0, jy = 0;
+    if (pull) { jx = (hh & 1) ? 1 : -1; jy = (hh & 2) ? 1 : 0; }             // thrash
+    else if (w && ((hh >>> 6) & 31) < w * 3) jx = (hh & 1) ? 1 : -1;          // wrongness twitch
+    var fr = Math.floor(t * (pull ? 10 : 2)) & 1;
+    if (d.n > 2 && ((hh >>> 15) & 15) < w * 2) fr = 2;
+    S.draw(ctx, name, Math.round(h.x - camPx - d.w / 2) + jx, Math.round(loc.waterY - camPy + h.y - d.h / 2) + jy, fr, h.face < 0);
+  }
+
+  // Screen position of the hooked fish's mouth (where the line ties on), written into out.
+  function mouth(loc, camPx, camPy, out) {
+    var h = G.state.run.hook, d = S.get(G.gfx.fishgen.sprite(h.sp));
+    out[0] = Math.round(h.x - camPx + h.face * (d.w / 2 - 1));
+    out[1] = Math.round(loc.waterY - camPy + h.y);
+    return out;
   }
 
   // Debug: puts the lure at depthM metres (clamped to the bottom), optionally at world x.
@@ -270,7 +422,8 @@ G.scene.underwater = (function () {
 
   return {
     UW: UW, UNDER: UNDER, stats: stats, prepare: prepare, bottomAt: bottomAt, deepestX: deepestX,
-    lureStep: lureStep, viewStep: viewStep, draw: draw, setLure: setLure
+    lureStep: lureStep, viewStep: viewStep, draw: draw, setLure: setLure,
+    GEAR: GEAR, createCatch: createCatch, catchStep: catchStep, resetHeavy: resetHeavy, drawHooked: drawHooked, mouth: mouth
   };
 })();
 
