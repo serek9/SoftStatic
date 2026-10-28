@@ -34,6 +34,13 @@ G.data.locations.fog = {
     { id: 'marker_b', kind: 'marker', x: 985 }
   ],
 
+  // The cross-section (V3.3). The bottom wanders between maxDepth - bottomAmp and maxDepth,
+  // and touches maxDepth somewhere. shaftEvery is the spacing of light shafts in px.
+  underwater: {
+    bottomAmp: 24, rock: 'stone_dark', silt: 'wood_dark',
+    weed: 'moss', weedDark: 'moss_dark', weedDensity: 0.07, shaftEvery: 150
+  },
+
   spots: [
     { id: 'pier_shade', kind: 'open', x: 300, r: 36 },
     { id: 'channel', kind: 'open', x: 560, r: 40 },

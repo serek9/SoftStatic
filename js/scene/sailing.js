@@ -15,7 +15,7 @@ G.scene.sailing = (function () {
   var boundsByLoc = {};          // loc id -> landmark id -> [x0, x1] as painted
   var skyCv = null, skyKey = -1, skyLum = 0;
   var skyOut = [0, 0, 0];
-  var camPx = 0;                 // rounded camera x for this frame's drawing
+  var camPx = 0, camPy = 0;      // rounded camera for this frame's drawing
   var wakeDist = 0, rippleT = 0;
 
   // Casting (V3.2). Distance follows sqrt(charge), so a short hold still reaches mid-range.
@@ -181,8 +181,9 @@ G.scene.sailing = (function () {
     run.loc = id;
     run.boat = boat.create(loc.start);
     run.dog = dog.create();
-    run.cam = { x: 0 };
+    run.cam = { x: 0, y: 0 };
     run.cam.x = camTarget(run);
+    run.uw = { alpha: 0 }; // how far the underwater cross-section has faded in
     // One cast at a time. seed is drawn from G.rng on release and is the cast's own seed (§3).
     run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0 };
     fx.clear();
@@ -231,11 +232,6 @@ G.scene.sailing = (function () {
     }
   }
 
-  function reelIn(run) {
-    run.cast.flying = false;
-    G.core.state.go(run, 'sailing');
-  }
-
   // Debug: casts straight away at the given charge. Returns the landing x, or false if not sailing.
   function forceCast(charge) {
     var run = G.state.run;
@@ -262,8 +258,8 @@ G.scene.sailing = (function () {
         flight(run, dt);
         break;
       case 'sinking':
-        // TODO(P5.4): the lure sinks through the underwater view. For now it floats until reeled in.
-        if (inp.pressed('action')) reelIn(run);
+      case 'waiting':
+        G.scene.underwater.lureStep(run, dt, loc);
         break;
     }
   }
@@ -293,12 +289,12 @@ G.scene.sailing = (function () {
     return out;
   }
 
-  // 1 px line between two screen points (Bresenham).
-  function line(ctx, x0, y0, x1, y1) {
+  // 1 px line between two screen points (Bresenham). dotted draws every other pixel.
+  function line(ctx, x0, y0, x1, y1, dotted) {
     x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
-    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy, n = 0;
     for (;;) {
-      ctx.fillRect(x0, y0, 1, 1);
+      if (!dotted || (n++ & 1) === 0) ctx.fillRect(x0, y0, 1, 1);
       if (x0 === x1 && y0 === y1) break;
       var e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
@@ -308,7 +304,7 @@ G.scene.sailing = (function () {
 
   // Marker, line and lure, in screen space.
   function drawCast(ctx) {
-    var run = G.state.run, c = run.cast, b = run.boat, wy = loc.waterY, fsm = run.fsm;
+    var run = G.state.run, c = run.cast, b = run.boat, wy = loc.waterY - camPy, fsm = run.fsm;
     if (fsm === 'charging') {
       var mx = landingX(b, c.charge) - camPx;
       ctx.globalAlpha = 0.4;
@@ -319,17 +315,25 @@ G.scene.sailing = (function () {
       ctx.globalAlpha = 1;
       return;
     }
-    if (fsm !== 'casting' && fsm !== 'sinking') return;
+    var under = G.scene.underwater.UNDER[fsm] === 1;
+    if (fsm !== 'casting' && !under) return;
     rodPose(run, pose);
     var sx = Math.round(b.x - run.cam.x);
     boat.rodTip(b, sx, wy, pose[0], tip);
     var lx, ly;
-    if (fsm === 'casting' && !c.flying) { lx = tip[0]; ly = tip[1]; }
-    else if (fsm === 'sinking') { lx = c.x1 - camPx; ly = wy - 1 + Math.round(Math.sin(b.t * 2.3) * 0.6); }
-    else { lx = c.lx - camPx; ly = c.ly; }
     ctx.globalAlpha = 0.6;
     ctx.fillStyle = P.fog_light;
-    line(ctx, tip[0], tip[1], lx, ly);
+    if (fsm === 'casting') {
+      if (c.flying) { lx = c.lx - camPx; ly = c.ly - camPy; } else { lx = tip[0]; ly = tip[1]; }
+      line(ctx, tip[0], tip[1], lx, ly, false);
+    } else {
+      // Above the water the line runs to where the lure went in; below it drops dotted to the lure.
+      var ex = c.x1 - camPx;
+      lx = ex; ly = c.ly - camPy;
+      if (fsm === 'waiting') lx += Math.round(Math.sin(b.t * 1.3) * 1.5); // the lure sways once it stops
+      line(ctx, tip[0], tip[1], ex, wy, false);
+      line(ctx, ex, wy, lx, ly, true);
+    }
     ctx.globalAlpha = 1;
     S.draw(ctx, 'lure', Math.round(lx) - 1, Math.round(ly) - 1, 0, false);
   }
@@ -415,6 +419,7 @@ G.scene.sailing = (function () {
     boat.step(b, move, dt, loc.width);
     dog.step(run.dog, dt);
     camStep(run, dt);
+    G.scene.underwater.viewStep(run, dt, loc);
 
     // Wake: a puff and a small ripple every 6 px travelled; a slow ring while idling.
     var wy = loc.waterY;
@@ -435,10 +440,10 @@ G.scene.sailing = (function () {
 
   function drawBackdrop(c) {
     var wy = loc.waterY;
-    c.drawImage(skyCv, 0, 0, 1, wy, 0, 0, VIEW_W, wy);
+    c.drawImage(skyCv, 0, 0, 1, wy, 0, -camPy, VIEW_W, wy);
     for (var i = 0; i < layers.length; i++) {
       var L = layers[i];
-      c.drawImage(L.cv, Math.round(camPx * L.p), 0, VIEW_W, wy, 0, 0, VIEW_W, wy);
+      c.drawImage(L.cv, Math.round(camPx * L.p), 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
     }
   }
 
@@ -447,7 +452,7 @@ G.scene.sailing = (function () {
   function drawBoat(c) {
     var run = G.state.run;
     rodPose(run, pose);
-    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY, true, drawDog, pose[0], pose[1]);
+    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, true, drawDog, pose[0], pose[1]);
   }
 
   function drawAbove(c) { drawBackdrop(c); drawBoat(c); }
@@ -456,12 +461,17 @@ G.scene.sailing = (function () {
     var run = G.state.run, wy = loc.waterY;
     refreshSky(hourNow());
     camPx = Math.round(run.cam.x);
+    camPy = Math.round(run.cam.y);
+    var a = run.uw.alpha;
     drawBackdrop(ctx);
-    G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove);
-    ctx.drawImage(glint, camPx, 0, VIEW_W, 1, 0, wy, VIEW_W, 1);
-    fx.draw(ctx, camPx, 0);
+    // The mirror is only ever drawn with the camera at the surface (see underwater.js).
+    if (a < 1) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove);
+    if (a > 0) G.scene.underwater.draw(ctx, loc, camPx, camPy, a, run.boat.t);
+    ctx.drawImage(glint, camPx, 0, VIEW_W, 1, 0, wy - camPy, VIEW_W, 1);
+    fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
     drawCast(ctx);
+    G.ui.hud.draw(ctx, run, wy);
   }
 
   return {
