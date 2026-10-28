@@ -185,8 +185,37 @@ G.scene.sailing = (function () {
     run.cam.x = camTarget(run);
     run.uw = { alpha: 0 }; // how far the underwater cross-section has faded in
     // One cast at a time. seed is drawn from G.rng on release and is the cast's own seed (§3).
-    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0 };
+    // latched: clock windows open when the lure landed (D1), cleared when it is reeled in.
+    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, latched: {} };
+    run.school = G.sim.fish_ai.createSchool(G.data);
+    run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
+    run.lureIn = { active: false, x: 0, y: 0, bait: '' };
+    run.uneaseIn = { loc: id, still: true, atShop: false };
     fx.clear();
+  }
+
+  // Inputs for the sim modules that are not the player's keys.
+  var BAIT = 'worm';       // TODO(P8.1): the equipped bait
+  var ROD_MAX_MASS = 3;    // kg   TODO(P8.1): the equipped rod's limit
+
+  function fishStep(run, dt) {
+    var save = G.state.save, c = run.cast, li = run.lureIn, ctx = run.school.ctx;
+    li.active = G.scene.underwater.UNDER[run.fsm] === 1;
+    li.x = c.x1;
+    li.y = c.ly - loc.waterY;
+    li.bait = BAIT;
+    ctx.loc = loc.id;
+    ctx.depthM = li.y * 0.25;
+    ctx.hour = save.clock;
+    ctx.unease = G.sim.unease.get(save, loc.id);
+    ctx.bait = BAIT;
+    ctx.latched = c.latched;
+    ctx.rodMaxMass = ROD_MAX_MASS;
+    ctx.maxDepthPx = loc.maxDepth;
+    G.sim.fish_ai.stepSchool(run.school, li, dt, G.rng, G.data);
+    var n = G.sim.fish_ai.interested(run.school);
+    if (run.fsm === 'waiting' && n > 0) G.core.state.go(run, 'interest');
+    else if (run.fsm === 'interest' && n === 0) G.core.state.go(run, 'waiting');
   }
 
   // ---- Cast ------------------------------------------------------------------------
@@ -228,6 +257,7 @@ G.scene.sailing = (function () {
     if (u >= 1) {
       c.lx = c.x1; c.ly = wy;
       fx.splash(c.x1, wy, Math.min(1, c.dist / 100));
+      G.sim.clock.latch(c.latched, G.state.save.clock, G.data.windows);
       G.core.state.go(run, 'sinking');
     }
   }
@@ -246,7 +276,11 @@ G.scene.sailing = (function () {
     var c = run.cast, inp = G.core.input;
     switch (run.fsm) {
       case 'sailing':
-        if (inp.pressed('action') && run.boat.stopped) { c.charge = 0; G.core.state.go(run, 'charging'); }
+        if (inp.pressed('action') && run.boat.stopped) {
+          c.charge = 0;
+          G.sim.clock.clearLatch(c.latched); // the last cast is out of the water
+          G.core.state.go(run, 'charging');
+        }
         break;
       case 'charging':
         if (inp.move() !== 0) { G.core.state.go(run, 'sailing'); break; } // steering cancels the charge
@@ -259,6 +293,7 @@ G.scene.sailing = (function () {
         break;
       case 'sinking':
       case 'waiting':
+      case 'interest':
         G.scene.underwater.lureStep(run, dt, loc);
         break;
     }
@@ -381,10 +416,7 @@ G.scene.sailing = (function () {
     return out;
   }
 
-  function hourNow() {
-    var h = G.state.save.clock || 0; // TODO(P6.1): the clock advances here
-    return ((h % 24) + 24) % 24;
-  }
+  function hourNow() { return G.sim.clock.wrap(G.state.save.clock || 0); }
 
   // Rebakes the 1 px wide sky strip when the hour moves by 0.05 (3 real seconds).
   function refreshSky(hour) {
@@ -413,8 +445,13 @@ G.scene.sailing = (function () {
   function exit() {}
 
   function update(dt) {
-    var run = G.state.run, b = run.boat;
+    var run = G.state.run, b = run.boat, save = G.state.save;
+    G.sim.clock.step(save, null, dt, G.rng, G.data);
+    run.uneaseIn.loc = loc.id;
+    run.uneaseIn.still = b.stopped;
+    G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);
     castStep(run, dt);
+    fishStep(run, dt);
     var move = run.fsm === 'sailing' ? G.core.input.move() : 0;
     boat.step(b, move, dt, loc.width);
     dog.step(run.dog, dt);
@@ -492,6 +529,18 @@ if (G.core.debug) G.core.debug.addLine(function () {
     '  sky lum ' + sc.skyLum().toFixed(0) + '/' + G.gfx.sprites.CEILING.toFixed(0) + '\n' +
     'boat x ' + b.x.toFixed(1) + '  vx ' + b.vx.toFixed(2) + '  stopped ' + (b.stopped ? 'Y' : 'n') +
     '  facing ' + (b.facing > 0 ? 'R' : 'L') + '  dog ' + run.dog.pose;
+});
+
+if (G.core.debug) G.core.debug.addLine(function () {
+  var save = G.state.save, run = G.state.run, C = G.sim.clock, h = C.wrap(save.clock || 0), wins = '';
+  G.data.windows.forEach(function (w) {
+    var open = C.inWindow(h, w), lat = run.cast && run.cast.latched[w.id];
+    if (open || lat) wins += '  ' + w.id + (open ? ' open' : '') + (lat ? ' latched' : '');
+  });
+  var hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
+  return 'clock ' + (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + (C.isGrey(h) ? ' grey' : ' night') + wins +
+    '  unease ' + (run.loc || '-') + ' ' + G.sim.unease.get(save, run.loc).toFixed(3) +
+    (run.school && run.school.ctx.tooHeavyNear ? '  tooHeavyNear' : '');
 });
 
 if (G.core.debug) G.core.debug.addLine(function () {

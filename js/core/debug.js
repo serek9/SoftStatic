@@ -98,7 +98,20 @@ G.core.debug = (function () {
       if (!ok) console.log('poses: ' + G.scene.dog.POSES.join(', '));
       return ok;
     },
-    unease: todo('unease', 'TODO(P6.2)'), // TODO(P6.2)
+    // dbg.unease(v) sets the current location's unease (0..1); dbg.unease() reads it.
+    unease: function (v) {
+      var loc = G.state.run.loc;
+      if (v !== undefined) G.sim.unease.set(G.state.save, loc, v);
+      return G.sim.unease.get(G.state.save, loc);
+    },
+    // dbg.spawn(id) puts a fish of that species beside the lure (lure must be in the water).
+    spawn: function (id) {
+      var run = G.state.run, sp = -1;
+      for (var i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === id) sp = i;
+      if (sp < 0 || !run.lureIn.active) return false;
+      var h = G.data.fish[sp].habitat;
+      return !!G.sim.fish_ai.spawn(run.school, sp, run.lureIn.x - 60, (h.depthMin + h.depthMax) * 2, 1, G.rng, G.data);
+    },
     // dbg.cast(charge) casts at once with charge 0..1 (default 0.3); returns the landing x.
     cast: function (charge) { return G.scene.sailing.forceCast(charge === undefined ? 0.3 : charge); },
     // dbg.lure(m, x) puts an underwater lure at m metres (clamped to the bottom), optionally at world x.
@@ -123,6 +136,7 @@ G.core.debug = (function () {
     var CELL_W = 80, CELL_H = 42, COLS = 4, ROWS = 4;
 
     function enter() {
+      if (G.gfx.fishgen) G.gfx.fishgen.defineGallery(); // every part on every base
       var names = G.gfx.sprites.names, per = COLS * ROWS;
       pages = ['palette', 'font'];
       for (var i = 0; i < names.length; i += per) pages.push('sprites:' + i);

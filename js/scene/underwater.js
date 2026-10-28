@@ -29,6 +29,10 @@ G.scene.underwater = (function () {
   var MN = 36;     // drifting motes
   var mx = new Float32Array(MN), my = new Float32Array(MN), mp = new Float32Array(MN);
   var motesReady = false;
+  // Background silhouettes (V3.4): far, dark, drifting; never interact with anything.
+  var BGN = 4, BG_SPR = ['fishsil_base_carp', 'fishsil_base_pike', 'fishsil_base_catfish', 'fishsil_base_trout'];
+  var bx = new Float32Array(BGN), by = new Float32Array(BGN), bv = new Float32Array(BGN);
+  var SIL_DEPTH = 56; // px (14 m): deeper fish show only as silhouettes at night   TODO(P8.1): lantern
   var stats = { ms: 0 };
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -147,7 +151,7 @@ G.scene.underwater = (function () {
       c.lx = c.x1;
       c.bubT = (c.bubT || 0) - dt;
       if (c.bubT <= 0) { c.bubT = 0.4; fx.emit('bubbles', c.lx, c.ly - 2, 1); }
-    } else if (run.fsm === 'waiting') {
+    } else if (run.fsm === 'waiting' || run.fsm === 'interest') {
       if (inp.held('action')) {
         var b = run.boat, home = b.x + b.facing * UW.reach;
         c.x1 += clamp(home - c.x1, -UW.reelIn * dt, UW.reelIn * dt);
@@ -160,7 +164,6 @@ G.scene.underwater = (function () {
           return;
         }
       }
-      // TODO(P6.7): fish notice the lure here (waiting -> interest).
       c.ly = Math.min(c.ly, wy + bottomAt(loc, c.x1));
     }
   }
@@ -182,15 +185,41 @@ G.scene.underwater = (function () {
 
     if (!motesReady) {
       for (var i = 0; i < MN; i++) { mx[i] = G.vrng.range(0, 1200); my[i] = G.vrng.range(0, set.H); mp[i] = G.vrng.range(0, 6.28); }
+      for (var b = 0; b < BGN; b++) { bx[b] = G.vrng.range(0, 640); by[b] = G.vrng.range(20, loc.maxDepth - 10); bv[b] = G.vrng.range(2, 5) * (G.vrng.next() < 0.5 ? -1 : 1); }
       motesReady = true;
     }
     if (uw.alpha > 0) {
       for (var j = 0; j < MN; j++) { mp[j] += dt * 0.8; my[j] += dt * 1.5; mx[j] += Math.sin(mp[j]) * 2 * dt; }
+      for (var k = 0; k < BGN; k++) bx[k] += bv[k] * dt;
     }
   }
 
   // ---- Draw ----------------------------------------------------------------------------
   var WEED_SEQ = [0, 1, 2, 1];
+
+  // Fish (6.8). Reads the AI state only. Wrongness w makes the movement wrong too, all
+  // decided by a hash of (fish, 1/8 s time bucket) so it never changes any state:
+  //   twitch: a 1 px jerk; uneven fins: the tail beat drifts out of step;
+  //   reversing: from w >= 2, a beat drawn facing backwards while still moving forwards;
+  //   shimmer: from w = 3, glitch frames.
+  function drawFish(ctx, loc, camPx, camPy, t) {
+    var school = G.state.run.school, FG = G.gfx.fishgen, night = !G.sim.clock.isGrey(G.state.save.clock || 0);
+    if (!school) return;
+    for (var i = 0; i < school.fish.length; i++) {
+      var f = school.fish[i];
+      if (!f.active) continue;
+      var sp = G.data.fish[f.sp], w = sp.look.wrongness;
+      var name = night && f.y > SIL_DEPTH ? FG.silhouette(f.sp) : FG.sprite(f.sp), d = S.get(name);
+      var h = S.hash(f.uid, Math.floor(t * 8));
+      var face = f.vx < -0.5 ? -1 : (f.vx > 0.5 ? 1 : f.dir);
+      if (w >= 2 && (h & 63) < 2 + 2 * w) face = -face;
+      var jx = 0, jy = 0;
+      if (w >= 1 && ((h >>> 6) & 31) < w * 3) { jx = ((h >>> 11) & 1) ? 1 : -1; jy = ((h >>> 12) & 1) ? 1 : 0; }
+      var fr = Math.floor(t * (2 + Math.abs(f.vx) / 6) + (w ? ((h >>> 13) & 3) * 0.3 * w : 0)) & 1;
+      if (d.n > 2 && ((h >>> 15) & 15) < w * 2) fr = 2;
+      S.draw(ctx, name, Math.round(f.x - camPx - d.w / 2) + jx, Math.round(loc.waterY - camPy + f.y - d.h / 2) + jy, fr, face < 0);
+    }
+  }
 
   // camPx, camPy: the rounded camera. alpha: how far the fade has got. t: time in seconds.
   function draw(ctx, loc, camPx, camPy, alpha, t) {
@@ -203,9 +232,15 @@ G.scene.underwater = (function () {
       ctx.globalAlpha = alpha * (0.55 + 0.45 * Math.sin(t * 0.6 + k * 1.7));
       ctx.drawImage(set.shaft, Math.round(k * every + 40 - par), wyS);
     }
+    ctx.globalAlpha = alpha * 0.3;
+    for (var b = 0; b < BGN; b++) {
+      var bxs = ((bx[b] - camPx * 0.5) % 640 + 640) % 640 - 160; // parallax 0.5, wrapping
+      S.draw(ctx, BG_SPR[b], Math.round(bxs), Math.round(wyS + by[b]), Math.floor(t * 2 + b) & 1, bv[b] < 0);
+    }
     ctx.globalAlpha = alpha;
     ctx.drawImage(set.bottom, camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
     ctx.drawImage(set.weeds[WEED_SEQ[Math.floor(t * 1.5) % 4]], camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
+    drawFish(ctx, loc, camPx, camPy, t);
 
     ctx.globalAlpha = alpha * 0.5;
     ctx.fillStyle = P.water_hi;
@@ -246,4 +281,17 @@ if (G.core.debug) G.core.debug.addLine(function () {
   return 'underwater alpha ' + run.uw.alpha.toFixed(2) + '  camY ' + run.cam.y.toFixed(1) + '  lure ' + depth.toFixed(1) + ' px = ' +
     (depth * 0.25).toFixed(2) + ' m  bottom ' + (G.scene.underwater.bottomAt(loc, run.cast.x1) * 0.25).toFixed(2) + ' m  draw ' +
     G.scene.underwater.stats.ms.toFixed(2) + ' ms';
+});
+
+if (G.core.debug) G.core.debug.addLine(function () {
+  var school = G.state.run.school, s = '', n = 0;
+  if (!school) return 'fish: -';
+  for (var i = 0; i < school.fish.length; i++) {
+    var f = school.fish[i];
+    if (!f.active) continue;
+    n++;
+    s += '  ' + G.data.fish[f.sp].id + ' ' + f.state + (f.state === 'inspect' ? '(' + f.circles + ')' : '') +
+      (f.state === 'nibble' ? '(' + f.nibbles + '/' + f.nibbleN + ')' : '') + ' ' + (f.y * 0.25).toFixed(1) + 'm';
+  }
+  return 'fish ' + n + '/' + G.sim.fish_ai.MAX + s;
 });
