@@ -3,7 +3,8 @@
 A calm, liminal side-view fishing game in plain JavaScript (no libraries, no build step).
 
 - **The plan:** [PLAN.md](PLAN.md). Read **§0 Shared Conventions** before any coding task, then only the phase or task you were given.
-- **Where things stand:** [HANDOFF.md](HANDOFF.md) has the completed phases, open TODOs and decisions made along the way.
+- **Where things stand:** PLAN.md **§8 Project Status** has the completed phases, the architecture as built, technical decisions, known issues, check baselines and the exact next task (§8.6). Read it before starting work.
+- **Machine setup and moving saves:** [HANDOFF.md](HANDOFF.md).
 
 ## How we work
 
@@ -11,7 +12,7 @@ A calm, liminal side-view fishing game in plain JavaScript (no libraries, no bui
 - Implement only what the task names. If something outside it is missing, leave a `// TODO(Px.y)` stub and mention it (§0.1).
 - "Done" means a `dbg.*` or Node check passes, never "I played for a while" (§0.13). Report the actual check output.
 - Commit once per phase: `Phase N: <name> (tasks N.1-N.k)`, with a body saying what was built. Never push without asking.
-- Never rewrite PLAN.md; record departures from it in HANDOFF.md under "Decisions".
+- PLAN.md §0–§7 and Appendix V are the approved spec: don't edit them. At the end of every phase, update **§8**: the phase table, new decisions (8.3), known issues (8.4), baselines (8.5) and the next task (8.6).
 
 ## Rules that are easy to break (§0)
 

@@ -1,6 +1,6 @@
 # SoftStatic: Handoff
 
-Where the project stands, and how to pick it up on another computer. Last updated 2026-10-28, at commit `ead0edf`.
+How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-28, at commit `ead0edf`.
 
 ## State in one paragraph
 
