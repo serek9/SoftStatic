@@ -89,9 +89,97 @@ G.core.debug = (function () {
     hour: todo('hour', 'TODO(P6.1)'),     // TODO(P6.1)
     unease: todo('unease', 'TODO(P6.2)'), // TODO(P6.2)
     tp: todo('tp', 'TODO(P3.1)'),         // TODO(P3.1)
-    caught: todo('caught', 'TODO(P8.3)')  // TODO(P8.3)
+    caught: todo('caught', 'TODO(P8.3)'), // TODO(P8.3)
+    // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).
+    sprite: function (name) { return G.gfx.sprites.verify(name || 'test'); },
+    // dbg.fx(kind, n, x, y) emits particles; they show wherever a scene draws fx (the gallery's fx page).
+    fx: function (kind, n, x, y) { return G.gfx.fx.emit(kind || 'splash', x === undefined ? 160 : x, y === undefined ? 110 : y, n || 20); }
   };
   if (on) window.dbg = dbg;
 
-  return { on: on, addLine: addLine, log: log, error: error, dbg: dbg };
+  // `?gallery`: pages of everything the gfx layer can draw. A/D or arrows change page.
+  var gallery = (function () {
+    var pages = [], page = 0, t = 0, emitT = 0;
+    var SAMPLE = 'The quick brown fox jumps over the lazy dog.';
+    var CELL_W = 80, CELL_H = 42, COLS = 4, ROWS = 4;
+
+    function enter() {
+      var names = G.gfx.sprites.names, per = COLS * ROWS;
+      pages = ['palette', 'font'];
+      for (var i = 0; i < names.length; i += per) pages.push('sprites:' + i);
+      pages.push('fx');
+      page = 0; t = 0;
+    }
+
+    function update(dt) {
+      var inp = G.core.input;
+      if (inp.pressed('right')) page = (page + 1) % pages.length;
+      if (inp.pressed('left')) page = (page + pages.length - 1) % pages.length;
+      t += dt;
+      if (pages[page] === 'fx') {
+        emitT -= dt;
+        if (emitT <= 0) {
+          emitT = 0.3;
+          G.gfx.fx.emit('splash', 50, 110, 14);
+          G.gfx.fx.emit('wake', 130, 110, 6);
+          G.gfx.fx.emit('bubbles', 210, 168, 3);
+          G.gfx.fx.emit('dust', 280, 60, 2);
+        }
+      }
+      G.gfx.fx.update(dt);
+    }
+
+    function draw(ctx) {
+      var S = G.gfx.sprites, P = S.PALETTE, name = pages[page];
+      ctx.fillStyle = P.night_ink;
+      ctx.fillRect(0, 0, 320, 180);
+      S.drawText(ctx, 'GALLERY  ' + name.split(':')[0] + '  ' + (page + 1) + '/' + pages.length + '   A/D: page', 4, 2, 'dusk_high');
+
+      if (name === 'palette') {
+        var keys = Object.keys(P);
+        for (var i = 0; i < keys.length; i++) {
+          var cx = 4 + Math.floor(i / 14) * 106, cy = 13 + (i % 14) * 11;
+          ctx.fillStyle = P[keys[i]];
+          ctx.fillRect(cx, cy, 8, 8);
+          S.drawText(ctx, keys[i] + (S.SKY_WATER.test(keys[i]) ? '*' : ''), cx + 11, cy + 1, 'fog_light');
+        }
+        S.drawText(ctx, '* sky/water: never brighter than ' + S.CEILING_KEY, 4, 171, 'fog_mid');
+      } else if (name === 'font') {
+        for (var c = 32; c < 127; c++) {
+          var k = c - 32;
+          S.drawText(ctx, String.fromCharCode(c), 6 + (k % 24) * 12, 14 + Math.floor(k / 24) * 10, 'bone');
+        }
+        for (var j = 0; j < 4; j++) {
+          S.drawText(ctx, 'jitter ' + (j / 3).toFixed(2), 4, 66 + j * 14, 'fog_mid');
+          S.drawText(ctx, SAMPLE, 60, 66 + j * 14, 'paper', j / 3, 7);
+        }
+        S.drawText(ctx, 'width of sample: ' + S.measure(SAMPLE) + ' px', 4, 126, 'fog_mid');
+      } else if (name.indexOf('sprites:') === 0) {
+        var start = +name.split(':')[1], names = S.names;
+        for (var s = start; s < Math.min(names.length, start + COLS * ROWS); s++) {
+          var cell = s - start, x0 = 4 + (cell % COLS) * CELL_W, y0 = 13 + Math.floor(cell / COLS) * CELL_H;
+          var d = S.get(names[s]), f = Math.floor(t * 3);
+          ctx.save();
+          ctx.beginPath(); ctx.rect(x0, y0, CELL_W - 2, CELL_H - 2); ctx.clip();
+          S.draw(ctx, names[s], x0, y0, f, false);
+          S.draw(ctx, names[s], x0 + d.w + 4, y0, f, true);
+          S.drawText(ctx, names[s] + ' ' + d.w + 'x' + d.h + ' x' + d.n, x0, y0 + CELL_H - 10, 'fog_light');
+          ctx.restore();
+        }
+      } else if (name === 'fx') {
+        ctx.fillStyle = P.water_dark;
+        ctx.fillRect(0, 110, 320, 70);
+        G.gfx.fx.draw(ctx, 0, 0);
+        S.drawText(ctx, 'splash', 50 - (S.measure('splash') >> 1), 172, 'fog_mid');
+        S.drawText(ctx, 'wake', 130 - (S.measure('wake') >> 1), 172, 'fog_mid');
+        S.drawText(ctx, 'bubbles', 210 - (S.measure('bubbles') >> 1), 120, 'fog_mid');
+        S.drawText(ctx, 'dust', 280 - (S.measure('dust') >> 1), 80, 'fog_mid');
+        S.drawText(ctx, 'live ' + G.gfx.fx.count() + '/' + G.gfx.fx.MAX, 4, 14, 'fog_light');
+      }
+    }
+
+    return { enter: enter, exit: function () { G.gfx.fx.clear(); }, update: update, draw: draw };
+  })();
+
+  return { on: on, addLine: addLine, log: log, error: error, dbg: dbg, gallery: gallery };
 })();
