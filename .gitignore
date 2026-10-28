@@ -1,0 +1,48 @@
+# Dependencies (the game itself has none; this guards against tooling added later)
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Credentials and local environment
+.env
+.env.*
+*.pem
+*.key
+secrets.*
+
+# Claude Code: per-machine settings, permissions and session state
+.claude/settings.local.json
+.claude/*.local.*
+CLAUDE.local.md
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.AppleDouble
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs, temporary and generated files
+*.log
+npm-debug.log*
+*.tmp
+*.temp
+tmp/
+temp/
+coverage/
+dist/
+build/
+
+# Exported saves (save strings can hold personal progress; keep them out of the repo)
+*.save.txt
