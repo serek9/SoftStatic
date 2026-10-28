@@ -2,7 +2,7 @@
 
 > **FOR THE CODING AGENT:** Read **§0 Shared Conventions** first, then ONLY the task or section named in your assignment. Implement nothing that is not named in the task.
 
-**Status:** Plan final and approved. **Phases 1–10 are done (Milestones A and B reached).** The next task is **11.1 Blackwater Creek**; each phase starts only after explicit authorization. Progress, architecture as built, decisions, known issues and the exact next task are in **§8 Project Status**, which is updated at the end of every phase.
+**Status:** Plan final and approved. **Phases 1–11 are done (Milestones A and B reached; all four locations exist).** The next task is **12.1 `passive.cycle`**; each phase starts only after explicit authorization. Progress, architecture as built, decisions, known issues and the exact next task are in **§8 Project Status**, which is updated at the end of every phase.
 
 ---
 
@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-10-28, after Phase 10 (Anomalies, Milestone B). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-10-28, after Phase 11 (Locations 2–4). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -387,13 +387,13 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 7 Bite, fight, landing | Done | `1b6ab97` | **Milestone A reached** |
 | 8 Economy, save, balance | Done | `855d35a`, `ead0edf` | `tools/balance.js` in place |
 | 9 Interface | Done | `Phase 9: Interface` | HUD, pause menu, journal, shop, map, cabin; save v3 |
-| 10 Anomalies | Done | `Phase 10: Anomalies` | **Milestone B reached** (see 8.3 #33 for which §2 elements are live); save v4 |
-| 11 Locations 2–4 | **Next** | | Start with task 11.1 (see 8.6) |
-| 12 Passive and the tape | Not started | | |
+| 10 Anomalies | Done | `b041d97` | **Milestone B reached** (see 8.3 #33 for which §2 elements are live); save v4 |
+| 11 Locations 2–4 | Done | `Phase 11: Locations 2-4` | Creek (current), Pines (set pieces), Red Room (moving structures, unlock), scenery hook, the shared pier. No fish there yet (14.2–14.4) |
+| 12 Passive and the tape | **Next** | | Start with task 12.1 (see 8.6) |
 | 13 Audio | Not started | | May run alongside any phase from 7 on |
 | 14 Content and polish | Not started | | Milestone C |
 
-Every task in Phases 1–10 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
+Every task in Phases 1–11 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
 
 ### 8.2 Architecture as built
 
@@ -407,10 +407,16 @@ js/core/  debug.js  ?debug overlay (page text), red error box, dbg.* API, ?galle
           input.js  keys/mouse -> actions (left, right, action, pause, journal, map, passive, up, down, back)
           save.js   save v3, migrations, SS1.<base64>.<checksum> format, autosave
           loop.js   fixed 1/60 step, 0.1 s frame cap (setPaused is a debug freeze; P is the pause menu)
-data/     loc_fog.js   Fogbound: layers, landmarks, underwater settings, spots (with boosts), maxDepth 96 px (24 m)
+data/     loc_fog.js   Fogbound: layers, landmarks, underwater settings, spots (with boosts), maxDepth 96 px (24 m), cost 0
+          loc_creek.js Blackwater Creek: forest layers, cabins, snags (above and below water), the current
+                       (drift(seed, t, depth, onBottom)), maxDepth 64 px (16 m), cost 300
+          loc_pines.js The Pines: far shore with diner and lot, signal, road, owl branch, the shared pier,
+                       maxDepth 112 px (28 m), cost 1500
+          loc_red.js   Red Room: curtains, zigzag floor, movers and place(seed, xs), crimson reflect, the
+                       unlock condition (need.windowCatch), maxDepth 80 px (20 m), cost 6000
           fish.js      clock windows, rarity weights, 4 species, validateFish()
           gear.js      rod/reel/line tiers, baits (with shop pack sizes), lantern, depth finder, fight
-                       constants, economy constants, unlock costs and names, cabin stages,
+                       constants, economy constants, cabin stages,
                        passive.incomeMult (D5)
           dialogue.js  the shopkeeper: small talk and the special lines (hints, repeated, reversed)
           anomalies.js the anomaly list and scheduler constants, validateAnomalies()
@@ -427,10 +433,12 @@ js/gfx/   bake.js      offscreen canvases, layers, flipped copies, lazy cache
           fishgen.js   8 bases × 15 parts, wrongness, asymmetry, shimmer; ?gallery combinations
 js/scene/ boat.js      boat physics, rod geometry and bend
           dog.js       6 poses, interest thresholds, the stare and the bark (cues)
-          underwater.js  cross-section, lure sink/stop/reel, fish drawing, bite -> hook -> fight -> landing,
-                         heavy-fish shadow
+          underwater.js  cross-section (with submerged snags), lure sink/stop/reel and the current's drift,
+                         fish drawing, bite -> hook -> fight -> landing, heavy-fish shadow
+          scenery.js   scenery modules (11.4): 'pines' (blinking signal, neon, fluorescent lot lamps, the
+                       perched owl) and 'red' (curtain and zigzag painters, moving structures, crimson wash)
           sailing.js   the scene in play: location loading, parallax, camera, sky, cast, anomalies, the owl,
-                       the step order below
+                       the scenery hook, the step order below
 js/ui/    hud.js       clock, coins, bait in use; depth readout, tension tint, depth-finder bands
           card.js      catch card, sell/keep
           menu.js      overlay manager (pause, journal, map), pause menu with settings and export/import,
@@ -445,11 +453,11 @@ tools/    balance.js   --validate [--strict], --replay <seed> [min], --pacing (N
 
 **Scenes and overlays:** the scene manager holds `sailing`, `shop`, `cabin` and `gallery`. Each boot-loop step first calls `G.ui.menu.update(dt)`; while an overlay (pause, journal, map) is open it takes the step and the scene does not update, and `G.ui.menu.draw` draws it over the scene.
 
-**One update step** (`sailing.update`): gear effects → clock → unease → anomaly scheduler → owl → cast steps (charge, flight, or the lure under water) → fish school → `underwater.catchStep` (bite, hook, fight, landing, card) → card input → boat → dog cues and dog → camera → underwater view (fade, vertical camera) → particles.
+**One update step** (`sailing.update`): gear effects → clock → unease → anomaly scheduler → owl → cast steps (charge, flight, or the lure under water, drifting where there is a current) → fish school → scenery module `update` → `underwater.catchStep` (bite, hook, fight, landing, card) → card input → boat → dog cues and dog → camera → underwater view (fade, vertical camera) → particles.
 
-**Drawing order** (`sailing.draw`): sky and layers → mirror (only when the camera is at the surface) or the cross-section → waterline glints → particles → boat and dog → hooked fish → line and lure → HUD → card; then any overlay.
+**Drawing order** (`sailing.draw`): sky and layers (the scenery module's `afterLayer` after each) → mirror (anomaly deltas, then the module's `reflect`) (only when the camera is at the surface) or the cross-section → waterline glints → particles → boat and dog → hooked fish → line and lure → HUD → card; then any overlay.
 
-**Run state** (`G.state.run`, never saved): `fsm`, `loc`, `boat`, `dog`, `cam {x, y}`, `uw {alpha}`, `cast` (charge, landing x, lure position, seed, `latched` windows, bait, `boost {attract, rare, legend}`), `school`, `lureIn`, `bite`, `fight`, `hook`, `heavy`, `gearFx`, `dogIn`, `uneaseIn`, `anom` (the active anomaly, gap, next roll, cooldowns), `anomIn`, `owl`.
+**Run state** (`G.state.run`, never saved): `fsm`, `loc`, `boat`, `dog`, `cam {x, y}`, `uw {alpha}`, `cast` (charge, landing x, lure position, seed, `tw` time in the water, `latched` windows, bait, `boost {attract, rare, legend}`), `school`, `lureIn`, `bite`, `fight`, `hook`, `heavy`, `gearFx`, `dogIn`, `uneaseIn`, `anom` (the active anomaly, gap, next roll, cooldowns), `anomIn`, `owl`, `spots` (the location's spots as they stand for the next cast), `scen` (the scenery module's own state, or null).
 
 **Save** (`G.state.save`, version 4): `coins`, `gear {rod, reel, line, lantern, depthFinder, bait}`, `baits {id: count}`, `journal {id: {caught, bestLen, bestW, hints, seen, phantom, read}}` (`read` is set when the entry is looked at; absent means NEW; `late {ref: true}` and `lateNew` mark hints written in later, 10.5, and such an entry can exist with `caught: 0`), `kept [{id, len, w}]`, `cabinLevel`, `unlocks {fog: true}`, `loc` (where the game resumes), `unease {loc: 0..1}`, `clock` (a new game starts at 19:00), `flags {windowCatch {windowId: true}, lines {lineId: visit said on}, shopVisits, heavy {loc: true}, anomalies {id: times seen}, dogStare {loc: true}, lateAt}`, `settings {volume, mute}`, `lastSeen`, `rng`, plus `tapes` (P12). Migrations v1 → v2 → v3 → v4 exist.
 
@@ -470,7 +478,7 @@ These are interpretations and additions made while building, where the spec abov
 11. **The fight starts at D = 0.6** (`gear.fight.d0`). On screen the hooked fish stays within 140 px of the boat, and the camera frames boat and fish together.
 12. **Auto-player landing band** (7.3; the spec gives none): skill 0.8 with starter gear lands at least 90% of fish within the line's rating (strength ≤ line strength), and stronger fish less often but above 40%.
 13. **Gear tiers are linear upgrades** (`save.gear.rod = 2` means tier 2 is owned and equipped). Bait: one per cast; worms are unlimited; with none of the equipped bait left, worms go on. `attract` shortens time between fish arrivals; `rareBoost` multiplies rare and legendary weights.
-14. **Unlock costs** are in `data/gear.js` `unlocks` until each location file carries its own (11.1). The Red Room's condition is any landed catch whose cast was latched in a window (`flags.windowCatch`); 11.3 may narrow it to a specific fish.
+14. **Unlock costs** live in each location file (`cost`, and `need` for a condition) since 11.1; `data/gear.js` no longer has `unlocks`. The Red Room's condition is any landed catch whose cast was latched in a window (`flags.windowCatch`); see #34.
 15. **Pacing model** (`tools/balance.js`): an active player at depth 8 m, hooking 90% of bites, fight skill 0.85, buying in the order `PLAN` (line, reel, rod, lantern, depth finder, creek, …). It fishes the Fogbound roster for the whole run, because no other location has fish yet.
 16. **Run state is built by `sailing.load()`**, not by `state.newRun()` (which only creates `fsm`, `fsmPrev` and `fsmT`).
 17. **Overlays and scenes (9.2):** pause, journal and map are overlays over the current scene; shop and cabin are scenes. While an overlay is open the world waits (no clock, fish or fight). P pauses anywhere, and Esc pauses on the water; J opens the journal anywhere; M opens the map only from the boat with no line out. In the shop and cabin, Esc or M leaves.
@@ -490,6 +498,14 @@ These are interpretations and additions made while building, where the spec abov
 31. **The owl (10.4):** `clock.cueCrossed` reports when a step passes a window's `cue`. An owl then shows on a snag on the shore (screen x 250 of the view at that moment) for 7 s, calls at 1.5 s as two spreading rings, and the dog looks up (alert, 2 s). It is drawn with the backdrop, so it reflects too. No sound until 13.3.
 32. **Late journal hints (10.5):** `unease.lateHint` runs when the journal closes. It needs this location's unease ≥ 0.4 and at least one catch since the last late hint (`flags.lateAt` holds the catch total then). It writes the first hint not yet known, uncaught species first, in data order. Candidates are the species' `hintRefs`, then `bait`, then `depth`; bait and depth are skipped if catching has already shown them. No RNG is involved: the same save gives the same line. Late notes are drawn in `night_blue`, the cell gets a `*` until the page is viewed, and an uncaught species' page shows them under "Not caught yet." The `empty_boat` anomaly's `revealHint` uses the same function, forced past the gates.
 33. **Milestone B, as built:** of §2's elements, these are live on Fogbound: unease, clock windows with the owl, heavy-fish hints, catch-card lines, the dog (point, look down, stare; the bark is ready and waits for a legendary species, 14.1), reflection deltas, the shopkeeper, journal handwriting and late pages, and cabin trophies. Still to come by plan: moving structures (Red Room, 11.3), set pieces (11.2/11.4) and the tape (12).
+34. **The Red Room's unlock stays "any window catch" (11.3):** `need: {windowCatch: 'any'}` in `data/loc_red.js`; `economy.canUnlock` also accepts a window id there. V6 asks for a specific fish in a specific window, but the pacing model fishes at 8 m and never catches the window-only `owl_eel` (12–24 m), so narrowing it now would make `--pacing` report "red: never". Narrow it with the Red Room roster (14.4), and teach the pacing model to fish the window deep then.
+35. **The creek's current (11.1):** `drift(seed, t, depth, onBottom)` in `data/loc_creek.js` is the whole rule: it ramps up over `ramp` s, sways by ±`sway` with a phase hashed from the cast's seed, slows with depth (half as fast at `maxDepth`) and only creeps on the bottom (×0.2). `underwater.lureStep` adds it to `cast.x1` each fixed step while sinking, waiting or nibbling, so the line's entry point follows the lure. At 3 px/s the lure goes about 70 px in 30 s at 6 m and 14 px on the bottom. Any location with a `drift` function gets a current.
+36. **Scenery modules (11.4) are a new file, `js/scene/scenery.js`** (not in the §3 tree), registered as `G.scene.scenery[id]` and named by `loc.scenery`. The hook in `sailing.js` takes optional parts: `paint` and `landmarks` (extra painters, baked once), `load`, `update`, `landed`, `afterLayer` (draws over a given layer at its scroll, so near layers still cover it and the mirror reflects it), `reflect` (mirror pass only) and `debugLine`. Fogbound and the creek have no module. Generic painters stay in `sailing.js` (the creek's `trunks`, `cabin`, `snag`); a module's painter wins for its own kinds.
+37. **The traffic light (11.2)** blinks every 1.4 s, at 0.45 s inside a clock window, and closes in on that over the game hour before a window opens (`scenery.pines.blinkPeriod(hour)`, pure). Its phase runs at the current period, so it follows `dbg.hour` straight away. The perched owl opens its eyes while a window is open. The neon and the stuttering fluorescent lamp use a hash of time, never RNG. The 10.4 window owl still appears on its own snag in the Pines too.
+38. **Moving structures (11.3):** the lamp (rare ×2.5), the armchair (attract ×1.5) and the statue (attract ×1.2, rare ×1.5) each carry a spot. `place(seed, xs)` in `data/loc_red.js` lays them out (60 px from the ends, 140 px apart): from the location's seed on arrival, then, once a cast has landed and its boost is decided where things stood, from that cast's seed. They fade across over 2 s. `unease.castBoost` now takes the spots list (`run.spots`) instead of the location. The legendary and hidden spots stay put, and the dog's cues still read `loc.spots`. The layout is run state, so a reload starts again from the location's seed.
+39. **The same pier (11.4):** a landmark with its own `seed` paints from that seed instead of the layer's shared stream. Fogbound's pier and the Pines' pier both have seed 3301 and are identical pixel for pixel. Giving Fogbound's pier a seed changed how Fogbound's other landmarks bake slightly (they no longer share a stream with it).
+40. **Crimson reflection:** the Red Room's module washes the mirror buffer with `crimson` at 0.55 (`loc.reflect`), so `water.js` is unchanged. Through the water's 0.35 alpha and depth shade it reads as a dark red reflection.
+41. **Anomalies by location:** the reflected figure and the empty boat can appear on all four waters, the lit window on Fogbound, the creek and the Pines, the second pier on Fogbound and the Pines.
 
 ### 8.4 Known bugs and pending issues
 
@@ -498,7 +514,7 @@ No crashes or failing checks are known. Open items, roughly by importance:
 | # | Issue | Where | Owner |
 |---|---|---|---|
 | 1 | "Fog thickens in grey hours" (§0.8) is not built; only the sky follows the clock | `js/scene/sailing.js` | Not assigned to a task; suggest 14 |
-| 2 | Only Fogbound has data. The map shows the other three as "Not charted yet". Travel was checked against a stand-in location injected in the browser | `js/ui/map.js` | 11.1 |
+| 2 | The creek, the Pines and the Red Room have no fish yet, so the school stays empty there (the lure, drift, anomalies and the dog's stare all work). Their legendary spots wait for a legendary species, like Fogbound's | `data/fish.js` | 14.2–14.4 |
 | 3 | Placeholder roster limits: the journal's heavy-fish margin note cannot appear (no Fogbound fish is heavier than the starter rod's 3 kg); the dog never barks (no legendary); and the hidden spot's rare ×2 only pays inside the owl window (the only rare fish is window-only). Measured coins per hour at `reed_gap` vs open water: ×1.44 at 02:45, ×1.10 at 23:00. Each was checked with injected data or at the window | `data/fish.js` | 14.1 |
 | 4 | Volume and mute are saved and shown in the pause menu, but there is no audio yet | `js/ui/menu.js` | 13.1 |
 | 5 | `tooHeavyNear` is recomputed only when a fish spawns, so after a rod upgrade it can stay stale until the next spawn | `js/sim/fish_ai.js` | Minor; fix when touched (7.6/7.7 behaviour) |
@@ -509,6 +525,11 @@ No crashes or failing checks are known. Open items, roughly by importance:
 | 10 | The per-phase Node and browser checks were not committed. Phases 1, 6, 7 and 8 used Node scripts in a temporary folder. Phases 9 and 10 used a headless-Brave DevTools driver plus Node checks (shop lines, anomaly scheduler, spot value, late hints), in the session scratchpad. `tools/balance.js` covers validation, replay and pacing; the rest can be rebuilt from the §4 "Done when" column | — | Optional: a `tools/` browser check |
 | 11 | Testing note: many `getImageData` reads on the game canvas make Chrome move it off the GPU, and the page drops to 16–40 fps until reloaded. This only affects pixel-reading tests; the game never reads pixels back. (The 9.3 check reads offscreen canvases from `journal.render()` instead.) | — | Keep pixel tests short, or reload after them |
 | 12 | Menus are keyboard-only: the mouse only casts | `js/core/input.js` | 14.6 (touch and on-screen buttons) |
+| 13 | The Red Room unlock accepts a catch in any window, not a specific fish (8.3 #34) | `data/loc_red.js` | 14.4 (with the pacing model) |
+| 14 | The pacing model still fishes only Fogbound, even after it buys the other waters | `tools/balance.js` | 14.5 |
+| 15 | The shop drains Fogbound's unease (`ui/shop.js` passes `loc: 'fog'`), whichever water you came from; 8.3 #23 says "the current location's". Harmless now that the shop is on the Fogbound shore, but the two disagree | `js/ui/shop.js` | Decide when touched |
+| 16 | No sound for the fluorescent lamp's hum or the Pines' jazz | `js/scene/scenery.js` | 13.2, 13.4 |
+| 17 | In the Pines at 02:47 and 03:33 two owls show: the perched one opens its eyes, and the window owl appears on its own snag | `js/scene/sailing.js` | Minor; could hand the cue to the perched owl |
 
 The remaining `TODO(Px.y)` markers in the code are listed in [HANDOFF.md](HANDOFF.md#pending-work).
 
@@ -518,42 +539,40 @@ Run these after any change. A different result means something changed.
 
 | Command | Expected |
 |---|---|
-| `node tools/balance.js --validate` | `validate: OK (4 warning(s))`: Fogbound roster 4/9, and creek, pines and red not in data yet |
+| `node tools/balance.js --validate` | `validate: OK (4 warning(s))`: the rosters (Fogbound 4 of 9 species; creek, pines and red 0 of 9) |
 | `node tools/balance.js --replay 12345` | `hash 2265718513 / 2265718513, 16 catches, 18 casts`, then `PASS: identical` |
 | `node tools/balance.js --pacing` | All PASS. Medians: first upgrade 6.0 catches, creek 32.3 min, red 324.4 min |
 
-The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here. Phases 9 and 10 left all three unchanged. `--validate` now also checks `data/anomalies.js` (schema, locations, durations of at most 60 s, effects).
+The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here. Phases 9, 10 and 11 left all three unchanged. `--validate` also checks `data/anomalies.js` (schema, locations, durations of at most 60 s, effects) and, since Phase 11, every location file (fields, spots inside the world, at most one hidden spot, finite drift, `place` deterministic, in the world and spaced).
 
 Phase 9 browser checks (headless, 320×180 at scale 1, `?debug&seed=N`): HUD strings match the save after `dbg.money`, `dbg.hour` and `dbg.buy('bait','minnow',5)`. P freezes the clock, and export then import through the menu restores coins, journal and clock. The journal at `dbg.unease(0)` vs `dbg.unease(1)` differs in 2510 px (1975 at 0.5; 0 between two renders at the same unease). Every special shop line is said exactly once in 200 visits (Node). Travel's switch at black takes 4 ms and its longest frame is 16.8 ms. Trophy facing is unchanged inside the cabin after `dbg.unease(1)` plus a restoration, and cabin level and kept fish persist across a reload.
 
 Phase 10 checks: anomaly scheduler over 3 simulated hours (Node): at most 1 active, none past its max duration, gap and cooldowns kept, none below `uneaseMin`, deterministic per seed. Forced `dbg.anomaly(...)` ends by itself, a second one is refused, and the boat steers during it. Each delta changes 0 px above the waterline and 25–234 px below. A cast on a `lit_window` gets rare ×3. The dog's stare flag survives a reload with no repeat. At `dbg.hour(2.75)` the owl calls at 02:47, a Two-Forty-Seven bites by itself (hooked in 41 s), lands after the window has closed (latched), sets `flags.windowCatch.owl_247` and takes the Red Room from LOCKED to needing coins. Late hints are the same for identical saves and arrive one per new catch.
 
+Phase 11 checks. Node: the creek's lure path over 1800 steps (stop at 6 m) is identical for the same seed and differs for another; it drifts 67.6 px in 30 s at 6 m and 14.4 px on the bottom. `place(9001)` gives [910, 474, 133] twice. Browser (headless Brave, `?debug&seed=7`, fresh save): travel by the map bakes the creek in 7.1 ms, the Pines in 3.6 ms, the Red Room in 3.5 ms, longest frame 16.8 ms each time. A creek cast at x 589 drifted to 597.9 over 9.5 s with the school empty. Pines blink period: 1.4 s at 23:00 and 01:00 (4 flips in 3 s), 0.874 at ~02:03, 0.45 at 02:45 and 03:30 (13 flips, owl eyes open), 1.4 at 05:00; it matches the pure `blinkPeriod`. Fogbound's and the Pines' piers: 0 of 9072 pixels differ. The Red Room says "It opens to someone who has fished while the owl calls" until a catch latched in `owl_247`, then takes 6000 and opens. A cast landing on the lamp got rare ×2.5, and afterwards the structures stood exactly where `place(castSeed)` puts them. A reload resumes in the Red Room with its module loaded. No page errors.
+
 ### 8.6 Next task
 
-**Task 11.1 Blackwater Creek**, in the §7 template:
+**Task 12.1 `passive.cycle`**, in the §7 template:
 
 ```
-Read: §0 Shared Conventions, then §4 Task 11.1 only, plus V6 (locations) and §2 for any
-  liminal element the creek carries. Also 8.3 and 8.4 above (decisions 19, 26-30).
-Files you may touch: data/loc_creek.js (new; add it to index.html after data/loc_fog.js),
-  data/gear.js (move creek's cost and name into the location file, TODO(P11.1)),
-  js/ui/map.js (drop the TODO(P11.1) "Not charted yet" path once a location has data),
-  js/scene/sailing.js and js/scene/underwater.js only as far as the current needs,
-  data/anomalies.js only to list 'creek' in anomalies that fit it.
-Do: Blackwater Creek as data: winding forest river layers, decaying cabins and submerged
-  branches as landmarks, underwater settings, spots (one hidden spot for the dog), maxDepth,
-  and a slow current that drifts the lure. The drift is simulated: a pure function of
-  (time in water, the cast's seed, location data), stepped at the fixed dt, never
-  Math.random or the frame time. The cost (about 300) comes from the location file.
-  No creek fish yet (14.1): with none, the lure still works and the school stays empty.
-Done when: the drift is deterministic (the same seed and steps give the same lure path,
-  checked in Node), travel from the map bakes it without a hitch (8.5 method), and
-  node tools/balance.js --validate, --replay and --pacing still pass (the creek warning
-  in --validate goes away).
+Read: §0 Shared Conventions, then §4 Task 12.1 only, plus V7 (passive mode) and V8 (economy).
+  Also 8.3 above (decisions 12, 13, 15, 26) and 8.4 (#14: the pacing model fishes Fogbound only).
+Files you may touch: js/sim/passive.js (new, approved in D7; add it to index.html after
+  js/sim/economy.js), tools/balance.js (a passive measurement next to --pacing).
+Do: passive.cycle(state, rng): one passive fishing cycle through the same sim as active
+  play. Wait time = base / (bait attract x rod attract); the species from fish_ai.pickSpecies
+  with the location's context; auto-hook; the fight run by fight.autoPlayer at skill 0.8; the
+  sale scaled by passive.incomeMult (data/gear.js, D5, the only place it is set); the journal
+  through economy.recordCatch; the clock and unease advanced by the cycle's length. Pure:
+  no DOM, no Math.random, no Date; it must load in Node through vm.
+Done when: in Node, passive income over the same game time and seeds is 60% +/-5% of the
+  active model's (measured on Fogbound, the only water with fish), the same seed gives the
+  same result, and node tools/balance.js --validate, --replay and --pacing still pass.
 Report: what changed, the check output, any TODO stubs left; then update §8 (8.1, 8.4, 8.6).
 ```
 
-After 11.1, the rest of Phase 11 follows §4 in order: 11.2 The Pines, 11.3 Red Room, 11.4 scenery module hook.
+After 12.1, the rest of Phase 12 follows §4 in order: 12.2 live passive mode (TAB), 12.3 offline cycles, 12.4 the tape, 12.5 `?compact`.
 
 ---
 

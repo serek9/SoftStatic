@@ -1,0 +1,66 @@
+var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
+
+// Blackwater Creek (V6.2): a winding forest river with decaying cabins, snags of dead
+// branches, and a slow current that carries the lure downstream (drift, below).
+// Same units as loc_fog.js: world pixels, layer features in layer pixels, depths in px.
+G.data = G.data || {};
+G.data.locations = G.data.locations || {};
+G.data.locations.creek = {
+  id: 'creek',
+  name: 'Blackwater Creek',
+  cost: 300,
+  width: 1300,
+  waterY: 112,
+  maxDepth: 64,
+  seed: 5113,
+  start: 160,
+
+  layers: [
+    { id: 'hills', kind: 'ridge', parallax: 0.12, color: 'night_blue', base: 86, amp: 16 },
+    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 88, h: 14, color: 'fog_mid', alpha: 0.22 },
+    { id: 'forest', kind: 'treeline', parallax: 0.35, color: 'night_deep', base: 102, height: 24 },
+    { id: 'trunks', kind: 'trunks', parallax: 0.55, color: 'night_ink', crown: 'moss_dark', top: 18, gap: [26, 70] },
+    { id: 'fog_near', kind: 'fog', parallax: 0.6, y: 100, h: 10, color: 'fog_light', alpha: 0.12 },
+    { id: 'bank', kind: 'shore', parallax: 0.7, color: 'night_ink', detail: 'moss_dark', height: 5 },
+    { id: 'marks', kind: 'landmarks', parallax: 1 }
+  ],
+
+  // cabin: on stilts at the water's edge, roof sagging. snag: dead branches out of the water;
+  // the same branches reach down to the bottom in the cross-section (underwater.snags).
+  landmarks: [
+    { id: 'cabin_a', kind: 'cabin', x: 250 },
+    { id: 'snag_a', kind: 'snag', x: 470 },
+    { id: 'cabin_b', kind: 'cabin', x: 720, sag: 3 },
+    { id: 'snag_b', kind: 'snag', x: 960 },
+    { id: 'snag_c', kind: 'snag', x: 1190 }
+  ],
+
+  // snags: {x, top} branches standing up from the bottom to depth `top` px (0 breaks the surface).
+  underwater: {
+    bottomAmp: 20, rock: 'stone_dark', silt: 'wood_dark',
+    weed: 'moss', weedDark: 'moss_dark', weedDensity: 0.05, shaftEvery: 190,
+    snags: [{ x: 470, top: 0 }, { x: 610, top: 30 }, { x: 960, top: 0 }, { x: 1080, top: 38 }, { x: 1190, top: 0 }]
+  },
+
+  spots: [
+    { id: 'cabin_steps', kind: 'open', x: 250, r: 32 },
+    { id: 'snag_eddy', kind: 'open', x: 470, r: 26 },
+    { id: 'black_pool', kind: 'legendary', x: 830, r: 22, legend: 4 },
+    { id: 'undercut', kind: 'hidden', x: 1060, r: 24, attract: 1.6, rare: 2 }
+  ],
+
+  // The current. dir +1 flows to the right. speed px/s once it has the lure (after about
+  // `ramp` s), swaying by ±sway every `period` s in a phase set by the cast's seed. Deeper
+  // water is slower (slack: share lost at maxDepth); on the bottom the lure only creeps.
+  current: { dir: 1, speed: 3, ramp: 2.5, sway: 0.45, period: 7, slack: 0.5, bottom: 0.2 },
+
+  // 11.1: px/s the lure drifts at t s after landing, on the cast with this seed, at depth px.
+  // Pure: the same arguments always give the same answer, so a cast's path is fixed by its
+  // seed and the fixed dt (sailing steps it in underwater.lureStep).
+  drift: function (seed, t, depth, onBottom) {
+    var c = this.current, ph = (Math.imul(seed | 0, 0x9e3779b1) >>> 0) / 4294967296 * 6.2832;
+    var v = c.speed * (1 - Math.exp(-t / c.ramp)) * (1 + c.sway * Math.sin(t * 6.2832 / c.period + ph));
+    v *= 1 - c.slack * Math.min(1, Math.max(0, depth) / this.maxDepth);
+    return c.dir * v * (onBottom ? c.bottom : 1);
+  }
+};

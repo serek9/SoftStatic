@@ -60,7 +60,7 @@ function validate(G, opts) {
     const short = Object.keys(ROSTER).filter(r => (have[r] || 0) !== ROSTER[r]).map(r => r + ' ' + (have[r] || 0) + '/' + ROSTER[r]);
     if (short.length) (opts.strict ? err : warn)('roster ' + id + ': ' + short.join(', ') + ' (target 9 species, TODO P14)');
   }
-  for (const id in d.gear.unlocks) if (!d.locations[id]) warn('unlock ' + id + ': location not in data yet (TODO P11)');
+  validateLocations(G, err);
 
   // Gear: 5 tiers each, tier 0 free, every tier dearer and better (V8: every item has an effect).
   const g = d.gear;
@@ -102,6 +102,40 @@ function validate(G, opts) {
   return { errors, warnings };
 }
 
+// Location files (V6, P11): the fields the game reads, spots inside the world, at most one
+// hidden spot, a current that gives finite speeds, and moving structures placed inside the
+// world, apart, and the same for the same seed.
+function validateLocations(G, err) {
+  const d = G.data, num = v => typeof v === 'number' && isFinite(v);
+  for (const id in d.locations) {
+    const L = d.locations[id], p = 'location ' + id + ': ';
+    if (L.id !== id) err(p + 'id does not match its key');
+    if (typeof L.name !== 'string' || !L.name) err(p + 'name');
+    if (!num(L.cost) || L.cost < 0) err(p + 'cost');
+    ['width', 'waterY', 'maxDepth', 'seed', 'start'].forEach(k => { if (!num(L[k]) || L[k] <= 0) err(p + k); });
+    if (!(L.start > 0 && L.start < L.width)) err(p + 'start outside the world');
+    if (!L.layers || !L.layers.length || !L.layers.some(l => l.kind === 'landmarks')) err(p + 'layers (needs a landmarks layer)');
+    if (!L.underwater) err(p + 'underwater');
+    (L.landmarks || []).forEach(m => { if (!(m.x >= 0 && m.x < L.width)) err(p + 'landmark ' + m.id + ' outside the world'); });
+    const spots = L.spots || [];
+    spots.forEach(s => { if (!(s.x >= 0 && s.x < L.width && s.r > 0)) err(p + 'spot ' + s.id + ' x or r'); });
+    if (spots.filter(s => s.kind === 'hidden').length > 1) err(p + 'more than one hidden spot (the dog stares once)');
+    if (L.need && L.need.windowCatch !== 'any' && !d.windows.some(w => w.id === L.need.windowCatch)) err(p + 'need.windowCatch: unknown window');
+    if (L.drift) {
+      for (let t = 0; t < 30; t += 0.5) for (const depth of [0, L.maxDepth]) {
+        const v = L.drift(12345, t, depth, false);
+        if (!num(v) || Math.abs(v) > 40) err(p + 'drift gives ' + v + ' px/s at t ' + t);
+      }
+    }
+    if (L.place) {
+      const a = L.place(777, []), b = L.place(777, []);
+      if (a.length !== L.movers.length || a.some((x, i) => x !== b[i])) err(p + 'place is not deterministic');
+      if (a.some(x => !(x >= 0 && x < L.width))) err(p + 'place puts a structure outside the world');
+      for (let i = 0; i < a.length; i++) for (let k = 0; k < i; k++) if (Math.abs(a[i] - a[k]) < L.moverGap) err(p + 'place puts two structures closer than moverGap');
+    }
+  }
+}
+
 // ---- Headless session (used by --replay and --pacing) ----------------------------------------
 // A scripted active player on Fogbound: cast, sink to a depth, wait, hook most bites, fight
 // with the auto-player, sell, buy along a plan. Everything runs through the real sim modules
@@ -136,7 +170,7 @@ function session(G, seed, opts) {
   function shop() {
     while (st.plan < PLAN.length) {
       const k = PLAN[st.plan], E = S.economy;
-      const r = data.gear.unlocks[k] ? E.unlock(save, k, data) : E.buy(save, k, data);
+      const r = data.locations[k] ? E.unlock(save, k, data) : E.buy(save, k, data);
       if (r === E.OK || r === E.MAXED) { if (r === E.OK) event(k); st.plan++; } else break;
     }
   }

@@ -96,13 +96,13 @@ G.sim.unease = (function () {
   // Where a cast lands matters (§2): fills out {attract, rare, legend} for a lure landing at
   // world x. An active spotBoost anomaly within reach raises rare weights; the location's
   // spots add their own (data/loc_*.js: hidden spots attract and rare, legendary spots legend).
-  function castBoost(A, loc, x, data, out) {
+  // spots is the location's list as it stands for this cast (the Red Room's move, 11.3).
+  function castBoost(A, spots, x, data, out) {
     out.attract = 1; out.rare = 1; out.legend = 1;
     if (A && A.on) {
       var a = data.anomalies.list[A.idx];
       if (a.effect === 'spotBoost' && Math.abs(x - A.x) <= a.params.r) out.rare *= a.params.rare;
     }
-    var spots = loc.spots || [];
     for (var i = 0; i < spots.length; i++) {
       var s = spots[i];
       if (Math.abs(x - s.x) > s.r) continue;

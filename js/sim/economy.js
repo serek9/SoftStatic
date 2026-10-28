@@ -95,20 +95,26 @@ G.sim.economy = (function () {
   }
 
   // OK when the location can be bought now; MAXED if already open; POOR; LOCKED if its
-  // condition (a clock-window catch for the Red Room) is not met yet.
+  // condition is not met yet. Cost and condition come from the location's own file:
+  // need.windowCatch is 'any' (any clock window) or a window id (the Red Room's catch).
   function canUnlock(save, locId, data) {
-    var u = data.gear.unlocks[locId];
-    if (!u) return UNKNOWN;
+    var L = data.locations[locId];
+    if (!L) return UNKNOWN;
     if (save.unlocks[locId]) return MAXED;
-    if (u.windowCatch) { var any = false; for (var k in save.flags.windowCatch) any = true; if (!any) return LOCKED; }
-    if (save.coins < u.cost) return POOR;
+    var w = L.need && L.need.windowCatch;
+    if (w) {
+      var met = false;
+      for (var k in save.flags.windowCatch) if (w === 'any' || k === w) met = true;
+      if (!met) return LOCKED;
+    }
+    if (save.coins < L.cost) return POOR;
     return OK;
   }
 
   function unlock(save, locId, data) {
     var r = canUnlock(save, locId, data);
     if (r !== OK) return r;
-    save.coins -= data.gear.unlocks[locId].cost;
+    save.coins -= data.locations[locId].cost;
     save.unlocks[locId] = true;
     return OK;
   }

@@ -28,7 +28,7 @@ G.data.locations.fog = {
 
   // On the water at the boat's distance (parallax 1): x is where the landmark is centred.
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 300 },
+    { id: 'pier', kind: 'pier', x: 300, seed: 3301 }, // the same pier stands in The Pines (11.4)
     { id: 'marker_a', kind: 'marker', x: 560 },
     { id: 'wreck', kind: 'wreck', x: 770 },
     { id: 'marker_b', kind: 'marker', x: 985 }

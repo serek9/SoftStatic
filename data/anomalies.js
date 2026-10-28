@@ -20,13 +20,13 @@ G.data.anomalies = {
   chance: 0.12,
   gap: 45,
   list: [
-    { id: 'reflected_figure', locations: ['fog'], uneaseMin: 0.3, hours: [19, 5], cooldown: 240, kind: 'reflection',
+    { id: 'reflected_figure', locations: ['fog', 'creek', 'pines', 'red'], uneaseMin: 0.3, hours: [19, 5], cooldown: 240, kind: 'reflection',
       params: { what: 'figure', place: 'near', dur: [14, 22], r: 26, rare: 3 }, effect: 'spotBoost' },
-    { id: 'lit_window', locations: ['fog'], uneaseMin: 0.45, hours: [20, 5], cooldown: 300, kind: 'reflection',
+    { id: 'lit_window', locations: ['fog', 'creek', 'pines'], uneaseMin: 0.45, hours: [20, 5], cooldown: 300, kind: 'reflection',
       params: { what: 'window', place: 'near', dur: [16, 24], r: 30, rare: 3 }, effect: 'spotBoost' },
-    { id: 'second_pier', locations: ['fog'], uneaseMin: 0.6, hours: null, cooldown: 420, kind: 'reflection',
+    { id: 'second_pier', locations: ['fog', 'pines'], uneaseMin: 0.6, hours: null, cooldown: 420, kind: 'reflection',
       params: { what: 'pier', place: 'near', dur: [18, 26], r: 40, rare: 2.5 }, effect: 'spotBoost' },
-    { id: 'empty_boat', locations: ['fog'], uneaseMin: 0.8, hours: [1, 4], cooldown: 900, kind: 'reflection',
+    { id: 'empty_boat', locations: ['fog', 'creek', 'pines', 'red'], uneaseMin: 0.8, hours: [1, 4], cooldown: 900, kind: 'reflection',
       params: { what: 'empty_boat', place: 'boat', dur: [8, 12] }, effect: 'revealHint' }
   ]
 };

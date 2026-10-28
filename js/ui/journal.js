@@ -35,15 +35,14 @@ G.ui.journal = (function () {
   function buildLocs() {
     locs.length = 0;
     locs.push('all');
-    for (var id in G.data.gear.unlocks) {
+    for (var id in G.data.locations) {
       for (var i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].locations.indexOf(id) >= 0) { locs.push(id); break; }
     }
   }
 
   function locName(id) {
     if (id === 'all') return 'Every water';
-    var L = G.data.locations[id];
-    return L ? L.name : G.data.gear.unlocks[id].name;
+    return G.data.locations[id].name;
   }
 
   function caught(id) { var j = G.state.save.journal[id]; return !!j && j.caught > 0; }

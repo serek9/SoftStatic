@@ -88,6 +88,52 @@ G.scene.sailing = (function () {
         if (i >= 6 && i % 4 === 2) ctx.fillRect(x0 + i, top - 3, 1, 3);
       }
       return [x0, x0 + 23];
+    },
+    // 11.1: a decaying cabin on stilts at the water's edge; its roof sags by lm.sag px.
+    cabin: function (ctx, x, wy, rng, lm) {
+      var x0 = x - 16, x1 = x + 16, floor = wy - 6, top = floor - 16, sag = lm.sag || 1, i, r;
+      ctx.fillStyle = P.wood_dark;
+      for (i = x0 + 1; i <= x1 - 2; i += 6) ctx.fillRect(i, floor, 2, wy - floor); // stilts
+      ctx.fillRect(x0, top, x1 - x0 + 1, floor - top);
+      ctx.fillStyle = P.wood;
+      for (i = top + 1; i < floor; i += 3) {                                       // boards, some missing
+        for (var bx = x0; bx <= x1; bx += 4) if (rng.next() > 0.15) ctx.fillRect(bx, i, 4, 1);
+      }
+      ctx.fillStyle = P.night_ink;
+      ctx.fillRect(x0 + 5, top + 4, 6, 5);                                         // dark window
+      ctx.fillRect(x1 - 10, top + 5, 6, floor - top - 5);                          // the door, ajar
+      ctx.fillStyle = P.wood_dark; ctx.fillRect(x1 - 10, top + 5, 2, floor - top - 5);
+      ctx.fillStyle = P.stone_dark; ctx.fillRect(x0 + 8, top + 4, 1, 5); ctx.fillRect(x0 + 5, top + 6, 6, 1);
+      // Gable roof whose ridge has sunk.
+      var peak = top - 10 + sag;
+      ctx.fillStyle = P.rust_dark;
+      for (r = peak; r < top; r++) {
+        var hw = Math.round(19 * (r - peak + 1) / (top - peak));
+        ctx.fillRect(x - hw, r, hw * 2 + 1, 1);
+      }
+      ctx.fillStyle = P.night_ink;
+      for (i = 0; i < 4; i++) ctx.fillRect(x + rng.int(-10, 10), rng.int(peak + 3, top - 1), 1, 1); // holes
+      ctx.fillStyle = P.rust; ctx.fillRect(x + 8, peak - 1, 2, 6);                 // a leaning stovepipe
+      return [x - 19, x + 19];
+    },
+    // 11.1: dead branches standing out of the water. They carry on down to the bottom in the
+    // cross-section (underwater.snags).
+    snag: function (ctx, x, wy, rng) {
+      var lean = rng.next() < 0.5 ? -1 : 1, h = rng.int(14, 22), lo = x, hi = x + 1, px, i, k;
+      ctx.fillStyle = P.wood_dark;
+      for (i = 0; i < h; i++) {
+        px = x + Math.round(lean * i * 0.45);
+        ctx.fillRect(px, wy - 1 - i, i < h * 0.6 ? 2 : 1, 1);
+        if (px < lo) lo = px;
+        if (px + 1 > hi) hi = px + 1;
+        if (i === Math.floor(h / 3) || i === Math.floor(h * 2 / 3)) {
+          var len = rng.int(4, 7);
+          for (k = 1; k <= len; k++) ctx.fillRect(px - lean * k, wy - 1 - i - k, 1, 1);
+          lo = Math.min(lo, px - len); hi = Math.max(hi, px + len);
+        }
+      }
+      ctx.fillStyle = P.stone_dark; ctx.fillRect(x - 3, wy - 1, 7, 1);
+      return [lo, hi];
     }
   };
 
@@ -147,22 +193,57 @@ G.scene.sailing = (function () {
       ctx.fillStyle = P.stone_dark;
       for (i = 0; i < w / 60; i++) ctx.fillRect(rng.int(0, w - 4), wy - 2, rng.int(2, 4), 2);
     },
+    // 11.1: the creek's near forest: straight trunks from above the view to the bank, a few
+    // broken branches, and a ragged crown where the top shows.
+    trunks: function (ctx, L, w, wy, rng) {
+      for (var x = rng.int(0, 20); x < w; x += rng.int(L.gap[0], L.gap[1])) {
+        var tw = rng.int(2, 4), top = rng.int(-12, L.top), b, k;
+        ctx.fillStyle = P[L.color];
+        ctx.fillRect(x, top, tw, wy - top);
+        for (b = 0; b < 3; b++) {
+          var by = rng.int(Math.max(4, top + 8), wy - 22), len = rng.int(3, 8), dir = rng.next() < 0.5 ? -1 : 1;
+          for (k = 0; k < len; k++) ctx.fillRect(dir < 0 ? x - 1 - k : x + tw + k, by - (k >> 1), 1, 1);
+        }
+        if (top < 0) continue;
+        ctx.fillStyle = P[L.crown];
+        for (k = -9; k <= 5; k++) {
+          var cw = Math.round((6 - Math.abs(k + 2) * 0.5) + rng.range(-1.5, 1.5));
+          if (cw > 0) ctx.fillRect(x + (tw >> 1) - cw, top + k, cw * 2, 1);
+        }
+      }
+    },
+    // A landmark with its own seed paints the same wherever it stands (the same pier in two lakes, 11.4).
     landmarks: function (ctx, L, w, wy, rng) {
       var b = boundsByLoc[loc.id] = {};
       for (var i = 0; i < loc.landmarks.length; i++) {
-        var lm = loc.landmarks[i];
-        b[lm.id] = LANDMARKS[lm.kind](ctx, lm.x, wy, rng);
+        var lm = loc.landmarks[i], paint = (scen.landmarks && scen.landmarks[lm.kind]) || LANDMARKS[lm.kind];
+        b[lm.id] = paint(ctx, lm.x, wy, lm.seed ? new G.core.rng.Rng(lm.seed) : rng, lm);
       }
     }
   };
 
+  // ---- Scenery modules (11.4) ---------------------------------------------------
+  // loc.scenery names a module in G.scene.scenery (js/scene/scenery.js) for what baked
+  // layers cannot do alone. Every part is optional; a location without a module (Fogbound,
+  // the creek) skips them all:
+  //   paint {kind: fn}, landmarks {kind: fn}: more layer and landmark painters (baked once)
+  //   load(run, loc): after the run is built; may set run.scen and replace run.spots
+  //   update(run, dt, loc): every step, after the fish (state only)
+  //   landed(run, loc): when a cast's lure lands, after its boost is worked out
+  //   afterLayer(c, id, ox, oy, run, loc): draws over the layer just drawn; ox and oy are
+  //     that layer's scroll, so layer pixel (x, y) is at screen (x - ox, y - oy)
+  //   reflect(c, run, loc): inside the mirror pass only, after the anomaly deltas
+  //   debugLine(run): the module's overlay line
+  var NO_SCENERY = {}, scen = NO_SCENERY;
+
   function bakeLayer(L, i) {
     var w = VIEW_W + Math.ceil((loc.width - VIEW_W) * L.parallax), wy = loc.waterY;
-    var rng = new G.core.rng.Rng(loc.seed * 31 + i);
+    var rng = new G.core.rng.Rng(loc.seed * 31 + i), paint = (scen.paint && scen.paint[L.kind]) || PAINT[L.kind];
     return {
+      id: L.id,
       p: L.parallax,
       cv: B.cached('loc:' + loc.id + ':' + L.id, function () {
-        return B.layer(w, wy, function (ctx) { PAINT[L.kind](ctx, L, w, wy, rng); });
+        return B.layer(w, wy, function (ctx) { paint(ctx, L, w, wy, rng); });
       })
     };
   }
@@ -175,6 +256,7 @@ G.scene.sailing = (function () {
     loc = G.data.locations[id];
     if (!loc) throw new Error('unknown location: ' + id);
     G.state.save.loc = id;
+    scen = (loc.scenery && G.scene.scenery && G.scene.scenery[loc.scenery]) || NO_SCENERY;
     layers.length = 0;
     for (var i = 0; i < loc.layers.length; i++) layers.push(bakeLayer(loc.layers[i], i));
     var rng = new G.core.rng.Rng(loc.seed * 31 + 99);
@@ -197,7 +279,8 @@ G.scene.sailing = (function () {
     // One cast at a time. seed is drawn from G.rng on release and is the cast's own seed (§3).
     // latched: clock windows open when the lure landed (D1), cleared when it is reeled in.
     // boost: what the landing spot is worth for this cast (anomaly and spots, 10.1/10.3).
-    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, latched: {},
+    // tw: seconds the lure has been in the water (the creek's current, 11.1).
+    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, tw: 0, latched: {},
       boost: { attract: 1, rare: 1, legend: 1 } };
     run.school = G.sim.fish_ai.createSchool(G.data);
     run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
@@ -214,6 +297,9 @@ G.scene.sailing = (function () {
     run.anom = G.sim.unease.createAnomalies(); // the one active anomaly (10.1); never saved
     run.anomIn = { loc: id, hour: 0, unease: 0, boatX: 0, reach: 0, width: loc.width };
     run.owl = { on: false, t: 0, x: 0, win: -1 };
+    run.spots = loc.spots || []; // where casts are worth more; a scenery module may move them
+    run.scen = null;             // the scenery module's own run state
+    if (scen.load) scen.load(run, loc);
     G.gfx.water.setDeltas(drawDeltas);
     fx.clear();
   }
@@ -286,9 +372,11 @@ G.scene.sailing = (function () {
     if (u >= 1) {
       c.lx = c.x1; c.ly = wy;
       fx.splash(c.x1, wy, Math.min(1, c.dist / 100));
+      c.tw = 0;
       G.sim.clock.latch(c.latched, G.state.save.clock, G.data.windows);
-      G.sim.unease.castBoost(run.anom, loc, c.x1, G.data, c.boost); // casting at a delta or a spot counts now
+      G.sim.unease.castBoost(run.anom, run.spots, c.x1, G.data, c.boost); // casting at a delta or a spot counts now
       c.bait = G.sim.economy.useBait(G.state.save, G.data); // one bait goes on per cast
+      if (scen.landed) scen.landed(run, loc);
       G.core.state.go(run, 'sinking');
     }
   }
@@ -563,8 +651,9 @@ G.scene.sailing = (function () {
 
   // The water's delta slot (P10.2): runs only inside the mirror pass.
   function drawDeltas(c) {
-    var A = G.state.run.anom;
+    var run = G.state.run, A = run.anom;
     if (A && A.on) G.gfx.water.drawDelta(c, A.what, Math.round(A.x - camPx), loc.waterY - camPy, anomalyAlpha(A));
+    if (scen.reflect) scen.reflect(c, run, loc);
   }
 
   // The boat in the reflection has no fisher while the empty_boat anomaly is mostly shown.
@@ -633,6 +722,7 @@ G.scene.sailing = (function () {
     owlStep(run, save, hour0, dt);
     castStep(run, dt);
     fishStep(run, dt);
+    if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
     if (run.fsm === 'card') {
       var choice = G.ui.card.update(dt);
@@ -669,11 +759,12 @@ G.scene.sailing = (function () {
   }
 
   function drawBackdrop(c) {
-    var wy = loc.waterY;
+    var wy = loc.waterY, run = G.state.run;
     c.drawImage(skyCv, 0, 0, 1, wy, 0, -camPy, VIEW_W, wy);
     for (var i = 0; i < layers.length; i++) {
-      var L = layers[i];
-      c.drawImage(L.cv, Math.round(camPx * L.p), 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+      var L = layers[i], ox = Math.round(camPx * L.p);
+      c.drawImage(L.cv, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+      if (scen.afterLayer) scen.afterLayer(c, L.id, ox, camPy, run, loc);
     }
     drawOwl(c);
   }
@@ -714,6 +805,7 @@ G.scene.sailing = (function () {
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
     skyColor: skyColor, hourNow: hourNow,
     loc: function () { return loc; },
+    scenery: function () { return scen === NO_SCENERY ? null : scen; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },
     skyLum: function () { return skyLum; }
   };
@@ -755,6 +847,13 @@ if (G.core.debug) G.core.debug.addLine(function () {
   return 'anomaly ' + (A.on ? A.id + ' x ' + Math.round(A.x) + ' ' + A.t.toFixed(1) + '/' + A.dur.toFixed(1) + 's' : 'none' + (A.gap > 0 ? ' (gap ' + A.gap.toFixed(0) + 's)' : '')) +
     '  cast boost a' + b.attract.toFixed(2) + ' r' + b.rare.toFixed(2) + ' l' + b.legend.toFixed(2) +
     (run.owl.on ? '  owl ' + run.owl.t.toFixed(1) + 's' : '') + '  dog cue ' + (run.dog.cue || '-');
+});
+
+if (G.core.debug) G.core.debug.addLine(function () {
+  var run = G.state.run, loc = G.scene.sailing.loc(), m = G.scene.sailing.scenery(), c = run.cast;
+  if (!loc) return 'scenery: -';
+  var drift = loc.drift && G.scene.underwater.UNDER[run.fsm] ? '  current ' + loc.drift(c.seed, c.tw, c.ly - loc.waterY, false).toFixed(2) + ' px/s at ' + c.tw.toFixed(1) + ' s' : '';
+  return 'scenery ' + (loc.scenery || 'none') + (m && m.debugLine ? '  ' + m.debugLine(run) : '') + drift;
 });
 
 if (G.core.debug) G.core.debug.addLine(function () {

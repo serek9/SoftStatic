@@ -92,6 +92,20 @@ G.scene.underwater = (function () {
           ctx.fillRect(x, base - rh + 1, rw, rh);
           ctx.fillStyle = P.stone; ctx.fillRect(x + 1, base - rh, 1, 1);
         }
+        // 11.1: submerged branches standing up from the bottom to depth s.top (0: the surface).
+        var snags = u.snags || [];
+        for (var n = 0; n < snags.length; n++) {
+          var sn = snags[n], foot = prof[clamp(sn.x, 0, w - 1)] + 2, lean = rng.next() < 0.5 ? -1 : 1;
+          ctx.fillStyle = P.wood_dark;
+          for (var y = foot; y >= sn.top; y--) {
+            var h = foot - y, bx = sn.x + Math.round(lean * Math.sin(h * 0.05) * 6);
+            ctx.fillRect(bx, y, h < 12 ? 3 : 2, 1);
+            if (h > 6 && h % 11 === 0) {
+              var side = (h / 11) % 2 ? lean : -lean, len = rng.int(4, 9);
+              for (var q = 1; q <= len; q++) ctx.fillRect(bx + side * q, y - (q >> 1), 1, 1);
+            }
+          }
+        }
       });
     });
 
@@ -139,6 +153,7 @@ G.scene.underwater = (function () {
   // The lure hangs below where it entered the water (cast.x1); cast.ly is its world y.
   // Sinking: it falls to the bottom; tapping action stops it at its depth (-> waiting).
   // Waiting: holding action reels it up and in; at the surface it is out (-> sailing).
+  // A location with a current (11.1, loc.drift) carries it downstream the whole time.
   function lureStep(run, dt, loc) {
     var c = run.cast, inp = G.core.input, wy = loc.waterY, bottom = bottomAt(loc, c.x1);
     if (run.fsm === 'sinking') {
@@ -147,6 +162,8 @@ G.scene.underwater = (function () {
       depth += UW.sinkV * Math.min(1, 0.15 + (bottom - depth) / 6) * dt;
       if (depth >= bottom) { depth = bottom; G.core.state.go(run, 'waiting'); }
       c.ly = wy + depth;
+      drift(c, loc, dt, depth >= bottom);
+      c.ly = Math.min(c.ly, wy + bottomAt(loc, c.x1));
       c.lx = c.x1;
       c.bubT = (c.bubT || 0) - dt;
       if (c.bubT <= 0) { c.bubT = 0.4; fx.emit('bubbles', c.lx, c.ly - 2, 1); }
@@ -163,8 +180,18 @@ G.scene.underwater = (function () {
           return;
         }
       }
+      drift(c, loc, dt, c.ly - wy >= bottom);
+      c.lx = c.x1;
       c.ly = Math.min(c.ly, wy + bottomAt(loc, c.x1));
     }
+  }
+
+  // 11.1: the current moves the lure (and where its line enters) by loc.drift, a pure
+  // function of the cast's seed, its time in the water and its depth, at the fixed dt.
+  function drift(c, loc, dt, onBottom) {
+    if (!loc.drift) return;
+    c.tw += dt;
+    c.x1 = clamp(c.x1 + loc.drift(c.seed, c.tw, c.ly - loc.waterY, onBottom) * dt, 8, loc.width - 8);
   }
 
   // ---- View: fade, vertical camera, motes -------------------------------------------

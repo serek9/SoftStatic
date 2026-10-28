@@ -1,7 +1,7 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // The map (9.5): an overlay opened with M from the boat when no line is out. A baked paper
-// chart with every water (open, for sale, locked by a condition, or not charted yet), the
+// chart with every water (open, for sale, or locked by a condition), the
 // bait shop and the cabin. Choosing one fades to black, does the switch while the screen
 // is dark (a location bakes all it draws in sailing.load, the first time only), then fades
 // in. Opening a location spends its cost (economy.unlock) and autosaves (§0.12).
@@ -62,30 +62,27 @@ G.ui.map = (function () {
   function stopName(s) {
     if (s.kind === 'shop') return 'Bait Shop';
     if (s.kind === 'cabin') return 'The Cabin';
-    var L = G.data.locations[s.id];
-    return L ? L.name : G.data.gear.unlocks[s.id].name;
+    return G.data.locations[s.id].name;
   }
 
   // What choosing stop s does now: 'here', 'travel', 'buy', or '' (nothing yet).
   function verdict(s) {
     if (s.kind !== 'loc') return 'travel';
     if (s.id === G.state.run.loc) return 'here';
-    if (!G.data.locations[s.id]) return '';
     if (G.state.save.unlocks[s.id]) return 'travel';
     return E.canUnlock(G.state.save, s.id, G.data) === E.OK ? 'buy' : '';
   }
 
   function describe() {
-    var s = STOPS[sel], save = G.state.save, v = verdict(s), u = G.data.gear.unlocks[s.id];
+    var s = STOPS[sel], save = G.state.save, v = verdict(s), L = G.data.locations[s.id];
     info.name = stopName(s); info.key = 'wood'; info.hint = '';
     if (s.kind === 'shop') { info.status = 'On the Fogbound shore. Coffee is on the house.'; info.hint = 'SPACE go in'; return; }
     if (s.kind === 'cabin') { info.status = 'Yours. ' + G.data.gear.cabin[save.cabinLevel].name + '.'; info.hint = 'SPACE go in'; return; }
     if (v === 'here') { info.status = 'You are here.'; return; }
-    if (!G.data.locations[s.id]) { info.status = 'Not charted yet.'; return; } // TODO(P11.1): locations 2-4
     if (v === 'travel') { info.status = 'Open water.'; info.hint = 'SPACE travel'; return; }
     var r = E.canUnlock(save, s.id, G.data);
     if (r === E.LOCKED) { info.status = 'It opens to someone who has fished while the owl calls.'; info.key = 'rust'; return; }
-    info.status = 'Opens for ' + u.cost + 'c.';
+    info.status = 'Opens for ' + L.cost + 'c.';
     if (r === E.OK) info.hint = 'SPACE pay and travel'; else info.key = 'rust';
   }
 
@@ -141,14 +138,14 @@ G.ui.map = (function () {
     M.panel(ctx, CX, CY, CW, CH, 'wood_dark', 'paper');
     ctx.drawImage(chart, CX, CY);
     for (var i = 0; i < STOPS.length; i++) {
-      var s = STOPS[i], on = i === sel, charted = s.kind !== 'loc' || !!G.data.locations[s.id];
+      var s = STOPS[i], on = i === sel;
       var open = s.kind !== 'loc' || !!G.state.save.unlocks[s.id];
       if (s.kind === 'loc') {
         ctx.fillStyle = P[open ? 'ink' : 'wood_hi']; ctx.fillRect(s.x - 1, s.y - 1, 3, 3);
       } else S.draw(ctx, 'map_house', s.x - 2, s.y - 4, 0, false);
       if (s.id === G.state.run.loc) S.draw(ctx, 'map_boat', s.x - 2, s.y - 6, 0, false);
       var name = stopName(s), lx = s.x - (S.measure(name) >> 1);
-      S.drawText(ctx, name, lx, s.y + (s.ry || 4) + 3, on ? 'rust' : (open ? 'ink' : (charted ? 'wood' : 'wood_hi')));
+      S.drawText(ctx, name, lx, s.y + (s.ry || 4) + 3, on ? 'rust' : (open ? 'ink' : 'wood'));
       if (on) {
         ctx.fillStyle = P.signal_amber;
         ctx.fillRect(s.x - 5, s.y - 5, 3, 1); ctx.fillRect(s.x + 3, s.y - 5, 3, 1);

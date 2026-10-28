@@ -54,15 +54,6 @@ G.data.gear = {
   // Prices (V8): base × rarityMult × sizeFactor, sizeFactor from sizeMin to sizeMax.
   economy: { rarityMult: { common: 1, uncommon: 2.5, rare: 8, legendary: 40 }, sizeMin: 0.7, sizeMax: 1.5 },
 
-  // Location unlocks (V6), in map order. name is what the map shows before the location
-  // has data. TODO(P11.1): each location file carries its own cost and name.
-  unlocks: {
-    fog: { cost: 0, name: 'Fogbound Lake' },
-    creek: { cost: 300, name: 'Blackwater Creek' },
-    pines: { cost: 1500, name: 'The Pines' },
-    red: { cost: 6000, name: 'Red Room Reservoir', windowCatch: true } // plus a catch made during a clock window
-  },
-
   // Cabin restoration (V9), one stage after another; cabinLevel is the index reached.
   // plaques: how many kept fish can be mounted at that stage.
   cabin: [
