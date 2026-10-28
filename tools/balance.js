@@ -4,6 +4,8 @@
 //   node tools/balance.js --pacing                active-player model against the V8 targets
 //   node tools/balance.js --replay <seed> [min]   a deterministic headless session, run twice;
 //                                                 prints its hash and fails if the runs differ
+//   node tools/balance.js --passive               passive income against active (V7: 60% ±5%),
+//                                                 and time away fished twice gives the same result
 // It loads the same files index.html loads, in the same order, into a vm context.
 'use strict';
 const vm = require('vm'), fs = require('fs'), path = require('path');
@@ -220,7 +222,7 @@ function session(G, seed, opts) {
         if (st.t >= P.cardTime) {
           S.economy.recordCatch(save, st.cur, 'sell');
           st.catches++; st.mix[st.cur.id] = (st.mix[st.cur.id] || 0) + 1; h(save.coins);
-          shop();
+          if (!opts || opts.shop !== false) shop();
           st.phase = 'cast'; st.t = 0;
         }
         break;
@@ -286,6 +288,44 @@ function pacing() {
   return failed ? 1 : 0;
 }
 
+// ---- --passive ----------------------------------------------------------------------------
+// V7: passive earns about 60% of active income (passive.incomeMult, D5). Both start from a new
+// save on Fogbound at 19:00 with the starter gear (the active model does not shop here) and
+// fish the same game time on the same seeds. Then time away is fished twice from the same
+// save and seed, which must give the same save and tape.
+
+function passiveCheck() {
+  const seeds = [11, 22, 33, 44, 55, 66, 77, 88, 99, 110], secs = 3600;
+  let act = 0, pas = 0;
+  console.log('seed   active coins/h   passive coins/h   ratio   passive catches');
+  for (const seed of seeds) {
+    const a = session(load(), seed, { shop: false });
+    a.run(secs);
+    const G = load(), save = G.core.save.defaults(), ps = G.sim.passive.create(save, 'fog', G.data), rng = new G.core.rng.Rng(seed);
+    let t = 0, n = 0;
+    while (t < secs) { t += G.sim.passive.cycle(ps, rng, G.data); if (ps.plan.result === G.sim.passive.CAUGHT) n++; }
+    const ah = a.save.coins * 3600 / secs, ph = save.coins * 3600 / t;
+    act += ah; pas += ph;
+    console.log(String(seed).padEnd(6) + ' ' + ah.toFixed(0).padStart(14) + ' ' + ph.toFixed(0).padStart(17) + ' ' + (ph / ah).toFixed(3).padStart(7) + ' ' + String(n).padStart(17));
+  }
+  const ratio = pas / act, mult = load().data.gear.passive.incomeMult;
+  console.log('\npassive / active over all seeds: ' + ratio.toFixed(3) + ' (incomeMult ' + mult + '; before it: ' + (ratio / mult).toFixed(3) + ')');
+  const pass = ratio >= 0.55 && ratio <= 0.65;
+  console.log((pass ? 'PASS' : 'FAIL') + ' passive income ' + (ratio * 100).toFixed(1) + '% of active (target 60% ±5%)');
+
+  const runAway = () => {
+    const G = load(), save = G.core.save.defaults(), rng = new G.core.rng.Rng(4242);
+    save.lastSeen = 1e12; save.clock = 23;
+    const tape = G.sim.passive.away(save, 1e12 + 5 * 3600 * 1000, rng, G.data);
+    return { json: JSON.stringify(save), tape };
+  };
+  const x = runAway(), y = runAway(), same = x.json === y.json;
+  console.log('away 5 h: ' + x.tape.caught + ' caught, ' + x.tape.lost + ' lost, +' + x.tape.coins + ' coins, ' + x.tape.entries.length + ' tape lines, gap ' +
+    (x.tape.gap ? x.tape.gap.from.toFixed(2) + '-' + x.tape.gap.to.toFixed(2) : 'none') + ', phantom ' + (x.tape.phantom || 'none') + ', clock ' + x.tape.from.toFixed(2) + ' -> ' + x.tape.to.toFixed(2));
+  console.log((same ? 'PASS' : 'FAIL') + ' time away: the same save and seed give ' + (same ? 'the same' : 'a different') + ' result');
+  return pass && same ? 0 : 1;
+}
+
 // ---- Main ---------------------------------------------------------------------------------
 
 if (require.main === module) {
@@ -303,11 +343,12 @@ if (require.main === module) {
     code = replay(isNaN(seed) ? 12345 : seed, min) || code;
   }
   if (args.includes('--pacing')) code = pacing() || code;
-  if (!args.some(a => ['--validate', '--replay', '--pacing'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --replay <seed> [minutes]');
+  if (args.includes('--passive')) code = passiveCheck() || code;
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --replay <seed> [minutes]');
     code = 2;
   }
   process.exit(code);
 }
 
-module.exports = { load, validate, session, replay, pacing, PLAN, P };
+module.exports = { load, validate, session, replay, pacing, passiveCheck, PLAN, P };

@@ -29,6 +29,7 @@ G.scene.sailing = (function () {
   var tip = [0, 0], pose = [0, 0];
 
   S.def('lure', { r: 'rust_hi', b: 'bone' }, ['.r.', 'rbr', '.r.']);
+  S.def('float', { r: 'neon_red', b: 'bone' }, ['r', 'r', 'b']); // the passive line's float (12.2)
   // 10.4: the owl that calls at a clock window's cue. Its eyes are open in frame 1.
   S.def('owl', { o: 'stone', d: 'stone_dark', e: 'signal_amber', k: 'ink' }, [
     ['o...o', 'ooooo', 'okook', 'ooooo', 'odddo', '.ddd.', '.k.k.'],
@@ -269,7 +270,7 @@ G.scene.sailing = (function () {
     if (!skyCv) skyCv = B.canvas(1, VIEW_H);
     skyKey = -1;
 
-    var run = G.state.run;
+    var run = G.state.run, pv = run.passive;
     run.loc = id;
     run.boat = boat.create(loc.start);
     run.dog = dog.create();
@@ -300,6 +301,9 @@ G.scene.sailing = (function () {
     run.spots = loc.spots || []; // where casts are worth more; a scenery module may move them
     run.scen = null;             // the scenery module's own run state
     if (scen.load) scen.load(run, loc);
+    // Passive mode (12.2) carries on across travel, with its tape; the next cycle starts here.
+    run.passive = pv || { on: false, ps: null, pl: false, t: 0, x: 0, tape: null, cycles: 0, note: '', noteT: 0 };
+    run.passive.ps = null; run.passive.pl = false;
     G.gfx.water.setDeltas(drawDeltas);
     fx.clear();
   }
@@ -442,6 +446,11 @@ G.scene.sailing = (function () {
         }
         break;
       case 'sailing':
+        if (run.passive.on && run.passive.pl) { // 12.2: fishing by itself; bent while a fish is on
+          var on = passiveFighting(run);
+          out[0] = CAST.waitAngle + (on ? 4 : 0); out[1] = on ? 4 + 2 * Math.sin(run.passive.t * 9) : 1;
+        } else { out[0] = CAST.restAngle; out[1] = 0; }
+        break;
       case 'card':
         out[0] = CAST.restAngle; out[1] = 0;
         break;
@@ -490,6 +499,7 @@ G.scene.sailing = (function () {
       return;
     }
     var under = G.scene.underwater.UNDER[fsm] === 1;
+    if (fsm === 'sailing' && run.passive.on && run.passive.pl) { drawPassiveLine(ctx, run, wy); return; }
     if (fsm !== 'casting' && !under) return;
     rodPose(run, pose);
     var sx = Math.round(b.x - run.cam.x);
@@ -513,6 +523,18 @@ G.scene.sailing = (function () {
     }
     ctx.globalAlpha = 1;
     S.draw(ctx, 'lure', Math.round(lx) - 1, Math.round(ly) - 1, 0, false);
+  }
+
+  // 12.2: the passive line runs to a float; while a fish is on, the float pulls under and shakes.
+  function drawPassiveLine(ctx, run, wy) {
+    var pv = run.passive, b = run.boat, on = passiveFighting(run);
+    rodPose(run, pose);
+    boat.rodTip(b, Math.round(b.x - run.cam.x), wy, pose[0], tip);
+    var fxs = pv.x - camPx + (on ? Math.round(Math.sin(pv.t * 31)) : 0), fy = wy - 2 + (on ? 2 : Math.round(Math.sin(b.t * 2)));
+    ctx.globalAlpha = 0.6; ctx.fillStyle = P.fog_light;
+    line(ctx, tip[0], tip[1], fxs, fy, false);
+    ctx.globalAlpha = 1;
+    S.draw(ctx, 'float', fxs, fy, 0, false);
   }
 
   // 7.4: pulling, the line runs straight and shakes; tired, it sags. The tint warms with
@@ -700,6 +722,80 @@ G.scene.sailing = (function () {
     c.globalAlpha = 1;
   }
 
+  // ---- Passive mode (12.2, V7) --------------------------------------------------
+  // TAB turns it on from any state. A lure in the water is reeled in; a fish already on the
+  // line is fought by the auto-player and sold, then the cycles start. Each cycle is
+  // sim/passive.js plan (decided as it starts, from the boat's spot), run in real time while
+  // the scene's own clock and unease go on, then apply: the same cycles time away uses.
+  // TAB, a move or the action key turns it off (never blocking input), and the tape of
+  // what it caught opens.
+  var PASSIVE = { reach: 60, card: 1.2 }; // px from the boat where the float sits; s the card shows
+
+  function passiveOn(run) {
+    var pv = run.passive, fsm = run.fsm, c = run.cast;
+    pv.on = true; pv.pl = false; pv.t = 0; pv.cycles = 0; pv.note = ''; pv.noteT = 0;
+    if (fsm === 'charging') G.core.state.go(run, 'sailing');
+    else if (fsm === 'casting' || fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest') {
+      if (fsm === 'casting') G.core.state.go(run, 'sinking');
+      fx.splash(c.x1, loc.waterY, 0.15);
+      G.core.state.go(run, 'sailing'); // reeled in: the fish drift off, the next cast starts clean
+    }
+    if (G.core.debug) G.core.debug.log('passive on (from ' + fsm + ')');
+  }
+
+  // show: open the tape of this stretch (when it fished at least once).
+  function passiveOff(run, show) {
+    var pv = run.passive, tape = pv.tape;
+    pv.on = false; pv.pl = false; pv.tape = null;
+    if (tape && tape.secs > 0) {
+      G.sim.passive.finish(tape, G.state.save, G.rng, G.data);
+      G.core.save.autosave('passive');
+      if (show) { G.ui.tape.show(tape); G.ui.menu.open('tape'); }
+    }
+    if (G.core.debug) G.core.debug.log('passive off');
+  }
+
+  function setPassive(on) {
+    var run = G.state.run;
+    if (!!on === run.passive.on) return run.passive.on;
+    if (on) passiveOn(run); else passiveOff(run, true);
+    return run.passive.on;
+  }
+
+  // Cycles run only while the boat is between casts; a fight it took over finishes first.
+  function passiveStep(run, dt) {
+    var pv = run.passive, PS = G.sim.passive, save = G.state.save;
+    if (pv.noteT > 0) pv.noteT -= dt;
+    if (!pv.on || run.fsm !== 'sailing') return;
+    if (!pv.ps) pv.ps = PS.create(save, loc.id, G.data);
+    if (!pv.tape) pv.tape = PS.newTape(save, loc.id, 'live');
+    if (!pv.pl) {
+      pv.x = clamp(Math.round(run.boat.x + run.boat.facing * PASSIVE.reach), 8, loc.width - 8);
+      G.sim.unease.castBoost(run.anom, run.spots, pv.x, G.data, pv.ps.boost); // where it fishes counts
+      PS.plan(pv.ps, G.rng, G.data);
+      pv.pl = true; pv.t = 0;
+      fx.splash(pv.x, loc.waterY, 0.2);
+      return;
+    }
+    pv.t += dt;
+    var pl = pv.ps.plan;
+    if (pv.t < pl.total) return;
+    var r = PS.apply(pv.ps, G.data);
+    PS.record(pv.tape, pv.ps, G.rng, G.data);
+    pv.cycles++; pv.pl = false; pv.noteT = 4;
+    if (r === PS.CAUGHT) {
+      pv.note = '+' + pl.coins + 'c ' + G.data.fish[pl.sp].name;
+      fx.splash(pv.x, loc.waterY, 0.5);
+      G.core.save.autosave('catch');
+    } else pv.note = r === PS.LOST ? 'It got away.' : 'Nothing bit.';
+  }
+
+  // True while a passive cycle's fish is on (the float pulls under, the rod bends).
+  function passiveFighting(run) {
+    var pv = run.passive;
+    return pv.on && pv.pl && pv.ps.plan.result !== G.sim.passive.EMPTY && pv.t >= pv.ps.plan.wait;
+  }
+
   // ---- Scene -------------------------------------------------------------------
 
   // Resumes at the saved location; coming back from the shop or cabin keeps the run as it was.
@@ -711,7 +807,11 @@ G.scene.sailing = (function () {
   function exit() {}
 
   function update(dt) {
-    var run = G.state.run, b = run.boat, save = G.state.save;
+    var run = G.state.run, b = run.boat, save = G.state.save, inp = G.core.input, pv = run.passive;
+    // 12.2: TAB toggles passive in every state; moving or the action key also ends it, and
+    // that key does nothing else this step.
+    var toggled = inp.pressed('passive') || (pv.on && (inp.move() !== 0 || inp.pressed('action')));
+    if (toggled) { if (pv.on) passiveOff(run, true); else passiveOn(run); }
     G.sim.economy.effects(save, G.data, run.gearFx);
     var hour0 = save.clock;
     G.sim.clock.step(save, null, dt, G.rng, G.data);
@@ -720,19 +820,20 @@ G.scene.sailing = (function () {
     G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);
     anomalyStep(run, save, dt);
     owlStep(run, save, hour0, dt);
-    castStep(run, dt);
+    if (!toggled && !pv.on) castStep(run, dt); // a fight passive took over goes on in catchStep
     fishStep(run, dt);
+    passiveStep(run, dt);
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
     if (run.fsm === 'card') {
-      var choice = G.ui.card.update(dt);
+      var choice = pv.on ? (run.fsmT >= PASSIVE.card ? 'sell' : null) : G.ui.card.update(dt); // passive sells
       if (choice) { G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing'); }
     }
-    var move = run.fsm === 'sailing' ? G.core.input.move() : 0;
+    var move = run.fsm === 'sailing' && !pv.on && !toggled ? inp.move() : 0;
     boat.step(b, move, dt, loc.width);
     // 7.6: the dog reads interest and the heavy-fish flag only while the lure is fishing.
     var fishing = FISHING[run.fsm] === 1;
-    run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' ? 0.5 : 0);
+    run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' || passiveFighting(run) ? 0.5 : 0);
     run.dogIn.tooHeavyNear = fishing && run.school.ctx.tooHeavyNear;
     if (run.dogIn.tooHeavyNear) save.flags.heavy[loc.id] = true; // the journal's margin note (D4)
     var cue = dog.cues(run.dog, save, loc, b.x, G.data);
@@ -800,7 +901,7 @@ G.scene.sailing = (function () {
   }
 
   return {
-    load: load, tp: tp, enter: enter, exit: exit, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
+    load: load, tp: tp, enter: enter, exit: exit, setPassive: setPassive, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
     skyColor: skyColor, hourNow: hourNow,
@@ -854,6 +955,15 @@ if (G.core.debug) G.core.debug.addLine(function () {
   if (!loc) return 'scenery: -';
   var drift = loc.drift && G.scene.underwater.UNDER[run.fsm] ? '  current ' + loc.drift(c.seed, c.tw, c.ly - loc.waterY, false).toFixed(2) + ' px/s at ' + c.tw.toFixed(1) + ' s' : '';
   return 'scenery ' + (loc.scenery || 'none') + (m && m.debugLine ? '  ' + m.debugLine(run) : '') + drift;
+});
+
+if (G.core.debug) G.core.debug.addLine(function () {
+  var pv = G.state.run.passive;
+  if (!pv) return 'passive: -';
+  var pl = pv.ps && pv.ps.plan;
+  return 'passive ' + (pv.on ? 'on' : 'off') + (pv.on && pv.pl ? '  cycle ' + pv.t.toFixed(1) + '/' + pl.total.toFixed(1) + 's (wait ' + pl.wait.toFixed(1) + ') ' +
+    (pl.sp >= 0 ? G.data.fish[pl.sp].id + ' ' + ['empty', 'caught', 'lost'][pl.result] : 'nothing') : '') +
+    '  cycles ' + pv.cycles + (pv.tape ? '  tape ' + pv.tape.entries.length + ' lines +' + pv.tape.coins + 'c' : '') + '  tapes saved ' + G.state.save.tapes.length;
 });
 
 if (G.core.debug) G.core.debug.addLine(function () {

@@ -1,10 +1,10 @@
 # SoftStatic: Handoff
 
-How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-28, after the Phase 11 commit (not pushed yet).
+How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-28, after the Phase 12 commit (Phases 11 and 12 not pushed yet).
 
 ## State in one paragraph
 
-Phases 1 to 11 of [PLAN.md](PLAN.md) are built, checked and committed, one commit per phase (Phase 11 is not pushed yet). **Milestone A** (the cozy loop, Phase 7) and **Milestone B** (the liminal slice on Fogbound, Phase 10) are reached. On Fogbound Lake you sail, cast, watch the lure sink, hook and fight a fish, and sell or keep it. A HUD shows the clock, coins and bait. P pauses (volume, mute, save export/import), J opens the field journal, M opens the map, which leads to the bait shop and the cabin. At night, with unease, the water reflects things the shore does not have, the dog stares at a hidden spot, an owl calls at 02:47 and 03:33, and journal pages gain hints after you leave them. The map now opens three more waters: Blackwater Creek (300 coins; a current carries the lure), The Pines (1500; a traffic light that blinks faster near the owl's hours, a diner, a parking lot, the same pier as Fogbound) and the Red Room Reservoir (6000 plus a catch made in a clock window; curtains, a zigzag shore, a crimson reflection, and structures that move after every cast). None of the three has fish yet (Phase 14). **Next is Phase 12 (Passive and the tape), starting with task 12.1 `passive.cycle`.** Nothing from Phase 12 has been started.
+Phases 1 to 12 of [PLAN.md](PLAN.md) are built, checked and committed, one commit per phase (Phases 11 and 12 are not pushed yet). **Milestone A** (the cozy loop, Phase 7) and **Milestone B** (the liminal slice on Fogbound, Phase 10) are reached. On Fogbound Lake you sail, cast, watch the lure sink, hook and fight a fish, and sell or keep it. A HUD shows the clock, coins and bait. P pauses (volume, mute, save export/import), J opens the field journal, M opens the map, which leads to the bait shop and the cabin. At night, with unease, the water reflects things the shore does not have, the dog stares at a hidden spot, an owl calls at 02:47 and 03:33, and journal pages gain hints after you leave them. The map now opens three more waters: Blackwater Creek (300 coins; a current carries the lure), The Pines (1500; a traffic light that blinks faster near the owl's hours, a diner, a parking lot, the same pier as Fogbound) and the Red Room Reservoir (6000 plus a catch made in a clock window; curtains, a zigzag shore, a crimson reflection, and structures that move after every cast). None of the three has fish yet (Phase 14). TAB turns on passive mode: the boat fishes by itself at about 60% of active income. Time away is fished the same way when you come back (up to 8 hours), and a VHS-style tape shows what was caught, sometimes with `???` lines, a missing stretch, or a fish in your own handwriting that you never caught. `?compact` opens a small view for a second monitor. **Next is Phase 13 (Audio), starting with task 13.1 the audio engine.** Nothing from Phase 13 has been started.
 
 ## Completed phases
 
@@ -20,7 +20,8 @@ Phases 1 to 11 of [PLAN.md](PLAN.md) are built, checked and committed, one commi
 | 8 Economy, save, balance | `855d35a`, `ead0edf` | `data/gear.js`, `sim/economy.js`, save v2 with migration and autosave, gear wired into play, `tools/balance.js` |
 | 9 Interface | `29a69dc` | HUD; overlays (pause menu with settings and export/import, journal, map); shop and cabin scenes; shopkeeper dialogue; travel; save v3 |
 | 10 Anomalies | `b041d97` | Anomaly scheduler and data; reflection deltas; spot boosts; dog stare and bark; the owl at the clock windows; journal pages that gain hints; save v4 |
-| 11 Locations 2–4 | `Phase 11` commit | Creek, Pines and Red Room data; the creek's current; the scenery hook and modules; moving structures; unlock costs in the location files |
+| 11 Locations 2–4 | `5c9b3c8` | Creek, Pines and Red Room data; the creek's current; the scenery hook and modules; moving structures; unlock costs in the location files |
+| 12 Passive and the tape | `Phase 12` commit | `sim/passive.js` (cycles, time away, the tape's contents); live passive on TAB from any state; `ui/tape.js`; phantom journal entries; `?compact`; one tab owns the save |
 
 ## Architecture
 
@@ -30,52 +31,51 @@ The tree follows PLAN.md §3. These files exist so far:
 index.html           canvas, script load order (core → data → sim → gfx → scene → ui), boot
 js/core/             debug.js rng.js state.js input.js save.js loop.js
 data/                loc_fog.js loc_creek.js loc_pines.js loc_red.js fish.js gear.js dialogue.js anomalies.js
-js/sim/              clock.js unease.js fish_ai.js bite.js fight.js economy.js   (pure; run in Node)
+js/sim/              clock.js unease.js fish_ai.js bite.js fight.js economy.js passive.js   (pure; run in Node)
 js/gfx/              bake.js sprites.js fx.js water.js fishgen.js
 js/scene/            boat.js dog.js underwater.js scenery.js sailing.js
-js/ui/               hud.js card.js menu.js journal.js shop.js map.js cabin.js
-tools/balance.js     --validate | --replay <seed> | --pacing
+js/ui/               hud.js card.js menu.js journal.js shop.js map.js cabin.js tape.js
+tools/balance.js     --validate | --replay <seed> | --pacing | --passive
 ```
 
-- **Flow:** the scene manager holds `sailing`, `shop`, `cabin` and `gallery`. Each loop step first gives the overlays (`G.ui.menu`: pause, journal, map) the step; while one is open the scene waits. `sailing.js` is the scene in play: clock, unease, anomaly scheduler, owl, cast (with the creek's drift), fish school, the location's scenery module, then `underwater.catchStep` (bite → hook → fight → landing → card), dog cues. The map is the way into the shop and the cabin.
-- **State:** `G.state.save` is saved. `G.state.run` is never saved and holds the boat, camera, cast (with its spot boost), school, fight, hook, the active anomaly, the owl, the spots as they stand (the Red Room moves them), the scenery module's state and so on.
+- **Flow:** the scene manager holds `sailing`, `shop`, `cabin` and `gallery`. Each loop step first gives the overlays (`G.ui.menu`: pause, journal, map, tape) the step; while one is open the scene waits. `sailing.js` is the scene in play: the passive toggle, clock, unease, anomaly scheduler, owl, cast (with the creek's drift), fish school, the passive cycle, the location's scenery module, then `underwater.catchStep` (bite → hook → fight → landing → card), dog cues. The map is the way into the shop and the cabin.
+- **State:** `G.state.save` is saved. `G.state.run` is never saved and holds the boat, camera, cast (with its spot boost), school, fight, hook, the active anomaly, the owl, the spots as they stand (the Red Room moves them), the scenery module's state, passive mode and so on. The boot script fishes time away (`G.ui.tape.away`) before the first frame.
 - **Saves:** localStorage key `softstatic_save_v1`, save format version 4 (migrations from v1). They are stored per browser, so they do not travel with git.
-- **Keys:** A/D or arrows sail, Space (or mouse) casts and reels, W/S or ↑/↓ move in menus, Enter confirms, Esc goes back, P pauses, J journal, M map.
-- **Debug:** with `?debug`, the console has `dbg.state, hour, unease, tp, cast, lure, give(id, quick), land, spawn, dog, rod, money, buy, caught, save, wipe, sprite, fx, ui(name), travel(id), restore, anomaly(id)`.
+- **Keys:** A/D or arrows sail, Space (or mouse) casts and reels, W/S or ↑/↓ move in menus, Enter confirms, Esc goes back, P pauses, J journal, M map, TAB passive. URL flags: `?debug`, `?seed=N`, `?gallery`, `?compact`.
+- **Debug:** with `?debug`, the console has `dbg.state, hour, unease, tp, cast, lure, give(id, quick), land, spawn, dog, rod, money, buy, caught, save, wipe, sprite, fx, ui(name), travel(id), restore, anomaly(id), passive(on), away(seconds), tape(i)`.
 
 ## How to continue on another computer
 
 1. **Clone** the repository: `git clone https://github.com/serek9/SoftStatic.git`.
 2. **Install Node** (any recent LTS; developed on v26) and **Python 3** to serve the files. VS Code Live Server works too. No `npm install` is needed: there are no dependencies.
 3. **Run the game:** `python3 -m http.server 5517 --bind 127.0.0.1` (on Windows, `python`), then open `http://127.0.0.1:5517/?debug`.
-4. **Check that everything works:** `node tools/balance.js --validate`, `node tools/balance.js --replay 12345`, `node tools/balance.js --pacing`. All three should end with OK or PASS and exit 0 (expected output in PLAN.md §8.5).
-5. **Claude Code:** open the folder and Claude will read [CLAUDE.md](CLAUDE.md). To resume, say "Start Phase 12". Claude's memory and settings are per machine and are not in git; everything it needs is in PLAN.md, CLAUDE.md and this file.
-6. **Moving a save:** saves stay in each browser. In the game, press P, choose **Export save** (it copies the save string, or shows it to copy), and on the other machine choose **Import save** and paste it (between casts). The console equivalents are `G.core.save.exportString(G.state.save)` and `G.ui.menu.importSave(s)`.
+4. **Check that everything works:** `node tools/balance.js --validate`, `node tools/balance.js --replay 12345`, `node tools/balance.js --pacing`, `node tools/balance.js --passive`. All four should end with OK or PASS and exit 0 (expected output in PLAN.md §8.5).
+5. **Claude Code:** open the folder and Claude will read [CLAUDE.md](CLAUDE.md). To resume, say "Start Phase 13". Claude's memory and settings are per machine and are not in git; everything it needs is in PLAN.md, CLAUDE.md and this file.
+6. **Moving a save:** saves stay in each browser (and only one tab plays a save at a time; an older tab waits until clicked). In the game, press P, choose **Export save** (it copies the save string, or shows it to copy), and on the other machine choose **Import save** and paste it (between casts). The console equivalents are `G.core.save.exportString(G.state.save)` and `G.ui.menu.importSave(s)`.
 
 **Portability notes:** line endings are fixed to LF by `.gitattributes`, so `core.autocrlf` settings don't matter. All script paths in `index.html` match the files' case exactly, which matters on case-sensitive file systems. The code has no absolute paths. `tools/balance.js` builds paths with `path.join`.
 
 ## Pending work
 
-**Next phases** (PLAN.md §4): 12 Passive and the tape, 13 Audio (can run alongside), 14 Content and polish (Milestone C). The exact next task, in the §7 template, is in PLAN.md §8.6.
+**Next phases** (PLAN.md §4): 13 Audio, 14 Content and polish (Milestone C). The exact next task, in the §7 template, is in PLAN.md §8.6.
 
 **Open `TODO(Px.y)` markers left in the code for later phases:**
 
 | Task | Where | What |
 |---|---|---|
-| 12.2 | `js/scene/underwater.js` | Passive mode hooks automatically |
 | 13.1 | `index.html`, `js/ui/menu.js` | Audio engine; it reads `save.settings.volume` and `mute` |
 | 13.2 | `js/scene/scenery.js` | The Pines lot's fluorescent hum (and 13.4's jazz chords) |
 | 13.3 | `js/scene/underwater.js`, `js/scene/sailing.js` | Slip sound, heavy-fish line hum, the owl's cry |
 | 14.1 | `data/fish.js` | Full Fogbound roster (currently 4 placeholder species) |
-| 14.6 | `js/core/input.js` | Touch controls (menus are keyboard-only for now) |
+| 14.6 | `js/core/input.js`, `js/ui/hud.js` | Touch controls (menus are keyboard-only for now); the passive label as a button to click |
 
-**Waiting on the full rosters (14.1–14.4):** the creek, the Pines and the Red Room have no fish, so the school stays empty there. The Red Room opens on a catch in any clock window, not yet a specific fish (PLAN.md §8.3 #34). With today's 4 placeholder fish, the dog never barks (no legendary), the journal's heavy-fish margin note cannot appear (nothing is heavier than the starter rod), and the hidden spot's rare boost only pays during the owl window. Each mechanism was checked with injected test data.
+**Waiting on the full rosters (14.1–14.4):** the creek, the Pines and the Red Room have no fish, so the school stays empty there and passive cycles catch nothing. The Red Room opens on a catch in any clock window, not yet a specific fish (PLAN.md §8.3 #34). With today's 4 placeholder fish, the dog never barks (no legendary), the journal's heavy-fish margin note cannot appear (nothing is heavier than the starter rod), and the hidden spot's rare boost only pays during the owl window. Each mechanism was checked with injected test data.
 
-**Checks outside the repo:** the per-phase Node scripts (Phases 1, 6, 7, 8) and the Phase 9–11 browser checks (a small headless-Brave DevTools driver in Node, plus Node checks of the shop lines, anomaly scheduler, spot value, late hints and the creek's drift) lived in temporary folders and are not in git. The checks that matter long-term are in `tools/balance.js`; the results of the rest are recorded in PLAN.md §8.5.
+**Checks outside the repo:** the per-phase Node scripts (Phases 1, 6, 7, 8) and the Phase 9–12 browser checks (a small headless-Brave DevTools driver in Node, plus Node checks of the shop lines, anomaly scheduler, spot value, late hints and the creek's drift; Phase 12's TAB-in-every-state, tape and two-tab checks) lived in temporary folders and are not in git. The checks that matter long-term are in `tools/balance.js`; the results of the rest are recorded in PLAN.md §8.5.
 
 ## Decisions and departures from the plan
 
-The full, numbered list is PLAN.md §8.3 (41 entries). The ones most likely to surprise:
+The full, numbered list is PLAN.md §8.3 (48 entries). The ones most likely to surprise:
 
 - **Debug overlay and red errors are page text**, not canvas text. Save export/import also uses the browser's own prompt dialog when the clipboard is unavailable.
 - **No fail states:** extra state-machine exits back to `sailing` (cancel a charge, reel in early, snap, escape).
@@ -90,4 +90,8 @@ The full, numbered list is PLAN.md §8.3 (41 entries). The ones most likely to s
 - **Location costs and conditions live in each `data/loc_*.js`** (`cost`, `need`); `data/gear.js` no longer lists them.
 - **Scenery modules** (`js/scene/scenery.js`, a file not in the §3 tree) draw what baked layers cannot: the Pines' signal, neon and lamps, the Red Room's moving structures and crimson reflection. Fogbound and the creek have none.
 - **The Red Room's structures move after each cast lands** (seeded by that cast), each carrying a spot; the boost goes by where they stood when the lure landed.
+- **Passive mode is the same cycle everywhere:** live (TAB) and time away both run `sim/passive.js` plan/apply, so they earn alike. `incomeMult` (0.6) is the only knob for the share; the wait `base` (48 s) is set so a cycle matches an active cast before it.
+- **Time away moves the game clock** (it used to resume where it was saved), and on boot the tape shows what happened.
+- **A phantom journal entry never counts as caught** until you really catch that fish.
+- **One tab owns the save:** opening the game in a second tab (or `?compact`) makes the first one wait, so they never overwrite each other.
 - **Pacing model:** it fishes the Fogbound roster for the whole run until Phase 14; final tuning is task 14.5.

@@ -11,6 +11,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Pages also gain text after you leave them (10.5, V10.8): closing the journal lets
 // sim/unease.js lateHint write one true hint you never found. Those notes are in blue pen,
 // even on pages of fish not caught yet, and a page with a new one is marked in the grid.
+// A phantom entry (12.4, from the tape) is a page in your handwriting for a fish you never
+// caught: its picture shows faintly, and it counts for nothing until you really catch it.
 G.ui = G.ui || {};
 G.ui.journal = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, M = G.ui.menu;
@@ -113,6 +115,13 @@ G.ui.journal = (function () {
     var notes = 0, h;
     function note(ref) { para(hintText(ref, sp), j.late && j.late[ref] ? 'night_blue' : 'ink', notes++ ? 0 : 4); }
     if (j) j.lateNew = false;
+    if (j && !j.caught && j.phantom) {
+      add(sp.name, 'ink', true);
+      add(sp.rarity, 'wood', false);
+      para('My writing. I do not remember catching it.', 'ink', 4);
+      for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
+      return;
+    }
     if (!j || !j.caught) {
       add('???', 'ink', true);
       add(sp.rarity, 'wood', false);
@@ -171,10 +180,13 @@ G.ui.journal = (function () {
     var on = focus === 2 && k === sel;
     ctx.fillStyle = P[on ? 'rust' : 'wood_hi'];
     ctx.fillRect(x, y, CW, 1); ctx.fillRect(x, y + CH - 1, CW, 1); ctx.fillRect(x, y, 1, CH); ctx.fillRect(x + CW - 1, y, 1, CH);
-    var name = got ? G.gfx.fishgen.sprite(spIdx) : G.gfx.fishgen.silhouette(spIdx), d = S.get(name);
+    var ghost = !got && !!j && j.phantom;
+    var name = got || ghost ? G.gfx.fishgen.sprite(spIdx) : G.gfx.fishgen.silhouette(spIdx), d = S.get(name);
     var sx = x + ((CW - d.w) >> 1), sy = y + ((CH - d.h) >> 1);
+    if (ghost) ctx.globalAlpha = 0.35;
     if (d.w > CW - 2) { ctx.save(); ctx.beginPath(); ctx.rect(x + 1, y + 1, CW - 2, CH - 2); ctx.clip(); S.draw(ctx, name, sx, sy, 0, false); ctx.restore(); }
     else S.draw(ctx, name, sx, sy, 0, false);
+    ctx.globalAlpha = 1;
     if (got && !j.read) S.drawText(ctx, 'NEW', x + 2, y + 2, 'crimson');
     if (j && j.lateNew) S.drawText(ctx, '*', x + CW - 6, y + 2, 'night_blue'); // a page that gained a line
   }
@@ -201,12 +213,14 @@ G.ui.journal = (function () {
     // Right page: the entry.
     var rx = SPINE + 7;
     if (list.length) {
-      var spIdx = list[sel], got = caught(G.data.fish[spIdx].id);
-      var name = got ? G.gfx.fishgen.sprite(spIdx) : G.gfx.fishgen.silhouette(spIdx), d = S.get(name);
+      var spIdx = list[sel], got = caught(G.data.fish[spIdx].id), js = G.state.save.journal[G.data.fish[spIdx].id];
+      var ghost = !got && !!js && js.phantom;
+      var name = got || ghost ? G.gfx.fishgen.sprite(spIdx) : G.gfx.fishgen.silhouette(spIdx), d = S.get(name);
       var scale = Math.max(1, Math.min(3, Math.floor(128 / d.w), Math.floor(34 / d.h)));
       ctx.save();
       ctx.translate(rx + 68 - (d.w * scale >> 1), BY + 26 - (d.h * scale >> 1));
       ctx.scale(scale, scale);
+      if (ghost) ctx.globalAlpha = 0.35;
       S.draw(ctx, name, 0, 0, 0, false);
       ctx.restore();
       if (selIsNew) S.drawText(ctx, 'NEW', SPINE + BW / 2 - 24, BY + 5, 'crimson');
@@ -228,7 +242,7 @@ G.ui.journal = (function () {
   return {
     open: open, update: update, draw: draw, render: render, jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close,
     lastLate: function () { return lastLate; },
-    state: function () { return { loc: locs[locIdx], rarity: RARITIES[rarIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, entry: entry.map(function (e) { return e.s; }) }; }
+    state: function () { return { loc: locs[locIdx], rarity: RARITIES[rarIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
   };
 })();
 

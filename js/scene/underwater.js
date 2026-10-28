@@ -346,13 +346,13 @@ G.scene.underwater = (function () {
     var inp = G.core.input, fsm = run.fsm, F = G.sim.fight;
     if (fsm === 'waiting' || fsm === 'interest') {
       biteIn.reel = inp.held('action');
-      biteIn.auto = false; // TODO(P12.2): passive mode hooks automatically
+      biteIn.auto = run.passive.on; // passive mode hooks by itself (V3.5)
       if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
     } else if (fsm === 'hooked') {
       run.hook.t += dt;
       if (run.hook.t >= HOOKED_BEAT) G.core.state.go(run, 'fighting');
     } else if (fsm === 'fighting') {
-      fightIn.reel = inp.held('action');
+      fightIn.reel = run.passive.on ? F.autoPlayer(run.fight, G.sim.passive.P.skill, G.rng) === 1 : inp.held('action'); // 12.2
       var res = F.step(run.fight, fightIn, dt, G.rng, G.data);
       if (run.fight.slipped) fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); // TODO(P13.3): the soft slip sound
       if (res === F.WIN) {

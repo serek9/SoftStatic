@@ -41,6 +41,7 @@
 <script src="js/sim/bite.js"></script>
 <script src="js/sim/fight.js"></script>
 <script src="js/sim/economy.js"></script>
+<script src="js/sim/passive.js"></script>
 <!-- gfx -->
 <script src="js/gfx/bake.js"></script>
 <script src="js/gfx/sprites.js"></script>
@@ -61,14 +62,21 @@
 <script src="js/ui/shop.js"></script>
 <script src="js/ui/map.js"></script>
 <script src="js/ui/cabin.js"></script>
+<script src="js/ui/tape.js"></script>
 <!-- audio: TODO(P13.1) -->
 
 <!-- boot -->
 <script>
 (function () {
-  var W = 320, H = 180;
+  var q = new URLSearchParams(location.search);
+  // ?compact (12.5): a 160×90 view with no HUD for a second monitor, fishing passively. The
+  // game still draws at 320×180 into an offscreen canvas, which is halved onto the page.
+  G.core.compact = q.has('compact');
+  var W = G.core.compact ? 160 : 320, H = G.core.compact ? 90 : 180;
   var canvas = document.getElementById('game');
-  var ctx = canvas.getContext('2d', { alpha: false });
+  canvas.width = W; canvas.height = H;
+  var vctx = canvas.getContext('2d', { alpha: false });
+  var ctx = G.core.compact ? G.gfx.bake.canvas(320, 180).getContext('2d') : vctx;
 
   // Largest whole-number scale that fits, measured in device pixels so every game
   // pixel maps to the same number of screen pixels. Below 1× it falls back to a
@@ -79,12 +87,12 @@
     var scale = fitScale >= 1 ? Math.floor(fitScale) : fitScale;
     canvas.style.width = (W * scale / dpr) + 'px';
     canvas.style.height = (H * scale / dpr) + 'px';
-    ctx.imageSmoothingEnabled = false;
+    vctx.imageSmoothingEnabled = false;
   }
   window.addEventListener('resize', fit);
   fit();
 
-  var q = new URLSearchParams(location.search);
+  G.core.save.claim(); // this tab owns the save now (12.5)
   G.state.save = G.core.save.load();
 
   // ?seed=N wins; otherwise the sim RNG carries on from the save (visual RNG starts fresh).
@@ -101,11 +109,28 @@
   G.core.state.register('cabin', G.ui.cabin);
   G.core.state.register('gallery', G.core.debug.gallery);
   G.core.state.change(q.has('gallery') ? 'gallery' : 'sailing');
+  if (!q.has('gallery')) {
+    G.ui.tape.away(Date.now()); // 12.3: time away is fished passively, and the tape shows it
+    if (G.core.compact) G.scene.sailing.setPassive(true);
+  }
 
-  // An open overlay (pause, journal, map) takes the step and the scene waits (9.2).
+  // Another tab owns the save (12.5): this one waits, and a click or key brings it back here.
+  function reclaim() { if (G.core.save.lost()) { G.core.save.claim(); location.reload(); } }
+  canvas.addEventListener('mousedown', reclaim);
+  window.addEventListener('keydown', reclaim);
+  function idle(c) {
+    G.ui.menu.dim(c, 0.75);
+    G.ui.menu.centre(c, 'Fishing in another tab.', 160, 78, 'fog_light');
+    G.ui.menu.centre(c, 'Click to fish here.', 160, 90, 'fog_mid');
+  }
+
+  // An open overlay (pause, journal, map, tape) takes the step and the scene waits (9.2).
   G.core.loop.start({
     update: function (dt) { if (!G.ui.menu.update(dt)) G.core.state.update(dt); },
-    draw: function (ctx) { G.core.state.draw(ctx); G.ui.menu.draw(ctx); }
+    draw: function (ctx) { G.core.state.draw(ctx); G.ui.menu.draw(ctx); },
+    idle: idle,
+    // ?compact: halve the full picture onto the page canvas (smoothed, so 1 px lines survive).
+    present: G.core.compact ? function (c) { vctx.imageSmoothingEnabled = true; vctx.drawImage(c.canvas, 0, 0, 320, 180, 0, 0, W, H); vctx.imageSmoothingEnabled = false; } : null
   }, ctx);
 })();
 </script>

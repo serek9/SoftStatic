@@ -3,6 +3,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Fixed-timestep loop (1/60) with an accumulator. Real time beyond MAX_FRAME in one
 // frame is dropped instead of simulated, so a stall or a hidden tab never causes a
 // catch-up spiral. P opens the pause menu (G.ui.menu); setPaused is a hard freeze for debugging.
+// While another tab owns the save (12.5, core/save.js) nothing steps: the frame still draws,
+// and hooks.idle(ctx) draws over it.
 G.core = G.core || {};
 G.core.loop = (function () {
   var DT = 1 / 60;
@@ -12,7 +14,7 @@ G.core.loop = (function () {
   var secT = 0, secFrames = 0, secSteps = 0;
 
   function step() {
-    if (!paused) hooks.update(DT);
+    if (!paused && !G.core.save.lost()) hooks.update(DT);
     G.core.input.endStep();
   }
 
@@ -30,6 +32,8 @@ G.core.loop = (function () {
     stats.steps = n;
 
     hooks.draw(ctx);
+    if (G.core.save.lost() && hooks.idle) hooks.idle(ctx);
+    if (hooks.present) hooks.present(ctx);
 
     secT += ft; secFrames++; secSteps += n;
     if (secT >= 1) {
@@ -56,5 +60,5 @@ G.core.loop = (function () {
 if (G.core.debug) G.core.debug.addLine(function () {
   var s = G.core.loop.stats;
   return 'fps ' + s.fps + '  ups ' + s.ups + '  steps ' + s.steps + '  dropped ' + s.dropped.toFixed(2) + 's' +
-    (G.core.loop.isPaused() ? '  PAUSED' : '');
+    (G.core.loop.isPaused() ? '  PAUSED' : '') + (G.core.save.lost() ? '  IDLE (another tab owns the save)' : '') + (G.core.compact ? '  compact' : '');
 });

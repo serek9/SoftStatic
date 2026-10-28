@@ -143,9 +143,25 @@ G.core.save = (function () {
     return defaults();
   }
 
+  // 12.5: one tab owns the save, so a ?compact tab and a normal one never write over each
+  // other. The newest tab claims it; a tab that sees another claim stops saving, and its
+  // loop waits (core/loop.js) until it is clicked, when it claims the save and reloads it.
+  var OWNER = KEY + '_owner', tabId = '', lost = false;
+
+  function claim() {
+    var ls = storage();
+    tabId = Date.now().toString(36) + '.' + Math.floor(performance.now() * 1000).toString(36);
+    lost = false;
+    try { if (ls) ls.setItem(OWNER, tabId); } catch (e) {}
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', function (e) { if (tabId && e.key === OWNER && e.newValue !== tabId) lost = true; });
+  }
+
   function persist(save) {
     var ls = storage();
-    if (!ls) return false;
+    if (!ls || lost) return false;
     save.lastSeen = Date.now();
     if (G.rng) save.rng = G.rng.getState();
     try { ls.setItem(KEY, encode(save)); status = 'saved'; return true; } catch (e) { return false; }
@@ -168,7 +184,8 @@ G.core.save = (function () {
   return {
     KEY: KEY, VERSION: VERSION, migrations: migrations,
     defaults: defaults, migrate: migrate, load: load, persist: persist, autosave: autosave,
-    exportString: encode, importString: decode,
+    exportString: encode, importString: decode, claim: claim,
+    lost: function () { return lost; },
     status: function () { return status; }
   };
 })();

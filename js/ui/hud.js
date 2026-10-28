@@ -2,8 +2,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // HUD (9.1): the clock, coins and the bait going on the hook in the top-left corner (over
 // the sky, clear of the boat), and the depth readout in the top-right while the lure is
-// under water. Hidden while the catch card is open. Every string is rebuilt only when the
-// value it shows changes, never per frame.
+// under water. Hidden while the catch card is open, and in the ?compact view (12.5). Between
+// casts the top-right says how to start passive mode, and while it is on, what it just
+// caught (12.2). Every string is rebuilt only when the value it shows changes, never per frame.
 G.ui = G.ui || {};
 G.ui.hud = (function () {
   var S = G.gfx.sprites;
@@ -80,13 +81,21 @@ G.ui.hud = (function () {
     }
   }
 
+  var PASSIVE_ON = 'PASSIVE  TAB', PASSIVE_OFF = 'TAB passive';
+
   function draw(ctx, run, waterY) {
-    if (G.ui.card.isOpen()) return;
+    if (G.ui.card.isOpen() || G.core.compact) return;
     var save = G.state.save, s = clockText(save.clock || 0), cx = X + S.measure(s) + 6;
     label(ctx, s, X, Y, 'fog_light');
     S.draw(ctx, 'hud_coin', cx, Y + 1, 0, false);
     label(ctx, coinText(save.coins), cx + 6, Y, 'paper');
     label(ctx, baitText(save, run.gearFx.bait), X, Y + 9, 'fog_light');
+
+    var pv = run.passive;
+    if (pv.on) {
+      label(ctx, PASSIVE_ON, 316 - S.measure(PASSIVE_ON), Y, 'signal_amber');
+      if (pv.noteT > 0) label(ctx, pv.note, 316 - S.measure(pv.note), Y + 9, 'paper');
+    } else if (run.fsm === 'sailing') S.drawText(ctx, PASSIVE_OFF, 316 - S.measure(PASSIVE_OFF), Y, 'fog_mid'); // TODO(P14.6): a button to click
 
     if (!G.scene.underwater.UNDER[run.fsm]) return;
     if (run.gearFx.depthBands && run.uw.alpha >= 1) drawBands(ctx, run, waterY, run.gearFx.depthBands);
