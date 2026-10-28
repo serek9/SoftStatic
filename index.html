@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SoftStatic</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #game {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+  }
+</style>
+</head>
+<body>
+<canvas id="game" width="320" height="180"></canvas>
+
+<!-- Load order is fixed (§0.4): core → data → sim → gfx → scene → ui → audio → boot. -->
+<!-- core (debug first so it catches errors thrown while the other scripts load) -->
+<script src="js/core/debug.js"></script>
+<script src="js/core/rng.js"></script>
+<script src="js/core/state.js"></script>
+<script src="js/core/input.js"></script>
+<script src="js/core/save.js"></script>
+<script src="js/core/loop.js"></script>
+<!-- data: TODO(P3.1) -->
+<!-- sim: TODO(P6.1) -->
+<!-- gfx: TODO(P2.1) -->
+<!-- scene: TODO(P3.1) -->
+<!-- ui: TODO(P9.1) -->
+<!-- audio: TODO(P13.1) -->
+
+<!-- boot -->
+<script>
+(function () {
+  var W = 320, H = 180;
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d', { alpha: false });
+
+  // Largest whole-number scale that fits, measured in device pixels so every game
+  // pixel maps to the same number of screen pixels. Below 1× it falls back to a
+  // fractional fit (still nearest-neighbour, never smoothed).
+  function fit() {
+    var dpr = window.devicePixelRatio || 1;
+    var fitScale = Math.min(window.innerWidth * dpr / W, window.innerHeight * dpr / H);
+    var scale = fitScale >= 1 ? Math.floor(fitScale) : fitScale;
+    canvas.style.width = (W * scale / dpr) + 'px';
+    canvas.style.height = (H * scale / dpr) + 'px';
+    ctx.imageSmoothingEnabled = false;
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  var q = new URLSearchParams(location.search);
+  var seed = parseInt(q.get('seed'), 10);
+  if (isNaN(seed)) seed = Date.now() | 0;
+  G.core.rng.seedAll(seed);
+
+  G.state.save = G.core.save.load();
+  G.core.input.attach(canvas);
+
+  // Placeholder scene: a pixel test pattern for checking that scaling stays sharp.
+  // TODO(P2.1): colours come from palette keys once gfx/sprites.js exists.
+  G.core.state.register('boot', {
+    enter: function () {},
+    exit: function () {},
+    update: function (dt) { G.core.state.tick(G.state.run, dt); },
+    draw: function (ctx) {
+      ctx.fillStyle = '#0d0f17';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#3a3550';
+      ctx.fillRect(0, 0, W, 1); ctx.fillRect(0, H - 1, W, 1);
+      ctx.fillRect(0, 0, 1, H); ctx.fillRect(W - 1, 0, 1, H);
+      ctx.fillStyle = '#8a6a5a';
+      for (var y = 0; y < 16; y++) for (var x = (y & 1); x < 16; x += 2) ctx.fillRect(W - 20 + x, 4 + y, 1, 1);
+      for (var i = 0; i < 40; i++) ctx.fillRect(4 + i, H - 5 - (i >> 1), 1, 1);
+    }
+  });
+  G.core.state.change('boot');
+
+  G.core.loop.start({
+    update: function (dt) { G.core.state.update(dt); },
+    draw: function (ctx) { G.core.state.draw(ctx); }
+  }, ctx);
+})();
+</script>
+</body>
+</html>
