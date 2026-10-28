@@ -28,12 +28,14 @@
 <!-- data -->
 <script src="data/loc_fog.js"></script>
 <script src="data/fish.js"></script>
+<script src="data/gear.js"></script>
 <!-- sim -->
 <script src="js/sim/clock.js"></script>
 <script src="js/sim/unease.js"></script>
 <script src="js/sim/fish_ai.js"></script>
 <script src="js/sim/bite.js"></script>
 <script src="js/sim/fight.js"></script>
+<script src="js/sim/economy.js"></script>
 <!-- gfx -->
 <script src="js/gfx/bake.js"></script>
 <script src="js/gfx/sprites.js"></script>
@@ -72,11 +74,15 @@
   fit();
 
   var q = new URLSearchParams(location.search);
-  var seed = parseInt(q.get('seed'), 10);
-  if (isNaN(seed)) seed = Date.now() | 0;
-  G.core.rng.seedAll(seed);
-
   G.state.save = G.core.save.load();
+
+  // ?seed=N wins; otherwise the sim RNG carries on from the save (visual RNG starts fresh).
+  var seed = parseInt(q.get('seed'), 10);
+  if (!isNaN(seed)) G.core.rng.seedAll(seed);
+  else {
+    G.core.rng.seedAll(Date.now() | 0);
+    if (G.state.save.rng !== null) G.rng.setState(G.state.save.rng);
+  }
   G.core.input.attach(canvas);
 
   G.core.state.register('sailing', G.scene.sailing);

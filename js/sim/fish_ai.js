@@ -24,7 +24,9 @@ G.sim.fish_ai = (function () {
     noticePause: 0.6,             // s
     inspectR: 10,                 // px circle radius around the lure
     biteHold: 2.5,                // s; only if nothing resolves the bite (sim/bite.js does, in 2 s)
-    swimPx: 10                    // px/s per unit of species speed (speed is in fight units, V4)
+    swimPx: 10,                   // px/s per unit of species speed (speed is in fight units, V4)
+    scent: 3,                     // × awareness: how far a wandering fish senses the lure is there
+    drift: 0.75                   // chance per turn that it heads toward the lure
   };
   var INTERESTED = { notice: 1, approach: 1, inspect: 1, nibble: 1, bite: 1 };
   // How interested a fish in each state is, for the dog (V3.8): 0..1.
@@ -45,6 +47,7 @@ G.sim.fish_ai = (function () {
     }
     var v = ctx.rarity[f.rarity];
     if (f.baitLikes.length) v *= f.baitLikes.indexOf(ctx.bait) >= 0 ? W.baitLiked : W.baitOther;
+    if (f.rarity === 'rare' || f.rarity === 'legendary') v *= ctx.rareBoost || 1; // bait (V8)
     if (ctx.depthM !== null) {
       var h = f.habitat, out = ctx.depthM < h.depthMin ? h.depthMin - ctx.depthM : (ctx.depthM > h.depthMax ? ctx.depthM - h.depthMax : 0);
       if (out > 0) v *= Math.max(W.depthFloor, 1 - out / W.depthFalloff);
@@ -82,6 +85,7 @@ G.sim.fish_ai = (function () {
       ctx: {
         species: data.fish, rarity: data.rarity, windows: data.windows, loc: '', depthM: null, hour: 0,
         unease: 0, bait: '', latched: {}, rodMaxMass: 0, weights: null, tooHeavyNear: false,
+        attract: 1, rareBoost: 1, // gear (V8): attract shortens the wait between arrivals
         maxDepthPx: 0, floorAt: null // floorAt(x) -> bottom depth in px; null uses maxDepthPx
       }
     };
@@ -136,8 +140,16 @@ G.sim.fish_ai = (function () {
         f.turnT -= dt;
         if (f.turnT <= 0) {
           f.turnT = rng.range(2, 6);
-          if (rng.next() < 0.35) f.dir = -f.dir;
-          f.home = clampDepth(school, f, f.home + rng.range(-6, 6));
+          if (lure.active && Math.abs(dx) < sp.awareness * A.scent) {
+            // Near a lure, a wandering fish drifts toward it, and toward its depth when that
+            // depth is inside the fish's habitat.
+            if (rng.next() < A.drift) f.dir = dx >= 0 ? 1 : -1;
+            var lo = sp.habitat.depthMin * 4, hi = sp.habitat.depthMax * 4;
+            f.home = clampDepth(school, f, (f.home + (lure.y < lo ? lo : (lure.y > hi ? hi : lure.y))) / 2 + rng.range(-3, 3));
+          } else {
+            if (rng.next() < 0.35) f.dir = -f.dir;
+            f.home = clampDepth(school, f, f.home + rng.range(-6, 6));
+          }
         }
         f.vx = ease(f.vx, f.dir * speed * 0.35, 2, dt);
         f.vy = (f.home - f.y) * 0.5;
@@ -210,7 +222,7 @@ G.sim.fish_ai = (function () {
     if (lure.active) {
       school.spawnT -= dt;
       if (school.spawnT <= 0) {
-        school.spawnT = rng.range(A.spawnMin, A.spawnMax);
+        school.spawnT = rng.range(A.spawnMin, A.spawnMax) / (school.ctx.attract || 1);
         if (count(school) < MAX) {
           var sp = pickSpecies(school.ctx, rng);
           if (sp >= 0) {

@@ -7,11 +7,8 @@ G.ui = G.ui || {};
 G.ui.card = (function () {
   var S = G.gfx.sprites, P = S.PALETTE;
   var X = 36, Y = 28, W = 248, H = 124;
-  var RMULT = { common: 1, uncommon: 2.5, rare: 8, legendary: 40 }; // TODO(P8.2): prices come from economy.js
   var cur = null, sel = 0, t = 0;
   var txt = { len: '', wt: '', sellOn: '', sellOff: '', rarity: '', lines: [] }; // built once per card, not per frame
-
-  function price(sp, q) { return Math.round(sp.price * RMULT[sp.rarity] * (0.7 + 0.8 * q)); }
 
   function wrap(text, width) {
     var words = text.split(' '), out = [], line = '';
@@ -23,13 +20,15 @@ G.ui.card = (function () {
     return out;
   }
 
-  // Builds the card for species spIdx from a hooked fish {len, w, q}, reading the journal for NEW/RECORD.
-  function build(spIdx, h, save) {
-    var sp = G.data.fish[spIdx], j = save.journal[sp.id];
+  // Builds the card for species spIdx from a hooked fish {len, w, q}, reading the journal for
+  // NEW/RECORD. latched: the cast's clock windows; the first one marks this as a window catch.
+  function build(spIdx, h, save, latched) {
+    var sp = G.data.fish[spIdx], j = save.journal[sp.id], win = null;
+    for (var k in latched) if (latched[k]) { win = k; break; }
     return {
       spIdx: spIdx, id: sp.id, name: sp.name, rarity: sp.rarity, len: h.len, w: h.w, q: h.q,
-      price: price(sp, h.q), isNew: !j || !j.caught, isRecord: !!j && j.caught > 0 && h.w > j.bestW,
-      desc: sp.desc, hintRefs: sp.hintRefs
+      price: G.sim.economy.price(sp, h.q, G.data), isNew: !j || !j.caught, isRecord: !!j && j.caught > 0 && h.w > j.bestW,
+      desc: sp.desc, hintRefs: sp.hintRefs, windowCatch: win
     };
   }
 
@@ -59,18 +58,11 @@ G.ui.card = (function () {
     return null;
   }
 
-  // Writes the catch into the save and closes the card.
-  // TODO(P8.2): coins via economy.js. TODO(P8.3): autosave on catch.
+  // Writes the catch into the save, closes the card and autosaves (§0.12).
   function commit(choice, save) {
-    var c = cur, j = save.journal[c.id];
-    if (!j) j = save.journal[c.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: true, phantom: false };
-    j.caught++; j.seen = true; j.phantom = false;
-    if (c.len > j.bestLen) j.bestLen = c.len;
-    if (c.w > j.bestW) j.bestW = c.w;
-    for (var i = 0; i < c.hintRefs.length; i++) if (j.hints.indexOf(c.hintRefs[i]) < 0) j.hints.push(c.hintRefs[i]);
-    if (choice === 'sell') save.coins += c.price;
-    else save.kept.push({ id: c.id, len: c.len, w: c.w });
+    G.sim.economy.recordCatch(save, cur, choice);
     cur = null;
+    G.core.save.autosave('catch');
   }
 
   function draw(ctx) {
@@ -101,5 +93,5 @@ G.ui.card = (function () {
     S.drawText(ctx, sel === 1 ? '[KEEP]' : ' KEEP ', X + W - 80, by, sel === 1 ? 'signal_amber' : 'fog_mid');
   }
 
-  return { price: price, build: build, open: open, isOpen: isOpen, info: info, update: update, commit: commit, draw: draw };
+  return { build: build, open: open, isOpen: isOpen, info: info, update: update, commit: commit, draw: draw };
 })();

@@ -21,8 +21,7 @@ G.scene.sailing = (function () {
   // Casting (V3.2). Distance follows sqrt(charge), so a short hold still reaches mid-range.
   var CAST = {
     chargeTime: 1.0, // s from empty to full; a full charge simply holds
-    minD: 20,        // px beyond the rod reach at zero charge   TODO(P8.1): rod tiers set these
-    maxD: 110,       // px beyond the rod reach at full charge
+    minD: 20,        // px beyond the rod reach at zero charge (full charge: the rod's castMax)
     reach: 12,       // px from the boat centre to where the cast distance starts
     flick: 0.12,     // s the rod takes to whip forward before the lure leaves
     flickAngle: 20, restAngle: 50, waitAngle: 40, backAngle: 70
@@ -197,29 +196,30 @@ G.scene.sailing = (function () {
     run.hook = cc.hook;
     run.heavy = cc.heavy;
     run.dogIn = { interest: 0, tooHeavyNear: false };
+    run.gearFx = G.sim.economy.effects(G.state.save, G.data, {});
     fx.clear();
   }
 
   // The lure is fishing (fish can spawn, notice and bite) only in these states.
   var FISHING = { sinking: 1, waiting: 1, interest: 1 };
 
-  // Inputs for the sim modules that are not the player's keys.
-  var BAIT = 'worm';       // TODO(P8.1): the equipped bait
-  var ROD_MAX_MASS = 3;    // kg   TODO(P8.1): the equipped rod's limit
+  var rodMaxOverride = 0; // debug only (dbg.rod): 0 uses the rod's own limit
 
   function fishStep(run, dt) {
-    var save = G.state.save, c = run.cast, li = run.lureIn, ctx = run.school.ctx;
+    var save = G.state.save, c = run.cast, li = run.lureIn, ctx = run.school.ctx, gx = run.gearFx;
     li.active = FISHING[run.fsm] === 1;
     li.x = c.x1;
     li.y = c.ly - loc.waterY;
-    li.bait = BAIT;
+    li.bait = c.bait || gx.bait;
     ctx.loc = loc.id;
     ctx.depthM = li.y * 0.25;
     ctx.hour = save.clock;
     ctx.unease = G.sim.unease.get(save, loc.id);
-    ctx.bait = BAIT;
+    ctx.bait = li.bait;
     ctx.latched = c.latched;
-    ctx.rodMaxMass = ROD_MAX_MASS;
+    ctx.rodMaxMass = rodMaxOverride || gx.maxMass;
+    ctx.attract = gx.attract;
+    ctx.rareBoost = gx.rareBoost;
     ctx.maxDepthPx = loc.maxDepth;
     G.sim.fish_ai.stepSchool(run.school, li, dt, G.rng, G.data);
     var n = G.sim.fish_ai.interested(run.school);
@@ -231,7 +231,8 @@ G.scene.sailing = (function () {
 
   // World x where a cast at this charge lands. The marker and the release both use this.
   function landingX(b, charge) {
-    var dist = CAST.minD + (CAST.maxD - CAST.minD) * Math.sqrt(charge);
+    var maxD = G.state.run.gearFx.castMax; // the rod sets how far a full cast reaches
+    var dist = CAST.minD + (maxD - CAST.minD) * Math.sqrt(charge);
     return clamp(Math.round(b.x + b.facing * (CAST.reach + dist)), 8, loc.width - 8);
   }
 
@@ -267,6 +268,7 @@ G.scene.sailing = (function () {
       c.lx = c.x1; c.ly = wy;
       fx.splash(c.x1, wy, Math.min(1, c.dist / 100));
       G.sim.clock.latch(c.latched, G.state.save.clock, G.data.windows);
+      c.bait = G.sim.economy.useBait(G.state.save, G.data); // one bait goes on per cast
       G.core.state.go(run, 'sinking');
     }
   }
@@ -287,6 +289,7 @@ G.scene.sailing = (function () {
       case 'sailing':
         if (inp.pressed('action') && run.boat.stopped) {
           c.charge = 0;
+          c.bait = '';
           G.sim.clock.clearLatch(c.latched); // the last cast is out of the water
           G.scene.underwater.resetHeavy(run);
           G.core.state.go(run, 'charging');
@@ -504,6 +507,7 @@ G.scene.sailing = (function () {
 
   function update(dt) {
     var run = G.state.run, b = run.boat, save = G.state.save;
+    G.sim.economy.effects(save, G.data, run.gearFx);
     G.sim.clock.step(save, null, dt, G.rng, G.data);
     run.uneaseIn.loc = loc.id;
     run.uneaseIn.still = b.stopped;
@@ -583,7 +587,7 @@ G.scene.sailing = (function () {
   return {
     load: load, tp: tp, enter: enter, exit: exit, update: update, draw: draw,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
-    setRodMax: function (kg) { ROD_MAX_MASS = kg; return kg; }, // debug   TODO(P8.1)
+    setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
     skyColor: skyColor, hourNow: hourNow,
     loc: function () { return loc; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },
@@ -611,6 +615,14 @@ if (G.core.debug) G.core.debug.addLine(function () {
   return 'clock ' + (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + (C.isGrey(h) ? ' grey' : ' night') + wins +
     '  unease ' + (run.loc || '-') + ' ' + G.sim.unease.get(save, run.loc).toFixed(3) +
     (run.school && run.school.ctx.tooHeavyNear ? '  tooHeavyNear' : '');
+});
+
+if (G.core.debug) G.core.debug.addLine(function () {
+  var s = G.state.save, g = s.gear, fx = G.state.run.gearFx;
+  if (!fx) return 'gear: -';
+  return 'coins ' + s.coins + '  rod ' + g.rod + ' reel ' + g.reel + ' line ' + g.line + '  bait ' + fx.bait +
+    (fx.bait !== 'worm' ? ' x' + (s.baits[fx.bait] || 0) : '') + (g.lantern ? '  lantern' : '') + (g.depthFinder ? '  finder' : '') +
+    '  open ' + Object.keys(s.unlocks).join(',') + '  caught ' + Object.keys(s.journal).length;
 });
 
 if (G.core.debug) G.core.debug.addLine(function () {

@@ -32,7 +32,6 @@ G.scene.underwater = (function () {
   // Background silhouettes (V3.4): far, dark, drifting; never interact with anything.
   var BGN = 4, BG_SPR = ['fishsil_base_carp', 'fishsil_base_pike', 'fishsil_base_catfish', 'fishsil_base_trout'];
   var bx = new Float32Array(BGN), by = new Float32Array(BGN), bv = new Float32Array(BGN);
-  var SIL_DEPTH = 56; // px (14 m): deeper fish show only as silhouettes at night   TODO(P8.1): lantern
   var stats = { ms: 0 };
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -209,7 +208,8 @@ G.scene.underwater = (function () {
       var f = school.fish[i];
       if (!f.active) continue;
       var sp = G.data.fish[f.sp], w = sp.look.wrongness;
-      var name = night && f.y > SIL_DEPTH ? FG.silhouette(f.sp) : FG.sprite(f.sp), d = S.get(name);
+      // Deeper than gearFx.nightDepth at night (no lantern): only a silhouette.
+      var name = night && f.y > G.state.run.gearFx.nightDepth ? FG.silhouette(f.sp) : FG.sprite(f.sp), d = S.get(name);
       var h = S.hash(f.uid, Math.floor(t * 8));
       var face = f.vx < -0.5 ? -1 : (f.vx > 0.5 ? 1 : f.dir);
       if (w >= 2 && (h & 63) < 2 + 2 * w) face = -face;
@@ -254,7 +254,6 @@ G.scene.underwater = (function () {
   }
 
   // ---- Bite, hook, fight, landing (7.1-7.5) --------------------------------------------
-  var GEAR = { lineStrength: 1, reelSpeed: 0.12 }; // TODO(P8.1): the equipped line and reel
   var HOOKED_BEAT = 0.3;  // s between the hook-set and the fight
   var LAND_TIME = 0.9;    // s to lift the fish out beside the boat
   var biteIn = { reel: false, auto: false }, fightIn = { reel: false };
@@ -275,7 +274,7 @@ G.scene.underwater = (function () {
     h.q = G.rng.next();
     h.len = Math.round((sp.lengthCm[0] + (sp.lengthCm[1] - sp.lengthCm[0]) * h.q) * 10) / 10;
     h.w = Math.round((sp.weightKg[0] + (sp.weightKg[1] - sp.weightKg[0]) * Math.pow(h.q, 1.3)) * 100) / 100;
-    G.sim.fight.start(run.fight, f.sp, sp, GEAR, G.rng);
+    G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data); // gearFx: lineStrength, reelSpeed
     f.active = false;
     G.sim.fish_ai.scatter(run.school);
     G.sim.bite.reset(b);
@@ -342,7 +341,7 @@ G.scene.underwater = (function () {
     } else if (fsm === 'landing') {
       if (run.hook.lift >= 1) {
         fx.splash(run.hook.x, loc.waterY, 0.4);
-        G.ui.card.open(G.ui.card.build(run.hook.sp, run.hook, G.state.save));
+        G.ui.card.open(G.ui.card.build(run.hook.sp, run.hook, G.state.save, run.cast.latched));
         G.core.state.go(run, 'card');
         return;
       }
@@ -423,7 +422,7 @@ G.scene.underwater = (function () {
   return {
     UW: UW, UNDER: UNDER, stats: stats, prepare: prepare, bottomAt: bottomAt, deepestX: deepestX,
     lureStep: lureStep, viewStep: viewStep, draw: draw, setLure: setLure,
-    GEAR: GEAR, createCatch: createCatch, catchStep: catchStep, resetHeavy: resetHeavy, drawHooked: drawHooked, mouth: mouth
+    createCatch: createCatch, catchStep: catchStep, resetHeavy: resetHeavy, drawHooked: drawHooked, mouth: mouth
   };
 })();
 

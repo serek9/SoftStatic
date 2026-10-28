@@ -108,7 +108,18 @@ G.core.debug = (function () {
     land: function () { var F = G.state.run.fight; if (!F.active) return false; F.D = 0; F.mode = 'tired'; F.modeT = 9; return true; },
     // dbg.rod(kg) sets the rod's mass limit (D4) until gear exists.   TODO(P8.1)
     rod: function (kg) { return G.scene.sailing.setRodMax(kg); },
-    money: todo('money', 'TODO(P8.2)'),   // TODO(P8.2)
+    // dbg.money(n) adds n coins (negative takes them); returns the balance.
+    money: function (n) { G.state.save.coins = Math.max(0, G.state.save.coins + (n || 0)); return G.state.save.coins; },
+    // dbg.buy(kind) buys the next 'rod' | 'reel' | 'line' | 'lantern' | 'depthFinder', or dbg.buy('bait', id, n).
+    buy: function (kind, id, n) {
+      var E = G.sim.economy, save = G.state.save;
+      var r = kind === 'bait' ? E.buyBait(save, id, n || 10, G.data) : E.buy(save, kind, G.data);
+      if (r === E.OK) { if (kind === 'bait') save.gear.bait = id; G.core.save.autosave('purchase'); }
+      return ['ok', 'maxed', 'not enough coins', 'locked', 'unknown'][r];
+    },
+    // dbg.save() saves now; dbg.wipe() deletes the save (reload for a new game).
+    save: function () { return G.core.save.autosave('dbg'); },
+    wipe: function () { localStorage.removeItem(G.core.save.KEY); return 'save deleted; reload'; },
     // dbg.hour(h) sets the game clock (0..24); dbg.hour() reads it. TODO(P6.1): the clock does not advance yet.
     hour: function (h) {
       if (h === undefined) return G.state.save.clock;
@@ -144,7 +155,15 @@ G.core.debug = (function () {
     },
     // dbg.tp(x) moves the boat to world x, stops it and snaps the camera.
     tp: function (x) { return G.scene.sailing.tp(x); },
-    caught: todo('caught', 'TODO(P8.3)'), // TODO(P8.3)
+    // dbg.caught(n) records one catch of each of the first n species in the journal (no coins).
+    caught: function (n) {
+      var save = G.state.save, list = G.data.fish;
+      for (var i = 0; i < Math.min(n || list.length, list.length); i++) {
+        var sp = list[i];
+        G.sim.economy.recordCatch(save, { id: sp.id, len: sp.lengthCm[0], w: sp.weightKg[0], price: 0, hintRefs: sp.hintRefs, windowCatch: null }, 'sell');
+      }
+      return Object.keys(save.journal).length;
+    },
     // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).
     sprite: function (name) { return G.gfx.sprites.verify(name || 'test'); },
     // dbg.fx(kind, n, x, y) emits particles; they show wherever a scene draws fx (the gallery's fx page).

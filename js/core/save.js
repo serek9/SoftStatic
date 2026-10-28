@@ -6,30 +6,42 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 1;
+  var VERSION = 2;
   var PREFIX = 'SS1';
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
-  var migrations = {};
+  var migrations = {
+    // v1 -> v2: gear became tiers and flags; Fogbound is always open.
+    1: function (s) {
+      var d = defaults();
+      s.gear = s.gear || {};
+      for (var k in d.gear) if (!(k in s.gear)) s.gear[k] = d.gear[k];
+      s.unlocks = s.unlocks || {};
+      s.unlocks.fog = true;
+      s.flags = s.flags || {};
+      s.flags.windowCatch = s.flags.windowCatch || {};
+      return s;
+    }
+  };
 
-  // TODO(P8.3): fill in the real contents of each field.
   function defaults() {
     return {
       version: VERSION,
       coins: 0,
-      gear: {},
-      baits: {},
-      journal: {},
-      kept: [],
+      // Tier index per kind (data/gear.js), equipment owned, and the bait to put on.
+      gear: { rod: 0, reel: 0, line: 0, lantern: false, depthFinder: false, bait: 'worm' },
+      baits: {},             // bait id -> count left
+      journal: {},           // species id -> {caught, bestLen, bestW, hints, seen, phantom}
+      kept: [],              // {id, len, w}
       cabinLevel: 0,
-      unlocks: {},
-      unease: {},
-      clock: 0,
-      lastSeen: 0,
-      flags: {},
+      unlocks: { fog: true },
+      unease: {},            // location id -> 0..1
+      clock: 19,             // a new game starts at dusk
+      lastSeen: 0,           // ms timestamp of the last save (offline time, P12.3)
+      flags: { windowCatch: {} }, // windowCatch: window id -> true once a fish was landed on a cast latched in it
       tapes: [],
       settings: {},
-      rng: null
+      rng: null              // G.rng state, restored on load unless ?seed is given
     };
   }
 
@@ -107,16 +119,31 @@ G.core.save = (function () {
     return defaults();
   }
 
-  // TODO(P8.3): autosave on catch, purchase and location change.
   function persist(save) {
     var ls = storage();
     if (!ls) return false;
+    save.lastSeen = Date.now();
+    if (G.rng) save.rng = G.rng.getState();
     try { ls.setItem(KEY, encode(save)); status = 'saved'; return true; } catch (e) { return false; }
+  }
+
+  // Autosave (§0.12): on catch, purchase and location change, plus when the page is hidden
+  // or closed so the clock and unease are not lost between catches.
+  function autosave(reason) {
+    var ok = G.state.save ? persist(G.state.save) : false;
+    if (ok) status = 'autosaved (' + reason + ')';
+    if (G.core.debug) G.core.debug.log('autosave: ' + reason + (ok ? '' : ' FAILED'));
+    return ok;
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', function () { autosave('page closed'); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) autosave('tab hidden'); });
   }
 
   return {
     KEY: KEY, VERSION: VERSION, migrations: migrations,
-    defaults: defaults, migrate: migrate, load: load, persist: persist,
+    defaults: defaults, migrate: migrate, load: load, persist: persist, autosave: autosave,
     exportString: encode, importString: decode,
     status: function () { return status; }
   };

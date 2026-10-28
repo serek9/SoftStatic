@@ -13,16 +13,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.sim = G.sim || {};
 G.sim.fight = (function () {
   var DT = 1 / 60;
-  // TODO(P8.1): these move to data/gear.js with the other fight constants; step() already
-  // prefers data.fightK when it exists.
-  var K = {
-    pull0: 1.2, pull1: 3, tired0: 1, tired1: 2.5,
-    pullRise: 0.5, easeFall: 0.7, run: 0.03,
-    tiredRise: 0.06, release: 0.45, recover: 0.03,
-    slipT: 0.6, slipD: 0.1, escape: 3,
-    d0: 0.6 // where D starts when the fish is hooked
-  };
   var NONE = 0, WIN = 1, SNAP = 2, ESCAPE = 3;
+  // The constants (rates, durations, d0 = D at the hook-set) live in data/gear.js `fight`.
 
   function create() {
     return {
@@ -34,8 +26,8 @@ G.sim.fight = (function () {
   }
 
   // Starts a fight with species fish (a data/fish.js entry) on gear {lineStrength, reelSpeed}.
-  function start(st, sp, fish, gear, rng, k) {
-    k = k || K;
+  function start(st, sp, fish, gear, rng, data) {
+    var k = data.gear.fight;
     st.active = true; st.sp = sp;
     st.T = 0; st.D = st.D0 = k.d0; st.S = 1; st.slips = 0; st.escT = 0; st.result = NONE; st.slipped = false; st.t = 0;
     st.strength = fish.strength; st.speed = fish.speed; st.fatigue = fish.fatigue; st.mass = fish.mass;
@@ -47,7 +39,7 @@ G.sim.fight = (function () {
 
   // step(state, input, dt, rng, data): input is {reel}. Returns NONE, WIN, SNAP or ESCAPE.
   function step(st, input, dt, rng, data) {
-    var k = (data && data.fightK) || K;
+    var k = data.gear.fight;
     st.slipped = false;
     st.t += dt;
     if (st.mode === 'pull') {
@@ -102,5 +94,5 @@ G.sim.fight = (function () {
     return ap.prev;
   }
 
-  return { K: K, AP: AP, NONE: NONE, WIN: WIN, SNAP: SNAP, ESCAPE: ESCAPE, create: create, start: start, step: step, autoPlayer: autoPlayer };
+  return { AP: AP, NONE: NONE, WIN: WIN, SNAP: SNAP, ESCAPE: ESCAPE, create: create, start: start, step: step, autoPlayer: autoPlayer };
 })();
