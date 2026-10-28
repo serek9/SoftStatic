@@ -25,13 +25,18 @@
 <script src="js/core/input.js"></script>
 <script src="js/core/save.js"></script>
 <script src="js/core/loop.js"></script>
-<!-- data: TODO(P3.1) -->
+<!-- data -->
+<script src="data/loc_fog.js"></script>
 <!-- sim: TODO(P6.1) -->
 <!-- gfx -->
 <script src="js/gfx/bake.js"></script>
 <script src="js/gfx/sprites.js"></script>
 <script src="js/gfx/fx.js"></script>
-<!-- scene: TODO(P3.1) -->
+<script src="js/gfx/water.js"></script>
+<!-- scene -->
+<script src="js/scene/boat.js"></script>
+<script src="js/scene/dog.js"></script>
+<script src="js/scene/sailing.js"></script>
 <!-- ui: TODO(P9.1) -->
 <!-- audio: TODO(P13.1) -->
 
@@ -64,25 +69,9 @@
   G.state.save = G.core.save.load();
   G.core.input.attach(canvas);
 
-  // Placeholder scene: a pixel test pattern for checking that scaling stays sharp.
-  var P = G.gfx.sprites.PALETTE;
-  G.core.state.register('boot', {
-    enter: function () {},
-    exit: function () {},
-    update: function (dt) { G.core.state.tick(G.state.run, dt); },
-    draw: function (ctx) {
-      ctx.fillStyle = P.night_ink;
-      ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = P.dusk_violet;
-      ctx.fillRect(0, 0, W, 1); ctx.fillRect(0, H - 1, W, 1);
-      ctx.fillRect(0, 0, 1, H); ctx.fillRect(W - 1, 0, 1, H);
-      ctx.fillStyle = P.dusk_rose;
-      for (var y = 0; y < 16; y++) for (var x = (y & 1); x < 16; x += 2) ctx.fillRect(W - 20 + x, 4 + y, 1, 1);
-      for (var i = 0; i < 40; i++) ctx.fillRect(4 + i, H - 5 - (i >> 1), 1, 1);
-    }
-  });
+  G.core.state.register('sailing', G.scene.sailing);
   G.core.state.register('gallery', G.core.debug.gallery);
-  G.core.state.change(q.has('gallery') ? 'gallery' : 'boot');
+  G.core.state.change(q.has('gallery') ? 'gallery' : 'sailing');
 
   G.core.loop.start({
     update: function (dt) { G.core.state.update(dt); },

@@ -86,9 +86,21 @@ G.core.debug = (function () {
     },
     give: todo('give', 'TODO(P7.5)'),     // TODO(P7.5)
     money: todo('money', 'TODO(P8.2)'),   // TODO(P8.2)
-    hour: todo('hour', 'TODO(P6.1)'),     // TODO(P6.1)
+    // dbg.hour(h) sets the game clock (0..24); dbg.hour() reads it. TODO(P6.1): the clock does not advance yet.
+    hour: function (h) {
+      if (h === undefined) return G.state.save.clock;
+      G.state.save.clock = ((h % 24) + 24) % 24;
+      return G.state.save.clock;
+    },
+    // dbg.dog(pose) switches the dog's pose; returns false for an unknown pose.
+    dog: function (pose) {
+      var ok = G.scene.dog.setPose(G.state.run.dog, pose);
+      if (!ok) console.log('poses: ' + G.scene.dog.POSES.join(', '));
+      return ok;
+    },
     unease: todo('unease', 'TODO(P6.2)'), // TODO(P6.2)
-    tp: todo('tp', 'TODO(P3.1)'),         // TODO(P3.1)
+    // dbg.tp(x) moves the boat to world x, stops it and snaps the camera.
+    tp: function (x) { return G.scene.sailing.tp(x); },
     caught: todo('caught', 'TODO(P8.3)'), // TODO(P8.3)
     // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).
     sprite: function (name) { return G.gfx.sprites.verify(name || 'test'); },

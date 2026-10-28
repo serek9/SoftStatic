@@ -22,6 +22,13 @@ G.gfx.fx = (function () {
   var kind = new Uint8Array(MAX);
   var n = 0, dropped = 0;
 
+  // Ripples: flat ellipses that grow and fade on the water surface, in their own small pool.
+  var RMAX = 32;
+  var rxw = new Float32Array(RMAX), ryw = new Float32Array(RMAX);
+  var rr0 = new Float32Array(RMAX), rr1 = new Float32Array(RMAX);
+  var rlife = new Float32Array(RMAX), rmax = new Float32Array(RMAX);
+  var rn = 0;
+
   // Emits up to count particles of kindName at (px, py) in world pixels. Returns how many fit.
   function emit(kindName, px, py, count) {
     var k = KINDS[kindName], s = SPEC[k], r = G.vrng, made = 0;
@@ -48,7 +55,23 @@ G.gfx.fx = (function () {
     life[i] = life[n]; max[i] = max[n]; phase[i] = phase[n]; kind[i] = kind[n];
   }
 
+  // A ripple centred at (px, py) growing from radius r0 to r1 over lifeS seconds. False if the pool is full.
+  function ripple(px, py, r0, r1, lifeS) {
+    if (rn >= RMAX) { dropped++; return false; }
+    rxw[rn] = px; ryw[rn] = py; rr0[rn] = r0; rr1[rn] = r1;
+    rlife[rn] = rmax[rn] = lifeS;
+    rn++;
+    return true;
+  }
+
   function update(dt) {
+    for (var j = rn - 1; j >= 0; j--) {
+      rlife[j] -= dt;
+      if (rlife[j] > 0) continue;
+      rn--;
+      rxw[j] = rxw[rn]; ryw[j] = ryw[rn]; rr0[j] = rr0[rn]; rr1[j] = rr1[rn];
+      rlife[j] = rlife[rn]; rmax[j] = rmax[rn];
+    }
     for (var i = n - 1; i >= 0; i--) {
       life[i] -= dt;
       if (life[i] <= 0) { kill(i); continue; }
@@ -64,6 +87,16 @@ G.gfx.fx = (function () {
   // Draws every live particle as one pixel, fading with life, offset by the camera.
   function draw(ctx, camX, camY) {
     var P = G.gfx.sprites.PALETTE;
+    ctx.fillStyle = P.water_hi;
+    for (var j = 0; j < rn; j++) {
+      var a = rlife[j] / rmax[j], rad = rr1[j] - (rr1[j] - rr0[j]) * a, ry = Math.max(1, rad * 0.22);
+      var steps = Math.min(48, Math.ceil(rad * 2) + 4), cx = rxw[j] - camX, cy = ryw[j] - camY;
+      ctx.globalAlpha = a;
+      for (var s = 0; s < steps; s++) {
+        var ang = s * 6.2832 / steps;
+        ctx.fillRect(Math.round(cx + Math.cos(ang) * rad), Math.round(cy + Math.sin(ang) * ry), 1, 1);
+      }
+    }
     for (var k = 0; k < SPEC.length; k++) {
       ctx.fillStyle = P[SPEC[k].color];
       for (var i = 0; i < n; i++) {
@@ -75,15 +108,17 @@ G.gfx.fx = (function () {
     ctx.globalAlpha = 1;
   }
 
-  function clear() { n = 0; }
+  function clear() { n = 0; rn = 0; }
 
   return {
-    MAX: MAX, emit: emit, update: update, draw: draw, clear: clear,
+    MAX: MAX, RMAX: RMAX, emit: emit, ripple: ripple, update: update, draw: draw, clear: clear,
     count: function () { return n; },
+    ripples: function () { return rn; },
     dropped: function () { return dropped; }
   };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {
-  return 'fx ' + G.gfx.fx.count() + '/' + G.gfx.fx.MAX + '  dropped ' + G.gfx.fx.dropped();
+  var fx = G.gfx.fx;
+  return 'fx ' + fx.count() + '/' + fx.MAX + '  ripples ' + fx.ripples() + '/' + fx.RMAX + '  dropped ' + fx.dropped();
 });
