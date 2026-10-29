@@ -21,7 +21,7 @@ G.scene.sailing = (function () {
   var skyCv = null, skyKey = -1, skyLum = 0;
   var skyOut = [0, 0, 0];
   var camPx = 0, camPy = 0;      // rounded camera for this frame's drawing
-  var wakeDist = 0, rippleT = 0;
+  var wakeDist = 0, rippleT = 0, churnT = 0;
 
   // Casting (V3.2). Distance follows sqrt(charge), so a short hold still reaches mid-range.
   var CAST = {
@@ -1302,6 +1302,9 @@ G.scene.sailing = (function () {
     }
     var move = run.fsm === 'sailing' && !pv.on && !toggled ? inp.move() : 0;
     boat.step(b, move, dt, loc.width);
+    var surf = G.gfx.surface; // Phase 24: pitch, heave and the outboard, on the surface under the hull
+    boat.motion(b, move, dt, surf.at(boat.bow(b)) / HI, surf.at(boat.stern(b)) / HI);
+    if (b.wakeHit) { surf.poke(boat.stern(b), 0.6 * b.wakeA, 4); fx.ripple(b.x, loc.waterY + 2, 8, 22, 1.6); } // its wake arrives
     ropeStep(run, dt); // Phase 21: after everything that moves the rod tip, the lure or the fish
     G.scene.underwater.bodyStep(run, dt, loc); // Phase 22: the lure's heading and flutter
     fx.setFlow(G.scene.underwater.flow(loc, 8)); // bubbles drift with the water
@@ -1330,6 +1333,16 @@ G.scene.sailing = (function () {
       G.gfx.surface.poke(boat.stern(b), 0.1 + 0.3 * sp, 3);
       G.gfx.surface.poke(b.x + b.facing * 16, 0.05 + 0.2 * sp, 2);
     }
+    // Phase 24: under throttle the propeller churns foam and bubbles under the stern, the bow
+    // pushes a little wave, and a hard start puffs exhaust from the motor.
+    churnT -= dt;
+    if (churnT <= 0 && b.throttle > 0.15) {
+      churnT = 0.12 / b.throttle;
+      fx.emit('bubbles', boat.stern(b) + b.facing * 2, wy + 3 + G.vrng.next() * 3, 1);
+      fx.emit('splash', boat.stern(b), wy, sp > 0.5 ? 1 : 0);
+      if (sp > 0.4) fx.emit('wake', boat.bow(b), wy, 1);
+    }
+    if (b.puff > 0.45) fx.emit('dust', boat.stern(b) + b.facing * 2, wy - 8, 1);
     rippleT += dt;
     if (b.stopped && rippleT >= 1.8) {
       rippleT = 0;
@@ -1366,7 +1379,7 @@ G.scene.sailing = (function () {
     drawOwl(c);
   }
 
-  function drawDog(c, x, y, flip) { dog.draw(c, G.state.run.dog, x, y, flip); }
+  function drawDog(c, x, y, flip, wind) { dog.draw(c, G.state.run.dog, x, y, flip, wind); }
 
   var gearLook = { rod: 0, lantern: false, finder: false, night: 0, sip: false };
   function drawBoat(c, fisher) {
@@ -1552,7 +1565,8 @@ if (G.core.debug) G.core.debug.addLine(function () {
     '  sky lum ' + sc.skyLum().toFixed(0) + '/' + G.gfx.sprites.CEILING.toFixed(0) + '  fog ' + sc.fogAlpha().toFixed(2) +
     '  moon ' + (sc.moon().a > 0 ? sc.moon().a.toFixed(2) : '-') + '\n' +
     'boat x ' + b.x.toFixed(1) + '  vx ' + b.vx.toFixed(2) + '  stopped ' + (b.stopped ? 'Y' : 'n') +
-    '  facing ' + (b.facing > 0 ? 'R' : 'L') + '  dog ' + run.dog.pose;
+    '  facing ' + (b.facing > 0 ? 'R' : 'L') + '  dog ' + run.dog.pose +
+    '  pitch ' + b.show.toFixed(2) + '°  heave ' + b.heave.toFixed(2) + '  throttle ' + b.throttle.toFixed(2) + '  rpm ' + Math.round(b.rpm) + (b.motor ? '' : ' (off)');
 });
 
 if (G.core.debug) G.core.debug.addLine(function () {

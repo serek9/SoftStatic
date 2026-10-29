@@ -87,6 +87,7 @@ G.scene.boat = (function () {
   function put(ctx, cv, x, y) { ctx.drawImage(cv, x, y, cv.width / HI, cv.height / HI); }
 
   var ROD_KEYS = ['stone_hi', 'wood_hi', 'rust_hi', 'moss_hi', 'bone'];
+  var P_SPEED = 42; // px/s, the speed at which the dog's ears stream fully (P.maxV)
   var halo = null;
 
   // A soft round glow in dusk_high (the ceiling), baked once; drawn at low alpha at night.
@@ -105,7 +106,78 @@ G.scene.boat = (function () {
     return cv;
   }
 
-  function create(x) { return { x: x, vx: 0, t: 0, facing: 1, stopped: true }; }
+  // Phase 24: what the boat does on top of its speed (presentation only; step() is unchanged).
+  var M = {
+    pitchK: 30, pitchC: 2,     // the pitch spring (1/s², 1/s): underdamped, it rocks a few times
+    accelPitch: 2 / 70,        // degrees of bow-up per px/s² of forward acceleration
+    waveTip: 0.6,              // share of the surface's slope the hull follows (it spans the waves)
+    speedPitch: 1,             // degrees of bow-up at full speed under full throttle
+    heaveK: 40, heaveC: 5,     // the boat riding the surface's height
+    halfLen: 15,               // px from the hull's centre to the bow and to the stern
+    up: 1 / 0.6, down: 1 / 1.2, // throttle per s, spooling up and back down
+    idle: 900, full: 4500,     // rpm
+    start: 0.4,                // s of pull-start before the motor runs
+    rest: 8,                   // s stopped before it cuts out
+    squat: 0.006,              // px the hull dips per px/s² of braking
+    wakeAfter: 1.3,            // s after the boat drops from speed until its own wake reaches it
+    wakeLift: 3, wakeTip: 8    // the wake's kick at full speed: heave px/s up, pitch °/s bow down
+  };
+  var D2R = Math.PI / 180;
+
+  function create(x) {
+    return { x: x, vx: 0, t: 0, facing: 1, stopped: true,
+      pitch: 0, pv: 0, wave: 0, show: 0, heave: 0, hv: 0, ax: 0, prevVx: 0, lean: 0, peak: 0, wakeT: -1, wakeA: 0, wakeHit: false,
+      throttle: 0, rpm: 0, motor: false, startT: -1, restT: 0, puff: 0, starts: 0 };
+  }
+
+  // Phase 24: pitch, heave, throttle and the outboard, after step(). hBow and hStern are the
+  // surface's heights (world px, up positive) under the bow and the stern.
+  function motion(b, move, dt, hBow, hStern) {
+    var a = (b.vx - b.prevVx) / dt;
+    b.prevVx = b.vx;
+    b.ax += (a * b.facing - b.ax) * Math.min(1, 8 * dt);
+    // The outboard: a pull-start on the first move, idling, cut out after a long rest.
+    if (move !== 0) {
+      b.restT = 0;
+      if (!b.motor && b.startT < 0) { b.startT = 0; b.starts++; }
+    } else if (b.stopped && b.motor) { b.restT += dt; if (b.restT >= M.rest) b.motor = false; }
+    if (b.startT >= 0) { b.startT += dt; if (b.startT >= M.start) { b.startT = -1; b.motor = true; b.puff = 0.5; } }
+    var tgt = b.motor ? Math.abs(move) : 0;
+    b.throttle += Math.max(-M.down * dt, Math.min(M.up * dt, tgt - b.throttle));
+    var rt = b.motor ? M.idle + (M.full - M.idle) * b.throttle : (b.startT >= 0 ? 600 * b.startT / M.start : 0);
+    b.rpm += (rt - b.rpm) * Math.min(1, (rt > b.rpm ? 6 : 3) * dt);
+    if (b.puff > 0) b.puff -= dt;
+    // Pitch: bow up under acceleration and at speed, down on a stop, rocking back to level.
+    var pt = M.accelPitch * b.ax + M.speedPitch * Math.min(1, Math.abs(b.vx) / P.maxV) * b.throttle;
+    b.pv += (-M.pitchK * (b.pitch - pt) - M.pitchC * b.pv) * dt;
+    b.pitch += b.pv * dt;
+    // The surface: heave rides its mean under the hull, and its slope tips the boat.
+    var w = M.waveTip * Math.atan2(hBow - hStern, 2 * M.halfLen) / D2R;
+    b.wave += (w - b.wave) * Math.min(1, 6 * dt);
+    b.show = b.pitch + b.wave;
+    // The boat's own wake: the waves it pushed out behind travel slower than it sails, so when
+    // it drops from speed they catch it up wakeAfter s later, lifting the stern first. (The
+    // ripples on the surface are too small and too damped to do this by themselves at the hull.)
+    var sp = Math.abs(b.vx) / P.maxV;
+    b.wakeHit = false;
+    if (sp > b.peak) b.peak = sp;
+    if (b.peak > 0.6 && sp < 0.3 && b.wakeT < 0) { b.wakeT = M.wakeAfter; b.wakeA = b.peak; b.peak = 0; }
+    if (b.wakeT >= 0) {
+      b.wakeT -= dt;
+      if (b.wakeT < 0) { b.hv += M.wakeLift * b.wakeA; b.pv -= M.wakeTip * b.wakeA; b.wakeHit = true; }
+    }
+    if (sp < 0.05) b.peak = Math.min(b.peak, sp);
+    // Heave: riding the surface under the hull, and squatting as it brakes.
+    var squat = b.ax < 0 ? M.squat * b.ax : 0;
+    b.hv += (-M.heaveK * (b.heave - (hBow + hStern) / 2 - squat) - M.heaveC * b.hv) * dt;
+    b.heave += b.hv * dt;
+    b.lean = Math.max(-1, Math.min(1, -b.ax * 0.012));   // the fisher leans back on throttle
+  }
+
+  // The vertical shift (world px) of a point dx px along the hull from its centre (toward the
+  // bow when dx > 0 along the facing): the pitch drawn as a shear, in whole view pixels, so
+  // the painted pixels stay crisp (8.3 #84: no rotated art).
+  function shear(b, dx) { return Math.round(-Math.tan(b.show * D2R) * dx * HI) / HI; }
 
   // move is the input axis (-1, 0, 1). worldW clamps the boat inside the location.
   function step(b, move, dt, worldW) {
@@ -125,25 +197,27 @@ G.scene.boat = (function () {
     b.stopped = Math.abs(b.vx) < P.stopV;
   }
 
-  function bob(b) { return Math.round(Math.sin(b.t * 1.9) * 0.8); }
+  // Phase 24: the heave on the surface (it was a 1 px sine), in view pixels; down positive.
+  function bob(b) { return -Math.round(b.heave * HI) / HI; }
 
   // The rod: a straight 22 px pole from the fisher's hands (Phase 15: the larger fisher's).
   // angle is in degrees up from the facing direction (90 = straight up, above 90 leans back).
   var ROD = { len: 22, baseX: 3, baseY: -6 };
 
   // Writes the rod tip into out for a boat centred at cx (world or screen) with waterline wy.
+  // Phase 24: the base rides the hull's shear and the fisher's lean; the rod tilts with the pitch.
   function rodTip(b, cx, wy, angle, out) {
-    var a = angle * Math.PI / 180, f = b.facing;
-    out[0] = cx + f * ROD.baseX + f * Math.cos(a) * ROD.len;
-    out[1] = wy + bob(b) + ROD.baseY - Math.sin(a) * ROD.len;
+    var a = (angle + b.show) * D2R, f = b.facing, bx = cx + f * ROD.baseX - f * b.lean, by = wy + bob(b) + ROD.baseY + shear(b, ROD.baseX);
+    out[0] = bx + f * Math.cos(a) * ROD.len;
+    out[1] = by - Math.sin(a) * ROD.len;
     return out;
   }
 
   // Draws the rod as a quadratic curve. bend > 0 bows its middle forward and down
   // (loaded), bend < 0 bows it back (the whip of a cast). The tip stays where rodTip says.
   function drawRod(ctx, b, sx, wy, angle, bend, key) {
-    var a = angle * Math.PI / 180, f = b.facing;
-    var bx = sx + f * ROD.baseX, by = wy + bob(b) + ROD.baseY;
+    var a = (angle + b.show) * D2R, f = b.facing;
+    var bx = sx + f * ROD.baseX - f * b.lean, by = wy + bob(b) + ROD.baseY + shear(b, ROD.baseX);
     var tx = bx + f * Math.cos(a) * ROD.len, ty = by - Math.sin(a) * ROD.len;
     var mx = (bx + tx) / 2 + f * Math.sin(a) * bend, my = (by + ty) / 2 + Math.cos(a) * bend;
     var steps = (ROD.len + 4) * HI;
@@ -159,15 +233,24 @@ G.scene.boat = (function () {
   // sx is the boat centre on screen, wy the waterline. Passengers sit behind the hull's
   // gunwale, so they are drawn first. withFisher false leaves the boat empty, rod and all (P10.2).
   // gear (optional): {rod: tier, lantern: bool, finder: bool, night: 0..1}.
+  // Draws a painted image sheared by the pitch: in 2-view-px columns, each at its own height.
+  function putSheared(ctx, b, cv, x, y, sx) {
+    var cols = cv.width / 2;
+    for (var i = 0; i < cols; i++) {
+      var cxw = x + (i * 2 + 1) / HI;
+      ctx.drawImage(cv, i * 2, 0, 2, cv.height, x + i * 2 / HI, y + shear(b, (cxw - sx) * b.facing), 2 / HI, cv.height / HI);
+    }
+  }
+
   function draw(ctx, b, sx, wy, withFisher, drawDog, rodAngle, rodBend, gear) {
     var flip = b.facing < 0, y = wy + bob(b), f = b.facing, P = S.PALETTE;
     if (withFisher) {
       var sip = gear && gear.sip;
-      put(ctx, img('fisher', flip, sip), flip ? sx - 3 : sx - 6, y - 15);
+      put(ctx, img('fisher', flip, sip), (flip ? sx - 3 : sx - 6) - f * b.lean, y - 15 + shear(b, -1));
       if (sip) { // steam from the cup, rising and thinning
         ctx.fillStyle = P.fog_light;
         for (var k = 0; k < 4; k++) {
-          var u = (b.t * 0.8 + k / 4) % 1, cx = flip ? sx - 2.5 : sx + 2.5;
+          var u = (b.t * 0.8 + k / 4) % 1, cx = (flip ? sx - 2.5 : sx + 2.5) - f * b.lean;
           ctx.globalAlpha = 0.5 * (1 - u);
           ctx.fillRect(cx + Math.round(Math.sin(u * 6 + k) * 2) / HI, y - 11.5 - Math.round(u * 12) / HI, 1 / HI, 1 / HI);
         }
@@ -175,9 +258,10 @@ G.scene.boat = (function () {
       }
       drawRod(ctx, b, sx, wy, rodAngle, rodBend, gear ? ROD_KEYS[Math.min(gear.rod, ROD_KEYS.length - 1)] : null);
     }
-    if (drawDog) drawDog(ctx, flip ? sx - 16 : sx + 4, y - 14, flip);
+    if (drawDog) drawDog(ctx, flip ? sx - 16 : sx + 4, y - 14 + shear(b, 10), flip, Math.abs(b.vx) / P_SPEED);
     if (gear && gear.lantern) {
-      var px = sx - f * 13;                                   // a pole at the stern, its arm out back
+      var px = sx - f * 13, ly0 = y;                          // a pole at the stern, its arm out back
+      y += shear(b, -13);
       ctx.fillStyle = P.wood_dark;
       ctx.fillRect(px, y - 18, 1, 15);
       ctx.fillRect(f > 0 ? px - 2 : px, y - 18, 3, 1 / HI);
@@ -190,9 +274,13 @@ G.scene.boat = (function () {
         ctx.globalAlpha = 1;
       }
       put(ctx, img('lantern', false), lx - 1.5, y - 17.5);
+      y = ly0;
     }
-    put(ctx, img('motor', flip), flip ? sx + 16 : sx - 21, y - 7);
-    put(ctx, img('hull', flip), sx - 17, y - 6);
+    // The motor, tilted by its thrust: its leg and propeller swing back under throttle.
+    var mcv = img('motor', flip), mx = flip ? sx + 16 : sx - 21, my = y - 7 + shear(b, -18), tilt = Math.round(b.throttle * 1.5 * HI) / HI;
+    ctx.drawImage(mcv, 0, 0, mcv.width, 16, mx, my, mcv.width / HI, 8);
+    ctx.drawImage(mcv, 0, 16, mcv.width, mcv.height - 16, mx - f * tilt, my + 8, mcv.width / HI, (mcv.height - 16) / HI);
+    putSheared(ctx, b, img('hull', flip), sx - 17, y - 6, sx);
     if (gear && gear.finder && (Math.floor(b.t * 1.25) & 1)) {
       ctx.fillStyle = P.neon_teal; ctx.fillRect(sx - f * 10, y - 3.5, 1, 1 / HI);
     }
@@ -206,5 +294,8 @@ G.scene.boat = (function () {
   // World x of the stern, where the wake starts.
   function stern(b) { return b.x - b.facing * 19; }
 
-  return { P: P, ROD: ROD, create: create, step: step, draw: draw, bob: bob, stern: stern, rodTip: rodTip };
+  // World x of the bow.
+  function bow(b) { return b.x + b.facing * 17; }
+
+  return { P: P, M: M, ROD: ROD, create: create, step: step, motion: motion, shear: shear, draw: draw, bob: bob, stern: stern, bow: bow, rodTip: rodTip };
 })();

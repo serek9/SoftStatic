@@ -143,9 +143,22 @@ G.scene.dog = (function () {
     if (w !== d.pose && d.hold <= 0) { setPose(d, w); d.hold = HOLD; }
   }
 
-  function draw(ctx, d, x, y, flip) {
+  // Phase 24: where each sitting pose's head is (view px in the painting), for the ears that
+  // stream back in the wind of a moving boat; the sleeping dog keeps its ears down.
+  var HEAD = { idle: [18, 5], alert: [18, 4], point: [20, 8], look_down: [18, 9], stare: [17, 5], bark: [18, 5], pet: [18, 4] };
+
+  // wind 0..1 (optional): how fast the boat moves; above 0.3 an ear flutters back.
+  function draw(ctx, d, x, y, flip, wind) {
     var n = FRAMES[d.pose] || 1, f = Math.floor(d.t * (d.pose === 'pet' ? 7 : (d.pose === 'sleep' ? 0.7 : 5))) % n;
     ctx.drawImage(img(d.pose, f, flip), x, y, W / HI, H / HI);
+    var h = HEAD[d.pose];
+    if (!h || !(wind > 0.3)) return;
+    var P = G.gfx.sprites.PALETTE, len = 2 + Math.round(2 * Math.min(1, wind)), flap = Math.round(Math.sin(d.t * 22)), q = 1 / HI;
+    for (var i = 0; i < len; i++) {
+      var ex = h[0] - 4 - i, ey = h[1] - 1 + (i > 0 ? flap : 0);
+      ctx.fillStyle = P[i === len - 1 ? 'dog' : 'dog_dark'];
+      ctx.fillRect(x + (flip ? W - 1 - ex : ex) * q, y + ey * q, q, q);
+    }
   }
 
   return { POSES: POSES, T: T, CUE: CUE, PET: PET, create: create, setPose: setPose, pet: pet, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };

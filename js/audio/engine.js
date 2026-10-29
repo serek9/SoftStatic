@@ -41,10 +41,62 @@ G.audio.engine = (function () {
     });
   }
 
-  function noise(secs) {
-    var n = Math.floor(ac.sampleRate * secs), b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0), s = 0x2545F491;
+  function noise(secs) { return noiseFor(ac, secs); }
+  // White noise from a fixed xorshift seed, for any audio context (the live one, or an offline one in checks).
+  function noiseFor(ctx, secs) {
+    var n = Math.floor(ctx.sampleRate * secs), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0), s = 0x2545F491;
     for (var i = 0; i < n; i++) { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; d[i] = ((s >>> 0) / 4294967296) * 2 - 1; }
     return b;
+  }
+
+  // ---- Phase 24: the outboard ------------------------------------------------------------------
+  // A small two-stroke: a train of narrow pulses at the firing rate (rpm / 60, one stroke a
+  // turn), its timing wandering a little from stroke to stroke, through the cowling's and the
+  // exhaust's resonances, with a low bubbling where the exhaust leaves under water. A low-pass
+  // muffles it at idle and opens with the throttle. Built for any context (the live one, or an
+  // OfflineAudioContext in the level check); update() sets it from the boat at time `when`.
+  var MOTOR = { idleGain: 0.012, fullGain: 0.04, crankGain: 0.006, jitter: 45 };
+  function makeMotor(ctx, nbuf, dest) {
+    var re = new Float32Array(31), im = new Float32Array(31);
+    for (var h = 1; h < 31; h++) im[h] = 1 / Math.sqrt(h);                       // a narrow, bright pulse
+    var o = ctx.createOscillator(); o.setPeriodicWave(ctx.createPeriodicWave(re, im)); o.frequency.value = 15;
+    var n = ctx.createBufferSource(); n.buffer = nbuf; n.loop = true;
+    var nlp = ctx.createBiquadFilter(); nlp.type = 'lowpass'; nlp.frequency.value = 14;
+    var nj = ctx.createGain(); nj.gain.value = MOTOR.jitter * 40;                  // cents of wander
+    n.connect(nlp); nlp.connect(nj); nj.connect(o.detune);
+    var out = ctx.createGain(); out.gain.value = 0;
+    var muff = ctx.createBiquadFilter(); muff.type = 'lowpass'; muff.frequency.value = 700; muff.Q.value = 0.7;
+    muff.connect(out); out.connect(dest);
+    function band(type, f, q, g) { var b = ctx.createBiquadFilter(), e = ctx.createGain(); b.type = type; b.frequency.value = f; b.Q.value = q; e.gain.value = g; o.connect(b); b.connect(e); e.connect(muff); return b; }
+    band('bandpass', 430, 2.5, 1.0);       // the cowling
+    band('bandpass', 1150, 4, 0.45);       // the exhaust
+    band('lowpass', 170, 1.2, 1.4);        // bubbling out under the water
+    o.start(); n.start();
+    return {
+      out: out,
+      // rpm, throttle 0..1, running (or cranking: starting true)
+      update: function (rpm, throttle, running, starting, when) {
+        var g = running ? MOTOR.idleGain + (MOTOR.fullGain - MOTOR.idleGain) * throttle : (starting ? MOTOR.crankGain : 0);
+        o.frequency.setTargetAtTime(Math.max(4, rpm / 60), when, 0.05);
+        out.gain.setTargetAtTime(g, when, running || starting ? 0.08 : 0.25);
+        muff.frequency.setTargetAtTime(600 + 2600 * throttle, when, 0.15);
+      }
+    };
+  }
+
+  // The pull-start: the rope's zip, then a few strokes catching. For any context, at time `when`.
+  function pullStart(ctx, nbuf, dest, when) {
+    var s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), e = ctx.createGain();
+    s.buffer = nbuf; f.type = 'bandpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(700, when); f.frequency.exponentialRampToValueAtTime(2600, when + 0.3);
+    e.gain.setValueAtTime(0, when); e.gain.linearRampToValueAtTime(0.03, when + 0.04); e.gain.exponentialRampToValueAtTime(0.0001, when + 0.32);
+    s.connect(f); f.connect(e); e.connect(dest); s.start(when, 0.3); s.stop(when + 0.4);
+    for (var i = 0; i < 3; i++) {
+      var o = ctx.createOscillator(), g = ctx.createGain(), t0 = when + 0.3 + i * 0.11;
+      o.type = 'sine'; o.frequency.setValueAtTime(70, t0); o.frequency.exponentialRampToValueAtTime(42, t0 + 0.08);
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.035 - i * 0.008, t0 + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+      o.connect(g); g.connect(dest); o.start(t0); o.stop(t0 + 0.12);
+    }
   }
 
   function build() {
@@ -94,6 +146,7 @@ G.audio.engine = (function () {
     var am = gain(0.5, amb.crick), cr = osc('sine', 4300); cr.connect(am); lfo(28, 0.5, am.gain);
     // The fight's tension tone (13.3): rises with T.
     amb.tens = gain(0, bus.sfx); amb.tensO = osc('triangle', 160); amb.tensO.connect(filter('lowpass', 900, 0.7, amb.tens));
+    amb.motor = makeMotor(ac, noiseBuf, bus.amb); // Phase 24 (on the ambience bus: muffled indoors with the rest)
   }
 
   function set(param, v, tc) { param.setTargetAtTime(v, ac.currentTime, tc || 0.25); }
@@ -180,6 +233,10 @@ G.audio.engine = (function () {
       for (var i = 0; i < 3; i++) hiss('lowpass', 500, 260, 0.7, 0.07, 0.03, pan, i * 0.22);
       tone('sine', 520, 610, 0.18, 0.015, pan, 0.5, null, 0.04); // a small contented sound
     },
+    // Phase 24: the hull. A slap of water on the planks (power 0..1), and a faint wooden creak.
+    slap: function (a) { hiss('lowpass', 1100, 280, 0.8, 0.07 + 0.06 * a.power, 0.012 + 0.025 * a.power, a.pan); },
+    creak: function (pan) { tone('triangle', 230, 182, 0.22, 0.007, pan, 0, null, 0.04); tone('triangle', 352, 270, 0.17, 0.003, pan, 0.03, null, 0.04); },
+    pullstart: function (pan) { pullStart(ac, noiseBuf, out(pan), ac.currentTime); },
     statik: function () {
       var t0 = ac.currentTime;
       amb.stat.gain.cancelScheduledValues(t0);
@@ -273,6 +330,7 @@ G.audio.engine = (function () {
     }
     prev.mode = F.mode;
     if (run.dog.pose === 'pet' && prev.dog !== 'pet') play('pat', panAt(run.boat.x));
+    hullStep(run.boat, dt);
     prev.dog = run.dog.pose;
     if (run.heavy.state === 1 && prev.heavy !== 1) play('hum', pan);
     prev.heavy = run.heavy.state;
@@ -304,6 +362,24 @@ G.audio.engine = (function () {
     prev.coins = save.coins;
   }
 
+  // Phase 24: the hull's sounds, read from the boat's motion: a pull-start when the motor is
+  // cranked; a slap when the pitch swings back hard or the boat's own wake arrives; now and
+  // then a creak as it rocks.
+  var hull = { pv: 0, starts: 0, slapT: 0, creakT: 0 };
+  var slapA = { power: 0, pan: 0 };
+  function hullStep(b, dt) {
+    var pan = panAt(b.x);
+    hull.slapT -= dt; hull.creakT -= dt;
+    if (b.starts !== hull.starts) { if (b.starts > hull.starts) play('pullstart', pan); hull.starts = b.starts; }
+    var turned = (b.pv > 0) !== (hull.pv > 0) && Math.abs(b.pitch) > 0.6;
+    if ((turned || b.wakeHit) && hull.slapT <= 0) {
+      slapA.power = b.wakeHit ? Math.min(1, 0.4 + 0.6 * b.wakeA) : Math.min(1, Math.abs(b.pitch) / 3); slapA.pan = pan;
+      play('slap', slapA); hull.slapT = 0.3;
+    }
+    if (turned && Math.abs(b.pitch) > 1.2 && hull.creakT <= 0 && (G.gfx.sprites.hash(Math.floor(t * 4), 31) & 1)) { play('creak', pan); hull.creakT = 4; }
+    hull.pv = b.pv;
+  }
+
   function splashOnce(p, pan) { if (ac.state === 'running') { splash(p, pan); note('splash'); } }
   function hissOnce() { if (ac.state === 'running') { hiss('bandpass', 900, 2600, 1.2, 0.18, 0.025, 0); note('whoosh'); } }
 
@@ -314,6 +390,8 @@ G.audio.engine = (function () {
     set(amb.wind.gain, red ? 0.004 : 0.012 + 0.025 * L.grey);
     set(amb.water.gain, red ? 0.01 : 0.03 + 0.01 * Math.sin(t * 0.8));
     set(amb.lap.gain, outside ? 0.004 + Math.min(1, vx / 42) * 0.06 : 0, 0.15);
+    var b = run.boat;
+    if (b) amb.motor.update(b.rpm, b.throttle, outside && b.motor, outside && b.startT >= 0, ac.currentTime);
     set(amb.stream.gain, loc === 'creek' ? 0.018 : 0);
     set(amb.rain.gain, outside && G.scene.sailing.rain ? 0.035 * G.scene.sailing.rain() : 0, 0.8);
     set(amb.drone.gain, (red ? 0.06 : 0.025 + 0.025 * L.night) * (loc === 'pines' ? 0.6 : 1));
@@ -344,9 +422,12 @@ G.audio.engine = (function () {
         buses: { music: +bus.music.gain.value.toFixed(2), amb: +bus.amb.gain.value.toFixed(2), sfx: +bus.sfx.gain.value.toFixed(2) },
         limiter: { threshold: limiter.threshold.value, knee: limiter.knee.value, ratio: limiter.ratio.value, attack: limiter.attack.value, release: limiter.release.value, reduction: +limiter.reduction.toFixed(2) },
         tension: +amb.tensO.frequency.value.toFixed(1), detune: +amb.sour.detune.value.toFixed(1), drone: +amb.drone.gain.value.toFixed(3), wind: +amb.wind.gain.value.toFixed(3),
-        voices: voices, events: log.slice()
+        voices: voices, events: log.slice(),
+        motor: { gain: +amb.motor.out.gain.value.toFixed(4), rpm: G.state.run.boat ? Math.round(G.state.run.boat.rpm) : 0 }
       };
     },
+    // Phase 24, for the level check: the motor and the pull-start built in any context.
+    makeMotor: makeMotor, pullStart: pullStart, noiseFor: noiseFor, BUS: BUS,
     play: function (ev, a) { if (!SOUNDS[ev]) return Object.keys(SOUNDS); play(ev, a); return ev; }
   };
 })();
