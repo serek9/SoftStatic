@@ -17,13 +17,17 @@ G.data.locations.creek = {
 
   layers: [
     { id: 'hills', kind: 'ridge', parallax: 0.12, color: 'night_blue', base: 86, amp: 16 },
-    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 88, h: 14, color: 'fog_mid', alpha: 0.22 },
+    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 88, h: 14, color: 'fog_mid', alpha: 0.22, drift: 0.8 },
     { id: 'forest', kind: 'treeline', parallax: 0.35, color: 'night_deep', base: 102, height: 24 },
     { id: 'trunks', kind: 'trunks', parallax: 0.55, color: 'night_ink', crown: 'moss_dark', top: 18, gap: [26, 70] },
-    { id: 'fog_near', kind: 'fog', parallax: 0.6, y: 100, h: 10, color: 'fog_light', alpha: 0.12 },
+    { id: 'fog_near', kind: 'fog', parallax: 0.6, y: 100, h: 10, color: 'fog_light', alpha: 0.12, drift: 1.6 },
     { id: 'bank', kind: 'shore', parallax: 0.7, color: 'night_ink', detail: 'moss_dark', height: 5 },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
+
+  // Presentation only (see loc_fog.js).
+  sky: { moonX: 150, glowX: 60 },
+  mist: { h: 5, alpha: 0.09, drift: 2 },
 
   // cabin: on stilts at the water's edge, roof sagging. snag: dead branches out of the water;
   // the same branches reach down to the bottom in the cross-section (underwater.snags).

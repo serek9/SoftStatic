@@ -32,9 +32,43 @@ G.gfx.water = (function () {
   // and appears only in the reflection, never on the shore. null clears it.
   function setDeltas(fn) { deltaDrawer = fn; }
 
+  // Glints (audit P1-3): short bright dashes drifting on the upper water, each blinking by a
+  // hash of time, so nothing is random and nothing is allocated per frame.
+  var GLINTS = 16;
+
+  function drawGlints(ctx, waterY, h, t) {
+    var S = G.gfx.sprites, rows = Math.min(h - 1, 26);
+    ctx.fillStyle = S.PALETTE.water_hi;
+    for (var i = 0; i < GLINTS; i++) {
+      var ph = S.hash(i, 3) & 255;
+      if ((S.hash(i, Math.floor(t * 1.2 + ph / 64)) & 3) !== 0) continue;
+      var x = ((S.hash(i, 1) % VIEW_W) + t * (0.6 + (ph & 7) * 0.15)) % VIEW_W;
+      var y = 1 + S.hash(i, 2) % rows;
+      ctx.globalAlpha = 0.35 + 0.4 * (1 - y / rows);
+      ctx.fillRect(Math.round(x), waterY + y, 1 + (ph & 1) + (y < 6 ? 1 : 0), 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // The light path under a low light (the moon, or the dusk glow): broken dashes every other
+  // row, narrow at the horizon and wider nearer, swaying with the mirrored rows.
+  function drawPath(ctx, waterY, h, t, L) {
+    var S = G.gfx.sprites, tick = Math.floor(t * 4);
+    ctx.fillStyle = S.PALETTE[L.key];
+    for (var r = 0; r < h; r += 2) {
+      if ((S.hash(r, tick) & 7) === 0) continue;
+      var f = r / h, w = 1 + Math.round(L.w * f);
+      var dx = Math.round(Math.sin(t * 1.7 + r * 0.55) * (1 + f));
+      ctx.globalAlpha = L.a * (1 - 0.75 * f);
+      ctx.fillRect(Math.round(L.x - w / 2) + dx, waterY + r, w, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // drawAbove(ctx) draws everything above the waterline in screen coordinates.
   // t is a time in seconds for the ripple of the mirrored rows.
-  function draw(ctx, waterY, viewH, t, drawAbove) {
+  // light (optional): {x, a, key, w}, the light path on the water (a = 0 for none).
+  function draw(ctx, waterY, viewH, t, drawAbove, light) {
     var t0 = performance.now(), h = viewH - waterY;
     if (h !== bufH) setup(h);
 
@@ -55,6 +89,8 @@ G.gfx.water = (function () {
       ctx.drawImage(buf, PAD - dx, r, VIEW_W, 1, 0, waterY + r, VIEW_W, 1);
     }
     ctx.globalAlpha = 1;
+    if (light && light.a > 0.01) drawPath(ctx, waterY, h, t, light);
+    drawGlints(ctx, waterY, h, t);
     ctx.drawImage(shade, 0, waterY);
     stats.ms = performance.now() - t0;
   }

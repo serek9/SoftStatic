@@ -19,12 +19,17 @@ G.data.locations.fog = {
   layers: [
     { id: 'ridge', kind: 'ridge', parallax: 0.12, color: 'night_blue', base: 94, amp: 12,
       features: [{ kind: 'tower', x: 120 }, { kind: 'mast', x: 330 }] },
-    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 82, h: 20, color: 'fog_mid', alpha: 0.32 },
+    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 82, h: 20, color: 'fog_mid', alpha: 0.32, drift: 1.2 },
     { id: 'trees', kind: 'treeline', parallax: 0.35, color: 'night_deep', base: 106, height: 15 },
-    { id: 'fog_near', kind: 'fog', parallax: 0.45, y: 99, h: 12, color: 'fog_light', alpha: 0.16 },
+    { id: 'fog_near', kind: 'fog', parallax: 0.45, y: 99, h: 12, color: 'fog_light', alpha: 0.16, drift: 2.4 },
     { id: 'shore', kind: 'shore', parallax: 0.6, color: 'night_ink', detail: 'moss_dark', height: 4 },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
+
+  // Presentation only. sky: where the moon and the dusk glow sit (sky px); mist: a low band on
+  // the water that drifts over the boat (fog layers drift by their own `drift`, px/s).
+  sky: { moonX: 92, glowX: 236 },
+  mist: { h: 7, alpha: 0.13, drift: 3 },
 
   // On the water at the boat's distance (parallax 1): x is where the landmark is centred.
   landmarks: [

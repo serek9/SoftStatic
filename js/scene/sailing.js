@@ -159,7 +159,7 @@ G.scene.sailing = (function () {
         var prof = 1 - Math.abs(2 * y / (L.h - 1) - 1);
         for (var x = 0; x < w;) {
           var len = rng.int(6, 40);
-          ctx.globalAlpha = L.alpha * prof * rng.range(0.4, 1);
+          ctx.globalAlpha = Math.min(1, L.alpha * FOG_HEAD) * prof * rng.range(0.4, 1);
           ctx.fillRect(x, L.y + y, len, 1);
           x += len;
         }
@@ -195,21 +195,22 @@ G.scene.sailing = (function () {
       for (i = 0; i < w / 60; i++) ctx.fillRect(rng.int(0, w - 4), wy - 2, rng.int(2, 4), 2);
     },
     // 11.1: the creek's near forest: straight trunks from above the view to the bank, a few
-    // broken branches, and a ragged crown where the top shows.
+    // broken branches, and (audit P2-5) the canopy as a ragged dark edge along the top of
+    // the view, so no crown floats loose in the sky.
     trunks: function (ctx, L, w, wy, rng) {
+      var cx, edge = 0;
+      ctx.fillStyle = P[L.crown];
+      for (cx = 0; cx < w; cx++) {
+        edge = clamp(edge + rng.int(-1, 1), 2, L.top >> 1);
+        ctx.fillRect(cx, 0, 1, edge + (rng.next() < 0.15 ? rng.int(1, 4) : 0));
+      }
       for (var x = rng.int(0, 20); x < w; x += rng.int(L.gap[0], L.gap[1])) {
-        var tw = rng.int(2, 4), top = rng.int(-12, L.top), b, k;
+        var tw = rng.int(2, 4), top = -1, b, k;
         ctx.fillStyle = P[L.color];
         ctx.fillRect(x, top, tw, wy - top);
         for (b = 0; b < 3; b++) {
           var by = rng.int(Math.max(4, top + 8), wy - 22), len = rng.int(3, 8), dir = rng.next() < 0.5 ? -1 : 1;
           for (k = 0; k < len; k++) ctx.fillRect(dir < 0 ? x - 1 - k : x + tw + k, by - (k >> 1), 1, 1);
-        }
-        if (top < 0) continue;
-        ctx.fillStyle = P[L.crown];
-        for (k = -9; k <= 5; k++) {
-          var cw = Math.round((6 - Math.abs(k + 2) * 0.5) + rng.range(-1.5, 1.5));
-          if (cw > 0) ctx.fillRect(x + (tw >> 1) - cw, top + k, cw * 2, 1);
         }
       }
     },
@@ -243,6 +244,7 @@ G.scene.sailing = (function () {
     return {
       id: L.id,
       p: L.parallax,
+      fog: L.kind === 'fog', w: w, drift: L.drift || 0,
       cv: B.cached('loc:' + loc.id + ':' + L.id, function () {
         return B.layer(w, wy, function (ctx) { paint(ctx, L, w, wy, rng); });
       })
@@ -267,8 +269,10 @@ G.scene.sailing = (function () {
         for (var x = rng.int(0, 10); x < w; x += rng.int(5, 18)) ctx.fillRect(x, 0, rng.int(1, 4), 1);
       });
     });
-    if (!skyCv) skyCv = B.canvas(1, VIEW_H);
+    if (!skyCv) skyCv = B.canvas(VIEW_W, VIEW_H);
     skyKey = -1;
+    bakeSky();
+    bakeMist();
 
     var run = G.state.run, pv = run.passive;
     run.loc = id;
@@ -595,41 +599,239 @@ G.scene.sailing = (function () {
     return run.boat.x;
   }
 
-  // ---- Sky (§0.8, §0.9) ------------------------------------------------------
-  // Permanent dusk: only a blend of night_ink and dusk_amber, darkest at 03:00 and
-  // brightest at 15:00, always darker toward the top.
+  // ---- Sky (§0.8, §0.9; audit P1-1, §8.3 #49) --------------------------------------
+  // Permanent dusk, never brighter than dusk_high (S.skySafe throws otherwise). Keyframes give
+  // four palette keys from the top of the sky to the horizon (at f = 0, 0.4, 0.75, 1); the
+  // hours between blend smoothly. Night is ink and blue with a faint violet horizon, dawn and
+  // dusk run through violet, plum and rose, and the grey hours are a flat overcast.
+  var SKY_F = [0, 0.4, 0.75, 1];
+  var SKY_KEYS = [
+    [0, ['night_ink', 'night_deep', 'night_blue', 'dusk_violet']],
+    [3, ['night_ink', 'night_ink', 'night_deep', 'night_blue']],
+    [5, ['night_ink', 'night_deep', 'night_blue', 'dusk_violet']],
+    [6.25, ['night_deep', 'dusk_violet', 'dusk_plum', 'dusk_rose']],
+    [7.5, ['night_blue', 'fog_dark', 'fog_mid', 'dusk_rose']],
+    [9, ['fog_dark', 'fog_dark', 'fog_mid', 'fog_mid']],
+    [12.5, ['fog_dark', 'fog_mid', 'fog_mid', 'fog_light']],
+    [16, ['fog_dark', 'fog_dark', 'fog_mid', 'fog_mid']],
+    [17.5, ['night_blue', 'dusk_violet', 'dusk_plum', 'dusk_rose']],
+    [19, ['night_blue', 'dusk_violet', 'dusk_rose', 'dusk_amber']],
+    [20.5, ['night_deep', 'night_blue', 'dusk_violet', 'dusk_plum']],
+    [22, ['night_ink', 'night_deep', 'night_blue', 'dusk_violet']],
+    [24, ['night_ink', 'night_deep', 'night_blue', 'dusk_violet']]
+  ];
+  var skyStops = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
 
-  function skyBrightness(hour) { return 0.5 - 0.5 * Math.cos((hour - 3) / 24 * 2 * Math.PI); }
+  function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+  function mix(c0, c1, t, out) {
+    out[0] = c0[0] + (c1[0] - c0[0]) * t; out[1] = c0[1] + (c1[1] - c0[1]) * t; out[2] = c0[2] + (c1[2] - c0[2]) * t;
+    return out;
+  }
+
+  // How much of each light the hour has, each 0..1 (presentation only).
+  function nightF(h) { return h < 12 ? 1 - smooth(4.5, 6.75, h) : smooth(18.5, 21, h); }
+  function greyF(h) { return h < 12 ? smooth(6.75, 8.75, h) : 1 - smooth(15.75, 17.5, h); }
+  function duskF(h) { return Math.max(0, 1 - Math.abs(h - 6.1) / 1.3, 1 - Math.abs(h - 18.6) / 1.7); }
+
+  // Kept for the debug line and older callers: 0 at 03:00, 1 in the grey hours.
+  function skyBrightness(hour) { return 1 - nightF(G.sim.clock.wrap(hour)); }
 
   // f is 0 at the top of the sky and 1 at the horizon. Writes [r, g, b] into out.
   function skyColor(hour, f, out) {
-    var b = skyBrightness(hour);
-    var t = Math.min(1, b * (0.2 + 0.8 * f) + 0.06 * f * (1 - b));
-    var a = S.RGB.night_ink, z = S.RGB.dusk_amber;
-    out[0] = Math.round(a[0] + (z[0] - a[0]) * t);
-    out[1] = Math.round(a[1] + (z[1] - a[1]) * t);
-    out[2] = Math.round(a[2] + (z[2] - a[2]) * t);
+    var h = G.sim.clock.wrap(hour), k = 0;
+    while (k < SKY_KEYS.length - 2 && h >= SKY_KEYS[k + 1][0]) k++;
+    var A = SKY_KEYS[k], Z = SKY_KEYS[k + 1], u = smooth(A[0], Z[0], h), i;
+    for (i = 0; i < 4; i++) mix(S.RGB[A[1][i]], S.RGB[Z[1][i]], u, skyStops[i]);
+    i = 0;
+    while (i < 2 && f > SKY_F[i + 1]) i++;
+    mix(skyStops[i], skyStops[i + 1], clamp((f - SKY_F[i]) / (SKY_F[i + 1] - SKY_F[i]), 0, 1), out);
+    out[0] = Math.round(out[0]); out[1] = Math.round(out[1]); out[2] = Math.round(out[2]);
     return out;
   }
 
   function hourNow() { return G.sim.clock.wrap(G.state.save.clock || 0); }
 
-  // Rebakes the 1 px wide sky strip when the hour moves by 0.05 (3 real seconds).
+  // Rebakes the sky when the hour moves by 0.05 (3 real seconds): SKY_BANDS bands, each
+  // boundary softened by one dithered row of the next band's colour.
+  var skyRGB = [];
+  for (var sb = 0; sb < SKY_BANDS; sb++) skyRGB.push('');
   function refreshSky(hour) {
     var key = Math.floor(hour * 20);
     if (key === skyKey) return;
     skyKey = key;
-    var ctx = skyCv.getContext('2d'), wy = loc.waterY;
+    var ctx = skyCv.getContext('2d'), wy = loc.waterY, i, x;
     skyLum = 0;
-    for (var i = 0; i < SKY_BANDS; i++) {
+    for (i = 0; i < SKY_BANDS; i++) {
       skyColor(hour, i / (SKY_BANDS - 1), skyOut);
       var lum = 0.2126 * skyOut[0] + 0.7152 * skyOut[1] + 0.0722 * skyOut[2];
       if (lum > skyLum) skyLum = lum;
       if (!S.skySafe(skyOut[0], skyOut[1], skyOut[2])) throw new Error('sky brighter than ' + S.CEILING_KEY + ' at hour ' + hour);
-      ctx.fillStyle = 'rgb(' + skyOut[0] + ',' + skyOut[1] + ',' + skyOut[2] + ')';
-      var y0 = Math.floor(i * wy / SKY_BANDS), y1 = Math.floor((i + 1) * wy / SKY_BANDS);
-      ctx.fillRect(0, y0, 1, y1 - y0);
+      skyRGB[i] = 'rgb(' + skyOut[0] + ',' + skyOut[1] + ',' + skyOut[2] + ')';
     }
+    for (i = 0; i < SKY_BANDS; i++) {
+      var y0 = Math.floor(i * wy / SKY_BANDS), y1 = Math.floor((i + 1) * wy / SKY_BANDS);
+      ctx.fillStyle = skyRGB[i];
+      ctx.fillRect(0, y0, VIEW_W, y1 - y0);
+      if (i + 1 < SKY_BANDS) {
+        ctx.fillStyle = skyRGB[i + 1];
+        for (x = (i & 1); x < VIEW_W; x += 2) ctx.fillRect(x, y1 - 1, 1, 1);
+      }
+    }
+  }
+
+  // Stars, the moon, a glow where the sun went down and slow cloud bands, baked once per
+  // location (each from its own seeded stream) and drawn with the sky. loc.sky can switch
+  // parts off (the Red Room is indoors) and place the moon and the glow (sky pixels).
+  var SKYP = 0.03, CLOUD_P = 0.08, CLOUD_W = 640, CLOUD_DRIFT = 1.6;
+  var sky = { stars: null, twinkle: null, glow: null, clouds: null, halo: null, opt: null };
+  S.def('moon', { m: 'fog_light', c: 'fog_mid' }, [
+    '..mmm..', '.mmmmm.', 'mmcmmmm', 'mmmmcmm', 'mcmmmmm', '.mmmcm.', '..mmm..'
+  ]);
+
+  function bakeSky() {
+    var o = sky.opt = loc.sky || {}, wy = loc.waterY, id = loc.id;
+    var sw = VIEW_W + Math.ceil((loc.width - VIEW_W) * SKYP);
+    function starField(seed, n, keyHi) {
+      return B.layer(sw, wy, function (ctx) {
+        var rng = new G.core.rng.Rng(seed);
+        for (var i = 0; i < n; i++) {
+          var y = Math.floor(wy * 0.8 * rng.next() * rng.next()); // denser high up
+          ctx.fillStyle = P[rng.next() < 0.2 ? keyHi : 'fog_mid'];
+          ctx.fillRect(rng.int(0, sw - 1), y, 1, 1);
+        }
+      });
+    }
+    sky.stars = o.stars === false ? null : B.cached('loc:' + id + ':stars', function () { return starField(loc.seed * 7 + 1, 70, 'fog_light'); });
+    sky.twinkle = o.stars === false ? null : B.cached('loc:' + id + ':twinkle', function () { return starField(loc.seed * 7 + 2, 18, 'fog_light'); });
+    sky.glow = o.glow === false ? null : B.cached('sky:glow', function () {
+      return B.layer(200, 46, function (ctx) {
+        ctx.fillStyle = P.dusk_amber;
+        for (var y = 0; y < 46; y++) for (var x = 0; x < 200; x++) {
+          var dx = (x - 100) / 100, dy = (45 - y) / 45, d = Math.sqrt(dx * dx + dy * dy);
+          if (d >= 1) continue;
+          ctx.globalAlpha = Math.round((1 - d) * 5) / 8;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      });
+    });
+    sky.halo = B.cached('sky:halo', function () {
+      return B.layer(19, 19, function (ctx) {
+        ctx.fillStyle = P.fog_mid;
+        for (var y = 0; y < 19; y++) for (var x = 0; x < 19; x++) {
+          var d = Math.sqrt((x - 9) * (x - 9) + (y - 9) * (y - 9)) / 9.5;
+          if (d < 1) { ctx.globalAlpha = Math.round((1 - d) * 4) / 10; ctx.fillRect(x, y, 1, 1); }
+        }
+      });
+    });
+    if (o.clouds === false) { sky.clouds = null; return; }
+    // One cloud shape baked in four colours: night body, grey body, dusk body, dusk underside.
+    var KEYS = ['night_blue', 'fog_mid', 'dusk_plum', 'dusk_rose'];
+    sky.clouds = KEYS.map(function (k, ki) {
+      return B.cached('loc:' + id + ':cloud' + ki, function () {
+        return B.layer(CLOUD_W, wy, function (ctx) {
+          var rng = new G.core.rng.Rng(loc.seed * 13 + 5), n = rng.int(7, 10);
+          ctx.fillStyle = P[k];
+          for (var c = 0; c < n; c++) {
+            var cx = rng.int(0, CLOUD_W - 1), cy = rng.int(10, Math.round(wy * 0.5)), len = rng.int(40, 130), th = rng.int(2, 5);
+            for (var r = -th; r <= th; r++) {
+              var hw = Math.round(len / 2 * Math.sqrt(1 - (r * r) / ((th + 1) * (th + 1))));
+              var under = r >= th - 1;
+              for (var x = cx - hw; x < cx + hw;) {
+                var seg = rng.int(4, 26), gap = rng.next() < 0.3 ? rng.int(1, 5) : 0;
+                ctx.globalAlpha = rng.range(0.5, 1);
+                if (ki < 3 || under) {
+                  var xx = ((x % CLOUD_W) + CLOUD_W) % CLOUD_W, ww = Math.min(seg, cx + hw - x);
+                  ctx.fillRect(xx, cy + r, ww, 1);
+                  if (xx + ww > CLOUD_W) ctx.fillRect(xx - CLOUD_W, cy + r, ww, 1);
+                }
+                x += seg + gap;
+              }
+            }
+          }
+          ctx.globalAlpha = 1;
+        });
+      });
+    });
+  }
+
+  // Draws cv (wrapping every w px) scrolled by ox, at screen y oy.
+  function drawWrapped(c, cv, w, ox, oy, h) {
+    ox = ((Math.round(ox) % w) + w) % w;
+    var first = Math.min(VIEW_W, w - ox);
+    c.drawImage(cv, ox, 0, first, h, 0, oy, first, h);
+    if (first < VIEW_W) c.drawImage(cv, 0, 0, VIEW_W - first, h, first, oy, VIEW_W - first, h);
+  }
+
+  // Where the moon is on screen for this hour (x, y, alpha), written into out. It rises
+  // after the dusk, crosses high at about 01:00 and sets before the grey hours.
+  var moonPt = [0, 0, 0];
+  function moonAt(h, out) {
+    var o = sky.opt, up = h >= 19.5 ? h - 19.5 : h + 4.5;  // hours since it rose
+    var u = up / 11;                                       // 0 rising .. 1 set (06:30)
+    out[2] = o.moon === false || u <= 0 || u >= 1 ? 0 : Math.min(1, u * 8, (1 - u) * 8) * nightF(h);
+    out[0] = Math.round((o.moonX || 92) - camPx * SKYP);
+    out[1] = Math.round(loc.waterY - 14 - Math.sin(u * Math.PI) * (loc.waterY - 34)) - camPy;
+    return out;
+  }
+
+  function drawSky(c) {
+    var wy = loc.waterY, h = hourNow(), t = G.state.run.boat.t, n = nightF(h), d = duskF(h), g = greyF(h);
+    var sx = Math.round(camPx * SKYP);
+    c.drawImage(skyCv, 0, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+    if (sky.glow && d > 0) {
+      c.globalAlpha = d * 0.55;
+      c.drawImage(sky.glow, Math.round((sky.opt.glowX || 230) - sx) - 100, wy - 46 - camPy);
+    }
+    if (sky.stars && n > 0) {
+      c.globalAlpha = n * (1 - 0.6 * g);
+      c.drawImage(sky.stars, sx, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+      c.globalAlpha = n * (0.35 + 0.35 * Math.sin(t * 1.3));
+      c.drawImage(sky.twinkle, sx, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+    }
+    moonAt(h, moonPt);
+    if (moonPt[2] > 0) {
+      c.globalAlpha = moonPt[2];                           // a faint halo, then the disk
+      c.drawImage(sky.halo, moonPt[0] - 9, moonPt[1] - 9);
+      S.draw(c, 'moon', moonPt[0] - 3, moonPt[1] - 3, 0, false);
+    }
+    if (sky.clouds) {
+      var ox = camPx * CLOUD_P + t * CLOUD_DRIFT, cw = [n * 0.55, g * 0.45, d * 0.6, d * 0.5];
+      for (var i = 0; i < 4; i++) {
+        if (cw[i] <= 0.01) continue;
+        c.globalAlpha = Math.min(1, cw[i]);
+        drawWrapped(c, sky.clouds[i], CLOUD_W, ox, -camPy, wy);
+      }
+    }
+    c.globalAlpha = 1;
+  }
+
+  // ---- Fog and mist (§0.8 "fog thickens in grey hours"; audit P1-2) ----------------------
+  // Fog layers are baked FOG_HEAD times as dense as their data alpha and drawn at a share of
+  // that: 1.4 / FOG_HEAD at night with no unease, up to 1 in the grey hours at high unease.
+  // They drift by their layer's `drift` (px/s), wrapping. loc.mist is a low band on the water
+  // drawn over the boat, in the mirror too.
+  var FOG_HEAD = 3;
+  var mistCv = null;
+
+  function fogMul() {
+    var h = hourNow();
+    return Math.min(FOG_HEAD, 1.4 + 1.1 * greyF(h) + 0.6 * G.sim.unease.get(G.state.save, loc.id));
+  }
+
+  function bakeMist() {
+    var m = loc.mist;
+    mistCv = !m ? null : B.cached('loc:' + loc.id + ':mist', function () {
+      return B.layer(loc.width, loc.waterY, function (ctx) {
+        PAINT.fog(ctx, { y: loc.waterY - m.h + 1, h: m.h, color: m.color || 'fog_light', alpha: m.alpha }, loc.width, loc.waterY, new G.core.rng.Rng(loc.seed * 31 + 77));
+      });
+    });
+  }
+
+  function drawMist(c) {
+    if (!mistCv) return;
+    c.globalAlpha = fogMul() / FOG_HEAD;
+    drawWrapped(c, mistCv, loc.width, camPx + G.state.run.boat.t * (loc.mist.drift || 0), -camPy, loc.waterY);
+    c.globalAlpha = 1;
   }
 
   // ---- Anomalies and the owl (10.1, 10.2, 10.4) ------------------------------
@@ -860,11 +1062,15 @@ G.scene.sailing = (function () {
   }
 
   function drawBackdrop(c) {
-    var wy = loc.waterY, run = G.state.run;
-    c.drawImage(skyCv, 0, 0, 1, wy, 0, -camPy, VIEW_W, wy);
+    var wy = loc.waterY, run = G.state.run, fa = fogMul() / FOG_HEAD;
+    drawSky(c);
     for (var i = 0; i < layers.length; i++) {
       var L = layers[i], ox = Math.round(camPx * L.p);
-      c.drawImage(L.cv, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+      if (L.fog) {
+        c.globalAlpha = fa;
+        drawWrapped(c, L.cv, L.w, ox + run.boat.t * L.drift, -camPy, wy);
+        c.globalAlpha = 1;
+      } else c.drawImage(L.cv, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
       if (scen.afterLayer) scen.afterLayer(c, L.id, ox, camPy, run, loc);
     }
     drawOwl(c);
@@ -872,14 +1078,29 @@ G.scene.sailing = (function () {
 
   function drawDog(c, x, y, flip) { dog.draw(c, G.state.run.dog, x, y, flip); }
 
+  var gearLook = { rod: 0, lantern: false, finder: false, night: 0 };
   function drawBoat(c, fisher) {
-    var run = G.state.run;
+    var run = G.state.run, g = G.state.save.gear;
     rodPose(run, pose);
-    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, fisher !== false, drawDog, pose[0], pose[1]);
+    gearLook.rod = g.rod || 0; gearLook.lantern = !!g.lantern; gearLook.finder = !!g.depthFinder;
+    gearLook.night = 1 - greyF(hourNow());
+    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, fisher !== false, drawDog, pose[0], pose[1], gearLook);
   }
 
   // The mirror pass (gfx/water.js): the scene above the waterline, mirrored.
-  function drawAbove(c) { drawBackdrop(c); drawBoat(c, mirrorFisher()); }
+  function drawAbove(c) { drawBackdrop(c); drawBoat(c, mirrorFisher()); drawMist(c); }
+
+  // The light on the water (audit P1-3): a path under the moon, or under the glow at dusk.
+  var waterLight = { x: 0, a: 0, key: 'fog_mid', w: 4 };
+  function lightOnWater(h) {
+    var d = duskF(h) * (sky.glow ? 1 : 0), m = moonPt[2];
+    if (m * 0.55 >= d * 0.45) {
+      waterLight.x = moonPt[0]; waterLight.a = m * 0.55; waterLight.key = 'fog_mid'; waterLight.w = 3;
+    } else {
+      waterLight.x = Math.round((sky.opt.glowX || 230) - camPx * SKYP); waterLight.a = d * 0.45; waterLight.key = 'dusk_rose'; waterLight.w = 7;
+    }
+    return waterLight;
+  }
 
   function draw(ctx) {
     var run = G.state.run, wy = loc.waterY;
@@ -889,11 +1110,12 @@ G.scene.sailing = (function () {
     var a = run.uw.alpha;
     drawBackdrop(ctx);
     // The mirror is only ever drawn with the camera at the surface (see underwater.js).
-    if (a < 1) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove);
+    if (a < 1) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, lightOnWater(hourNow()));
     if (a > 0) G.scene.underwater.draw(ctx, loc, camPx, camPy, a, run.boat.t);
     ctx.drawImage(glint, camPx, 0, VIEW_W, 1, 0, wy - camPy, VIEW_W, 1);
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
+    drawMist(ctx);
     G.scene.underwater.drawHooked(ctx, loc, camPx, camPy, run.boat.t);
     drawCast(ctx);
     G.ui.hud.draw(ctx, run, wy);
@@ -904,7 +1126,11 @@ G.scene.sailing = (function () {
     load: load, tp: tp, enter: enter, exit: exit, setPassive: setPassive, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
-    skyColor: skyColor, hourNow: hourNow,
+    skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
+    light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
+    fogAlpha: function () { return fogMul() / FOG_HEAD; },
+    moon: function () { return { x: moonPt[0], y: moonPt[1], a: moonPt[2] }; },
+    waterLight: function () { return waterLight; },
     loc: function () { return loc; },
     scenery: function () { return scen === NO_SCENERY ? null : scen; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },
@@ -917,7 +1143,8 @@ if (G.core.debug) G.core.debug.addLine(function () {
   if (!run.boat || !sc.loc()) return 'sailing: not loaded';
   var b = run.boat;
   return 'loc ' + run.loc + '  cam ' + run.cam.x.toFixed(1) + '  hour ' + sc.hourNow().toFixed(2) +
-    '  sky lum ' + sc.skyLum().toFixed(0) + '/' + G.gfx.sprites.CEILING.toFixed(0) + '\n' +
+    '  sky lum ' + sc.skyLum().toFixed(0) + '/' + G.gfx.sprites.CEILING.toFixed(0) + '  fog ' + sc.fogAlpha().toFixed(2) +
+    '  moon ' + (sc.moon().a > 0 ? sc.moon().a.toFixed(2) : '-') + '\n' +
     'boat x ' + b.x.toFixed(1) + '  vx ' + b.vx.toFixed(2) + '  stopped ' + (b.stopped ? 'Y' : 'n') +
     '  facing ' + (b.facing > 0 ? 'R' : 'L') + '  dog ' + run.dog.pose;
 });

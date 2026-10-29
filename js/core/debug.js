@@ -212,7 +212,25 @@ G.core.debug = (function () {
     // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).
     sprite: function (name) { return G.gfx.sprites.verify(name || 'test'); },
     // dbg.fx(kind, n, x, y) emits particles; they show wherever a scene draws fx (the gallery's fx page).
-    fx: function (kind, n, x, y) { return G.gfx.fx.emit(kind || 'splash', x === undefined ? 160 : x, y === undefined ? 110 : y, n || 20); }
+    fx: function (kind, n, x, y) { return G.gfx.fx.emit(kind || 'splash', x === undefined ? 160 : x, y === undefined ? 110 : y, n || 20); },
+    // dbg.sky(h) checks the sky at hour h (default: now) from the top to the horizon: the
+    // brightest luminance against the ceiling, and the night, grey and dusk light shares.
+    sky: function (h) {
+      var sc = G.scene.sailing, S = G.gfx.sprites, out = [0, 0, 0], max = 0;
+      h = h === undefined ? sc.hourNow() : h;
+      for (var i = 0; i <= 20; i++) {
+        sc.skyColor(h, i / 20, out);
+        max = Math.max(max, 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2]);
+      }
+      var L = sc.light(G.sim.clock.wrap(h));
+      return { hour: h, top: sc.skyColor(h, 0, [0, 0, 0]), horizon: sc.skyColor(h, 1, [0, 0, 0]), maxLum: +max.toFixed(1),
+        ceiling: +S.CEILING.toFixed(1), safe: max <= S.CEILING + 0.001, night: +L.night.toFixed(2), grey: +L.grey.toFixed(2), dusk: +L.dusk.toFixed(2) };
+    },
+    // dbg.fog() returns the alpha fog layers and the mist are drawn at now, the moon and the light on the water.
+    fog: function () {
+      var sc = G.scene.sailing, w = sc.waterLight();
+      return { alpha: +sc.fogAlpha().toFixed(3), moon: sc.moon(), light: { x: w.x, a: +w.a.toFixed(2), key: w.key } };
+    }
   };
   if (on) window.dbg = dbg;
 

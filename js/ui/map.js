@@ -65,11 +65,20 @@ G.ui.map = (function () {
     return G.data.locations[s.id].name;
   }
 
+  // True when some species lives in water id. A water without fish is not sold yet, so nobody
+  // pays for an empty lake (audit P0-2); one already bought stays open.
+  function stocked(id) {
+    var fish = G.data.fish;
+    for (var i = 0; i < fish.length; i++) if (fish[i].locations.indexOf(id) >= 0) return true;
+    return false;
+  }
+
   // What choosing stop s does now: 'here', 'travel', 'buy', or '' (nothing yet).
   function verdict(s) {
     if (s.kind !== 'loc') return 'travel';
     if (s.id === G.state.run.loc) return 'here';
     if (G.state.save.unlocks[s.id]) return 'travel';
+    if (!stocked(s.id)) return '';
     return E.canUnlock(G.state.save, s.id, G.data) === E.OK ? 'buy' : '';
   }
 
@@ -80,6 +89,7 @@ G.ui.map = (function () {
     if (s.kind === 'cabin') { info.status = 'Yours. ' + G.data.gear.cabin[save.cabinLevel].name + '.'; info.hint = 'SPACE go in'; return; }
     if (v === 'here') { info.status = 'You are here.'; return; }
     if (v === 'travel') { info.status = 'Open water.'; info.hint = 'SPACE travel'; return; }
+    if (!stocked(s.id)) { info.status = 'The water is still settling. Nothing lives here yet.'; info.key = 'rust'; return; }
     var r = E.canUnlock(save, s.id, G.data);
     if (r === E.LOCKED) { info.status = 'It opens to someone who has fished while the owl calls.'; info.key = 'rust'; return; }
     info.status = 'Opens for ' + L.cost + 'c.';
@@ -160,7 +170,7 @@ G.ui.map = (function () {
   }
 
   return {
-    open: open, update: update, draw: draw, STOPS: STOPS, verdict: verdict,
+    open: open, update: update, draw: draw, STOPS: STOPS, verdict: verdict, stocked: stocked,
     // dbg: travel to a stop id through the same path as the menu (fade included).
     travel: function (id) {
       for (var i = 0; i < STOPS.length; i++) if (STOPS[i].id === id) { sel = i; describe(); return go(STOPS[i]); }

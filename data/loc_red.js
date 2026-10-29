@@ -27,6 +27,8 @@ G.data.locations.red = {
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
   landmarks: [],
+  // Indoors: no stars, moon, clouds or dusk glow (presentation only).
+  sky: { stars: false, moon: false, clouds: false, glow: false },
 
   // The structures that move. Each one's spot goes wherever it stands.
   movers: [

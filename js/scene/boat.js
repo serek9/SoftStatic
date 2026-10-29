@@ -38,6 +38,28 @@ G.scene.boat = (function () {
     'ccccccc'
   ]);
 
+  // Bought gear shows on the boat (audit P1-5): a lantern on the bow pole that glows at
+  // night, a rod whose colour follows its tier, and the depth finder's small blinking light.
+  S.def('lantern', { k: 'stone_dark', g: 'lamp_glow', s: 'stone' }, ['.k.', 'kgk', 'kgk', '.s.']);
+  var ROD_KEYS = ['stone_hi', 'wood_hi', 'rust_hi', 'moss_hi', 'bone'];
+  var halo = null;
+
+  // A soft round glow in dusk_high (the ceiling), baked once; drawn at low alpha at night.
+  function bakeHalo() {
+    var R = 15, cv = G.gfx.bake.canvas(R * 2 + 1, R * 2 + 1), ctx = cv.getContext('2d');
+    ctx.fillStyle = S.PALETTE.dusk_high;
+    for (var y = -R; y <= R; y++) {
+      for (var x = -R; x <= R; x++) {
+        var d = Math.sqrt(x * x + y * y) / R;
+        if (d > 1) continue;
+        ctx.globalAlpha = Math.round((1 - d) * (1 - d) * 4) / 10; // 4 stepped rings, 0.4 at most
+        ctx.fillRect(x + R, y + R, 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+    return cv;
+  }
+
   function create(x) { return { x: x, vx: 0, t: 0, facing: 1, stopped: true }; }
 
   // move is the input axis (-1, 0, 1). worldW clamps the boat inside the location.
@@ -74,13 +96,13 @@ G.scene.boat = (function () {
 
   // Draws the rod as a quadratic curve. bend > 0 bows its middle forward and down
   // (loaded), bend < 0 bows it back (the whip of a cast). The tip stays where rodTip says.
-  function drawRod(ctx, b, sx, wy, angle, bend) {
+  function drawRod(ctx, b, sx, wy, angle, bend, key) {
     var a = angle * Math.PI / 180, f = b.facing;
     var bx = sx + f * ROD.baseX, by = wy + bob(b) + ROD.baseY;
     var tx = bx + f * Math.cos(a) * ROD.len, ty = by - Math.sin(a) * ROD.len;
     var mx = (bx + tx) / 2 + f * Math.sin(a) * bend, my = (by + ty) / 2 + Math.cos(a) * bend;
     var steps = ROD.len + 4;
-    ctx.fillStyle = S.PALETTE.stone_hi;
+    ctx.fillStyle = S.PALETTE[key || 'stone_hi'];
     for (var i = 0; i <= steps; i++) {
       var u = i / steps, v = 1 - u;
       ctx.fillRect(Math.round(v * v * bx + 2 * u * v * mx + u * u * tx), Math.round(v * v * by + 2 * u * v * my + u * u * ty), 1, 1);
@@ -89,14 +111,37 @@ G.scene.boat = (function () {
 
   // sx is the boat centre on screen, wy the waterline. Passengers sit behind the hull's
   // gunwale, so they are drawn first. withFisher false leaves the boat empty, rod and all (P10.2).
-  function draw(ctx, b, sx, wy, withFisher, drawDog, rodAngle, rodBend) {
-    var flip = b.facing < 0, y = wy + bob(b);
+  // gear (optional): {rod: tier, lantern: bool, finder: bool, night: 0..1}.
+  function draw(ctx, b, sx, wy, withFisher, drawDog, rodAngle, rodBend, gear) {
+    var flip = b.facing < 0, y = wy + bob(b), f = b.facing, P = S.PALETTE;
     if (withFisher) {
       S.draw(ctx, 'fisher', flip ? sx : sx - 7, y - 8, 0, flip);
-      drawRod(ctx, b, sx, wy, rodAngle, rodBend);
+      drawRod(ctx, b, sx, wy, rodAngle, rodBend, gear ? ROD_KEYS[Math.min(gear.rod, ROD_KEYS.length - 1)] : null);
     }
     if (drawDog) drawDog(ctx, flip ? sx - 14 : sx + 3, y - 8, flip);
+    if (gear && gear.lantern) {
+      var px = sx + f * 11;                                   // the bow pole, with an arm forward
+      ctx.fillStyle = P.wood_dark;
+      ctx.fillRect(px, y - 14, 1, 11);
+      ctx.fillRect(f > 0 ? px : px - 2, y - 14, 3, 1);
+      var lx = px + f * 2;
+      if (gear.night > 0) {
+        if (!halo) halo = bakeHalo();
+        ctx.globalAlpha = gear.night;
+        ctx.drawImage(halo, lx - 15, y - 26);
+        ctx.globalAlpha = 1;
+      }
+      S.draw(ctx, 'lantern', lx - 1, y - 13, 0, false);
+    }
     S.draw(ctx, 'boat_hull', sx - 13, y - 4, 0, flip);
+    if (gear && gear.finder && (Math.floor(b.t * 1.25) & 1)) {
+      ctx.fillStyle = P.neon_teal; ctx.fillRect(sx - f * 9, y - 3, 1, 1);
+    }
+    // Contact shadow on the water under the hull (below the waterline, so the mirror pass,
+    // which only keeps rows above it, never shows it).
+    ctx.globalAlpha = 0.5; ctx.fillStyle = P.water_deep;
+    ctx.fillRect(sx - 11, wy + 2, 22, 1); ctx.fillRect(sx - 8, wy + 3, 16, 1);
+    ctx.globalAlpha = 1;
   }
 
   // World x of the stern, where the wake starts.
