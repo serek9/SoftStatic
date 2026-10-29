@@ -7,7 +7,7 @@ G.scene = G.scene || {};
 G.scene.dog = (function () {
   var S = G.gfx.sprites;
   var MAP = { f: 'wood_hi', d: 'wood', e: 'ink', m: 'blood' };
-  var POSES = ['idle', 'alert', 'point', 'look_down', 'stare', 'bark'];
+  var POSES = ['idle', 'alert', 'point', 'look_down', 'stare', 'bark', 'pet', 'sleep'];
   var SPRITE = {};
 
   var ALERT = [
@@ -74,7 +74,47 @@ G.scene.dog = (function () {
       '..dffff....',
       '..fffff....',
       '..f.f.f....'
-    ], ALERT]
+    ], ALERT],
+    // Audit P1-6: being petted. Eyes shut, ears back, the tail wagging.
+    pet: [[
+      '...........',
+      '......dd...',
+      '......fdffe',
+      'd.....fff..',
+      '.d...ff....',
+      '..dffff....',
+      '..fffff....',
+      '..f.f.f....'
+    ], [
+      '...........',
+      '......dd...',
+      '......fdffe',
+      '......fff..',
+      'dd...ff....',
+      '..dffff....',
+      '..fffff....',
+      '..f.f.f....'
+    ]],
+    // Audit P2-2: asleep in the bow while passive mode fishes. It breathes.
+    sleep: [[
+      '...........',
+      '...........',
+      '...........',
+      '.......dd..',
+      '......fdffe',
+      'ddfffffff..',
+      '.ffffffff..',
+      '...........'
+    ], [
+      '...........',
+      '...........',
+      '...........',
+      '...........',
+      '.......ddd.',
+      'ddffffffdfe',
+      '.ffffffff..',
+      '...........'
+    ]]
   };
 
   for (var i = 0; i < POSES.length; i++) {
@@ -90,13 +130,23 @@ G.scene.dog = (function () {
   // how long it stares or barks (s), and how far the boat must go before it barks again.
   var CUE = { stareR: 110, stare: 4, barkR: 80, bark: 2.5, rearm: 160 };
 
-  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0, barkArmed: true, cue: '' }; }
+  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0, barkArmed: true, cue: '', petT: 0 }; }
 
   // Returns false for an unknown pose. manual (s) keeps the pose against step() (debug).
   function setPose(d, pose, manual) {
     if (!SPRITE[pose]) return false;
     if (d.pose !== pose) { d.pose = pose; d.t = 0; }
     if (manual) d.manual = manual;
+    return true;
+  }
+
+  // Audit P1-6: petting holds the 'pet' pose for PET.hold s, at most once every PET.again s,
+  // and never cuts into the stare or the bark. Returns true when the dog was petted.
+  var PET = { hold: 2, again: 3 };
+  function pet(d) {
+    if (d.petT > 0 || (d.manual > 0 && (d.pose === 'stare' || d.pose === 'bark'))) return false;
+    setPose(d, 'pet', PET.hold);
+    d.petT = PET.again;
     return true;
   }
 
@@ -138,18 +188,19 @@ G.scene.dog = (function () {
     if (info.tooHeavyNear) return 'look_down';
     if (info.interest >= T.point) return 'point';
     if (info.interest >= T.alert) return 'alert';
-    return 'idle';
+    return info.sleep ? 'sleep' : 'idle';
   }
 
   function step(d, dt, info) {
     d.t += dt;
     d.hold -= dt;
+    if (d.petT > 0) d.petT -= dt;
     if (d.manual > 0) { d.manual -= dt; return; }
     var w = want(info);
     if (w !== d.pose && d.hold <= 0) { setPose(d, w); d.hold = HOLD; }
   }
 
-  function draw(ctx, d, x, y, flip) { S.draw(ctx, SPRITE[d.pose], x, y, Math.floor(d.t * 5), flip); }
+  function draw(ctx, d, x, y, flip) { S.draw(ctx, SPRITE[d.pose], x, y, Math.floor(d.t * (d.pose === 'pet' ? 7 : (d.pose === 'sleep' ? 0.7 : 5))), flip); }
 
-  return { POSES: POSES, T: T, CUE: CUE, create: create, setPose: setPose, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
+  return { POSES: POSES, T: T, CUE: CUE, PET: PET, create: create, setPose: setPose, pet: pet, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
 })();

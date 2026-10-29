@@ -83,9 +83,28 @@ G.ui.journal = (function () {
       if (w) return 'Only between ' + hhmm(w.from) + ' and ' + hhmm(w.to) + '. The owl calls at ' + hhmm(w.cue) + '.';
     }
     if (p[0] === 'unease') return 'Comes only after sitting still a long while at night.';
+    // Phase 14: the rosters' other hint kinds (each is mechanically true; see data/fish.js).
+    if (p[0] === 'hour' && p[1] === 'night') return 'Bites best at night, 20 to 06.';
+    if (p[0] === 'bait') {
+      var b = G.sim.economy.baitById(p[1], G.data);
+      if (b) return 'Comes to ' + (b.label === false ? 'the jar with no label' : b.name.toLowerCase()) + '.';
+    }
+    if (ref === 'depth:deep') return 'Keeps to the deepest water here.';
+    if (ref === 'depth:shallow') return 'Stays near the surface.';
+    if (p[0] === 'spot') { var sp0 = spotById(sp, p[1]); if (sp0 && sp0.where) return 'Lives ' + sp0.where + '.'; }
+    if (p[0] === 'mover') return 'Stays by the ' + p[1] + ', wherever it stands now. The ' + p[1] + ' moves.';
     if (ref === 'bait') return 'Takes ' + baitNames(sp) + '.';
     if (ref === 'depth') return 'Found ' + sp.habitat.depthMin + ' to ' + sp.habitat.depthMax + ' m down. ' + hoursText(sp);
     return ref;
+  }
+
+  // A spot of the species' own waters (data/loc_*.js spots) by id.
+  function spotById(sp, id) {
+    for (var l = 0; l < sp.locations.length; l++) {
+      var L = G.data.locations[sp.locations[l]], s = (L && L.spots) || [];
+      for (var i = 0; i < s.length; i++) if (s[i].id === id) return s[i];
+    }
+    return null;
   }
 
   function hhmm(h) { var m = Math.round(h * 60); return (m < 600 ? '0' : '') + Math.floor(m / 60) + ':' + (m % 60 < 10 ? '0' : '') + (m % 60); }

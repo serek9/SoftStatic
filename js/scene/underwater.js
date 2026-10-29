@@ -244,13 +244,46 @@ G.scene.underwater = (function () {
       if (w >= 1 && ((h >>> 6) & 31) < w * 3) { jx = ((h >>> 11) & 1) ? 1 : -1; jy = ((h >>> 12) & 1) ? 1 : 0; }
       var fr = Math.floor(t * (2 + Math.abs(f.vx) / 6) + (w ? ((h >>> 13) & 3) * 0.3 * w : 0)) & 1;
       if (d.n > 2 && ((h >>> 15) & 15) < w * 2) fr = 2;
-      S.draw(ctx, name, Math.round(f.x - camPx - d.w / 2) + jx, Math.round(loc.waterY - camPy + f.y - d.h / 2) + jy, fr, face < 0);
+      var fxs = Math.round(f.x - camPx - d.w / 2) + jx, fys = Math.round(loc.waterY - camPy + f.y - d.h / 2) + jy;
+      if (name !== FG.silhouette(f.sp)) {
+        // P2-3: a dark 1 px outline (the silhouette drawn around it) so fish read at 1×.
+        var sil = FG.silhouette(f.sp), a0 = ctx.globalAlpha;
+        ctx.globalAlpha = a0 * 0.7;
+        S.draw(ctx, sil, fxs - 1, fys, fr, face < 0); S.draw(ctx, sil, fxs + 1, fys, fr, face < 0);
+        S.draw(ctx, sil, fxs, fys - 1, fr, face < 0); S.draw(ctx, sil, fxs, fys + 1, fr, face < 0);
+        ctx.globalAlpha = a0;
+      }
+      S.draw(ctx, name, fxs, fys, fr, face < 0);
     }
+  }
+
+  // P2-3: the boat's lantern at night throws a faint cone down into the water from the bow.
+  var cone = null;
+  function drawCone(ctx, loc, camPx, wyS, alpha) {
+    var g = G.state.save.gear, run = G.state.run;
+    if (!g.lantern || G.sim.clock.isGrey(G.state.save.clock || 0)) return;
+    if (!cone) cone = B.layer(61, 70, function (c) {
+      c.fillStyle = P.water_hi;
+      for (var y = 0; y < 70; y++) {
+        var hw = 2 + Math.round(y * 0.42);
+        c.globalAlpha = Math.round(0.3 * (1 - y / 70) * 10) / 10;
+        c.fillRect(30 - hw, y, hw * 2 + 1, 1);
+      }
+    });
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(cone, Math.round(run.boat.x + run.boat.facing * 13 - camPx) - 30, wyS);
   }
 
   // camPx, camPy: the rounded camera. alpha: how far the fade has got. t: time in seconds.
   function draw(ctx, loc, camPx, camPy, alpha, t) {
     var t0 = performance.now(), set = prepare(loc), H = set.H, wyS = loc.waterY - camPy;
+    // Audit P2-3: while it fades in or out, the cross-section also opens downward from the
+    // surface, as if the view were dipping under it.
+    var wipe = alpha < 1;
+    if (wipe) {
+      var open = 1 - (1 - alpha) * (1 - alpha);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, wyS, VIEW_W, Math.ceil(H * open)); ctx.clip();
+    }
     ctx.globalAlpha = alpha;
     ctx.drawImage(set.grad, 0, 0, 1, H, 0, wyS, VIEW_W, H);
 
@@ -264,6 +297,7 @@ G.scene.underwater = (function () {
       var bxs = ((bx[b] - camPx * 0.5) % 640 + 640) % 640 - 160; // parallax 0.5, wrapping
       S.draw(ctx, BG_SPR[b], Math.round(bxs), Math.round(wyS + by[b]), Math.floor(t * 2 + b) & 1, bv[b] < 0);
     }
+    drawCone(ctx, loc, camPx, wyS, alpha);
     ctx.globalAlpha = alpha;
     ctx.drawImage(set.bottom, camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
     ctx.drawImage(set.weeds[WEED_SEQ[Math.floor(t * 1.5) % 4]], camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
@@ -277,6 +311,7 @@ G.scene.underwater = (function () {
       ctx.fillRect(Math.round(x), Math.round(wyS + 2 + (my[i] % (H - 4))), 1, 1);
     }
     ctx.globalAlpha = 1;
+    if (wipe) ctx.restore();
     stats.ms = performance.now() - t0;
   }
 
@@ -287,7 +322,7 @@ G.scene.underwater = (function () {
 
   function createCatch() {
     return {
-      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0 },
+      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0, drip: -1 },
       heavy: { state: 0, t: 0, x: 0, y: 0, dir: 1, hum: 0 } // 7.7: 0 none yet this cast, 1 passing, 2 done
     };
   }
@@ -295,7 +330,8 @@ G.scene.underwater = (function () {
   // The fish on the bite is hooked: roll its size, start the fight, scatter the rest.
   function hook(run) {
     var b = run.bite, f = run.school.fish[b.slot], sp = G.data.fish[f.sp], h = run.hook, boatB = run.boat;
-    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0;
+    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1;
+    fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
     h.depth = f.y;
     h.q = G.rng.next();
@@ -320,6 +356,9 @@ G.scene.underwater = (function () {
       h.x = h.x0 + (tx - h.x0) * u;
       h.y = h.y0 + (ty - h.y0) * u;
       h.face = b.x > h.x ? 1 : -1;
+      // Audit P1-4: once out of the water the fish sheds droplets along its arc.
+      var k = Math.floor(h.lift * 12);
+      if (k !== h.drip && h.y < 0) { h.drip = k; fx.emit('splash', h.x, loc.waterY + h.y + 2, 2); }
     } else {
       var frac = F.D / F.D0;
       tx = b.x + b.facing * (UW.reach + Math.min(frac * h.dist, 140)); // 140 px: boat and fish share the screen
@@ -347,14 +386,16 @@ G.scene.underwater = (function () {
     if (fsm === 'waiting' || fsm === 'interest') {
       biteIn.reel = inp.held('action');
       biteIn.auto = run.passive.on; // passive mode hooks by itself (V3.5)
+      var biting = run.bite.slot >= 0;
       if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
+      else if (!biting && run.bite.slot >= 0) fx.ripple(run.cast.x1, loc.waterY + 1, 1, 7, 0.6); // audit P1-4: a ring where the line goes in
     } else if (fsm === 'hooked') {
       run.hook.t += dt;
       if (run.hook.t >= HOOKED_BEAT) G.core.state.go(run, 'fighting');
     } else if (fsm === 'fighting') {
       fightIn.reel = run.passive.on ? F.autoPlayer(run.fight, G.sim.passive.P.skill, G.rng) === 1 : inp.held('action'); // 12.2
       var res = F.step(run.fight, fightIn, dt, G.rng, G.data);
-      if (run.fight.slipped) fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); // TODO(P13.3): the soft slip sound
+      if (run.fight.slipped) fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); // the soft slip sound: audio/engine.js
       if (res === F.WIN) {
         run.hook.x0 = run.hook.x; run.hook.y0 = run.hook.y;
         G.core.state.go(run, 'landing');
@@ -385,7 +426,7 @@ G.scene.underwater = (function () {
       hv.state = 1; hv.t = 0; hv.dir = G.vrng.next() < 0.5 ? -1 : 1;
       hv.x = run.cast.x1 - hv.dir * 200; hv.y = run.cast.ly - G.scene.sailing.loc().waterY + 14; hv.hum = 0.6;
       if (G.core.debug) G.core.debug.log('something heavier circles here');
-      // TODO(P13.3): the single line hum sound.
+      // The single line hum is played by audio/engine.js when hv.state turns 1.
     }
     if (hv.state === 1) {
       hv.t += dt; hv.x += hv.dir * 40 * dt; hv.hum = Math.max(0, hv.hum - dt);

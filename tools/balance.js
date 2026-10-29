@@ -2,6 +2,7 @@
 //   node tools/balance.js --validate [--strict]   data and code checks; exit 1 on any error
 //                                                 (--strict also fails incomplete rosters)
 //   node tools/balance.js --pacing                active-player model against the V8 targets
+//   node tools/balance.js --saves                 saves from each milestone load and play (14.8)
 //   node tools/balance.js --replay <seed> [min]   a deterministic headless session, run twice;
 //                                                 prints its hash and fails if the runs differ
 //   node tools/balance.js --passive               passive income against active (V7: 60% ±5%),
@@ -22,7 +23,8 @@ function scriptList() {
 }
 
 function load() {
-  const ctx = vm.createContext({});
+  // The browser's text and base64 helpers, which core/save.js uses for its export string (--saves).
+  const ctx = vm.createContext({ TextEncoder, TextDecoder, btoa, atob });
   for (const f of scriptList()) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
   ctx.G.state = ctx.G.state || {};
   return ctx.G;
@@ -55,6 +57,31 @@ function validate(G, opts) {
   else err('anomalies: data/anomalies.js is not loaded');
   d.fish.forEach(f => { try { G.gfx.fishgen.generate(f.look); } catch (e) { err('fish ' + f.id + ': look does not generate: ' + e.message); } });
 
+  const g = d.gear;
+  // Phase 14: every hint ref is a known kind and true of the species (the journal prints it).
+  const NIGHT = [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], GREY = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+  d.fish.forEach(f => f.hintRefs.forEach(ref => {
+    const [k, v] = ref.split(':'), p = 'fish ' + f.id + ': hint ' + ref + ' ';
+    const same = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+    if (k === 'hour' && v === 'grey') { if (!same(f.timeLikes, GREY)) err(p + 'needs timeLikes = the grey hours'); }
+    else if (k === 'hour' && v === 'night') { if (!f.timeLikes.length || !f.timeLikes.every(h => NIGHT.includes(h))) err(p + 'needs night timeLikes'); }
+    else if (k === 'window') { if (!f.windows.includes(v)) err(p + 'not in its windows'); }
+    else if (k === 'unease') { if (!(f.uneaseMin > 0)) err(p + 'needs uneaseMin > 0'); }
+    else if (k === 'bait') { if (!f.baitLikes.includes(v) || !g.baits.some(b => b.id === v)) err(p + 'not a bait it takes'); }
+    else if (k === 'depth') {
+      const L = d.locations[f.locations[0]], deepest = L.maxDepth / 4;
+      if (v === 'deep' && f.habitat.depthMax < deepest * 0.6) err(p + 'habitat is not deep here');
+      if (v === 'shallow' && f.habitat.depthMax > 8) err(p + 'habitat is not shallow');
+      if (v !== 'deep' && v !== 'shallow') err(p + 'unknown depth hint');
+    } else if (k === 'spot') { if (!f.locations.some(l => (d.locations[l].spots || []).some(s => s.id === v && s.kind === 'legendary' && s.where))) err(p + 'needs a legendary spot with `where` in its waters'); }
+    else if (k === 'mover') { if (!f.locations.some(l => (d.locations[l].movers || []).some(m => m.id === v && (m.rare || 1) > 1)) || !['rare', 'legendary'].includes(f.rarity)) err(p + 'needs a rare-boosting mover and a rare species'); }
+    else err(p + 'unknown kind');
+  }));
+  for (const id in d.locations) {
+    const n = d.locations[id].need && d.locations[id].need.fish;
+    if (n && !d.fish.some(f => f.id === n && (!d.locations[id].need.windowCatch || f.windows.includes(d.locations[id].need.windowCatch)))) err('location ' + id + ': need.fish ' + n + ' must exist and bite in need.windowCatch');
+  }
+
   // Roster counts per location.
   for (const id in d.locations) {
     const here = d.fish.filter(f => f.locations.includes(id)), have = {};
@@ -65,7 +92,6 @@ function validate(G, opts) {
   validateLocations(G, err);
 
   // Gear: 5 tiers each, tier 0 free, every tier dearer and better (V8: every item has an effect).
-  const g = d.gear;
   [['rods', ['castMax', 'maxMass', 'attract']], ['reels', ['speed']], ['lines', ['strength']]].forEach(([kind, fx]) => {
     const t = g[kind];
     if (!t || t.length !== 5) { err('gear ' + kind + ': needs 5 tiers'); return; }
@@ -139,9 +165,10 @@ function validateLocations(G, err) {
 }
 
 // ---- Headless session (used by --replay and --pacing) ----------------------------------------
-// A scripted active player on Fogbound: cast, sink to a depth, wait, hook most bites, fight
-// with the auto-player, sell, buy along a plan. Everything runs through the real sim modules
-// at the fixed 1/60 step.
+// A scripted active player: cast, sink to a depth, wait, hook most bites, fight with the
+// auto-player, sell, buy along a plan. Everything runs through the real sim modules at the
+// fixed 1/60 step. Since Phase 14 it moves to each water it opens, and once it fishes the
+// Pines it hunts the Red Room's key: at the 03:33 window it fishes deep for Three-Thirty-Three.
 
 const DT = 1 / 60;
 const P = {
@@ -152,19 +179,31 @@ const P = {
   hookRate: 0.9,   // share of bites hooked (the rest are missed and may come back)
   hookDelay: 0.5,  // s to react to a bite
   skill: 0.85,     // fight skill of an attentive player
-  depthM: 8,       // the player's usual depth
+  depthM: 8,       // the player's usual depth (per water: depthAt)
+  depthAt: { fog: 8, creek: 6, pines: 8, red: 8 },
+  huntDepthM: 24,  // m: where it fishes for the Red Room's key fish in its window
   lureX: 600
 };
 const PLAN = ['line', 'reel', 'rod', 'lantern', 'depthFinder', 'creek', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'red', 'line', 'rod', 'reel'];
 
 function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
-  const save = G.core.save.defaults(), loc = data.locations.fog;
+  const save = G.core.save.defaults();
   const school = S.fish_ai.createSchool(data), bite = S.bite.create(), fight = S.fight.create();
   const fx = {}, lure = { active: false, x: P.lureX, y: 0, bait: 'worm' }, latched = {};
   const uIn = { loc: 'fog', still: true, atShop: false }, bIn = { reel: false, auto: false }, fIn = { reel: false };
-  Object.assign(school.ctx, { loc: 'fog', maxDepthPx: loc.maxDepth, latched });
-  const st = { phase: 'cast', t: 0, time: 0, hash: 7, catches: 0, attempts: 0, events: [], plan: 0, hookUid: 0, willHook: false, cur: null, mix: {}, coinsAt: [] };
+  Object.assign(school.ctx, { loc: 'fog', maxDepthPx: data.locations.fog.maxDepth, latched });
+  const st = { phase: 'cast', t: 0, time: 0, hash: 7, catches: 0, attempts: 0, events: [], plan: 0, hookUid: 0, willHook: false, cur: null, mix: {}, coinsAt: [],
+    loc: 'fog', depthM: P.depthAt.fog };
+  const red = data.locations.red.need || {}, key = red.windowCatch && G.sim.clock.windowById(data.windows, red.windowCatch);
+
+  // Travels to water id (when the model has opened it): the school there starts empty.
+  function moveTo(id) {
+    if (opts && opts.stay) return;
+    st.loc = id; uIn.loc = id; school.ctx.loc = id; school.ctx.maxDepthPx = data.locations[id].maxDepth;
+    for (const f of school.fish) f.active = false;
+    lure.active = false; st.phase = 'cast'; st.t = 0;
+  }
 
   function h(v) { st.hash = (Math.imul(st.hash ^ (v | 0), 0x01000193) >>> 0); }
   function event(what) { st.events.push({ t: st.time, catches: st.catches, coins: save.coins, what }); }
@@ -173,7 +212,7 @@ function session(G, seed, opts) {
     while (st.plan < PLAN.length) {
       const k = PLAN[st.plan], E = S.economy;
       const r = data.locations[k] ? E.unlock(save, k, data) : E.buy(save, k, data);
-      if (r === E.OK || r === E.MAXED) { if (r === E.OK) event(k); st.plan++; } else break;
+      if (r === E.OK || r === E.MAXED) { if (r === E.OK) { event(k); if (data.locations[k] && k !== 'red') moveTo(k); } st.plan++; } else break;
     }
   }
 
@@ -184,7 +223,7 @@ function session(G, seed, opts) {
     uIn.still = st.phase !== 'cast';
     S.unease.step(save, uIn, DT, rng, data);
     const c = school.ctx;
-    c.hour = save.clock; c.unease = S.unease.get(save, 'fog'); c.bait = lure.bait; c.rodMaxMass = fx.maxMass;
+    c.hour = save.clock; c.unease = S.unease.get(save, st.loc); c.bait = lure.bait; c.rodMaxMass = fx.maxMass;
     c.attract = fx.attract; c.rareBoost = fx.rareBoost; c.depthM = lure.y * 0.25;
     st.t += DT;
     switch (st.phase) {
@@ -192,12 +231,16 @@ function session(G, seed, opts) {
         if (st.t >= P.castTime) {
           st.phase = 'sink'; st.t = 0; st.attempts++;
           lure.active = true; lure.y = 0; lure.bait = S.economy.useBait(save, data);
+          // The hunt: in the Pines, in (or just before) the key window, with the key not yet caught.
+          const hunt = key && st.loc === 'pines' && !(save.journal[red.fish] && save.journal[red.fish].caught) &&
+            G.sim.clock.wrap(save.clock) >= key.from - 0.05 && G.sim.clock.wrap(save.clock) < key.to;
+          st.depthM = hunt ? P.huntDepthM : P.depthAt[st.loc];
           S.clock.clearLatch(latched); S.clock.latch(latched, save.clock, data.windows);
         }
         break;
       case 'sink':
-        lure.y = Math.min(P.depthM * 4, lure.y + 12 * DT);
-        if (lure.y >= P.depthM * 4) { st.phase = 'wait'; st.t = 0; }
+        lure.y = Math.min(st.depthM * 4, lure.y + 12 * DT);
+        if (lure.y >= st.depthM * 4) { st.phase = 'wait'; st.t = 0; }
         break;
       case 'wait':
         if (bite.slot >= 0 && school.fish[bite.slot].uid !== st.hookUid) { st.hookUid = school.fish[bite.slot].uid; st.willHook = rng.next() < P.hookRate; }
@@ -223,6 +266,7 @@ function session(G, seed, opts) {
           S.economy.recordCatch(save, st.cur, 'sell');
           st.catches++; st.mix[st.cur.id] = (st.mix[st.cur.id] || 0) + 1; h(save.coins);
           if (!opts || opts.shop !== false) shop();
+          if (st.cur.id === red.fish) event('key');
           st.phase = 'cast'; st.t = 0;
         }
         break;
@@ -270,7 +314,7 @@ function pacing() {
       red: at('red') && at('red').t / 60, catches: s.st.catches, mix: s.st.mix, events: ev, coinsAt: s.st.coinsAt, windowCatch: Object.keys(s.save.flags.windowCatch) });
   }
   const median = k => { const v = rows.map(r => r[k]).filter(x => x != null).sort((a, b) => a - b); return v.length === rows.length ? v[Math.floor(v.length / 2)] : null; };
-  console.log('Active-player model (Fogbound roster only until P11/P14; ' + JSON.stringify(P) + ')\n');
+  console.log('Active-player model (moves to each water it opens; hunts the Red Room key in the Pines; ' + JSON.stringify(P) + ')\n');
   const r0 = rows[0];
   console.log('Seed ' + r0.seed + ' timeline:');
   r0.events.forEach(e => console.log('  ' + (e.t / 60).toFixed(1).padStart(6) + ' min  ' + String(e.catches).padStart(4) + ' catches  ' + e.what));
@@ -286,6 +330,67 @@ function pacing() {
     console.log((pass ? 'PASS ' : 'FAIL ') + t.what + ': median ' + (m == null ? 'never' : m.toFixed(1) + ' ' + t.unit) + ' (target ' + t.lo + '-' + t.hi + ' ' + t.unit + ')');
   }
   return failed ? 1 : 0;
+}
+
+// ---- --saves ------------------------------------------------------------------------------
+// 14.8: a save as each milestone wrote it (the shapes of save.js defaults() at those commits,
+// with some play in them) must load in today's game: through the real export/import string,
+// migrated to the current version, with every field today's defaults have, and usable by
+// the economy, the passive sim and the unlock checks.
+
+const OLD_SAVES = [
+  { from: 'Phase 1 (2f90f2b), v1', save: { version: 1, coins: 12, gear: {}, baits: {}, journal: {}, kept: [], cabinLevel: 0, unlocks: {}, unease: {}, clock: 0, lastSeen: 0, flags: {}, tapes: [], settings: {}, rng: null } },
+  { from: 'Milestone A, Phase 7 (1b6ab97), v1', save: { version: 1, coins: 140, gear: {}, baits: {}, journal: { gloam_perch: { caught: 9, bestLen: 24.1, bestW: 0.44, hints: [], seen: 1 }, mist_carp: { caught: 2, bestLen: 61, bestW: 2.6, hints: ['hour:grey'], seen: 1 } },
+    kept: [{ id: 'mist_carp', len: 61, w: 2.6 }], cabinLevel: 0, unlocks: {}, unease: { fog: 0.4 }, clock: 22.5, lastSeen: 0, flags: {}, tapes: [], settings: {}, rng: 123456789 } },
+  { from: 'Phase 8 (855d35a), v2', save: { version: 2, coins: 410, gear: { rod: 1, reel: 1, line: 1, lantern: true, depthFinder: false, bait: 'cricket' }, baits: { cricket: 7 }, journal: { gloam_perch: { caught: 30, bestLen: 25, bestW: 0.49, hints: [], seen: 1 } },
+    kept: [], cabinLevel: 0, unlocks: { fog: true, creek: true }, unease: { fog: 0.2 }, clock: 3.1, lastSeen: 0, flags: { windowCatch: { owl_247: true } }, tapes: [], settings: {}, rng: 99 } },
+  { from: 'Phase 9 (29a69dc), v3', save: { version: 3, coins: 900, gear: { rod: 2, reel: 1, line: 2, lantern: true, depthFinder: true, bait: 'minnow' }, baits: { minnow: 3, unlabelled: 1 }, journal: { owl_eel: { caught: 1, bestLen: 90, bestW: 1.8, hints: ['window:owl_247'], seen: 1, read: 1 } },
+    kept: [{ id: 'owl_eel', len: 90, w: 1.8 }], cabinLevel: 2, unlocks: { fog: true, creek: true }, loc: 'creek', unease: { fog: 0.1, creek: 0.5 }, clock: 12, lastSeen: 0,
+    flags: { windowCatch: { owl_247: true }, lines: { coffee: 3 }, shopVisits: 6, heavy: { fog: true } }, tapes: [], settings: { volume: 0.4, mute: true }, rng: 7 } },
+  { from: 'Milestone B, Phase 10 (b041d97), v4', save: { version: 4, coins: 2500, gear: { rod: 3, reel: 3, line: 3, lantern: true, depthFinder: true, bait: 'worm' }, baits: {}, journal: { hollow_pike: { caught: 4, bestLen: 80, bestW: 3.2, hints: ['unease'], seen: 1, late: { bait: true }, lateNew: true } },
+    kept: [], cabinLevel: 3, unlocks: { fog: true, creek: true, pines: true }, loc: 'pines', unease: { pines: 0.9 }, clock: 2.7, lastSeen: 0,
+    flags: { windowCatch: { owl_333: true }, lines: {}, shopVisits: 2, heavy: {}, anomalies: { lit_window: 2 }, dogStare: { fog: true }, lateAt: 30 }, tapes: [], settings: { volume: 0.8, mute: false }, rng: 5 } },
+  { from: 'Phase 12 (159b20d), v4 with tapes and a phantom', save: { version: 4, coins: 6100, gear: { rod: 4, reel: 4, line: 4, lantern: true, depthFinder: true, bait: 'unlabelled' }, baits: { unlabelled: 2 }, journal: { owl_eel: { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: 0, phantom: true } },
+    kept: [], cabinLevel: 4, unlocks: { fog: true, creek: true, pines: true, red: true }, loc: 'red', unease: { red: 0.3 }, clock: 9, lastSeen: 1700000000000,
+    flags: { windowCatch: { owl_247: true }, lines: {}, shopVisits: 9, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [{ loc: 'fog', kind: 'away', entries: [], caught: 3, lost: 0, coins: 20, secs: 600 }], settings: { volume: 1, mute: false }, rng: 11 } }
+];
+
+function savesCheck() {
+  const G = load(), SV = G.core.save, d = SV.defaults(), E = G.sim.economy;
+  let failed = 0;
+  // Every key today's defaults have, one level into the objects (gear, flags, settings).
+  function missing(s) {
+    const out = [];
+    for (const k in d) {
+      if (!(k in s)) { out.push(k); continue; }
+      if (d[k] && typeof d[k] === 'object' && !Array.isArray(d[k]) && ['gear', 'flags', 'settings'].includes(k)) for (const j in d[k]) if (!(j in s[k])) out.push(k + '.' + j);
+    }
+    return out;
+  }
+  for (const o of OLD_SAVES) {
+    const probs = [];
+    const r = SV.importString(SV.exportString(JSON.parse(JSON.stringify(o.save))));
+    if (!r.ok) probs.push('import: ' + r.error);
+    else {
+      const s = r.save;
+      if (s.version !== SV.VERSION) probs.push('version ' + s.version);
+      const miss = missing(s); if (miss.length) probs.push('missing ' + miss.join(', '));
+      try {
+        const fx = E.effects(s, G.data, {});
+        if (!(fx.maxMass > 0 && fx.castMax > 0)) probs.push('gear effects');
+        for (const id in G.data.locations) E.canUnlock(s, id, G.data);
+        const ps = G.sim.passive.create(s, s.loc || 'fog', G.data);
+        G.sim.passive.plan(ps, new G.core.rng.Rng(1), G.data);
+        for (const id in s.journal) if (!G.data.fish.some(f => f.id === id)) probs.push('journal species ' + id + ' no longer exists');
+        if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
+      } catch (e) { probs.push('throws: ' + e.message); }
+    }
+    if (probs.length) failed++;
+    console.log((probs.length ? 'FAIL ' : 'PASS ') + o.from + (probs.length ? ': ' + probs.join('; ') : ': loads as v' + SV.VERSION));
+  }
+  const bad = SV.importString('SS1.bm90IGEgc2F2ZQ==.0');
+  console.log((bad.ok ? 'FAIL' : 'PASS') + ' a damaged string is refused (' + (bad.error || 'accepted') + ')');
+  return failed || bad.ok ? 1 : 0;
 }
 
 // ---- --passive ----------------------------------------------------------------------------
@@ -343,12 +448,13 @@ if (require.main === module) {
     code = replay(isNaN(seed) ? 12345 : seed, min) || code;
   }
   if (args.includes('--pacing')) code = pacing() || code;
+  if (args.includes('--saves')) code = savesCheck() || code;
   if (args.includes('--passive')) code = passiveCheck() || code;
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --replay <seed> [minutes]');
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --replay <seed> [minutes]');
     code = 2;
   }
   process.exit(code);
 }
 
-module.exports = { load, validate, session, replay, pacing, passiveCheck, PLAN, P };
+module.exports = { load, validate, session, replay, pacing, passiveCheck, savesCheck, PLAN, P };

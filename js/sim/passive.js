@@ -16,7 +16,7 @@ G.sim = G.sim || {};
 G.sim.passive = (function () {
   var DT = 1 / 60;
   var P = {
-    base: 48,             // s of waiting per cycle at attract 1, so a cycle takes about as long as an active cast
+    base: 42,             // s of waiting per cycle at attract 1, so a cycle takes about as long as an active cast
     spread: [0.6, 1.4],   // × the wait, per cycle
     skill: 0.8,           // the auto-player's fight skill (V7)
     depthM: 8,            // where the passive lure sits (kept above the location's bottom)

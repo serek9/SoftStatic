@@ -132,7 +132,7 @@ G.ui.menu = (function () {
       }
       return true;
     },
-    // TODO(P13.1): the audio engine reads save.settings.volume and mute.
+    // The audio engine (js/audio/engine.js) reads save.settings.volume and mute every step.
     close: function () { if (dirty) G.core.save.autosave('settings'); dirty = false; },
     draw: function (ctx) {
       var st = G.state.save.settings;

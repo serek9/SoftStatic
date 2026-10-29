@@ -29,6 +29,10 @@ G.scene.scenery = (function () {
   // How often (s per blink) the traffic light blinks at this hour: sig.period most of the
   // night, sig.fast inside a clock window, and closing in on fast through the `lead` game
   // hours before a window opens. Pure.
+  // The lot's middle lamp has a bad starter: in some 2.5 s stretches it stutters (a hash of
+  // time, no RNG). The audio engine reads the same function for the hum.
+  function lampLit(t) { return !(S.hash(29, Math.floor(t / 2.5)) & 1) || (S.hash(31, Math.floor(t * 14)) & 7) > 2; }
+
   function blinkPeriod(sig, hour, windows) {
     var near = 24;
     for (var i = 0; i < windows.length; i++) {
@@ -133,7 +137,7 @@ G.scene.scenery = (function () {
       s.on = s.ph < 0.5;
       s.eyes = false;
       for (var i = 0; i < G.data.windows.length; i++) if (C.inWindow(hour, G.data.windows[i])) s.eyes = true;
-      // TODO(P13.2): the lot's fluorescent hum (and P13.4: the Pines jazz chords).
+      // The lot's hum, the relay's click and the chords are played by js/audio/engine.js from this state.
     },
 
     afterLayer: function (c, id, ox, oy, run, loc) {
@@ -151,12 +155,18 @@ G.scene.scenery = (function () {
         // The lot's fluorescent lamps; the middle one has a bad starter and stutters in bursts.
         for (k = 0; k < s.lot.lamps; k++) {
           var lit = true;
-          if (k === 1 && (S.hash(29, Math.floor(s.t / 2.5)) & 1)) lit = (S.hash(31, Math.floor(s.t * 14)) & 7) > 2;
+          if (k === 1) lit = lampLit(s.t);
           if (!lit) continue;
           x = s.lot.x + 4 + k * LOT.lampGap - ox; y = s.far.base - LOT.lampH - oy;
           c.fillStyle = P.lamp_glow; c.fillRect(x - 1, y + 1, 3, 1);
           c.globalAlpha = 0.12; c.fillStyle = P.fog_light;
           for (var r = 2; r < LOT.lampH; r++) c.fillRect(x - (r >> 1), y + r, (r >> 1) * 2 + 1, 1);
+          // Audit P2-1: two moths circling each lit lamp, never quite in step.
+          c.globalAlpha = 0.8; c.fillStyle = P.paper;
+          for (var mth = 0; mth < 2; mth++) {
+            var ang = s.t * (2.3 + mth * 0.7) + k * 2 + mth * 3;
+            c.fillRect(Math.round(x + Math.cos(ang) * (3 + mth)), Math.round(y + 1 + Math.sin(ang * 1.3) * 2), 1, 1);
+          }
           c.globalAlpha = 1;
         }
       } else if (id === 'marks') {
@@ -175,6 +185,7 @@ G.scene.scenery = (function () {
       return 'signal ' + s.period.toFixed(2) + ' s/blink ' + (s.on ? 'on' : 'off') + (s.eyes ? '  owl eyes open' : '');
     },
 
+    lampLit: lampLit,
     blinkPeriod: function (hour) { return blinkPeriod(landmarkOf(G.data.locations.pines, 'signal'), hour, G.data.windows); }
   };
 
