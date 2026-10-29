@@ -349,7 +349,289 @@ G.gfx.fishgen = (function () {
     }
   }
 
+  // ---- Portraits (Phase 17) ----------------------------------------------------------------
+  // A species painted natively at any size for the 640×360 screens (journal, trophies), in the
+  // one-pixel look of the rest of the art: never a scaled-up sprite. Each base has a real
+  // shape (a profile from tail to snout, shaped fins with rays, the eye and mouth) and a
+  // pattern; the palette names its keys; the seed places spots and patches; the look's parts
+  // are painted at full size too. Shading is flat bands that follow the body, and the whole
+  // fish gets a dark outline. portrait(i, maxW, maxH, sil) returns a cached canvas; sil paints
+  // the silhouette only (unknown journal entries).
+  // Shapes: body [x, top, bottom] from the tail root (x 0) to the snout (x 1), in body lengths;
+  // tail {len, spread, fork (0 straight .. 1 deep), round}; fins {k: dorsal|anal|pelvic|
+  // adipose|pectoral, a, b, h, spiny}; eye [x, y, r]; mouth [x, y, len]; barbels; pattern.
+  var SHAPES = {
+    perch: { body: [[0, -0.06, 0.05], [0.14, -0.13, 0.11], [0.36, -0.2, 0.16], [0.6, -0.19, 0.15], [0.82, -0.13, 0.1], [1, -0.02, 0.025]],
+      tail: { len: 0.2, spread: 0.16, fork: 0.45 }, eye: [0.85, -0.055, 0.04], mouth: [1, 0.012, 0.11], pattern: 'bars',
+      fins: [{ k: 'dorsal', a: 0.32, b: 0.56, h: 0.14, spiny: true }, { k: 'dorsal', a: 0.58, b: 0.76, h: 0.09 }, { k: 'anal', a: 0.2, b: 0.36, h: 0.08 },
+        { k: 'pelvic', a: 0.56, b: 0.66, h: 0.09 }, { k: 'pectoral', a: 0.7, b: 0.58, h: 0.09 }] },
+    pike: { body: [[0, -0.05, 0.04], [0.15, -0.085, 0.075], [0.5, -0.1, 0.09], [0.76, -0.085, 0.075], [0.92, -0.04, 0.035], [1, -0.012, 0.012]],
+      tail: { len: 0.14, spread: 0.1, fork: 0.35 }, eye: [0.84, -0.04, 0.024], mouth: [1, 0.004, 0.17], pattern: 'beans',
+      fins: [{ k: 'dorsal', a: 0.13, b: 0.27, h: 0.08 }, { k: 'anal', a: 0.14, b: 0.26, h: 0.07 }, { k: 'pelvic', a: 0.46, b: 0.54, h: 0.06 }, { k: 'pectoral', a: 0.76, b: 0.68, h: 0.05 }] },
+    carp: { body: [[0, -0.07, 0.06], [0.2, -0.18, 0.14], [0.45, -0.25, 0.17], [0.7, -0.22, 0.15], [0.88, -0.13, 0.1], [1, -0.04, 0.035]],
+      tail: { len: 0.22, spread: 0.19, fork: 0.35 }, eye: [0.86, -0.06, 0.032], mouth: [0.99, 0.02, 0.05], barbels: 1, pattern: 'scales',
+      fins: [{ k: 'dorsal', a: 0.3, b: 0.68, h: 0.1 }, { k: 'anal', a: 0.2, b: 0.3, h: 0.09 }, { k: 'pelvic', a: 0.5, b: 0.58, h: 0.08 }, { k: 'pectoral', a: 0.76, b: 0.66, h: 0.08 }] },
+    trout: { body: [[0, -0.06, 0.05], [0.2, -0.13, 0.11], [0.5, -0.16, 0.14], [0.75, -0.14, 0.12], [0.9, -0.08, 0.07], [1, -0.02, 0.025]],
+      tail: { len: 0.18, spread: 0.15, fork: 0.18 }, eye: [0.88, -0.045, 0.032], mouth: [1, 0.014, 0.13], pattern: 'dots', band: true,
+      fins: [{ k: 'dorsal', a: 0.45, b: 0.6, h: 0.1 }, { k: 'adipose', a: 0.18, b: 0.24, h: 0.04 }, { k: 'anal', a: 0.2, b: 0.32, h: 0.08 },
+        { k: 'pelvic', a: 0.46, b: 0.54, h: 0.07 }, { k: 'pectoral', a: 0.77, b: 0.67, h: 0.07 }] },
+    eel: { body: [[0, -0.03, 0.03], [0.3, -0.05, 0.05], [0.7, -0.055, 0.055], [0.94, -0.035, 0.03], [1, -0.012, 0.012]],
+      tail: { len: 0.05, spread: 0.035, round: true }, eye: [0.93, -0.017, 0.013], mouth: [1, 0.004, 0.05], pattern: 'none',
+      fins: [{ k: 'dorsal', a: 0.02, b: 0.66, h: 0.03 }, { k: 'anal', a: 0.02, b: 0.5, h: 0.028 }, { k: 'pectoral', a: 0.88, b: 0.84, h: 0.025 }] },
+    catfish: { body: [[0, -0.05, 0.05], [0.25, -0.12, 0.1], [0.6, -0.15, 0.12], [0.86, -0.12, 0.1], [1, -0.06, 0.05]],
+      tail: { len: 0.16, spread: 0.13, fork: 0.25 }, eye: [0.88, -0.055, 0.018], mouth: [1, 0.012, 0.1], barbels: 4, pattern: 'mottle',
+      fins: [{ k: 'dorsal', a: 0.6, b: 0.7, h: 0.13, spiny: true }, { k: 'adipose', a: 0.24, b: 0.34, h: 0.04 }, { k: 'anal', a: 0.13, b: 0.42, h: 0.07 },
+        { k: 'pelvic', a: 0.46, b: 0.53, h: 0.06 }, { k: 'pectoral', a: 0.8, b: 0.68, h: 0.07 }] },
+    gar: { body: [[0, -0.04, 0.035], [0.2, -0.065, 0.06], [0.5, -0.07, 0.065], [0.7, -0.06, 0.055], [0.76, -0.04, 0.035], [0.8, -0.018, 0.018], [1, -0.006, 0.006]],
+      tail: { len: 0.12, spread: 0.07, round: true }, eye: [0.735, -0.026, 0.02], mouth: [1, 0.002, 0.23], pattern: 'dots',
+      fins: [{ k: 'dorsal', a: 0.12, b: 0.21, h: 0.06 }, { k: 'anal', a: 0.12, b: 0.21, h: 0.055 }, { k: 'pelvic', a: 0.4, b: 0.46, h: 0.045 }, { k: 'pectoral', a: 0.72, b: 0.65, h: 0.04 }] },
+    koi: { body: [[0, -0.06, 0.05], [0.2, -0.16, 0.12], [0.45, -0.21, 0.15], [0.72, -0.18, 0.13], [0.9, -0.1, 0.08], [1, -0.03, 0.03]],
+      tail: { len: 0.24, spread: 0.2, fork: 0.22 }, eye: [0.88, -0.045, 0.026], mouth: [1, 0.015, 0.05], barbels: 1, pattern: 'patches',
+      fins: [{ k: 'dorsal', a: 0.3, b: 0.68, h: 0.08 }, { k: 'anal', a: 0.2, b: 0.3, h: 0.08 }, { k: 'pelvic', a: 0.5, b: 0.58, h: 0.09 }, { k: 'pectoral', a: 0.78, b: 0.64, h: 0.1 }] }
+  };
+
+  // Catmull-Rom through the control points: the body's top (col 1) or bottom (col 2) at x.
+  function profile(pts, col, x) {
+    if (x <= pts[0][0]) return pts[0][col];
+    for (var i = 0; i < pts.length - 1; i++) {
+      if (x > pts[i + 1][0]) continue;
+      var p0 = pts[Math.max(0, i - 1)][col], p1 = pts[i][col], p2 = pts[i + 1][col], p3 = pts[Math.min(pts.length - 1, i + 2)][col];
+      var t = (x - pts[i][0]) / (pts[i + 1][0] - pts[i][0]), t2 = t * t, t3 = t2 * t;
+      return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3);
+    }
+    return pts[pts.length - 1][col];
+  }
+
+  var portraits = {};
+  function portrait(i, maxW, maxH, sil) {
+    var key = i + ':' + maxW + ':' + maxH + ':' + (sil ? 1 : 0);
+    if (portraits[key]) return portraits[key];
+    var look = G.data.fish[i].look, SH = SHAPES[look.base], pal = PALETTES[look.palette], parts = look.parts, rng = new G.core.rng.Rng(look.seed * 7 + 3);
+    var has = function (p) { return parts.indexOf(p) >= 0; };
+    var T = SH.tail, x, y, k, f;
+    // Extent in body lengths: the tail behind, fins above and below, barbels and ribbons ahead.
+    var minY = 0, maxY = 0;
+    for (x = 0; x <= 1; x += 0.02) { minY = Math.min(minY, profile(SH.body, 1, x)); maxY = Math.max(maxY, profile(SH.body, 2, x)); }
+    var finUp = 0, finDn = 0;
+    for (k = 0; k < SH.fins.length; k++) { f = SH.fins[k]; if (f.k === 'dorsal' || f.k === 'adipose') finUp = Math.max(finUp, f.h); if (f.k === 'anal' || f.k === 'pelvic') finDn = Math.max(finDn, f.h); }
+    var top = Math.min(minY - finUp, -T.spread) - (has('vertebrae') || has('second_tail') || has('growths') ? 0.07 : 0.01);
+    var bot = Math.max(maxY + finDn, T.spread) + (SH.barbels > 1 ? 0.1 : 0) + (has('coffee_drip') ? 0.12 : 0) + (has('vhs_ribbon') ? 0.15 : 0) + 0.01;
+    if (has('fused_twins')) bot += (maxY - minY) * 0.8;
+    var left = -T.len - 0.01, right = 1 + (has('vhs_ribbon') ? 0.12 : 0.02);
+    var Lp = Math.min((maxW - 2) / (right - left), (maxH - 2) / (bot - top));
+    var W = Math.max(4, Math.ceil((right - left) * Lp) + 2), H = Math.max(4, Math.ceil((bot - top) * Lp) + 2);
+    var g = new Array(W * H);
+    for (k = 0; k < g.length; k++) g[k] = '';
+    function wx(px) { return (px + 0.5 - 1) / Lp + left; }
+    function wy(py) { return (py + 0.5 - 1) / Lp + top; }
+    function PX(v) { return Math.round((v - left) * Lp + 1 - 0.5); }
+    function PY(v) { return Math.round((v - top) * Lp + 1 - 0.5); }
+    function put(px, py, key) { if (px >= 0 && py >= 0 && px < W && py < H) g[py * W + px] = key; }
+    function get(px, py) { return px >= 0 && py >= 0 && px < W && py < H ? g[py * W + px] : ''; }
+    function disc(cx, cy, r, key) { for (var yy = Math.floor(cy - r); yy <= Math.ceil(cy + r); yy++) for (var xx = Math.floor(cx - r); xx <= Math.ceil(cx + r); xx++) if ((xx - cx) * (xx - cx) + (yy - cy) * (yy - cy) <= r * r + r * 0.6) put(xx, yy, key); }
+    function seg(x0, y0, x1, y1, key) { var n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); for (var q = 0; q <= n; q++) put(Math.round(x0 + (x1 - x0) * q / n), Math.round(y0 + (y1 - y0) * q / n), key); }
+    var B = pal.b, Dk = pal.d, Lb = pal.l, Fn = pal.f;
+    if (has('wood_grain')) { B = 'wood_mid'; Dk = 'wood'; }
+    if (has('mannequin')) Lb = 'bone';
+    var dark = S.shift(Dk, -1), finDark = S.shift(Fn, -1), finLit = S.shift(Fn, 1);
+
+    // The body as a function, for every layer to ask "is this on the fish, and how far down?"
+    function bodyAt(X, Y) {
+      if (X < 0 || X > 1) return -1;
+      var t0 = profile(SH.body, 1, X), b0 = profile(SH.body, 2, X);
+      return Y >= t0 && Y <= b0 ? (Y - t0) / (b0 - t0) : -1;
+    }
+
+    function paintFish(dy, headOnly) {
+      var px, py;
+      // Fins behind the body: tail, dorsal, anal, pelvic; rays drawn as darker lines.
+      for (py = 0; py < H; py++) for (px = 0; px < W; px++) {
+        var X = wx(px), Y = wy(py) - dy, key = '';
+        if (headOnly && X < 0.66) continue;
+        if (X < 0.02 && X >= -T.len) {
+          var tt = -X / T.len, root = profile(SH.body, 2, 0), half = root + (T.spread - root) * Math.pow(tt, 0.8), ay = Math.abs(Y - (profile(SH.body, 1, 0) + root) / 2);
+          var inTail = ay <= half;
+          if (T.round) inTail = ((X + T.len * 0.45) * (X + T.len * 0.45)) / (T.len * T.len * 0.3) + (ay * ay) / (T.spread * T.spread) <= 1 || (tt < 0.5 && ay <= half);
+          else if (T.fork && tt > 1 - T.fork * (1 - ay / Math.max(0.001, half))) inTail = false;
+          if (inTail) key = ((Math.round(ay * Lp) % 3 === 0) && tt > 0.15) ? finDark : (ay > half - 1.5 / Lp ? finLit : Fn);
+        }
+        for (k = 0; k < SH.fins.length && !key; k++) {
+          f = SH.fins[k];
+          if (f.k === 'pectoral' || X < f.a || X > f.b) continue;
+          var u = (X - f.a) / (f.b - f.a), edgeT = profile(SH.body, 1, X), edgeB = profile(SH.body, 2, X);
+          var hgt = f.h * (f.k === 'adipose' ? Math.sin(u * Math.PI) : (f.k === 'dorsal' && !f.spiny ? Math.sin(Math.min(1, u * 1.3) * Math.PI * 0.85) : Math.pow(1 - Math.abs(u - 0.3) / 1.3, 1.5)));
+          if (f.spiny) { var ph = (u * (f.b - f.a) * Lp / 4) % 1; hgt *= 0.75 + 0.25 * (ph < 0.25 ? 1 : 0); }
+          var up = f.k === 'dorsal' || f.k === 'adipose';
+          var inFin = up ? (Y < edgeT + 0.01 && Y > edgeT - hgt) : (Y > edgeB - 0.01 && Y < edgeB + hgt);
+          if (has('second_tail') && f.k === 'dorsal' && k > 0) inFin = false;
+          if (inFin) key = (f.k !== 'adipose' && Math.round(u * (f.b - f.a) * Lp) % 3 === 0) ? finDark : Fn;
+        }
+        if (key) put(px, py + Math.round(dy * Lp), key);
+      }
+      // The body: bands down the flank (lit back rim, back, flank, belly, belly shadow).
+      for (py = 0; py < H; py++) for (px = 0; px < W; px++) {
+        var X2 = wx(px), Y2 = wy(py) - dy;
+        if (headOnly && X2 < 0.68) continue;
+        var v = bodyAt(X2, Y2);
+        if (v < 0) continue;
+        var t0 = profile(SH.body, 1, X2), b0 = profile(SH.body, 2, X2), mid = (t0 + b0) / 2, edge = 1.5 / Lp / Math.max(0.001, b0 - t0);
+        var key2 = v < edge ? S.shift(Dk, 1) : (v < 0.36 ? Dk : (v < 0.7 ? B : (v < 1 - edge * 1.2 ? Lb : S.shift(Lb, -1))));
+        // Pattern.
+        if (SH.pattern === 'bars' && v < 0.72) {
+          for (var bI = 0; bI < 5; bI++) { var bc = 0.24 + bI * 0.12, bw = 0.035 * (1 - v * 0.9); if (Math.abs(X2 - bc - (v - 0.3) * 0.04) < bw) key2 = dark; }
+        }
+        if (SH.band && Math.abs(Y2 - mid) < 0.012 && X2 > 0.08 && X2 < 0.8) key2 = 'dusk_rose';
+        if (SH.pattern === 'scales' && v > 0.12 && v < 0.85 && X2 < 0.8) {
+          var cs = 0.055, gx = X2 / cs, gy = (Y2 - t0) / (cs * 0.8), row = Math.floor(gy), cx2 = gx - (row % 2) * 0.5, fx = cx2 - Math.floor(cx2), fy = gy - row;
+          if (fy > 0.78 && Math.abs(fx - 0.5) < 0.42) key2 = S.shift(key2, -1);
+          else if (fy < 0.25 && Math.abs(fx - 0.5) < 0.15) key2 = S.shift(key2, 1);
+        }
+        if (X2 > 0.76 && X2 < 0.8 && Math.abs(X2 - 0.78 + Math.pow((Y2 - mid) / (b0 - t0), 2) * 0.05) < 0.6 / Lp && v > 0.1 && v < 0.92) key2 = S.shift(key2, -1); // the gill cover
+        put(px, py + Math.round(dy * Lp), key2);
+      }
+      // Spots and patches, placed by the seed.
+      var srng = new G.core.rng.Rng(look.seed * 13 + 5), n = SH.pattern === 'dots' ? 14 : (SH.pattern === 'beans' ? 16 : (SH.pattern === 'patches' ? 4 : (SH.pattern === 'mottle' ? 9 : 0)));
+      for (k = 0; k < n; k++) {
+        var sx = srng.range(0.08, 0.76), t1 = profile(SH.body, 1, sx), b1 = profile(SH.body, 2, sx), sy = t1 + (b1 - t1) * srng.range(0.12, SH.pattern === 'dots' ? 0.62 : 0.55);
+        if (headOnly && sx < 0.68) continue;
+        var r = SH.pattern === 'patches' ? srng.range(0.05, 0.09) : (SH.pattern === 'mottle' ? srng.range(0.025, 0.045) : srng.range(0.011, 0.018));
+        var col = SH.pattern === 'beans' ? S.shift(B, 1) : (SH.pattern === 'patches' ? (pal.p || Dk) : dark);
+        for (var yy = -r * 1.2; yy <= r * 1.2; yy += 1 / Lp) for (var xx = -r * 1.8; xx <= r * 1.8; xx += 1 / Lp) {
+          var e = (xx * xx) / (r * r * (SH.pattern === 'beans' ? 3 : 1.6)) + (yy * yy) / (r * r * 0.9);
+          if (e <= 1 && bodyAt(sx + xx, sy + yy) > 0.05) put(PX(sx + xx), PY(sy + yy + dy), col);
+        }
+      }
+      // The pectoral fin over the flank.
+      for (k = 0; k < SH.fins.length; k++) {
+        f = SH.fins[k];
+        if (f.k !== 'pectoral') continue;
+        var fx0 = f.a, fy0 = (profile(SH.body, 1, f.a) + profile(SH.body, 2, f.a)) / 2 + 0.02, len = f.a - f.b;
+        for (var q = 0; q <= 1; q += 0.5 / (len * Lp)) for (var sp = -1; sp <= 1; sp += 0.5 / (f.h * Lp)) {
+          var ax = fx0 - len * q, ay2 = fy0 + q * len * 0.45 + sp * f.h * q * 0.7;
+          if (headOnly && ax < 0.66) continue;
+          put(PX(ax), PY(ay2 + dy), Math.abs(sp) > 0.85 ? finDark : (Math.round(sp * f.h * q * Lp * 0.7) % 3 === 0 && q > 0.25 ? Fn : finLit));
+        }
+      }
+      // Eye, mouth, barbels.
+      var EX = PX(SH.eye[0]), EY = PY(SH.eye[1] + dy), ER = Math.max(1.3, SH.eye[2] * Lp);
+      if (has('owl_eyes')) ER *= 2.1;
+      if (look.wrongness >= 2) EY -= Math.max(1, Math.round(ER * 0.5));
+      disc(EX, EY, ER + 1, 'ink');
+      disc(EX, EY, ER, has('owl_eyes') ? 'signal_amber' : (look.palette === 'ink' ? 'stone_hi' : 'leaf_gold'));
+      if (ER >= 2) disc(EX + 0.3, EY + 0.3, ER * (has('owl_eyes') ? 0.5 : 0.6), 'ink'); else put(EX, EY, 'ink');
+      if (ER > 1.6) put(Math.round(EX - ER * 0.3), Math.round(EY - ER * 0.3), 'bone');
+      var MX = PX(SH.mouth[0]), MY = PY(SH.mouth[1] + dy), ML = SH.mouth[2] * Lp;
+      seg(MX, MY, MX - ML, MY + Math.max(1, ML * 0.12), dark);
+      if (SH.barbels) for (k = 0; k < SH.barbels; k++) {
+        var bl = (SH.barbels > 1 ? 0.12 + k * 0.03 : 0.05) * Lp, bx = MX - 1 - k * 2;
+        for (q = 0; q <= bl; q++) put(Math.round(bx - q * 0.45), Math.round(MY + 1 + q * 0.85 + Math.sin(q / bl * 3) * 1.2), dark);
+      }
+    }
+
+    if (has('fused_twins')) paintFish((maxY - minY) * 0.8, true);
+    paintFish(0, false);
+
+    // The look's parts, at full size.
+    var midX = 0.45, midT = profile(SH.body, 1, midX), midB = profile(SH.body, 2, midX), midY = (midT + midB) / 2, bh = (midB - midT) * Lp;
+    if (has('wood_grain')) for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
+      var X3 = wx(x), Y3 = wy(y), v3 = bodyAt(X3, Y3);
+      if (v3 > 0.05 && v3 < 0.7 && X3 < 0.76 && Math.abs(Math.sin(Y3 * Lp * 0.5 + Math.sin(X3 * 9) * 2)) < 0.18) put(x, y, 'wood_dark');
+    }
+    if (has('mannequin')) for (k = 0; k < 2; k++) {
+      var mx = PX(0.3 + k * 0.28);
+      for (y = 0; y < H; y++) if (bodyAt(wx(mx), wy(y)) >= 0) { put(mx, y, 'stone'); put(mx + 1, y, 'stone_lit'); }
+      disc(mx, PY(midY), Math.max(1.5, bh * 0.08), 'stone_hi');
+    }
+    if (has('zipper')) {
+      for (x = PX(0.1); x < PX(0.74); x++) { var zy = PY((profile(SH.body, 1, wx(x)) + profile(SH.body, 2, wx(x))) / 2); put(x, zy, x % 2 ? 'stone_hi' : 'ink'); put(x, zy + (x % 2 ? 1 : -1), 'stone'); }
+      var zx = PX(0.74), zy2 = PY(midY); for (y = 0; y < Math.max(3, bh * 0.25); y++) { put(zx, zy2 + y, 'stone_lit'); put(zx + 1, zy2 + y, 'stone'); }
+    }
+    if (has('muscle')) {
+      var mcx = PX(0.5), mcy = PY(midY), rx = bh * 0.45, ry = bh * 0.28;
+      for (y = -ry - 1; y <= ry + 1; y++) for (x = -rx - 1; x <= rx + 1; x++) {
+        var e2 = (x * x) / (rx * rx) + (y * y) / (ry * ry);
+        if (e2 <= 1.25 && e2 > 1) put(Math.round(mcx + x), Math.round(mcy + y), 'flesh');
+        else if (e2 <= 1) put(Math.round(mcx + x), Math.round(mcy + y), (Math.round(x + y * 1.5) % 3 === 0) ? 'blood' : 'crimson');
+      }
+    }
+    if (has('vertebrae')) for (var vx = 0.1; vx < 0.74; vx += 0.065) {
+      var vpx = PX(vx), vty = PY(profile(SH.body, 1, vx)), vh = Math.max(2, Math.round(Lp * 0.035));
+      for (y = 0; y < vh; y++) for (x = -1; x <= 1; x++) put(vpx + x, vty - y - 1, y === vh - 1 ? 'bone' : (x < 1 ? 'paper' : 'paper_dark'));
+      put(vpx, vty - vh - 1, 'ink');
+    }
+    if (has('second_tail')) {
+      var stx = PX(0.5), sty = PY(profile(SH.body, 1, 0.5)), sh = Math.max(4, Lp * 0.12);
+      for (y = 0; y < sh; y++) { var sw = Math.round(1 + y * 0.6); for (x = -sw; x <= sw; x++) if (!(y > sh * 0.6 && Math.abs(x) < sw * 0.4)) put(stx + x, sty - 1 - y, Math.abs(x) % 3 === 0 ? finDark : Fn); }
+    }
+    if (has('tail_face')) {
+      var tfx = PX(-T.len * 0.55), tfy = PY((profile(SH.body, 1, 0) + profile(SH.body, 2, 0)) / 2), tr = Math.max(1, T.spread * Lp * 0.14);
+      disc(tfx - tr * 1.6, tfy - tr * 1.6, tr, 'bone'); disc(tfx + tr * 1.6, tfy - tr * 1.6, tr, 'bone');
+      put(Math.round(tfx - tr * 1.6), Math.round(tfy - tr * 1.6), 'ink'); put(Math.round(tfx + tr * 1.6), Math.round(tfy - tr * 1.6), 'ink');
+      seg(tfx - tr * 1.5, tfy + tr * 1.8, tfx + tr * 1.5, tfy + tr * 1.8, 'flesh_dark');
+    }
+    if (has('human_eyes')) for (k = 0; k < (look.seed % 2 ? 2 : 1); k++) {
+      var hx = PX(0.62 - k * 0.2), hy = PY(midY - (midB - midT) * 0.1), hr = Math.max(2, bh * 0.13);
+      for (y = -hr; y <= hr; y++) for (x = -hr * 1.8; x <= hr * 1.8; x++) if ((x * x) / (hr * hr * 3.2) + (y * y) / (hr * hr * 0.55) <= 1) put(Math.round(hx + x), Math.round(hy + y), 'bone');
+      disc(hx, hy, hr * 0.62, 'water_hi'); disc(hx, hy, hr * 0.32, 'ink'); put(Math.round(hx - hr * 0.3), Math.round(hy - hr * 0.3), 'cream');
+      seg(hx - hr * 1.8, hy - hr * 0.5, hx + hr * 1.8, hy - hr * 0.5, 'flesh_dark');
+    }
+    if (has('human_mouth')) {
+      var hmx = PX(0.96), hmy = PY(SH.mouth[1] + 0.01), hw = Math.max(3, Lp * 0.07);
+      for (y = -2; y <= 2; y++) for (x = -hw; x <= 1; x++) put(Math.round(hmx + x), hmy + y, Math.abs(y) === 2 ? 'flesh_dark' : (Math.abs(y) === 1 ? 'flesh' : 'ink'));
+      for (x = -hw + 1; x < 0; x += 2) { put(Math.round(hmx + x), hmy - 1, 'bone'); put(Math.round(hmx + x), hmy + 1, 'bone'); }
+    }
+    if (has('coffee_drip')) {
+      var crng = new G.core.rng.Rng(look.seed + 9);
+      for (k = 0; k < 3; k++) {
+        var cxw = crng.range(0.2, 0.7), cpx = PX(cxw), cpy = PY(profile(SH.body, 2, cxw)), clen = Math.round(Lp * crng.range(0.04, 0.09));
+        for (y = 0; y < clen; y++) { put(cpx, cpy + y, 'wood_dark'); if (y < clen - 2) put(cpx + 1, cpy + y, 'wood'); }
+        disc(cpx + 0.5, cpy + clen + 1, 1.2, 'wood_dark');
+      }
+    }
+    if (has('growths')) {
+      var grng = new G.core.rng.Rng(look.seed + 11);
+      for (k = 0; k < 4; k++) {
+        var gxw = grng.range(0.15, 0.7), upg = k % 2 === 0, gpx = PX(gxw), gpy = PY(profile(SH.body, upg ? 1 : 2, gxw)), gr = Math.max(1.5, Lp * grng.range(0.018, 0.03));
+        disc(gpx, gpy + (upg ? -gr * 0.6 : gr * 0.6), gr, 'flesh'); disc(gpx - gr * 0.3, gpy + (upg ? -gr * 0.9 : gr * 0.3), gr * 0.45, 'skin_hi');
+        put(gpx + 1, gpy + (upg ? -1 : 1), 'crimson');
+      }
+    }
+    if (has('vhs_ribbon')) {
+      var rx0 = PX(SH.mouth[0]), ry0 = PY(SH.mouth[1]);
+      for (k = 0; k < 2; k++) for (q = 0; q < Lp * 0.22; q++) {
+        var rxp = rx0 + q * 0.35 + k * 2, ryp = ry0 + q + Math.sin(q * 0.25 + k) * 3;
+        put(Math.round(rxp), Math.round(ryp), 'ink'); put(Math.round(rxp) + 1, Math.round(ryp), k ? 'stone' : 'stone_dark');
+      }
+    }
+    if (has('static')) for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
+      var v4 = bodyAt(wx(x), wy(y));
+      if (v4 < 0.15 || v4 > 0.8) continue;
+      var band = Math.floor(y / 2) % 5;
+      if (band < 2 && ((x * 7 + y * 13 + look.seed) % 11) < 4) put(x, y, band ? 'fog_light' : 'stone_hi');
+    }
+
+    // Outline, or the silhouette.
+    var out = new Array(W * H);
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
+      var c0 = g[y * W + x];
+      if (c0) out[y * W + x] = sil ? SIL_KEY : c0;
+      else out[y * W + x] = (get(x - 1, y) || get(x + 1, y) || get(x, y - 1) || get(x, y + 1)) ? (sil ? SIL_KEY : 'ink') : '';
+    }
+    var cv = G.gfx.bake.layer(W, H, function (c) {
+      G.gfx.paint.reset();
+      G.gfx.paint.area(c, 0, 0, W, H, function (xx, yy) { return out[yy * W + xx]; });
+    });
+    portraits[key] = cv;
+    return cv;
+  }
+  var mirrored = {};
+  function portraitFlipped(i, maxW, maxH) {
+    var key = i + ':' + maxW + ':' + maxH;
+    return mirrored[key] || (mirrored[key] = G.gfx.bake.flipped(portrait(i, maxW, maxH, false), 'x'));
+  }
+
   return {
+    portrait: portrait, portraitFlipped: portraitFlipped,
     BASE_NAMES: BASE_NAMES, PARTS: PARTS, PALETTES: PALETTES,
     generate: generate, defineSpecies: defineSpecies, defineGallery: defineGallery,
     sprite: function (i) { return spr[i]; },

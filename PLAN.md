@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-10-29, after Phase 16 (the bait shop's look). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-10-29, after Phase 17 (640×360, shop, journal, cabin). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -397,7 +397,8 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | Audit batch 6: Polish (P3) | Done | `Audit batch 6: Polish` | P3-1 drizzle, P3-2 still mode, P3-4 the 8.4 minors. P3-3 (a committed screenshot script) left out: it needs Playwright, a dependency the project does not have |
 | 14 Content and polish | Done | `Phase 14: Content and polish` | **Milestone C reached.** 36 species, final balance, touch, performance, save migrations |
 | 15 Visual detail | Done | `Phase 15: Visual detail` | Asked for by the user on 2026-10-29 (not in §4), against reference shots of Cast n Chill: tasks 15.1–15.6 in 8.3 #74–80 |
-| 16 The bait shop's look | Done | `Phase 16: Bait shop look` | Asked for by the user on 2026-10-29 (not in §4), against a reference shot of a pixel-art tackle shop: 8.3 #81 |
+| 16 The bait shop's look | Done | `Phase 16: Bait shop look` | Asked for by the user on 2026-10-29 (not in §4), against a reference shot of a pixel-art tackle shop: 8.3 #81. Superseded by Phase 17 |
+| 17 640×360: base, shop, journal, cabin | Done | `Phase 17: 640x360 base, shop, journal, cabin` | Asked for by the user on 2026-10-29 against five more Cast n Chill shots ("practically identical in detail and pixel definition"): the whole game moves to 640×360 in three phases, this one first. 8.3 #82–87 |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -583,6 +584,15 @@ These are interpretations and additions made while building, where the spec abov
     - The panel: a tab per shelf (the shelves of 8.3 #23 are unchanged, and so are W/S for the shelf and A/D for the item), the shelf's name and the coins, the selected item at 2× in a tile with its name and price, the effect text, the status or the last message, and the shelf's items as bevelled 22 px tiles: the selected one framed in amber, a teal mark on the bait or equipment in use, the count in stock on baits. New 16×16 item icons (`shopi_*`); the tabs use small icons.
     - `G.ui.shop.text()` now returns the name, status and message as wrapped lines; `select` and `act` still return strings.
 
+**Phase 17, 640×360 (2026-10-29).** The user asked for the shop and the rest of the game to match five Cast n Chill screenshots in detail and pixel definition, with the game's own mood. That needs finer pixels than §0.9's 320×180, so the user chose (2026-10-29) to move **everything** to a native 640×360, in phases they approve one at a time: 17 the base with the shop, journal and cabin; 18 the four waters, the boat, fisher and dog, and the HUD, map, pause and tape; 19 the underwater view and the fish there. This replaces §0.9's "internal canvas 320×180" by the user's decision; the rest of §0.9 stands. After a first pass the user pointed out that parts did not read as pixel art, so the pass was redone under the rules in #84.
+
+82. **The view (17):** `G.core.view` (in `core/loop.js`) is 640×360. A scene or overlay with `native: true` draws in those pixels; any other still draws in the 320×180 space of the earlier phases through `view.begin(ctx, false)`, a ×2 transform, so the game keeps working while scenes are converted. `index.html` sets the transform for the scene, then the overlay, then the on-screen buttons (still 320 space). `menu.dim` covers the whole view in either space. `?compact` draws the 640×360 picture offscreen and shrinks it to 160×90. Input still reports game pixels in 320×180 (touch zones, buttons); that moves with the HUD in Phase 18. Native now: the shop, the cabin and the journal.
+83. **The fine font (17):** `sprites.makeFont(glyphs, h, lineH, wander)` builds a bitmap font (the old one is now made by it too). `S.fine` is the 640×360 font: capitals 7 px, x-height 5, descenders 2, line 12 px; `fine.bold` draws a glyph twice 1 px apart; handwriting jitter works as before.
+84. **Pixel-art rules for the 640×360 art (17, from the user's correction):** one pixel size everywhere (no `ctx.scale` of art, no smoothing upscales); shading in flat clusters of 3–6 keys per material (`paint.tone` steps, it never dithers); no random speckle: texture is deliberate strokes (grain, seams, stitches, mesh); light pools step with the material (read per plank or log segment); dark outlines where an object needs separating. New helpers in `gfx/paint.js`: `area` (fills runs from a key function), `tone`, `blob`, `limb`, `line`, `slab`, `box`, `hash2`, `reset`. New ramps in the palette (wood, stone, skin, teal cloth, plum, fire, brass). `sprites.shift(key, dir)` finds the next lighter or darker key of about the same hue.
+85. **Fish portraits (17):** `fishgen.portrait(i, maxW, maxH, sil)` paints a species natively at any size from its look: each of the eight bases has a profile (Catmull-Rom top and bottom lines), a tail (forked or round), shaped fins with rays, an eye and a mouth, barbels, and a pattern (bars, bean spots, scales, dots and a band, mottling, koi patches) placed by the seed; all 15 parts are painted at full size (human and owl eyes, a human mouth, zipper, muscle, vertebrae, wood grain, VHS ribbon, mannequin seams, a second tail, a face on the tail, coffee drips, static, a fused twin's head, growths); wrongness 2+ lifts the eye. Flat bands (lit back rim, back, flank, belly, belly shadow), an ink outline; `sil` paints the silhouette. Cached per size; `portraitFlipped` for trophies that face the door. The underwater fish are still the small sprites (Phase 19).
+86. **Shop, journal and cabin at 640×360 (17):** the shop keeps Phase 16's layout, repainted natively (planks lit plank by plank under a green enamel lamp, the pegboard of packets, trophies by `portrait`, the keeper in flat clusters with her blink and moving mouth, the counter and cubby of jars), the speech on a cream card, and the panel with item icons painted at 32 px and 64 px (`shop.icon(name, s)`), a native coin. The journal is an open book: left page the entry (the name on a ribbon, the fish on a plate, rarity, where it lives, the catches, ~ BIGGEST CATCH ~, the notes in handwriting on ruled lines), right page the count, the location and rarity filters as pills, a 5×5 grid of rounded tiles (silhouettes for the unknown) with a scrollbar, a coffee ring and a ribbon bookmark. The cabin is a log room: the door with a fog pane, a hat, rods and boots; plaques for ten trophies on the back wall; the fog window and an armchair; a stone fireplace with a mantel. Its stages: derelict (holes to the night, a loose board, cobwebs, debris, a cracked pane, a torn chair, cold ash), patched (boards nailed over), the fire lit (animated at 10 frames a second from the scene's time, embers, warm light on the logs and stones, a clock stopped at 3:33, candles), a zigzag rug and a floor lamp, then curtains, a quilt and a painting of a lake with one lit cabin window. Logic is unchanged: purchases, the shopkeeper's lines, the journal's filters, hints, late pages and phantoms, trophy facing and restoration. `shop.text()` returns wrapped lines; `journal.state().entry` lists the page's lines as before.
+87. **Bakes (17):** the shop room takes about 90 ms (at the travel fade's black), each cabin stage about 45 ms, the journal's book about 90 ms on its first opening (one long frame, once per session).
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -610,6 +620,8 @@ No crashes or failing checks are known. Open items, roughly by importance:
 | 19 | ~~Passive catches nothing off Fogbound~~ Done with the rosters | `data/fish.js` | Closed |
 | 20 | Time away moves the game clock (8.3 #44). A player who closes the tab for a few minutes comes back hours later in game time, with a tape | `js/sim/passive.js` | Watch in play; `P.awayMin` is the knob |
 | 21 | Live passive shows only the float and the bending rod; there is no underwater view or fish on screen, and no sound | `js/scene/sailing.js` | 13.3 for sound; visuals optional |
+| 23 | Until Phases 18 and 19, the waters, the underwater view, the HUD, map, pause, tape and gallery are drawn ×2 from 320×180 (8.3 #82), so they keep the old, coarser pixels next to the native shop, journal and cabin | `index.html`, `js/scene/*`, `js/ui/*` | Phases 18–19 |
+| 24 | The journal's first opening in a session costs one ~90 ms frame (baking the book and the portraits) | `js/ui/journal.js` | Optional: bake at boot |
 | 22 | Testing note: headless Brave runs no animation frames in background tabs, so a tab must be brought to the front (`Page.bringToFront`) before its loop can be checked | — | — |
 
 The remaining `TODO(Px.y)` markers in the code are listed in [HANDOFF.md](HANDOFF.md#pending-work).
@@ -650,14 +662,13 @@ Phase 14 checks: `--validate --strict` OK with 9 species per water and every hin
 
 Phase 15 checks: `--validate` OK, `--replay 12345` still `2593400009` (identical), `--pacing` and `--passive` unchanged, `--saves` all PASS. In headless Chromium every water was screenshotted at 19:00, 23:00, 06:00 and 12:00, and travel baked the creek in 61 ms, the Pines in 73 ms and the Red Room in 63 ms (the worst frame after each was under 4 ms). The scene ran at 60 fps with 1.7 ms of drawing and a 1.2–1.9 ms reflection pass. The audit batch 3 and 5 browser checks and the `?gallery`, `?compact` and plain boots all passed again with the new art. No page errors.
 
+Phase 16 checks: `--validate` OK, `--replay 12345` identical, `--saves` all PASS; the shop screenshotted on every shelf after purchases, keys W/S/A/D and Esc as before, 60 fps.
+
+Phase 17 checks: `--validate` OK, `--replay 12345` PASS identical (no sim change), `--pacing`, `--passive` and `--saves` all PASS. In headless Chromium at 1280×720: the shop on every shelf with a rod and a bait bought through `select` + `act`; the journal after `dbg.caught(8)`, whose handwriting at unease 0 and 1 differs in 686 px; the cabin at all five stages with twelve kept fish; travel to the shop and the cabin and back, the map and pause opened and closed; `?compact` (160×90), `?gallery` and a plain boot. 60 fps, about 1.2 ms of drawing on the water; no page errors.
+
 ### 8.6 Next task
 
-**Every phase in §4 is done (Milestone C), and so are Phase 15 (visual detail) and Phase 16 (the bait shop's look).** There is no next task in the plan. Ideas, each needing the user's go-ahead:
-- Playtesting notes on feel and pacing (8.4 #6).
-- Cabin costs in the pacing model.
-- A touch zone for petting the dog.
-- Painted detail for the Red Room's curtains and the cabin interior, to match Phase 15 and the shop (Phase 16).
-- More content (anomalies, shopkeeper lines, a fifth water).
+**Phase 18 (on the user's go-ahead): the waters at 640×360.** Under the rules of 8.3 #84: the four locations' painted layers (sky, mountains, forests, shores, the Red Room's curtains, landmarks), the water and reflections, the boat, the fisher and the dog, then the HUD, map, pause menu and tape as native overlays, and input in 640×360 game pixels. Then Phase 19: the underwater view and its fish (portraits at swimming size).
 
 ---
 

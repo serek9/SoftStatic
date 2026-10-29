@@ -220,5 +220,81 @@ G.gfx.paint = (function () {
     }
   }
 
-  return { dither: dither, mountains: mountains, forest: forest, shore: shore, pine: pine, round: round, birch: birch, cloudMask: cloudMask, paintMask: paintMask };
+  // ---- Shading helpers for the 640×360 interiors (Phase 17) ------------------------------
+
+  function box(ctx, key, x, y, w, h) { pen(ctx, key); ctx.fillRect(x, y, w, h); }
+
+  // A small integer hash in 0..1 (tones and grain that need no RNG stream).
+  function hash2(a, b) { var h = (a * 374761393 + b * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+
+  // One key of a ramp (dark to light) for a value v in 0..1, in clean steps: the 640×360
+  // art (Phase 17) is shaded in flat clusters, never dithered (x, y are kept for callers).
+  function tone(keys, v, x, y) {
+    var n = keys.length - 1, i = Math.round(Math.max(0, Math.min(1, v)) * n);
+    return keys[i];
+  }
+
+  // A shaded ellipse, lit from the top left; o: {bias, rim (edge darkening), lx, ly}.
+  function blob(ctx, cx, cy, rx, ry, keys, o) {
+    o = o || {};
+    var bias = o.bias || 0, rim = o.rim === undefined ? 0.18 : o.rim, lx = o.lx === undefined ? 0.6 : o.lx, ly = o.ly === undefined ? 0.75 : o.ly;
+    for (var y = Math.ceil(-ry); y <= Math.floor(ry); y++) for (var x = Math.ceil(-rx); x <= Math.floor(rx); x++) {
+      var nx = x / rx, ny = y / ry, d = nx * nx + ny * ny;
+      if (d > 1) continue;
+      var v = 0.5 + 0.5 * (-nx * lx - ny * ly) + bias - (d > 0.7 ? rim * (d - 0.7) / 0.3 : 0);
+      px(ctx, tone(keys, v, cx + x, cy + y), cx + x, cy + y);
+    }
+  }
+
+  // A shaded capsule from (x0, y0) to (x1, y1) of radius r (a sleeve, a rod, a pipe).
+  function limb(ctx, x0, y0, x1, y1, r, keys, bias) {
+    var dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy || 1, x, y;
+    for (y = Math.floor(Math.min(y0, y1) - r); y <= Math.ceil(Math.max(y0, y1) + r); y++) {
+      for (x = Math.floor(Math.min(x0, x1) - r); x <= Math.ceil(Math.max(x0, x1) + r); x++) {
+        var t = Math.max(0, Math.min(1, ((x - x0) * dx + (y - y0) * dy) / L2));
+        var ex = x - (x0 + t * dx), ey = y - (y0 + t * dy);
+        if (ex * ex + ey * ey > r * r) continue;
+        px(ctx, tone(keys, 0.5 + (-ex * 0.6 - ey * 0.7) / Math.max(1, r) * 0.5 + (bias || 0), x, y), x, y);
+      }
+    }
+  }
+
+  // A 1 px line (Bresenham) in one key.
+  function line(ctx, key, x0, y0, x1, y1) {
+    x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0;
+    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, e = dx + dy;
+    pen(ctx, key);
+    for (;;) {
+      ctx.fillRect(x0, y0, 1, 1);
+      if (x0 === x1 && y0 === y1) break;
+      var e2 = 2 * e;
+      if (e2 >= dy) { e += dy; x0 += sx; }
+      if (e2 <= dx) { e += dx; y0 += sy; }
+    }
+  }
+
+  // Fills a w×h area from fn(x, y) -> palette key ('' leaves a pixel alone), in runs of one
+  // key per row, so big painted surfaces cost one fillRect per run instead of per pixel.
+  function area(ctx, x0, y0, w, h, fn) {
+    for (var y = y0; y < y0 + h; y++) {
+      var run = '', rx = x0;
+      for (var x = x0; x <= x0 + w; x++) {
+        var k = x < x0 + w ? fn(x, y) : '';
+        if (k !== run) { if (run) { pen(ctx, run); ctx.fillRect(rx, y, x - rx, 1); } run = k; rx = x; }
+      }
+    }
+  }
+
+  // A box shaded as a solid: lit top edge and left side, dark right side and bottom.
+  function slab(ctx, x, y, w, h, keys) {
+    var n = keys.length - 1;
+    box(ctx, keys[Math.max(0, n - 2)], x, y, w, h);
+    box(ctx, keys[n], x, y, w, 1); box(ctx, keys[n - 1], x, y + 1, 1, h - 1);
+    box(ctx, keys[0], x + w - 1, y + 1, 1, h - 1); box(ctx, keys[0], x, y + h - 1, w, 1);
+  }
+
+  // Forget the cached pen colour (a painter that also sets ctx.fillStyle itself calls this).
+  function reset() { penCtx = null; penKey = ''; }
+
+  return { reset: reset, area: area, pen: pen, px: px, box: box, hash2: hash2, tone: tone, blob: blob, limb: limb, line: line, slab: slab, dither: dither, mountains: mountains, forest: forest, shore: shore, pine: pine, round: round, birch: birch, cloudMask: cloudMask, paintMask: paintMask };
 })();

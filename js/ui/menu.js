@@ -14,8 +14,9 @@ G.ui.menu = (function () {
 
   // ---- Shared drawing helpers (journal, map, shop, cabin) ----------------------------
 
+  // Covers the whole view in either space (an oversized fill is clipped).
   function dim(ctx, a) {
-    ctx.globalAlpha = a; ctx.fillStyle = P.night_ink; ctx.fillRect(0, 0, 320, 180); ctx.globalAlpha = 1;
+    ctx.globalAlpha = a; ctx.fillStyle = P.night_ink; ctx.fillRect(0, 0, G.core.view.W, G.core.view.H); ctx.globalAlpha = 1;
   }
 
   // A box with a 1 px border.
@@ -158,6 +159,7 @@ G.ui.menu = (function () {
   return {
     open: open, update: update, draw: draw, mapAllowed: mapAllowed,
     isOpen: function () { return cur !== null; },
+    native: function () { return !!(cur && cur.native); },
     current: function () { return curName; },
     exportSave: exportSave, importSave: importSave,
     lastExport: function () { return lastExport; },

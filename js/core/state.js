@@ -64,10 +64,11 @@ G.core.state = (function () {
   function update(dt) { if (current) current.update(dt); }
   function draw(ctx) { if (current) current.draw(ctx); }
   function sceneName() { return currentName; }
+  function native() { return !!(current && current.native); }
 
   return {
     FSM: FSM, newRun: newRun, can: can, go: go, tick: tick,
-    register: register, change: change, update: update, draw: draw, sceneName: sceneName
+    register: register, change: change, update: update, draw: draw, sceneName: sceneName, native: native
   };
 })();
 
