@@ -8,7 +8,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // mirror buffer only (setDeltas + drawDelta), so they never appear above the waterline.
 G.gfx = G.gfx || {};
 G.gfx.water = (function () {
-  var VIEW_W = 320, PAD = 2, ALPHA = 0.35;
+  var VIEW_W = 320, PAD = 2, ALPHA = 0.5; // Phase 15: a clearer mirror (was 0.35)
   var buf = null, bctx = null, shade = null, bufH = 0;
   var deltaDrawer = null;
   var stats = { ms: 0 };
@@ -50,6 +50,23 @@ G.gfx.water = (function () {
     ctx.globalAlpha = 1;
   }
 
+  // Phase 15: long broken horizontal streaks across the mirror, drifting slowly, the way a
+  // still lake breaks a reflection into lines. By hash of time, nothing allocated.
+  var STREAKS = 26;
+  function drawStreaks(ctx, waterY, rows, t) {
+    if (rows < 3) return;
+    var S = G.gfx.sprites;
+    ctx.fillStyle = S.PALETTE.water_hi;
+    for (var i = 0; i < STREAKS; i++) {
+      var r = 1 + S.hash(i, 5) % (rows - 1), len = 4 + S.hash(i, 7) % 18;
+      var x = ((S.hash(i, 6) % 420) + t * (1 + (S.hash(i, 8) & 3))) % 420 - 50;
+      ctx.globalAlpha = 0.14 + 0.12 * (1 - r / rows);
+      ctx.fillRect(Math.round(x), waterY + r, len, 1);
+      if (len > 12) ctx.fillRect(Math.round(x) + len + 3, waterY + r, 3, 1); // the line breaks
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // The light path under a low light (the moon, or the dusk glow): broken dashes every other
   // row, narrow at the horizon and wider nearer, swaying with the mirrored rows.
   function drawPath(ctx, waterY, h, t, L) {
@@ -68,8 +85,10 @@ G.gfx.water = (function () {
   // drawAbove(ctx) draws everything above the waterline in screen coordinates.
   // t is a time in seconds for the ripple of the mirrored rows.
   // light (optional): {x, a, key, w}, the light path on the water (a = 0 for none).
-  function draw(ctx, waterY, viewH, t, drawAbove, light) {
-    var t0 = performance.now(), h = viewH - waterY;
+  // band (optional, Phase 15): only the top `band` rows are mirror; the cross-section shows
+  // below them (sailing draws it first).
+  function draw(ctx, waterY, viewH, t, drawAbove, light, band) {
+    var t0 = performance.now(), h = viewH - waterY, rows = band === undefined ? h : Math.min(h, band);
     if (h !== bufH) setup(h);
 
     // Mirror about the waterline: screen row waterY - 1 lands on buffer row 0.
@@ -81,17 +100,18 @@ G.gfx.water = (function () {
     bctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.fillStyle = G.gfx.sprites.PALETTE.water_dark;
-    ctx.fillRect(0, waterY, VIEW_W, h);
+    ctx.fillRect(0, waterY, VIEW_W, rows);
     ctx.globalAlpha = ALPHA * (light && light.mirror !== undefined ? light.mirror : 1);
-    for (var r = 0; r < h; r++) {
+    for (var r = 0; r < rows; r++) {
       var amp = 1 + r / h; // 1 px at the surface, 2 px at the bottom
       var dx = Math.round(Math.sin(t * 1.7 + r * 0.55) * amp);
       ctx.drawImage(buf, PAD - dx, r, VIEW_W, 1, 0, waterY + r, VIEW_W, 1);
     }
     ctx.globalAlpha = 1;
-    if (light && light.a > 0.01) drawPath(ctx, waterY, h, t, light);
-    drawGlints(ctx, waterY, h, t);
-    ctx.drawImage(shade, 0, waterY);
+    if (light && light.a > 0.01) drawPath(ctx, waterY, rows, t, light);
+    drawStreaks(ctx, waterY, rows, t);
+    drawGlints(ctx, waterY, rows, t);
+    if (rows > 0) ctx.drawImage(shade, 0, 0, VIEW_W, rows, 0, waterY, VIEW_W, rows);
     stats.ms = performance.now() - t0;
   }
 

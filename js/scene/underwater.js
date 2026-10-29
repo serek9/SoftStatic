@@ -33,6 +33,7 @@ G.scene.underwater = (function () {
   var BGN = 4, BG_SPR = ['fishsil_base_carp', 'fishsil_base_pike', 'fishsil_base_catfish', 'fishsil_base_trout'];
   var bx = new Float32Array(BGN), by = new Float32Array(BGN), bv = new Float32Array(BGN);
   var stats = { ms: 0 };
+  var FAR_W = 640; // the far underwater layer wraps every FAR_W px (Phase 15)
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
@@ -67,10 +68,11 @@ G.scene.underwater = (function () {
 
     set.grad = B.cached(key + 'grad', function () {
       return B.layer(1, H, function (ctx) {
-        for (var y = 0; y < H; y += 3) {
+        for (var y = 0; y < H; y += 2) {
           var f = y / H;
-          ctx.fillStyle = f < 0.5 ? lerpRGB('water_mid', 'water_dark', f / 0.5) : lerpRGB('water_dark', 'water_deep', (f - 0.5) / 0.5);
-          ctx.fillRect(0, y, 1, 3);
+          // Phase 15: lit teal near the surface, through blue-green, to the deep.
+          ctx.fillStyle = f < 0.3 ? lerpRGB('water_lit', 'water_mid', f / 0.3) : (f < 0.65 ? lerpRGB('water_mid', 'water_dark', (f - 0.3) / 0.35) : lerpRGB('water_dark', 'water_deep', (f - 0.65) / 0.35));
+          ctx.fillRect(0, y, 1, 2);
         }
       });
     });
@@ -78,19 +80,28 @@ G.scene.underwater = (function () {
     set.bottom = B.cached(key + 'bottom', function () {
       return B.layer(w, H, function (ctx) {
         var x, top;
+        var D = G.gfx.paint.dither;
         for (x = 0; x < w; x++) {
           top = prof[x] + 2; // the lure (3 px tall, centred on its depth) rests on this row
           ctx.fillStyle = P[u.silt]; ctx.fillRect(x, top, 1, H - top);
           ctx.fillStyle = P[u.rock]; ctx.fillRect(x, top, 1, 1);
+          // Phase 15: the bed is lit along its top and speckled with sand and grit below.
+          ctx.fillStyle = P[u.sand || 'wood'];
+          for (var yy = top + 1; yy < Math.min(H, top + 4); yy++) if (D(x, yy, 0.5 - (yy - top) * 0.12)) ctx.fillRect(x, yy, 1, 1);
+          if (rng.next() < 0.12) ctx.fillRect(x, top + rng.int(4, 12), 1, 1);
         }
-        for (var i = 0; i < w / 14; i++) {
-          x = rng.int(0, w - 8);
-          var rw = rng.int(3, 7), rh = rng.int(2, 4), base = 1e9;
-          for (var k = 0; k < rw; k++) base = Math.min(base, prof[x + k] + 2);
-          ctx.fillStyle = P[u.rock];
-          ctx.fillRect(x + 1, base - rh, rw - 2, 1);
-          ctx.fillRect(x, base - rh + 1, rw, rh);
-          ctx.fillStyle = P.stone; ctx.fillRect(x + 1, base - rh, 1, 1);
+        // Boulders, shaded: lit on the top left, dark below (Phase 15; they were flat blocks).
+        var RK = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' };
+        for (var i = 0; i < w / 18; i++) {
+          x = rng.int(4, w - 12);
+          var rw = rng.int(3, 8), rh = rng.int(2, 5), base = 1e9;
+          for (var k = -rw; k <= rw; k++) base = Math.min(base, prof[clamp(x + k, 0, w - 1)] + 3);
+          for (var by2 = -rh; by2 <= 0; by2++) for (var bx2 = -rw; bx2 <= rw; bx2++) {
+            if ((bx2 * bx2) / (rw * rw) + (by2 * by2) / (rh * rh) > 1) continue;
+            var l = (-bx2 / rw - by2 / rh) * 0.5 + rng.range(-0.2, 0.2);
+            ctx.fillStyle = P[l > 0.45 ? RK.lit : (l > -0.05 ? RK.mid : RK.dark)];
+            ctx.fillRect(x + bx2, base + by2, 1, 1);
+          }
         }
         // 11.1: submerged branches standing up from the bottom to depth s.top (0: the surface).
         var snags = u.snags || [];
@@ -130,6 +141,31 @@ G.scene.underwater = (function () {
         };
       })(f - 1)));
     }
+
+    // Phase 15: far rock formations and kelp, a wrapping layer behind everything (parallax
+    // 0.6), in the water's own darker blues with lit rims on their left faces.
+    set.far = B.cached(key + 'far', function () {
+      return B.layer(FAR_W, H, function (ctx) {
+        var r2 = new G.core.rng.Rng(loc.seed * 31 + 202), D = G.gfx.paint.dither, n = r2.int(6, 9), m, x, y;
+        for (m = 0; m < n; m++) {
+          var cx = r2.int(0, FAR_W - 1), hw = r2.int(40, 110), peak = Math.round(H * r2.range(0.4, 0.8));
+          for (var dx = -hw; dx <= hw; dx++) {
+            var X = ((cx + dx) % FAR_W + FAR_W) % FAR_W, t = peak + Math.round((H - peak) * Math.pow(Math.abs(dx) / hw, 2.4) + r2.range(-1, 1));
+            for (y = t; y < H; y++) {
+              var k = 'water_dark';
+              if (dx < 0 && y - t < 2) k = 'water_mid';
+              else if ((y - t) > 6 && D(X, y, 0.25)) k = 'water_deep';
+              ctx.fillStyle = P[k]; ctx.fillRect(X, y, 1, 1);
+            }
+          }
+        }
+        ctx.fillStyle = P.water_mid;
+        for (m = 0; m < 10; m++) {
+          var kx = r2.int(0, FAR_W - 1), kh = r2.int(Math.round(H * 0.3), Math.round(H * 0.8)), ph = r2.range(0, 6.28);
+          for (y = 0; y < kh; y++) ctx.fillRect(((kx + Math.round(Math.sin(y * 0.15 + ph) * 2)) % FAR_W + FAR_W) % FAR_W, H - 1 - y, 1, 1);
+        }
+      });
+    });
 
     set.shaft = B.cached(key + 'shaft', function () {
       return B.layer(28, 70, function (ctx) {
@@ -277,13 +313,8 @@ G.scene.underwater = (function () {
   // camPx, camPy: the rounded camera. alpha: how far the fade has got. t: time in seconds.
   function draw(ctx, loc, camPx, camPy, alpha, t) {
     var t0 = performance.now(), set = prepare(loc), H = set.H, wyS = loc.waterY - camPy;
-    // Audit P2-3: while it fades in or out, the cross-section also opens downward from the
-    // surface, as if the view were dipping under it.
-    var wipe = alpha < 1;
-    if (wipe) {
-      var open = 1 - (1 - alpha) * (1 - alpha);
-      ctx.save(); ctx.beginPath(); ctx.rect(0, wyS, VIEW_W, Math.ceil(H * open)); ctx.clip();
-    }
+    // Phase 15: the cross-section is always drawn (the mirror band covers its top while
+    // sailing), so the old opening wipe (audit P2-3) is the band shrinking instead.
     ctx.globalAlpha = alpha;
     ctx.drawImage(set.grad, 0, 0, 1, H, 0, wyS, VIEW_W, H);
 
@@ -292,6 +323,11 @@ G.scene.underwater = (function () {
       ctx.globalAlpha = alpha * (0.55 + 0.45 * Math.sin(t * 0.6 + k * 1.7));
       ctx.drawImage(set.shaft, Math.round(k * every + 40 - par), wyS);
     }
+    // The far formations (Phase 15), wrapping, behind the silhouettes.
+    var fo = ((Math.round(camPx * 0.6) % FAR_W) + FAR_W) % FAR_W, fw = Math.min(VIEW_W, FAR_W - fo);
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.drawImage(set.far, fo, 0, fw, H, 0, wyS, fw, H);
+    if (fw < VIEW_W) ctx.drawImage(set.far, 0, 0, VIEW_W - fw, H, fw, wyS, VIEW_W - fw, H);
     ctx.globalAlpha = alpha * 0.3;
     for (var b = 0; b < BGN; b++) {
       var bxs = ((bx[b] - camPx * 0.5) % 640 + 640) % 640 - 160; // parallax 0.5, wrapping
@@ -311,7 +347,6 @@ G.scene.underwater = (function () {
       ctx.fillRect(Math.round(x), Math.round(wyS + 2 + (my[i] % (H - 4))), 1, 1);
     }
     ctx.globalAlpha = 1;
-    if (wipe) ctx.restore();
     stats.ms = performance.now() - t0;
   }
 
