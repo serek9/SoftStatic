@@ -3,8 +3,10 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Fish wrongness generator (V5). A species' look is a hand-drawn base body plus seeded
 // variation, then `wrongness` 0..3 and parts from the catalog:
 //   0 ordinary, 1 one wrong part, 2 two parts + asymmetry, 3 impossible anatomy + glitch shimmer.
-// Output is ordinary sprite rows (sprites.def), baked lazily like any other sprite:
-// frame 0 rest, frame 1 tail flick, frame 2 (wrongness 3 or `static`) glitch shimmer.
+// generate() turns a look into the small sprite rows of the early phases; it now only checks
+// that a look is valid (tools/balance.js --validate runs it in Node). What is drawn is
+// painted natively by paintLook (Phase 17 portraits, Phase 19 swimmers): frame 0 rest,
+// frame 1 tail flick, frame 2 (wrongness 3 or `static`) glitch shimmer.
 // Generation is pure and deterministic per look.seed; nothing here touches the DOM at load.
 G.gfx = G.gfx || {};
 G.gfx.fishgen = (function () {
@@ -91,7 +93,7 @@ G.gfx.fishgen = (function () {
   };
   var BASE_NAMES = ['perch', 'pike', 'carp', 'trout', 'eel', 'catfish', 'gar', 'koi'];
 
-  // Species palettes fill b, d, l, f (and p, koi patches). Everything else is fixed.
+  // Species palettes: body b, back d, belly l, fins f (and p, koi patches).
   var PALETTES = {
     olive: { b: 'moss_hi', d: 'moss', l: 'paper', f: 'moss_dark' },
     silver: { b: 'stone_hi', d: 'stone', l: 'bone', f: 'stone_dark' },
@@ -99,10 +101,6 @@ G.gfx.fishgen = (function () {
     pale: { b: 'flesh', d: 'flesh_dark', l: 'bone', f: 'flesh_dark' },
     koi: { b: 'bone', d: 'crimson', l: 'bone', f: 'blood', p: 'neon_red' },
     ink: { b: 'night_blue', d: 'night_deep', l: 'fog_mid', f: 'night_ink' }
-  };
-  var FIXED = {
-    e: 'ink', k: 'ink', w: 'bone', h: 'flesh', r: 'crimson', m: 'stone_hi', M: 'stone',
-    g: 'wood_hi', G: 'wood_dark', t: 'ink', T: 'stone', c: 'wood_dark', s: 'fog_light', a: 'signal_amber', j: 'stone_hi'
   };
   var SIL_KEY = 'water_deep';
 
@@ -307,48 +305,6 @@ G.gfx.fishgen = (function () {
     });
   }
 
-  function mapFor(palette) {
-    var m = {}, k, P = PALETTES[palette];
-    for (k in FIXED) m[k] = FIXED[k];
-    for (k in P) m[k] = P[k];
-    if (!m.p) m.p = P.b;
-    return m;
-  }
-
-  var SIL_MAP = {};
-  'bdlfpekwhrmMgGtTcsaj'.split('').forEach(function (ch) { SIL_MAP[ch] = SIL_KEY; });
-
-  // Defines fish_<id> and fishsil_<id> for every species, and fishsil_base_<base> for
-  // background silhouettes. Rows only; canvases bake on first draw.
-  var spr = [], sil = [];
-  function defineSpecies(list) {
-    spr.length = 0; sil.length = 0;
-    for (var i = 0; i < list.length; i++) {
-      var f = list[i], frames = generate(f.look);
-      spr.push('fish_' + f.id); sil.push('fishsil_' + f.id);
-      S.def(spr[i], mapFor(f.look.palette), frames);
-      S.def(sil[i], SIL_MAP, frames);
-    }
-  }
-  for (var b = 0; b < BASE_NAMES.length; b++) {
-    S.def('fishsil_base_' + BASE_NAMES[b], SIL_MAP, generate({ base: BASE_NAMES[b], wrongness: 0, parts: [], palette: 'olive', seed: 1 }));
-  }
-  if (G.data && G.data.fish) defineSpecies(G.data.fish);
-
-  // ?gallery: every part on every base (8 × 15), defined only when the gallery opens.
-  var galleryDone = false;
-  function defineGallery() {
-    if (galleryDone) return;
-    galleryDone = true;
-    for (var i = 0; i < BASE_NAMES.length; i++) {
-      S.def('base_' + BASE_NAMES[i], mapFor('olive'), generate({ base: BASE_NAMES[i], wrongness: 0, parts: [], palette: 'olive', seed: 7 }));
-      for (var j = 0; j < PARTS.length; j++) {
-        S.def(BASE_NAMES[i] + '+' + PARTS[j], mapFor('olive'),
-          generate({ base: BASE_NAMES[i], wrongness: 1, parts: [PARTS[j]], palette: 'olive', seed: 7 }));
-      }
-    }
-  }
-
   // ---- Portraits (Phase 17) ----------------------------------------------------------------
   // A species painted natively at any size for the 640×360 screens (journal, trophies), in the
   // one-pixel look of the rest of the art: never a scaled-up sprite. Each base has a real
@@ -405,8 +361,15 @@ G.gfx.fishgen = (function () {
   var portraits = {};
   function portrait(i, maxW, maxH, sil) {
     var key = i + ':' + maxW + ':' + maxH + ':' + (sil ? 1 : 0);
-    if (portraits[key]) return portraits[key];
-    var look = G.data.fish[i].look, SH = SHAPES[look.base], pal = PALETTES[look.palette], parts = look.parts, rng = new G.core.rng.Rng(look.seed * 7 + 3);
+    return portraits[key] || (portraits[key] = paintLook(G.data.fish[i].look, maxW, maxH, sil, 0, false));
+  }
+
+  // Paints a look (a species' or a bare base's). frame 0 rest, 1 the tail flicked down, 2 the
+  // glitch shimmer (two bands slip sideways, static breaks out in short dashes). swim leaves
+  // room under the tail so every frame of a swimmer has the same size. The canvas carries
+  // where the mouth is (mouthX, mouthY) and the body's middle row (midY), in its pixels.
+  function paintLook(look, maxW, maxH, sil, frame, swim) {
+    var SH = SHAPES[look.base], pal = PALETTES[look.palette], parts = look.parts, rng = new G.core.rng.Rng(look.seed * 7 + 3);
     var has = function (p) { return parts.indexOf(p) >= 0; };
     var T = SH.tail, x, y, k, f;
     // Extent in body lengths: the tail behind, fins above and below, barbels and ribbons ahead.
@@ -417,6 +380,7 @@ G.gfx.fishgen = (function () {
     var top = Math.min(minY - finUp, -T.spread) - (has('vertebrae') || has('second_tail') || has('growths') ? 0.07 : 0.01);
     var bot = Math.max(maxY + finDn, T.spread) + (SH.barbels > 1 ? 0.1 : 0) + (has('coffee_drip') ? 0.12 : 0) + (has('vhs_ribbon') ? 0.15 : 0) + 0.01;
     if (has('fused_twins')) bot += (maxY - minY) * 0.8;
+    if (swim) bot = Math.max(bot, T.spread * 1.5 + 0.01);
     var left = -T.len - 0.01, right = 1 + (has('vhs_ribbon') ? 0.12 : 0.02);
     var Lp = Math.min((maxW - 2) / (right - left), (maxH - 2) / (bot - top));
     var W = Math.max(4, Math.ceil((right - left) * Lp) + 2), H = Math.max(4, Math.ceil((bot - top) * Lp) + 2);
@@ -434,6 +398,9 @@ G.gfx.fishgen = (function () {
     if (has('wood_grain')) { B = 'wood_mid'; Dk = 'wood'; }
     if (has('mannequin')) Lb = 'bone';
     var dark = S.shift(Dk, -1), finDark = S.shift(Fn, -1), finLit = S.shift(Fn, 1);
+    var MX = 0, MY = 0;
+    // Frame 1: how far the tail has dropped, in body lengths, at tt (0 root .. 1 tip).
+    function bend(tt) { return frame === 1 ? T.spread * 0.5 * Math.pow(tt, 1.6) : 0; }
 
     // The body as a function, for every layer to ask "is this on the fish, and how far down?"
     function bodyAt(X, Y) {
@@ -449,7 +416,7 @@ G.gfx.fishgen = (function () {
         var X = wx(px), Y = wy(py) - dy, key = '';
         if (headOnly && X < 0.66) continue;
         if (X < 0.02 && X >= -T.len) {
-          var tt = -X / T.len, root = profile(SH.body, 2, 0), half = root + (T.spread - root) * Math.pow(tt, 0.8), ay = Math.abs(Y - (profile(SH.body, 1, 0) + root) / 2);
+          var tt = Math.max(0, -X / T.len), root = profile(SH.body, 2, 0), half = root + (T.spread - root) * Math.pow(tt, 0.8), ay = Math.abs(Y - bend(tt) - (profile(SH.body, 1, 0) + root) / 2);
           var inTail = ay <= half;
           if (T.round) inTail = ((X + T.len * 0.45) * (X + T.len * 0.45)) / (T.len * T.len * 0.3) + (ay * ay) / (T.spread * T.spread) <= 1 || (tt < 0.5 && ay <= half);
           else if (T.fork && tt > 1 - T.fork * (1 - ay / Math.max(0.001, half))) inTail = false;
@@ -520,7 +487,8 @@ G.gfx.fishgen = (function () {
       disc(EX, EY, ER, has('owl_eyes') ? 'signal_amber' : (look.palette === 'ink' ? 'stone_hi' : 'leaf_gold'));
       if (ER >= 2) disc(EX + 0.3, EY + 0.3, ER * (has('owl_eyes') ? 0.5 : 0.6), 'ink'); else put(EX, EY, 'ink');
       if (ER > 1.6) put(Math.round(EX - ER * 0.3), Math.round(EY - ER * 0.3), 'bone');
-      var MX = PX(SH.mouth[0]), MY = PY(SH.mouth[1] + dy), ML = SH.mouth[2] * Lp;
+      MX = PX(SH.mouth[0]); MY = PY(SH.mouth[1] + dy);
+      var ML = SH.mouth[2] * Lp;
       seg(MX, MY, MX - ML, MY + Math.max(1, ML * 0.12), dark);
       if (SH.barbels) for (k = 0; k < SH.barbels; k++) {
         var bl = (SH.barbels > 1 ? 0.12 + k * 0.03 : 0.05) * Lp, bx = MX - 1 - k * 2;
@@ -564,7 +532,7 @@ G.gfx.fishgen = (function () {
       for (y = 0; y < sh; y++) { var sw = Math.round(1 + y * 0.6); for (x = -sw; x <= sw; x++) if (!(y > sh * 0.6 && Math.abs(x) < sw * 0.4)) put(stx + x, sty - 1 - y, Math.abs(x) % 3 === 0 ? finDark : Fn); }
     }
     if (has('tail_face')) {
-      var tfx = PX(-T.len * 0.55), tfy = PY((profile(SH.body, 1, 0) + profile(SH.body, 2, 0)) / 2), tr = Math.max(1, T.spread * Lp * 0.14);
+      var tfx = PX(-T.len * 0.55), tfy = PY((profile(SH.body, 1, 0) + profile(SH.body, 2, 0)) / 2 + bend(0.55)), tr = Math.max(1, T.spread * Lp * 0.14);
       disc(tfx - tr * 1.6, tfy - tr * 1.6, tr, 'bone'); disc(tfx + tr * 1.6, tfy - tr * 1.6, tr, 'bone');
       put(Math.round(tfx - tr * 1.6), Math.round(tfy - tr * 1.6), 'ink'); put(Math.round(tfx + tr * 1.6), Math.round(tfy - tr * 1.6), 'ink');
       seg(tfx - tr * 1.5, tfy + tr * 1.8, tfx + tr * 1.5, tfy + tr * 1.8, 'flesh_dark');
@@ -610,6 +578,22 @@ G.gfx.fishgen = (function () {
       if (band < 2 && ((x * 7 + y * 13 + look.seed) % 11) < 4) put(x, y, band ? 'fog_light' : 'stone_hi');
     }
 
+    if (frame === 2) {
+      // Two bands of rows slip sideways, then short dashes of static on the body.
+      var grng = new G.core.rng.Rng(look.seed + 77), y0 = PY(midT), y1 = PY(midB), row = new Array(W);
+      for (k = 0; k < 2; k++) {
+        var ys = grng.int(y0, Math.max(y0, y1 - 2)), sh = (grng.next() < 0.5 ? -1 : 1) * (2 + grng.int(0, 1));
+        for (y = ys; y < Math.min(H, ys + 2); y++) {
+          for (x = 0; x < W; x++) row[x] = g[y * W + x];
+          for (x = 0; x < W; x++) g[y * W + x] = row[x - sh] || '';
+        }
+      }
+      for (k = 0; k < 7; k++) {
+        var dx0 = PX(grng.range(0.1, 0.8)), dy0 = grng.int(y0 + 1, Math.max(y0 + 1, y1 - 1)), dl = grng.int(2, 4);
+        for (x = dx0; x < dx0 + dl; x++) if (get(x, dy0)) put(x, dy0, k % 3 ? 'fog_light' : 'stone_hi');
+      }
+    }
+
     // Outline, or the silhouette.
     var out = new Array(W * H);
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
@@ -621,7 +605,7 @@ G.gfx.fishgen = (function () {
       G.gfx.paint.reset();
       G.gfx.paint.area(c, 0, 0, W, H, function (xx, yy) { return out[yy * W + xx]; });
     });
-    portraits[key] = cv;
+    cv.mouthX = MX; cv.mouthY = MY; cv.midY = PY(midY);
     return cv;
   }
   var mirrored = {};
@@ -630,11 +614,50 @@ G.gfx.fishgen = (function () {
     return mirrored[key] || (mirrored[key] = G.gfx.bake.flipped(portrait(i, maxW, maxH, false), 'x'));
   }
 
+  // ---- Swimmers (Phase 19) ------------------------------------------------------------------
+  // The underwater fish: a look painted at swimming size in the view's pixels (about twice
+  // the old sprites), in its frames (rest, tail flick, and the shimmer for wrongness 3 or
+  // static), facing right or flipped, in colour or as a silhouette. Baked on first use.
+  // SWIM: the box per base, in view pixels.
+  var SWIM = { perch: [34, 30], pike: [50, 30], carp: [38, 34], trout: [40, 30], eel: [58, 26], catfish: [44, 34], gar: [54, 26], koi: [38, 34] };
+  var swimmers = {};
+  function swimArt(id, look, scale, frame, sil, flip) {
+    var key = id + ':' + scale + ':' + frame + (sil ? 's' : 'c') + (flip ? 'f' : 'r'), cv = swimmers[key];
+    if (cv) return cv;
+    if (flip) {
+      var src = swimArt(id, look, scale, frame, sil, false);
+      cv = G.gfx.bake.flipped(src, 'x');
+      cv.mouthX = src.width - 1 - src.mouthX; cv.mouthY = src.mouthY; cv.midY = src.midY;
+    } else {
+      var box = SWIM[look.base];
+      cv = paintLook(look, box[0] * scale, box[1] * scale, sil, frame, true);
+    }
+    return (swimmers[key] = cv);
+  }
+  // Drawn every frame, so these look up arrays (no string keys) once baked.
+  var swimTab = [], baseTab = {};
+  function slot(fr, sil, flip) { return fr * 4 + (sil ? 2 : 0) + (flip ? 1 : 0); }
+  function swimmer(i, frame, sil, flip) {
+    var t = swimTab[i] || (swimTab[i] = []), k = slot(frame, sil, flip);
+    return t[k] || (t[k] = swimArt(i, G.data.fish[i].look, 1, frame, sil, flip));
+  }
+  // A bare base (no parts, wrongness 0) for the far silhouettes and the heavy shadow.
+  var BARE = {};
+  function bareLook(base) { return BARE[base] || (BARE[base] = { base: base, wrongness: 0, parts: [], palette: 'olive', seed: 1 }); }
+  function baseSwimmer(base, scale, frame, sil, flip) {
+    var bs = baseTab[scale] || (baseTab[scale] = {}), t = bs[base] || (bs[base] = []), k = slot(frame, sil, flip);
+    return t[k] || (t[k] = swimArt('base_' + base, bareLook(base), scale, frame, sil, flip));
+  }
+  // A look with one part on a base ('' for none), for the gallery's pages.
+  function partSwimmer(base, part, frame, sil, flip) {
+    var id = base + '+' + part, look = BARE[id] || (BARE[id] = { base: base, wrongness: part ? 1 : 0, parts: part ? [part] : [], palette: 'olive', seed: 7 });
+    return swimArt(id, look, 1, frame, sil, flip);
+  }
+
   return {
-    portrait: portrait, portraitFlipped: portraitFlipped,
+    portrait: portrait, portraitFlipped: portraitFlipped, frameCount: frameCount,
+    swimmer: swimmer, baseSwimmer: baseSwimmer, partSwimmer: partSwimmer, SWIM: SWIM,
     BASE_NAMES: BASE_NAMES, PARTS: PARTS, PALETTES: PALETTES,
-    generate: generate, defineSpecies: defineSpecies, defineGallery: defineGallery,
-    sprite: function (i) { return spr[i]; },
-    silhouette: function (i) { return sil[i]; }
+    generate: generate
   };
 })();
