@@ -252,6 +252,9 @@ G.core.debug = (function () {
       for (var i = 0; i < w.length; i++) if (w[i] > 0) on++;
       return { mode: ['off', 'pinned', 'loose'][s.mode], n: G.gfx.rope.N, onSurface: on, len: +s.rest.toFixed(2), span: +s.span.toFixed(2), taut: +s.taut.toFixed(3), sagMax: +s.sagMax.toFixed(2), ms: +s.ms.toFixed(4) };
     },
+    // dbg.lureBody() returns the lure's heading (degrees: 0 right, 90 down, 180 left), its
+    // flutter 0..1, its velocity (px/s) and the current at it (Phase 22).
+    lureBody: function () { return G.scene.underwater.body(); },
     // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
     poke: function (x, s) {
       var b = G.state.run.boat;
@@ -278,7 +281,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
-      pages.push('sprites', 'fx');
+      pages.push('sprites', 'baits', 'fx');
       page = 0; t = 0;
     }
 
@@ -362,6 +365,17 @@ G.core.debug = (function () {
           S.draw(ctx, names[m], x0, y0, Math.floor(t * 3), false);
           S.draw(ctx, names[m], x0 + d.w + 4, y0, Math.floor(t * 3), true);
           F.drawText(ctx, names[m] + ' ' + d.w + 'x' + d.h + ' x' + d.n, x0, y0 + 22, 'fog_light');
+        }
+      } else if (name === 'baits') {
+        // Phase 22: each bait's body in every heading (both flutter phases), drawn ×3 on water.
+        var UWm = G.scene.underwater, ids = ['worm', 'cricket', 'minnow', 'unlabelled'];
+        ctx.fillStyle = P.water_mid; ctx.fillRect(0, 18, 640, 342);
+        ctx.imageSmoothingEnabled = false;
+        for (var bi = 0; bi < ids.length; bi++) {
+          F.drawText(ctx, ids[bi], 8, 26 + bi * 82, 'bone');
+          for (var dk = 0; dk < UWm.DIRS; dk++) for (var ph = 0; ph < 2; ph++) {
+            ctx.drawImage(UWm.lureImg(ids[bi], dk, ph), 8 + dk * 39, 40 + bi * 82 + ph * 34, 33, 33);
+          }
         }
       } else if (name === 'fx') {
         // The particles are drawn in world pixels, as the sailing scene draws them.

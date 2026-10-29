@@ -1,7 +1,7 @@
 # SoftStatic: Realism Phases 20–25 (line, sound, boat, current, fight, water)
 
 **Date:** 2026-10-29. **Repo state:** Phases 1–19 done (PLAN.md §8.1), `main` at `4c37623`.
-**Status:** R1–R5 approved by the user on 2026-10-29. Phases 20 and 21 done (PLAN.md §8.1); the others wait for the go-ahead, one phase at a time (CLAUDE.md "How we work").
+**Status:** R1–R5 approved by the user on 2026-10-29. Phases 20–22 done (PLAN.md §8.1); the user asked for the rest to follow, each merged by pull request.
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like the improvement audit, this file adds phases after §4. It does not edit §0–§7 or Appendix V. Where a phase bends the approved spec, the **Spec deviations** table below names it, and the phase needs the user's approval before it starts.
 
 The user asked for six things:

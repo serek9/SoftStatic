@@ -20,7 +20,7 @@ G.gfx.fx = (function () {
   var vx = new Float32Array(MAX), vy = new Float32Array(MAX);
   var life = new Float32Array(MAX), max = new Float32Array(MAX), phase = new Float32Array(MAX);
   var kind = new Uint8Array(MAX);
-  var n = 0, dropped = 0;
+  var n = 0, dropped = 0, flow = 0; // flow: px/s of current the bubbles drift with (Phase 22)
 
   // Ripples: flat ellipses that grow and fade on the water surface, in their own small pool.
   var RMAX = 32;
@@ -77,7 +77,7 @@ G.gfx.fx = (function () {
       if (life[i] <= 0) { kill(i); continue; }
       var k = kind[i];
       vy[i] += SPEC[k].grav * dt;
-      if (k === BUBBLE) { phase[i] += dt * 6; x[i] += Math.sin(phase[i]) * 6 * dt; }
+      if (k === BUBBLE) { phase[i] += dt * 6; x[i] += (Math.sin(phase[i]) * 6 + flow) * dt; } // Phase 22: carried by the current
       else if (k === WAKE) { vx[i] *= 1 - 1.5 * dt; }
       x[i] += vx[i] * dt;
       y[i] += vy[i] * dt;
@@ -122,6 +122,7 @@ G.gfx.fx = (function () {
   function clear() { n = 0; rn = 0; }
 
   return {
+    setFlow: function (v) { flow = v; },
     MAX: MAX, RMAX: RMAX, emit: emit, ripple: ripple, splash: splash, update: update, draw: draw, clear: clear,
     count: function () { return n; },
     ripples: function () { return rn; },

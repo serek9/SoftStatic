@@ -282,15 +282,34 @@ G.scene.underwater = (function () {
       drift(c, loc, dt, c.ly - wy >= bottom);
       c.lx = c.x1;
       c.ly = Math.min(c.ly, wy + bottomAt(loc, c.x1));
+      // Phase 22: a line held in a current lifts the lure off the bottom, the way it swings a
+      // real one: up to LIFT px per px/s of flow (the creek's 1–2 m), at 1.5 px/s.
+      if (loc.drift && !inp.held('action')) {
+        var hold = Math.min(8, LIFT * Math.abs(loc.drift(c.seed, c.tw, c.ly - wy, false, wind()))), floor = wy + bottomAt(loc, c.x1) - hold;
+        if (c.ly > floor) c.ly = Math.max(floor, c.ly - 1.5 * dt);
+      }
     }
   }
 
   // 11.1: the current moves the lure (and where its line enters) by loc.drift, a pure
-  // function of the cast's seed, its time in the water and its depth, at the fixed dt.
+  // function of the cast's seed, its time in the water, its depth and (Phase 22, the lakes)
+  // the grey hours' wind, at the fixed dt.
+  var LIFT = 1.8;
+  function wind() { return G.scene.sailing.light(G.state.save.clock || 0).grey; }
   function drift(c, loc, dt, onBottom) {
     if (!loc.drift) return;
     c.tw += dt;
-    c.x1 = clamp(c.x1 + loc.drift(c.seed, c.tw, c.ly - loc.waterY, onBottom) * dt, 8, loc.width - 8);
+    c.x1 = clamp(c.x1 + loc.drift(c.seed, c.tw, c.ly - loc.waterY, onBottom, wind()) * dt, 8, loc.width - 8);
+  }
+
+  // Phase 22: the water around the lure moves with it. flow(loc, depth) is the current now at
+  // depth px, from the same function as the lure's drift (the last cast's seed and time in
+  // the water, 20 s on, so it has built up), so the weeds, motes, bubbles, streaks and the line
+  // never move against the lure.
+  function flow(loc, depth) {
+    if (!loc.drift) return 0;
+    var c = G.state.run.cast;
+    return loc.drift(c.seed || loc.seed, c.tw + 20, depth, false, wind());
   }
 
   // ---- View: fade, vertical camera, motes -------------------------------------------
@@ -315,16 +334,25 @@ G.scene.underwater = (function () {
       motesReady = true;
     }
     if (uw.alpha > 0) {
-      for (var j = 0; j < MN; j++) { mp[j] += dt * 0.8; my[j] += dt * 1.5; mx[j] += Math.sin(mp[j]) * 2 * dt; }
+      var f0 = flow(loc, 0), f1 = flow(loc, loc.maxDepth);
+      for (var j = 0; j < MN; j++) { mp[j] += dt * 0.8; my[j] += dt * 1.5; mx[j] += (Math.sin(mp[j]) * 2 + f0 + (f1 - f0) * Math.min(1, (my[j] % set.H) / loc.maxDepth)) * dt; }
       for (var k = 0; k < BGN; k++) bx[k] += bv[k] * dt;
       var cur = loc.current;
-      // Faster than the lure drifts (the eye needs it), slower with depth, as the drift is.
-      if (cur) for (var q = 0; q < CN; q++) cx[q] += cur.dir * cur.speed * 4 * (1 - cur.slack * cy[q]) * dt;
+      // Faster than the lure drifts (the eye needs it), slower with depth, as the drift is (Phase 22: the same flow).
+      if (cur && !cur.lake) for (var q = 0; q < CN; q++) cx[q] += (f0 + (f1 - f0) * cy[q]) * 4 * dt;
     }
   }
 
   // ---- Draw ----------------------------------------------------------------------------
   var WEED_SEQ = [0, 1, 2, 1];
+  // Phase 22: the weeds lean the way the water flows (frame 2 leans right, 0 left) and sway
+  // back to upright now and then; in still water they sway both ways as before.
+  var WEED_FLOW = [2, 2, 1, 2];
+  function weedFrame(loc, t) {
+    var v = flow(loc, loc.maxDepth * 0.75), k = Math.floor(t * 1.5) % 4;
+    if (Math.abs(v) < 0.03) return WEED_SEQ[k];
+    return v > 0 ? WEED_FLOW[k] : 2 - WEED_FLOW[k];
+  }
 
   // Fish (6.8). Reads the AI state only. Wrongness w makes the movement wrong too, all
   // decided by a hash of (fish, 1/8 s time bucket) so it never changes any state:
@@ -440,13 +468,13 @@ G.scene.underwater = (function () {
     ctx.globalAlpha = alpha;
     drawLayer(ctx, set.bottom, camPx, wyS, H);
     drawCaustics(ctx, loc, camPx, wyS, alpha, t);
-    drawLayer(ctx, set.weeds[WEED_SEQ[Math.floor(t * 1.5) % 4]], camPx, wyS, H);
+    drawLayer(ctx, set.weeds[weedFrame(loc, t)], camPx, wyS, H);
     drawHeavy(ctx, loc, camPx, camPy, alpha);
     drawFish(ctx, loc, camPx, camPy, t);
 
     ctx.fillStyle = P.water_hi;
     var cur = loc.current;
-    if (cur) {
+    if (cur && !cur.lake) {
       // The current: short streaks, each two dashes, drifting downstream (parallax 1).
       ctx.fillStyle = P.water_foam;
       ctx.globalAlpha = alpha * 0.3;
@@ -645,7 +673,109 @@ G.scene.underwater = (function () {
     return best;
   }
 
+  // ---- The lure's body (Phase 22.3) --------------------------------------------------
+  // The lure has a heading and a flutter, from how it moves through the water: nose-first
+  // when it moves (sinking, reeled, flying), nose into the current when it hangs in one, nose
+  // toward the boat in still water. Each bait moves its own way: the worm undulates, the
+  // cricket kicks now and then, the minnow wobbles and flashes a pale pixel. The body only
+  // reads the cast; it never moves the lure.
+  var body = { a: 0, flutter: 0, vx: 0, vy: 0, px: 0, py: 0, flow: 0, t: 0, on: false, kick: 0 };
+
+  function bodyStep(run, dt, loc) {
+    var c = run.cast, fsm = run.fsm, inAir = fsm === 'casting', x = inAir ? c.lx : c.x1, y = c.ly;
+    var lureOut = inAir || fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest';
+    if (!lureOut) { body.on = false; return; }
+    if (!body.on) { body.on = true; body.px = x; body.py = y; body.vx = body.vy = 0; body.a = 0; }
+    body.t += dt;
+    body.vx += ((x - body.px) / dt - body.vx) * 0.25; body.vy += ((y - body.py) / dt - body.vy) * 0.25;
+    body.px = x; body.py = y;
+    body.flow = inAir ? 0 : (loc.drift ? loc.drift(c.seed, c.tw, c.ly - loc.waterY, false, wind()) : 0);
+    var rx = body.vx - body.flow, ry = body.vy, target, home = run.boat.x - x;
+    if (rx * rx + ry * ry > 4) target = Math.atan2(ry, rx);                         // moving: nose first
+    else if (Math.abs(body.flow) > 0.05) target = Math.atan2(0.15, -Math.sign(body.flow)); // nose into the flow
+    else target = Math.atan2(0.2, home >= 0 ? 1 : -1);                               // still: toward the line
+    var d = target - body.a;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    body.a += d * Math.min(1, 6 * dt);
+    if (body.a > Math.PI) body.a -= 2 * Math.PI; else if (body.a < -Math.PI) body.a += 2 * Math.PI;
+    var moving = Math.sqrt(rx * rx + ry * ry);
+    body.flutter = Math.min(1, (fsm === 'sinking' ? 0.8 : 0.2) + moving / 25 + Math.abs(body.flow) * 0.2);
+    body.kick = Math.max(0, body.kick - dt);
+    if (body.kick <= 0 && (G.gfx.sprites.hash(Math.floor(body.t * 3), 17) & 7) === 0) body.kick = 0.25; // the cricket's kick
+  }
+
+  // The baits' shapes, as a test of a pixel at (u, v) in the lure's own frame (u along the
+  // nose, v across it), returning a palette key or ''. ph is the flutter phase (0 or 1).
+  var BAITS = {
+    worm: function (u, v, ph) {
+      if (Math.abs(u) > 3.6 || Math.abs(v - 0.8 * Math.sin(u * 1.4 + ph * 3.14)) > 0.8) return '';
+      return Math.abs(u - 1) < 0.5 ? 'flesh_dark' : 'flesh';
+    },
+    cricket: function (u, v, ph) {
+      var e = (u / 2.6) * (u / 2.6) + (v / 1.2) * (v / 1.2);
+      if (e < 1) return u > 1.4 ? 'ink' : (v < -0.3 ? 'wood_hi' : 'wood_dark');
+      var leg = ph ? -2.6 : -1.6;                                     // kicked back, or tucked
+      if (Math.abs(v) > 1 && Math.abs(v) < 2.4 && Math.abs(u - leg - (Math.abs(v) - 1) * (ph ? -0.8 : 0.4)) < 0.6) return 'wood_dark';
+      if (u > 2.4 && u < 4 && Math.abs(v + (u - 2.4) * 0.6) < 0.45) return 'wood_dark';  // an antenna
+      return '';
+    },
+    minnow: function (u, v, ph) {
+      var e = (u / 3.4) * (u / 3.4) + (v / 1.5) * (v / 1.5);
+      if (e < 1) {
+        if (u > 1.9 && u < 2.8 && v > -0.7 && v < 0.2) return 'ink';
+        if (ph && Math.abs(u) < 0.7 && Math.abs(v) < 0.6) return 'paper';  // the flash
+        return v < 0 ? 'stone_hi' : 'bone';
+      }
+      if (u < -2.8 && u > -4.8 && Math.abs(v) < (-u - 2.6) * 0.9) return 'stone';      // the tail
+      return '';
+    },
+    unlabelled: function (u, v, ph) {
+      var e = (u / 2.3) * (u / 2.3) + (v / 1.6) * (v / 1.6);
+      if (e >= 1) return '';
+      if (u > 0.8 && u < 1.6 && v > -0.7 && v < 0.1) return ph ? 'neon_red' : 'ink'; // it looks back
+      return (Math.round(u * 1.7) + Math.round(v * 2.3)) % 3 === 0 ? 'blood' : 'paper';
+    }
+  };
+  var LURE_EDGE = { worm: 'flesh_dark', cricket: 'ink', minnow: 'stone_dark', unlabelled: 'paper_dark' };
+  var LS = 12, DIRS = 16, BAIT_IDS = ['worm', 'cricket', 'minnow', 'unlabelled'], lureCv = [];
+
+  // A bait's image facing heading slot k (of DIRS) in phase ph: LS view px square, baked once.
+  function lureImg(bait, k, ph) {
+    var bi = Math.max(0, BAIT_IDS.indexOf(bait)), key = (bi * DIRS + k) * 2 + ph;
+    if (lureCv[key]) return lureCv[key];
+    bait = BAIT_IDS[bi];
+    var shape = BAITS[bait] || BAITS.worm, edge = LURE_EDGE[bait] || 'ink', a = k / DIRS * 2 * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
+    var grid = [], i, j;
+    for (j = 0; j < LS; j++) for (i = 0; i < LS; i++) {
+      var dx = i + 0.5 - LS / 2, dy = j + 0.5 - LS / 2;
+      grid.push(shape(dx * ca + dy * sa, (-dx * sa + dy * ca) * (ca < -0.01 ? -1 : 1), ph)); // facing left it is mirrored, not upside down
+    }
+    return (lureCv[key] = B.layer(LS, LS, function (ctx) {
+      for (j = 0; j < LS; j++) for (i = 0; i < LS; i++) {
+        var kk = grid[j * LS + i];
+        if (!kk) continue;
+        // Shaded from above: only the lower edge takes the bait's dark key.
+        var low = j === LS - 1 || !grid[(j + 1) * LS + i];
+        ctx.fillStyle = P[low && kk !== 'paper' && kk !== 'neon_red' && kk !== 'ink' ? edge : kk];
+        ctx.fillRect(i, j, 1, 1);
+      }
+    }));
+  }
+
+  // Draws the lure centred at screen (x, y) with its bait's body, heading and flutter.
+  function drawLure(ctx, bait, x, y) {
+    var a = body.a, fl = body.flutter, t = body.t, ph = 0;
+    if (bait === 'minnow') { a += Math.sin(t * 12) * 0.3 * fl; ph = Math.sin(t * 5) > 0.85 ? 1 : 0; }
+    else if (bait === 'cricket') ph = body.kick > 0 ? 1 : 0;
+    else ph = Math.floor(t * (2 + 4 * fl)) & 1;
+    var k = ((Math.round(a / (2 * Math.PI) * DIRS) % DIRS) + DIRS) % DIRS;
+    ctx.drawImage(lureImg(bait, k, ph), Math.round(x * HI) / HI - LS / (2 * HI), Math.round(y * HI) / HI - LS / (2 * HI), LS / HI, LS / HI);
+  }
+
   return {
+    flow: flow, weedFrame: weedFrame, bodyStep: bodyStep, drawLure: drawLure, lureImg: lureImg, BAITS: BAITS, DIRS: DIRS,
+    body: function () { return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3) }; },
     UW: UW, UNDER: UNDER, stats: stats, prepare: prepare, bottomAt: bottomAt, deepestX: deepestX,
     lureStep: lureStep, viewStep: viewStep, draw: draw, setLure: setLure,
     createCatch: createCatch, catchStep: catchStep, resetHeavy: resetHeavy, drawHooked: drawHooked, mouth: mouth
