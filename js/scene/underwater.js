@@ -287,7 +287,7 @@ G.scene.underwater = (function () {
 
   function createCatch() {
     return {
-      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0 },
+      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0, drip: -1 },
       heavy: { state: 0, t: 0, x: 0, y: 0, dir: 1, hum: 0 } // 7.7: 0 none yet this cast, 1 passing, 2 done
     };
   }
@@ -295,7 +295,8 @@ G.scene.underwater = (function () {
   // The fish on the bite is hooked: roll its size, start the fight, scatter the rest.
   function hook(run) {
     var b = run.bite, f = run.school.fish[b.slot], sp = G.data.fish[f.sp], h = run.hook, boatB = run.boat;
-    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0;
+    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1;
+    fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
     h.depth = f.y;
     h.q = G.rng.next();
@@ -320,6 +321,9 @@ G.scene.underwater = (function () {
       h.x = h.x0 + (tx - h.x0) * u;
       h.y = h.y0 + (ty - h.y0) * u;
       h.face = b.x > h.x ? 1 : -1;
+      // Audit P1-4: once out of the water the fish sheds droplets along its arc.
+      var k = Math.floor(h.lift * 12);
+      if (k !== h.drip && h.y < 0) { h.drip = k; fx.emit('splash', h.x, loc.waterY + h.y + 2, 2); }
     } else {
       var frac = F.D / F.D0;
       tx = b.x + b.facing * (UW.reach + Math.min(frac * h.dist, 140)); // 140 px: boat and fish share the screen
@@ -347,7 +351,9 @@ G.scene.underwater = (function () {
     if (fsm === 'waiting' || fsm === 'interest') {
       biteIn.reel = inp.held('action');
       biteIn.auto = run.passive.on; // passive mode hooks by itself (V3.5)
+      var biting = run.bite.slot >= 0;
       if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
+      else if (!biting && run.bite.slot >= 0) fx.ripple(run.cast.x1, loc.waterY + 1, 1, 7, 0.6); // audit P1-4: a ring where the line goes in
     } else if (fsm === 'hooked') {
       run.hook.t += dt;
       if (run.hook.t >= HOOKED_BEAT) G.core.state.go(run, 'fighting');

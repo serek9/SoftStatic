@@ -132,6 +132,8 @@ G.core.debug = (function () {
       if (!ok) console.log('poses: ' + G.scene.dog.POSES.join(', '));
       return ok;
     },
+    // dbg.pet() pets the dog (as S or the down arrow does while stopped); false if it is not ready.
+    pet: function () { return G.scene.dog.pet(G.state.run.dog); },
     // dbg.unease(v) sets the current location's unease (0..1); dbg.unease() reads it.
     unease: function (v) {
       var loc = G.state.run.loc;

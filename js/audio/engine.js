@@ -17,7 +17,7 @@ G.audio.engine = (function () {
   var noiseBuf = null, clickBuf = null;
   var amb = {};                                  // the always-running ambience nodes
   var voices = 0, log = [], LOG_N = 8;
-  var prev = { fsm: '', bite: -1, mode: '', owlT: 0, heavy: 0, coins: -1, loc: '', cycles: 0, pl: false, menu: '', D: 0, ly: 0, sig: false, scene: '' };
+  var prev = { dog: '', fsm: '', bite: -1, mode: '', owlT: 0, heavy: 0, coins: -1, loc: '', cycles: 0, pl: false, menu: '', D: 0, ly: 0, sig: false, scene: '' };
   var clickAcc = 0, hornT = 120, clankT = 30, chordT = 0, chordI = 0, t = 0;
 
   // ---- Start-up ------------------------------------------------------------------------
@@ -175,6 +175,10 @@ G.audio.engine = (function () {
       for (var i = 0; i < 3; i++) tone('sine', f * k[i], f * k[i] * 0.998, 1.6 - i * 0.4, 0.012 / (i + 1), pan, 0, bus.amb, 0.005);
     },
     relay: function (pan) { click(1.6, 0.025, pan); },
+    pat: function (pan) {
+      for (var i = 0; i < 3; i++) hiss('lowpass', 500, 260, 0.7, 0.07, 0.03, pan, i * 0.22);
+      tone('sine', 520, 610, 0.18, 0.015, pan, 0.5, null, 0.04); // a small contented sound
+    },
     statik: function () {
       var t0 = ac.currentTime;
       amb.stat.gain.cancelScheduledValues(t0);
@@ -267,6 +271,8 @@ G.audio.engine = (function () {
       if (F.slipped) play('slip', pan);
     }
     prev.mode = F.mode;
+    if (run.dog.pose === 'pet' && prev.dog !== 'pet') play('pat', panAt(run.boat.x));
+    prev.dog = run.dog.pose;
     if (run.heavy.state === 1 && prev.heavy !== 1) play('hum', pan);
     prev.heavy = run.heavy.state;
     if (run.owl.on && prev.owlT < 1.5 && run.owl.t >= 1.5) play('owl', panAt(run.owl.x));

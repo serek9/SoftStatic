@@ -7,7 +7,7 @@ G.ui = G.ui || {};
 G.ui.card = (function () {
   var S = G.gfx.sprites, P = S.PALETTE;
   var X = 36, Y = 28, W = 248, H = 124;
-  var cur = null, sel = 0, t = 0;
+  var cur = null, sel = 0, t = 0, at = 0; // at: how long it has been showing (the slide-in, P1-4)
   var txt = { len: '', wt: '', sellOn: '', sellOff: '', rarity: '', lines: [] }; // built once per card, not per frame
 
   // Builds the card for species spIdx from a hooked fish {len, w, q}, reading the journal for
@@ -23,7 +23,7 @@ G.ui.card = (function () {
   }
 
   function open(info) {
-    cur = info; sel = 0; t = 0;
+    cur = info; sel = 0; t = 0; at = 0;
     txt.len = 'LEN ' + info.len.toFixed(1) + ' cm';
     txt.wt = 'WT  ' + info.w.toFixed(2) + ' kg';
     txt.sellOn = '[SELL ' + info.price + ']';
@@ -33,6 +33,10 @@ G.ui.card = (function () {
   }
 
   function isOpen() { return cur !== null; }
+  // Called every step while the card shows, in active and passive play alike.
+  function tick(dt) { at += dt; }
+  // 0 when it opens, 1 once it has slid into place (0.25 s, easing out).
+  function shownBy() { var u = Math.min(1, at / 0.25); return 1 - (1 - u) * (1 - u) * (1 - u); }
   function info() { return cur; }
 
   // Returns 'sell', 'keep' or null. Input is ignored for the first 0.4 s so a held reel
@@ -57,8 +61,10 @@ G.ui.card = (function () {
 
   function draw(ctx) {
     if (!cur) return;
-    var name = G.gfx.fishgen.sprite(cur.spIdx), d = S.get(name);
-    ctx.globalAlpha = 0.55; ctx.fillStyle = P.night_ink; ctx.fillRect(0, 0, 320, 180); ctx.globalAlpha = 1;
+    var name = G.gfx.fishgen.sprite(cur.spIdx), d = S.get(name), e = shownBy();
+    ctx.globalAlpha = 0.55 * e; ctx.fillStyle = P.night_ink; ctx.fillRect(0, 0, 320, 180); ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.translate(0, Math.round((1 - e) * 70));
     ctx.fillStyle = P.stone; ctx.fillRect(X - 1, Y - 1, W + 2, H + 2);
     ctx.fillStyle = P.ink; ctx.fillRect(X, Y, W, H);
 
@@ -81,7 +87,8 @@ G.ui.card = (function () {
     var by = Y + H - 14;
     S.drawText(ctx, sel === 0 ? txt.sellOn : txt.sellOff, X + 40, by, sel === 0 ? 'signal_amber' : 'fog_mid');
     S.drawText(ctx, sel === 1 ? '[KEEP]' : ' KEEP ', X + W - 80, by, sel === 1 ? 'signal_amber' : 'fog_mid');
+    ctx.restore();
   }
 
-  return { build: build, open: open, isOpen: isOpen, info: info, update: update, commit: commit, draw: draw };
+  return { build: build, open: open, isOpen: isOpen, info: info, update: update, tick: tick, shownBy: shownBy, commit: commit, draw: draw };
 })();

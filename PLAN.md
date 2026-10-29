@@ -392,7 +392,8 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 12 Passive and the tape | Done | `Phase 12: Passive and the tape` | `sim/passive.js` (61.6% of active income), live mode on TAB, time away, the tape with phantoms, `?compact`, one tab owns the save |
 | Audit batch 1: Atmosphere | Done | `Audit batch 1: Atmosphere` | From [SOFTSTATIC_IMPROVEMENT_AUDIT.md](SOFTSTATIC_IMPROVEMENT_AUDIT.md) (approved by the user 2026-10-29): sky, fog and mist, water light, visible gear, the map gate for unstocked waters, the creek canopy. Visual only (plus the map gate); replay and pacing unchanged |
 | 13 Audio (audit batch 2) | Done | `Audit batch 2: Audio` | 13.1–13.4 in `js/audio/engine.js`, with the audit's P0-1 cues (bite, run, drag, reel, tension) |
-| Audit batch 3: Feel | **Next** | | P1-4 feedback, P1-6 the dog, P1-7 calm HUD (see 8.6) |
+| Audit batch 3: Feel | Done | `Audit batch 3: Feel` | P1-4 feedback, P1-6 petting the dog, P1-7 the HUD fades when idle |
+| Audit batch 5: Life (P2) | **Next** | | See 8.6 |
 | 14 Content and polish | Not started | | Milestone C |
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -534,6 +535,10 @@ These are interpretations and additions made while building, where the spec abov
 57. **What plays (13.2–13.4):** ambience: wind (stronger in the grey hours), still water, lapping that grows with boat speed, a drone whose third tone goes out of tune with unease (+12 to +67 cents), the creek's stream, the Pines lot's 60 Hz hum (it drops out when the stuttering lamp does: `scenery.pines.lampLit(t)`, now shared by the drawing and the hum), night crickets at the creek and the Pines, a foghorn on Fogbound every 2–4 min and distant clanks on Fogbound and the creek (timing from `G.vrng`). Indoors (shop, cabin) the ambience goes through a 520 Hz low-pass. Effects: charge click, cast whoosh, landing splash, bite "plip" (panned to the line), hook-set, the run (a falling hiss when the fight turns from tired to pull), the slip, snap and escape, landing drips, card page, a soft sting for rare and legendary catches, the coin on a sale, the shop's purchase, menu pages, the heavy-fish line hum, the owl's two calls with an answer from the far shore, the traffic light's relay click, radio static on travel. Reel clicks while reeling (11/s) and the drag ratchet while a running fish takes line (26/s). The tension tone rises 160→420 Hz with T. The Pines play slow chords (Dm9, G13, Cmaj9, A7♭9), one every 4.5 s, each voice detuned and wobbling more as unease rises. The pause menu ducks the effects to 0.3.
 58. **Allocation note:** Web Audio one-shots need new source nodes, so each sound allocates a few nodes when it plays. These are events, not per-frame work. The per-step path only calls `setTargetAtTime` on existing nodes.
 
+59. **Feedback (audit P1-4):** a bite opens a ring where the line goes in (on the step the bite starts) and the rod tip dips about 2 px (angle −9° at most, was −5°). The hook-set splashes at the surface (power 0.25) and snaps the rod (+6 bend, gone over the 0.3 s hooked beat). Landing sheds two droplets per twelfth of the lift while the fish is out of the water. The catch card slides up 70 px and its dim fades in over 0.25 s (ease-out), timed by `card.tick(dt)`, which sailing calls every step while the card shows (passive included). The 0.4 s input guard is unchanged. No hitstop and no shake (§0.14).
+60. **Petting the dog (P1-6):** S or ↓ while the boat sits still between casts (not in passive) calls `dog.pet`: pose `pet` (eyes shut, ears back, the tail wagging at 7 frames/s) for 2 s, at most once every 3 s, and never over the stare or the bark. Run state only (`dog.petT`); nothing is saved and nothing is rewarded. The audio engine plays three soft pats and a small contented sound. A click on the dog is not used: the mouse button is the cast. `dbg.pet()`.
+61. **Calm HUD (P1-7):** `hud.update(dt, run)` (from sailing's update) counts idle seconds; any mapped input (`input.any()`), a line out (any state but `sailing`), passive news, or a change of coins or bait resets it. After 6 s the clock, coins, bait and passive label fade out over 1 s. The depth readout (underwater) and passive news always show. "TAB passive" shows only until passive has been used once this session.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -590,19 +595,23 @@ Audit batch 1 checks (headless Chromium via Playwright, `?debug&seed=7`, fresh s
 
 Audit batch 2 checks (headless Chromium, `?debug&seed=11`, fresh save): `dbg.audio()` reports "none (waiting for the first key or click)" until a key; after it the state is `running` with no console warnings. Master 0.64 at volume 0.8, 0 when muted, 0.4 at volume 0.5. Drone and wind at 03:00 0.05 and 0.012; at 12:00 0.025 and 0.037. The drone's out-of-tune voice is 12.2 cents off at unease 0 and 66 at unease 1. A forced catch logged `splash, plip, hook, slip, land, card`, then `coin` on the sale; `owl_eel` logged `sting`. At 02:47 the owl logged `owl`. In the Pines the log shows `relay` clicks and a `chord`. The pause menu ducks the effects bus to 0.27. Tension tone 243→409 Hz as T rose 0.37→0.87. Limiter −6 dB, ratio 20. Baselines unchanged.
 
+Audit batch 3 checks (headless Chromium, `?debug&seed=11`): HUD alpha 1 at first and 0 after 7.3 s without input. ↓ while stopped sets the dog to `pet` for 1.94 s (measured from outside, ±0.1 s); petting again at once is refused, after 3.1 s accepted, and during a stare refused. On `dbg.give`, ripples went 1 → 2 on the bite step; the rod angle went 40° → 31.0° (tip 2.04 px lower). Hooked: bend 7.3 at 0.15 s. During the landing the particle count rose 1 → 11 (droplets); the card's `shownBy` went 0.35 → 1 over about 0.2 s. Baselines unchanged.
+
 ### 8.6 Next task
 
-**Audit batch 3: Feel** (audit P1-4, P1-6, P1-7; the user asked on 2026-10-29 for the audit to be built batch by batch). Read the audit's §6 (P1-4, P1-6, P1-7) and §9 for the checks.
+**Audit batch 5: Life (P2)** (audit §5 P2-1 to P2-3; P2-5 was done in batch 1; P2-4 is Phase 13, done; P2-6 the rosters stay Phase 14). Read the audit's §6 "P2 notes" and §9.
 
 ```
-Files: js/scene/underwater.js (bite ring, hook burst, landing droplets), js/scene/sailing.js
-  (rod-tip dip), js/ui/card.js (eased slide-in), js/scene/dog.js + js/scene/sailing.js (pet the
-  dog with S/↓ while stopped, or a click on the dog), js/ui/hud.js (fade when idle).
-Do: what the audit §6 says for each; no hitstop or shake; no save change.
-Done when: the audit §9 rows for P1-4, P1-6, P1-7 pass; all four baselines unchanged.
+P2-1 ambient life: fish-rise rings above shallow fish (reads the school only, G.vrng timing),
+  moths at the Pines lamps, bats at night, fireflies at the creek.
+P2-2 passive presentation: the fisher's idle (a thermos, a little steam), the dog asleep, the
+  float dipping on a passive bite and the catch lifted out.
+P2-3 underwater: an eased camera dip on entering, darker grading with depth, a lantern cone at
+  night, a 1 px outline on fish so they read at 1×.
+Done when: the audit §9 rows for P2-1 to P2-3 pass; all four baselines unchanged.
 ```
 
-After batch 3: batch 5 (P2: ambient life, passive presentation, underwater dip, fish readability), then P3 and Phase 14 (rosters, balance, touch, performance, migrations).
+Then P3 (drizzle, a still mode, the §8.4 minors) and Phase 14 (rosters, balance, touch, performance, migrations).
 
 ---
 

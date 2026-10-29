@@ -76,6 +76,8 @@ G.core.input = (function () {
     pressed: function (name) { return acts[name].pressed; },
     released: function (name) { return acts[name].released; },
     // The `move` action as an axis: -1 left, 0 none or both, 1 right.
+    // True when any action is held or was pressed this step (the HUD's idle fade, P1-7).
+    any: function () { for (var k in acts) if (acts[k].held || acts[k].pressed) return true; return false; },
     move: function () { return (acts.right.held ? 1 : 0) - (acts.left.held ? 1 : 0); }
   };
 })();

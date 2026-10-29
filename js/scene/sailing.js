@@ -464,6 +464,7 @@ G.scene.sailing = (function () {
         var F = run.fight;
         out[0] = CAST.waitAngle + 8 - 10 * F.T;
         out[1] = F.mode === 'pull' ? 4 + 5 * F.T : 1 + 2 * F.T;
+        if (run.fsm === 'hooked') out[1] += 6 * (1 - Math.min(1, run.hook.t / 0.3)); // the hook-set snaps the rod (P1-4)
         break;
       case 'landing':
         out[0] = 70; out[1] = 2;
@@ -471,7 +472,7 @@ G.scene.sailing = (function () {
       default:
         out[0] = CAST.waitAngle; out[1] = 1;
         // Bite cue (7.1): the rod tip bobs while a fish is on the bite.
-        if (run.bite.slot >= 0) out[0] -= 5 * Math.abs(Math.sin(run.bite.t * 12));
+        if (run.bite.slot >= 0) out[0] -= 9 * Math.abs(Math.sin(run.bite.t * 12)); // about 2 px at the tip (P1-4)
     }
     return out;
   }
@@ -1023,11 +1024,14 @@ G.scene.sailing = (function () {
     anomalyStep(run, save, dt);
     owlStep(run, save, hour0, dt);
     if (!toggled && !pv.on) castStep(run, dt); // a fight passive took over goes on in catchStep
+    // Audit P1-6: S or the down arrow pets the dog while the boat sits still between casts.
+    if (run.fsm === 'sailing' && !pv.on && b.stopped && inp.pressed('down')) dog.pet(run.dog);
     fishStep(run, dt);
     passiveStep(run, dt);
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
     if (run.fsm === 'card') {
+      G.ui.card.tick(dt);
       var choice = pv.on ? (run.fsmT >= PASSIVE.card ? 'sell' : null) : G.ui.card.update(dt); // passive sells
       if (choice) { G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing'); }
     }
@@ -1041,6 +1045,7 @@ G.scene.sailing = (function () {
     var cue = dog.cues(run.dog, save, loc, b.x, G.data);
     if (cue && G.core.debug) G.core.debug.log('the dog ' + (run.dog.pose === 'stare' ? 'stares at' : 'barks toward') + ' ' + cue);
     dog.step(run.dog, dt, run.dogIn);
+    G.ui.hud.update(dt, run);
     camStep(run, dt);
     G.scene.underwater.viewStep(run, dt, loc);
 
@@ -1127,6 +1132,7 @@ G.scene.sailing = (function () {
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
     skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
+    rodPose: function () { return rodPose(G.state.run, [0, 0]); }, // debug: [angle, bend] now
     light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
     fogAlpha: function () { return fogMul() / FOG_HEAD; },
     moon: function () { return { x: moonPt[0], y: moonPt[1], a: moonPt[2] }; },
