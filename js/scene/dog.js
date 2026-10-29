@@ -7,7 +7,7 @@ G.scene = G.scene || {};
 G.scene.dog = (function () {
   var S = G.gfx.sprites;
   var MAP = { f: 'wood_hi', d: 'wood', e: 'ink', m: 'blood' };
-  var POSES = ['idle', 'alert', 'point', 'look_down', 'stare', 'bark', 'pet'];
+  var POSES = ['idle', 'alert', 'point', 'look_down', 'stare', 'bark', 'pet', 'sleep'];
   var SPRITE = {};
 
   var ALERT = [
@@ -94,6 +94,26 @@ G.scene.dog = (function () {
       '..dffff....',
       '..fffff....',
       '..f.f.f....'
+    ]],
+    // Audit P2-2: asleep in the bow while passive mode fishes. It breathes.
+    sleep: [[
+      '...........',
+      '...........',
+      '...........',
+      '.......dd..',
+      '......fdffe',
+      'ddfffffff..',
+      '.ffffffff..',
+      '...........'
+    ], [
+      '...........',
+      '...........',
+      '...........',
+      '...........',
+      '.......ddd.',
+      'ddffffffdfe',
+      '.ffffffff..',
+      '...........'
     ]]
   };
 
@@ -168,7 +188,7 @@ G.scene.dog = (function () {
     if (info.tooHeavyNear) return 'look_down';
     if (info.interest >= T.point) return 'point';
     if (info.interest >= T.alert) return 'alert';
-    return 'idle';
+    return info.sleep ? 'sleep' : 'idle';
   }
 
   function step(d, dt, info) {
@@ -180,7 +200,7 @@ G.scene.dog = (function () {
     if (w !== d.pose && d.hold <= 0) { setPose(d, w); d.hold = HOLD; }
   }
 
-  function draw(ctx, d, x, y, flip) { S.draw(ctx, SPRITE[d.pose], x, y, Math.floor(d.t * (d.pose === 'pet' ? 7 : 5)), flip); }
+  function draw(ctx, d, x, y, flip) { S.draw(ctx, SPRITE[d.pose], x, y, Math.floor(d.t * (d.pose === 'pet' ? 7 : (d.pose === 'sleep' ? 0.7 : 5))), flip); }
 
   return { POSES: POSES, T: T, CUE: CUE, PET: PET, create: create, setPose: setPose, pet: pet, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
 })();

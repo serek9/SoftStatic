@@ -393,7 +393,8 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | Audit batch 1: Atmosphere | Done | `Audit batch 1: Atmosphere` | From [SOFTSTATIC_IMPROVEMENT_AUDIT.md](SOFTSTATIC_IMPROVEMENT_AUDIT.md) (approved by the user 2026-10-29): sky, fog and mist, water light, visible gear, the map gate for unstocked waters, the creek canopy. Visual only (plus the map gate); replay and pacing unchanged |
 | 13 Audio (audit batch 2) | Done | `Audit batch 2: Audio` | 13.1–13.4 in `js/audio/engine.js`, with the audit's P0-1 cues (bite, run, drag, reel, tension) |
 | Audit batch 3: Feel | Done | `Audit batch 3: Feel` | P1-4 feedback, P1-6 petting the dog, P1-7 the HUD fades when idle |
-| Audit batch 5: Life (P2) | **Next** | | See 8.6 |
+| Audit batch 5: Life (P2) | Done | `Audit batch 5: Life` | P2-1 ambient life, P2-2 passive presentation, P2-3 underwater |
+| Audit batch 6: Polish (P3) | **Next** | | See 8.6 |
 | 14 Content and polish | Not started | | Milestone C |
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -539,6 +540,10 @@ These are interpretations and additions made while building, where the spec abov
 60. **Petting the dog (P1-6):** S or ↓ while the boat sits still between casts (not in passive) calls `dog.pet`: pose `pet` (eyes shut, ears back, the tail wagging at 7 frames/s) for 2 s, at most once every 3 s, and never over the stare or the bark. Run state only (`dog.petT`); nothing is saved and nothing is rewarded. The audio engine plays three soft pats and a small contented sound. A click on the dog is not used: the mouse button is the cast. `dbg.pet()`.
 61. **Calm HUD (P1-7):** `hud.update(dt, run)` (from sailing's update) counts idle seconds; any mapped input (`input.any()`), a line out (any state but `sailing`), passive news, or a change of coins or bait resets it. After 6 s the clock, coins, bait and passive label fade out over 1 s. The depth readout (underwater) and passive news always show. "TAB passive" shows only until passive has been used once this session.
 
+62. **Ambient life (audit P2-1):** every 2–6 s (`G.vrng`) the scene puts a ring, and sometimes a droplet, above one fish swimming shallower than 16 px (4 m). It reads the school only. Fish live only while a lure is fishing, so the rings show then. Two bats cross the lower night sky (night share above 0.5, not in the Red Room) in some 26–35 s stretches, by a hash of time. `loc.life.fireflies` (the creek: 16) blink along the bank at parallax 0.7 at night, 1 px `lamp_glow`. Two moths circle each lit lamp in the Pines lot (`paper`). Bats and fireflies are drawn in `drawBackdrop`, so the mirror shows them too.
+63. **Passive presentation (P2-2):** while passive fishes and no fish is on, the dog sleeps (pose `sleep`, breathing at 0.7 frames/s; `dogIn.sleep`, the lowest priority in `dog.want`). A passive catch rises from the float to the boat over 0.9 s, shedding droplets. Between casts, with the boat still, the fisher sips from a thermos for 3 s of every 34 (`fisher_sip`, `stone` cup, `fog_light` steam), in active and passive play alike.
+64. **Underwater (P2-3):** while the cross-section fades in or out it also opens downward from the surface (a clip of `1 − (1 − alpha)²` of its height), so the view seems to dip under. The camera itself is unchanged (8.3 #6 still holds). With the lantern, outside the grey hours, a faint `water_hi` cone falls from the bow. Fish drawn in colour get a 1 px outline: their silhouette (`water_deep`) drawn at four 1 px offsets at 0.7 alpha, then the sprite.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -597,21 +602,13 @@ Audit batch 2 checks (headless Chromium, `?debug&seed=11`, fresh save): `dbg.aud
 
 Audit batch 3 checks (headless Chromium, `?debug&seed=11`): HUD alpha 1 at first and 0 after 7.3 s without input. ↓ while stopped sets the dog to `pet` for 1.94 s (measured from outside, ±0.1 s); petting again at once is refused, after 3.1 s accepted, and during a stare refused. On `dbg.give`, ripples went 1 → 2 on the bite step; the rod angle went 40° → 31.0° (tip 2.04 px lower). Hooked: bend 7.3 at 0.15 s. During the landing the particle count rose 1 → 11 (droplets); the card's `shownBy` went 0.35 → 1 over about 0.2 s. Baselines unchanged.
 
+Audit batch 5 checks (headless Chromium, `?debug&seed=11`): with four perch held at 2 m, the ripple pool grew on 12 of 60 quarter-second samples over 15 s (rises plus the idle boat's own rings). `dbg.passive(true)` puts the dog to `sleep` within 1.5 s; a passive catch made `sailing.lift()` run (0.32 seen mid-arc). Screenshots: fireflies on the creek at 23:30, moths at the Pines lamps, a bat low over Fogbound at 01:00, the lantern cone and outlined fish at 10 m. No page errors. Baselines unchanged.
+
 ### 8.6 Next task
 
-**Audit batch 5: Life (P2)** (audit §5 P2-1 to P2-3; P2-5 was done in batch 1; P2-4 is Phase 13, done; P2-6 the rosters stay Phase 14). Read the audit's §6 "P2 notes" and §9.
+**Audit batch 6: Polish (P3)** (audit §5 P3-1 to P3-4): a drizzle tied to unease (rings on the water, a softer mirror, never bright); a still mode (a key hides all UI); a committed headless screenshot check in `tools/` (dev only); the §8.4 minors (#5 stale `tooHeavyNear`, #15 the shop's unease location, #17 two owls in the Pines). P3-5 is Phase 14 itself.
 
-```
-P2-1 ambient life: fish-rise rings above shallow fish (reads the school only, G.vrng timing),
-  moths at the Pines lamps, bats at night, fireflies at the creek.
-P2-2 passive presentation: the fisher's idle (a thermos, a little steam), the dog asleep, the
-  float dipping on a passive bite and the catch lifted out.
-P2-3 underwater: an eased camera dip on entering, darker grading with depth, a lantern cone at
-  night, a 1 px outline on fish so they read at 1×.
-Done when: the audit §9 rows for P2-1 to P2-3 pass; all four baselines unchanged.
-```
-
-Then P3 (drizzle, a still mode, the §8.4 minors) and Phase 14 (rosters, balance, touch, performance, migrations).
+After the audit: Phase 14 (content and polish, Milestone C) in §4 order: 14.1–14.4 the rosters (the map gate, 8.3 #54, lifts by itself), 14.5 balance, 14.6 touch, 14.7 performance, 14.8 migrations.
 
 ---
 

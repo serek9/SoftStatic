@@ -161,6 +161,12 @@ G.scene.scenery = (function () {
           c.fillStyle = P.lamp_glow; c.fillRect(x - 1, y + 1, 3, 1);
           c.globalAlpha = 0.12; c.fillStyle = P.fog_light;
           for (var r = 2; r < LOT.lampH; r++) c.fillRect(x - (r >> 1), y + r, (r >> 1) * 2 + 1, 1);
+          // Audit P2-1: two moths circling each lit lamp, never quite in step.
+          c.globalAlpha = 0.8; c.fillStyle = P.paper;
+          for (var mth = 0; mth < 2; mth++) {
+            var ang = s.t * (2.3 + mth * 0.7) + k * 2 + mth * 3;
+            c.fillRect(Math.round(x + Math.cos(ang) * (3 + mth)), Math.round(y + 1 + Math.sin(ang * 1.3) * 2), 1, 1);
+          }
           c.globalAlpha = 1;
         }
       } else if (id === 'marks') {

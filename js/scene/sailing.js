@@ -28,6 +28,14 @@ G.scene.sailing = (function () {
   };
   var tip = [0, 0], pose = [0, 0];
 
+  // ---- Life (audit P2-1, P2-2) --------------------------------------------------------
+  // Fish rising: every few seconds a ring above a fish swimming shallower than 4 m, so the
+  // surface hints where fish are. Bats cross the night sky; fireflies blink along the creek's
+  // bank. Passive mode lifts its catch out of the water. Timing is G.vrng or a hash of time.
+  var riseT = 3, RISE_DEPTH = 16;
+  var plift = { t: -1, sp: -1, x0: 0 }, PLIFT = 0.9;
+  S.def('bat', { k: 'night_ink' }, [['k...k', '.kkk.'], ['.....', 'kkkkk']]);
+
   S.def('lure', { r: 'rust_hi', b: 'bone' }, ['.r.', 'rbr', '.r.']);
   S.def('float', { r: 'neon_red', b: 'bone' }, ['r', 'r', 'b']); // the passive line's float (12.2)
   // 10.4: the owl that calls at a clock window's cue. Its eyes are open in frame 1.
@@ -969,6 +977,12 @@ G.scene.sailing = (function () {
   function passiveStep(run, dt) {
     var pv = run.passive, PS = G.sim.passive, save = G.state.save;
     if (pv.noteT > 0) pv.noteT -= dt;
+    if (plift.t >= 0) {
+      var k0 = Math.floor(plift.t * 12);
+      plift.t += dt;
+      if (Math.floor(plift.t * 12) !== k0) fx.emit('splash', plift.x0 + (run.boat.x - plift.x0) * plift.t / PLIFT, loc.waterY - Math.sin(plift.t / PLIFT * Math.PI) * 22, 1);
+      if (plift.t >= PLIFT) plift.t = -1;
+    }
     if (!pv.on || run.fsm !== 'sailing') return;
     if (!pv.ps) pv.ps = PS.create(save, loc.id, G.data);
     if (!pv.tape) pv.tape = PS.newTape(save, loc.id, 'live');
@@ -989,8 +1003,62 @@ G.scene.sailing = (function () {
     if (r === PS.CAUGHT) {
       pv.note = '+' + pl.coins + 'c ' + G.data.fish[pl.sp].name;
       fx.splash(pv.x, loc.waterY, 0.5);
+      plift.t = 0; plift.sp = pl.sp; plift.x0 = pv.x;
       G.core.save.autosave('catch');
     } else pv.note = r === PS.LOST ? 'It got away.' : 'Nothing bit.';
+  }
+
+  function riseStep(run, dt) {
+    riseT -= dt;
+    if (riseT > 0) return;
+    riseT = 2 + G.vrng.next() * 4;
+    var fish = run.school.fish, n = fish.length, k0 = Math.floor(G.vrng.next() * Math.max(1, n));
+    for (var i = 0; i < n; i++) {
+      var f = fish[(k0 + i) % n];
+      if (!f.active || f.y > RISE_DEPTH) continue;
+      fx.ripple(f.x, loc.waterY + 1, 1, 6, 1.0);
+      if (G.vrng.next() < 0.5) fx.emit('splash', f.x, loc.waterY - 1, 1);
+      return;
+    }
+  }
+
+  function bats(c, n) {
+    if (n < 0.5 || sky.opt.stars === false) return;
+    var t = G.state.run.boat.t;
+    for (var i = 0; i < 2; i++) {
+      var per = 26 + i * 9, k = Math.floor((t + i * 11) / per), u = ((t + i * 11) % per) / per;
+      if (u > 0.35 || (S.hash(i + 40, k) & 1)) continue;
+      var dir = (k & 1) ? 1 : -1, x = dir > 0 ? -20 + u / 0.35 * 360 : 340 - u / 0.35 * 360;
+      var y = 58 + i * 12 + Math.sin(t * 5 + i) * 3 + Math.sin(t * 1.3 + k) * 5; // low, against the paler horizon
+      c.globalAlpha = n;
+      S.draw(c, 'bat', Math.round(x), Math.round(y) - camPy, Math.floor(t * 10 + i) & 1, false);
+    }
+    c.globalAlpha = 1;
+  }
+
+  function fireflies(c, n) {
+    var cnt = loc.life && loc.life.fireflies;
+    if (!cnt || n < 0.3) return;
+    var t = G.state.run.boat.t, wy = loc.waterY - camPy, span = VIEW_W + Math.ceil((loc.width - VIEW_W) * 0.7);
+    c.fillStyle = P.lamp_glow;
+    for (var i = 0; i < cnt; i++) {
+      var a = Math.sin(t * (1.1 + (i & 3) * 0.2) + i * 1.7);
+      if (a <= 0.2) continue;
+      var x = (S.hash(i, 11) % span) - Math.round(camPx * 0.7) + Math.sin(t * 0.5 + i) * 4;
+      if (x < -2 || x > VIEW_W + 2) continue;
+      c.globalAlpha = n * a * 0.8;
+      c.fillRect(Math.round(x), Math.round(wy - 4 - (S.hash(i, 12) % 12) + Math.sin(t * 0.8 + i * 2) * 2), 1, 1);
+    }
+    c.globalAlpha = 1;
+  }
+
+  // The passive catch rises from the float to the boat (P2-2).
+  function drawLift(c, run) {
+    if (plift.t < 0) return;
+    var u = plift.t / PLIFT, b = run.boat, tx = b.x + b.facing * 8;
+    var x = plift.x0 + (tx - plift.x0) * u, y = loc.waterY - 2 - Math.sin(u * Math.PI) * 22;
+    var name = G.gfx.fishgen.sprite(plift.sp), d = S.get(name);
+    S.draw(c, name, Math.round(x - camPx - d.w / 2), Math.round(y - camPy - d.h / 2), 0, tx < plift.x0);
   }
 
   // True while a passive cycle's fish is on (the float pulls under, the rod bends).
@@ -1027,6 +1095,7 @@ G.scene.sailing = (function () {
     // Audit P1-6: S or the down arrow pets the dog while the boat sits still between casts.
     if (run.fsm === 'sailing' && !pv.on && b.stopped && inp.pressed('down')) dog.pet(run.dog);
     fishStep(run, dt);
+    riseStep(run, dt);
     passiveStep(run, dt);
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
@@ -1041,6 +1110,7 @@ G.scene.sailing = (function () {
     var fishing = FISHING[run.fsm] === 1;
     run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' || passiveFighting(run) ? 0.5 : 0);
     run.dogIn.tooHeavyNear = fishing && run.school.ctx.tooHeavyNear;
+    run.dogIn.sleep = pv.on && run.fsm === 'sailing' && !passiveFighting(run); // P2-2: the dog naps while it fishes by itself
     if (run.dogIn.tooHeavyNear) save.flags.heavy[loc.id] = true; // the journal's margin note (D4)
     var cue = dog.cues(run.dog, save, loc, b.x, G.data);
     if (cue && G.core.debug) G.core.debug.log('the dog ' + (run.dog.pose === 'stare' ? 'stares at' : 'barks toward') + ' ' + cue);
@@ -1078,17 +1148,22 @@ G.scene.sailing = (function () {
       } else c.drawImage(L.cv, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
       if (scen.afterLayer) scen.afterLayer(c, L.id, ox, camPy, run, loc);
     }
+    var nf = nightF(hourNow());
+    bats(c, nf);
+    fireflies(c, nf);
     drawOwl(c);
   }
 
   function drawDog(c, x, y, flip) { dog.draw(c, G.state.run.dog, x, y, flip); }
 
-  var gearLook = { rod: 0, lantern: false, finder: false, night: 0 };
+  var gearLook = { rod: 0, lantern: false, finder: false, night: 0, sip: false };
   function drawBoat(c, fisher) {
     var run = G.state.run, g = G.state.save.gear;
     rodPose(run, pose);
     gearLook.rod = g.rod || 0; gearLook.lantern = !!g.lantern; gearLook.finder = !!g.depthFinder;
     gearLook.night = 1 - greyF(hourNow());
+    // P2-2: between casts, still, the fisher drinks from a thermos now and then.
+    gearLook.sip = run.fsm === 'sailing' && run.boat.stopped && !passiveFighting(run) && (run.boat.t % 34) > 31;
     boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, fisher !== false, drawDog, pose[0], pose[1], gearLook);
   }
 
@@ -1120,6 +1195,7 @@ G.scene.sailing = (function () {
     ctx.drawImage(glint, camPx, 0, VIEW_W, 1, 0, wy - camPy, VIEW_W, 1);
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
+    drawLift(ctx, run);
     drawMist(ctx);
     G.scene.underwater.drawHooked(ctx, loc, camPx, camPy, run.boat.t);
     drawCast(ctx);
@@ -1133,6 +1209,7 @@ G.scene.sailing = (function () {
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
     skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
     rodPose: function () { return rodPose(G.state.run, [0, 0]); }, // debug: [angle, bend] now
+    lift: function () { return plift.t; },
     light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
     fogAlpha: function () { return fogMul() / FOG_HEAD; },
     moon: function () { return { x: moonPt[0], y: moonPt[1], a: moonPt[2] }; },

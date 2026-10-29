@@ -28,6 +28,7 @@ G.data.locations.creek = {
   // Presentation only (see loc_fog.js).
   sky: { moonX: 150, glowX: 60 },
   mist: { h: 5, alpha: 0.09, drift: 2 },
+  life: { fireflies: 16 },
 
   // cabin: on stilts at the water's edge, roof sagging. snag: dead branches out of the water;
   // the same branches reach down to the bottom in the cross-section (underwater.snags).

@@ -60,6 +60,18 @@ G.scene.boat = (function () {
     return cv;
   }
 
+  // Audit P2-2: the fisher with the thermos cup at the mouth.
+  S.def('fisher_sip', { h: 'stone_dark', f: 'flesh_dark', c: 'rust', k: 'stone' }, [
+    '..hhh..',
+    '.hhhhh.',
+    '.hhhff.',
+    '.hhhffk',
+    '..hcck.',
+    '.ccccc.',
+    'ccccccc',
+    'ccccccc'
+  ]);
+
   function create(x) { return { x: x, vx: 0, t: 0, facing: 1, stopped: true }; }
 
   // move is the input axis (-1, 0, 1). worldW clamps the boat inside the location.
@@ -115,7 +127,17 @@ G.scene.boat = (function () {
   function draw(ctx, b, sx, wy, withFisher, drawDog, rodAngle, rodBend, gear) {
     var flip = b.facing < 0, y = wy + bob(b), f = b.facing, P = S.PALETTE;
     if (withFisher) {
-      S.draw(ctx, 'fisher', flip ? sx : sx - 7, y - 8, 0, flip);
+      var sip = gear && gear.sip;
+      S.draw(ctx, sip ? 'fisher_sip' : 'fisher', flip ? sx : sx - 7, y - 8, 0, flip);
+      if (sip) { // steam from the cup, rising and thinning
+        ctx.fillStyle = P.fog_light;
+        for (var k = 0; k < 3; k++) {
+          var u = (b.t * 0.8 + k / 3) % 1, cx = flip ? sx : sx - 1;
+          ctx.globalAlpha = 0.5 * (1 - u);
+          ctx.fillRect(cx + Math.round(Math.sin(u * 6 + k) * 1), y - 6 - Math.round(u * 6), 1, 1);
+        }
+        ctx.globalAlpha = 1;
+      }
       drawRod(ctx, b, sx, wy, rodAngle, rodBend, gear ? ROD_KEYS[Math.min(gear.rod, ROD_KEYS.length - 1)] : null);
     }
     if (drawDog) drawDog(ctx, flip ? sx - 14 : sx + 3, y - 8, flip);

@@ -244,13 +244,46 @@ G.scene.underwater = (function () {
       if (w >= 1 && ((h >>> 6) & 31) < w * 3) { jx = ((h >>> 11) & 1) ? 1 : -1; jy = ((h >>> 12) & 1) ? 1 : 0; }
       var fr = Math.floor(t * (2 + Math.abs(f.vx) / 6) + (w ? ((h >>> 13) & 3) * 0.3 * w : 0)) & 1;
       if (d.n > 2 && ((h >>> 15) & 15) < w * 2) fr = 2;
-      S.draw(ctx, name, Math.round(f.x - camPx - d.w / 2) + jx, Math.round(loc.waterY - camPy + f.y - d.h / 2) + jy, fr, face < 0);
+      var fxs = Math.round(f.x - camPx - d.w / 2) + jx, fys = Math.round(loc.waterY - camPy + f.y - d.h / 2) + jy;
+      if (name !== FG.silhouette(f.sp)) {
+        // P2-3: a dark 1 px outline (the silhouette drawn around it) so fish read at 1×.
+        var sil = FG.silhouette(f.sp), a0 = ctx.globalAlpha;
+        ctx.globalAlpha = a0 * 0.7;
+        S.draw(ctx, sil, fxs - 1, fys, fr, face < 0); S.draw(ctx, sil, fxs + 1, fys, fr, face < 0);
+        S.draw(ctx, sil, fxs, fys - 1, fr, face < 0); S.draw(ctx, sil, fxs, fys + 1, fr, face < 0);
+        ctx.globalAlpha = a0;
+      }
+      S.draw(ctx, name, fxs, fys, fr, face < 0);
     }
+  }
+
+  // P2-3: the boat's lantern at night throws a faint cone down into the water from the bow.
+  var cone = null;
+  function drawCone(ctx, loc, camPx, wyS, alpha) {
+    var g = G.state.save.gear, run = G.state.run;
+    if (!g.lantern || G.sim.clock.isGrey(G.state.save.clock || 0)) return;
+    if (!cone) cone = B.layer(61, 70, function (c) {
+      c.fillStyle = P.water_hi;
+      for (var y = 0; y < 70; y++) {
+        var hw = 2 + Math.round(y * 0.42);
+        c.globalAlpha = Math.round(0.3 * (1 - y / 70) * 10) / 10;
+        c.fillRect(30 - hw, y, hw * 2 + 1, 1);
+      }
+    });
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(cone, Math.round(run.boat.x + run.boat.facing * 13 - camPx) - 30, wyS);
   }
 
   // camPx, camPy: the rounded camera. alpha: how far the fade has got. t: time in seconds.
   function draw(ctx, loc, camPx, camPy, alpha, t) {
     var t0 = performance.now(), set = prepare(loc), H = set.H, wyS = loc.waterY - camPy;
+    // Audit P2-3: while it fades in or out, the cross-section also opens downward from the
+    // surface, as if the view were dipping under it.
+    var wipe = alpha < 1;
+    if (wipe) {
+      var open = 1 - (1 - alpha) * (1 - alpha);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, wyS, VIEW_W, Math.ceil(H * open)); ctx.clip();
+    }
     ctx.globalAlpha = alpha;
     ctx.drawImage(set.grad, 0, 0, 1, H, 0, wyS, VIEW_W, H);
 
@@ -264,6 +297,7 @@ G.scene.underwater = (function () {
       var bxs = ((bx[b] - camPx * 0.5) % 640 + 640) % 640 - 160; // parallax 0.5, wrapping
       S.draw(ctx, BG_SPR[b], Math.round(bxs), Math.round(wyS + by[b]), Math.floor(t * 2 + b) & 1, bv[b] < 0);
     }
+    drawCone(ctx, loc, camPx, wyS, alpha);
     ctx.globalAlpha = alpha;
     ctx.drawImage(set.bottom, camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
     ctx.drawImage(set.weeds[WEED_SEQ[Math.floor(t * 1.5) % 4]], camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
@@ -277,6 +311,7 @@ G.scene.underwater = (function () {
       ctx.fillRect(Math.round(x), Math.round(wyS + 2 + (my[i] % (H - 4))), 1, 1);
     }
     ctx.globalAlpha = 1;
+    if (wipe) ctx.restore();
     stats.ms = performance.now() - t0;
   }
 
