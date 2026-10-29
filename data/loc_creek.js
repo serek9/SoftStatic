@@ -14,6 +14,8 @@ G.data.locations.creek = {
   maxDepth: 64,
   seed: 5113,
   start: 160,
+  // Phase 20: the surface's swell (view px; see loc_fog.js): short and choppy, running with the current.
+  swell: { amp: 2, mirror: 1.1, waves: [[52, 22, 0.45], [27, 15, 0.35], [13, 9, 0.2]] },
 
   layers: [
     { id: 'hills', kind: 'mountains', parallax: 0.1, base: 92, amp: 30, color: 'mount_mid', lit: 'mount_lit', dark: 'night_deep', haze: 'fog_dark' },

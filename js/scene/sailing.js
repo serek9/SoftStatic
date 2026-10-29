@@ -378,6 +378,7 @@ G.scene.sailing = (function () {
     run.passive = pv || { on: false, ps: null, pl: false, t: 0, x: 0, tape: null, cycles: 0, note: '', noteT: 0 };
     run.passive.ps = null; run.passive.pl = false;
     G.gfx.water.setDeltas(drawDeltas);
+    G.gfx.surface.setup(loc); // Phase 20: a calm surface with this water's swell
     fx.clear();
   }
 
@@ -591,12 +592,14 @@ G.scene.sailing = (function () {
     } else {
       // Above the water the line runs to where the lure went in; below it drops dotted to the lure.
       var ex = c.x1 - camPx, hum = run.heavy.hum > 0 ? Math.round(Math.sin(b.t * 90)) : 0;
+      var ey = Math.round((floatY(c.x1) - camPy) * HI) / HI; // Phase 20: the line goes in where the surface is
       lx = ex; ly = c.ly - camPy;
+      if (c.ly - loc.waterY < 1.5) ly = Math.min(ly, ey);      // just in, the lure rides the surface
       if (fsm !== 'sinking') lx += Math.round(Math.sin(b.t * 1.3) * 1.5);      // the lure sways once it stops
       if (run.bite.slot >= 0) ly += 2 + Math.round(Math.sin(run.bite.t * 18)); // bite cue: the line dips
       else if (G.sim.fish_ai.interestLevel(run.school) >= 0.85) lx += Math.round(Math.sin(b.t * 40)); // nibbles
-      line(ctx, tip[0], tip[1], ex, wy, false);
-      line(ctx, ex + hum, wy, lx + hum, ly, true); // hum: the line shivers once for a heavy fish
+      line(ctx, tip[0], tip[1], ex, ey, false);
+      line(ctx, ex + hum, ey, lx + hum, ly, true); // hum: the line shivers once for a heavy fish
     }
     ctx.globalAlpha = 1;
     ctx.drawImage(tinyArt('lure'), Math.round(lx * HI) / HI - 1.5, Math.round(ly * HI) / HI - 1.5, 3, 3);
@@ -607,7 +610,8 @@ G.scene.sailing = (function () {
     var pv = run.passive, b = run.boat, on = passiveFighting(run);
     rodPose(run, pose);
     boat.rodTip(b, Math.round(b.x - run.cam.x), wy, pose[0], tip);
-    var fxs = pv.x - camPx + (on ? Math.round(Math.sin(pv.t * 31)) : 0), fy = wy - 2 + (on ? 2 : Math.round(Math.sin(b.t * 2)));
+    // Phase 20: the float rides the surface (floatY); a fish pulls it under and shakes it.
+    var fxs = pv.x - camPx + (on ? Math.round(Math.sin(pv.t * 31)) : 0), fy = Math.round((floatY(pv.x) - camPy - 2 + (on ? 2 : 0)) * HI) / HI;
     ctx.globalAlpha = 0.6; ctx.fillStyle = P.fog_light;
     line(ctx, tip[0], tip[1], fxs, fy, false);
     ctx.globalAlpha = 1;
@@ -1100,6 +1104,7 @@ G.scene.sailing = (function () {
       var f = fish[(k0 + i) % n];
       if (!f.active || f.y > RISE_DEPTH) continue;
       fx.ripple(f.x, loc.waterY + 1, 1, 6, 1.0);
+      G.gfx.surface.poke(f.x, 0.3, 1.5);
       if (G.vrng.next() < 0.5) fx.emit('splash', f.x, loc.waterY - 1, 1);
       return;
     }
@@ -1180,7 +1185,12 @@ G.scene.sailing = (function () {
     fishStep(run, dt);
     riseStep(run, dt);
     rainAcc += rainK() * 6 * dt; // rings where the drizzle meets the water
-    while (rainAcc >= 1) { rainAcc -= 1; fx.ripple(run.cam.x + G.vrng.next() * VIEW_W, loc.waterY + 1 + G.vrng.next() * 24, 0, 3, 0.5); }
+    while (rainAcc >= 1) {
+      rainAcc -= 1;
+      var rx = run.cam.x + G.vrng.next() * VIEW_W;
+      fx.ripple(rx, loc.waterY + 1 + G.vrng.next() * 24, 0, 3, 0.5);
+      G.gfx.surface.poke(rx, 0.12, 1); // the same drop dents the waterline (Phase 20)
+    }
     passiveStep(run, dt);
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
@@ -1207,16 +1217,23 @@ G.scene.sailing = (function () {
     // Wake: a puff and a small ripple every 6 px travelled; a slow ring while idling.
     var wy = loc.waterY;
     wakeDist += Math.abs(b.vx) * dt;
+    var sp = Math.min(1, Math.abs(b.vx) / boat.P.maxV);
     while (wakeDist >= 6) {
       wakeDist -= 6;
       fx.emit('wake', boat.stern(b), wy, 2);
       fx.ripple(boat.stern(b), wy + 2, 2, 9, 1.1);
+      // Phase 20: the stern's wash and the bow's push dent the surface, harder with speed.
+      G.gfx.surface.poke(boat.stern(b), 0.1 + 0.3 * sp, 3);
+      G.gfx.surface.poke(b.x + b.facing * 16, 0.05 + 0.2 * sp, 2);
     }
     rippleT += dt;
     if (b.stopped && rippleT >= 1.8) {
       rippleT = 0;
       fx.ripple(b.x, wy + 2, 13, 24, 2.2);
+      G.gfx.surface.poke(b.x - b.facing * 12, 0.06, 4); // the idle hull rocking
     }
+    // The surface's swell roughens in drizzle and in the grey hours' wind.
+    G.gfx.surface.step(dt, 1 + 0.6 * rainK() + 0.35 * greyF(hourNow()));
     fx.update(dt);
     G.core.state.tick(run, dt);
   }
@@ -1261,20 +1278,101 @@ G.scene.sailing = (function () {
   // The mirror pass (gfx/water.js): the scene above the waterline, mirrored.
   function drawAbove(c) { drawBackdrop(c); drawBoat(c, mirrorFisher()); drawMist(c); }
 
-  // The light on the water (audit P1-3): a path under the moon, or under the glow at dusk.
-  // The waterline between the mirror and the cross-section: a bright line with a slow small
-  // wave, and a lit row of water under it.
+  // The waterline between the mirror and the cross-section (Phase 20), one column per view
+  // pixel from the surface's heights (gfx/surface.js). The surface sits `lift` px above the
+  // line (the swell's height plus a little), so its troughs reach the line and never open a
+  // gap; the water between the surface and the line is filled. Per column: a 1 px surface row,
+  // foam on crests, on steep slopes and on faces turned to the light, water_hi on faces turned
+  // away; a foam cap on crests and a darker meniscus under it; a lit band below that thickens
+  // under crests. Under water (under > 0) a fainter second line below the band wavers the
+  // other way: the surface's underside reflecting the cross-section back down.
+  // i0, i1 (optional) limit it to view columns i0..i1-1, with alpha k: the hull's wash.
   var MIRROR = 34;
-  function drawWaterline(c, y, t) {
-    if (y < 0 || y >= VIEW_H) return;
-    var h = 1 / HI;
-    c.fillStyle = P.water_lit; c.globalAlpha = 0.6; c.fillRect(0, y + h, VIEW_W, 3 * h); c.globalAlpha = 1;
-    c.fillStyle = P.water_foam;
-    c.fillRect(0, y, VIEW_W, h);
-    for (var x = ((Math.floor(t * 6) % 9) - 9); x < VIEW_W; x += 4.5) c.fillRect(x, y - h, 2, h);
-    c.fillStyle = P.water_hi;
-    for (x = ((Math.floor(t * 4) % 13) - 13); x < VIEW_W; x += 6.5) c.fillRect(x + 2, y + h, 1.5, h);
+  var wlTop = new Int16Array(640), wlCls = new Uint8Array(640), wlBand = new Int16Array(640);
+  var LINE_FOAM = 1, LINE_HI = 2, CREST = 4;
+
+  // Draws a vertical span [top, bot) in view rows for each column in i0..i1-1 where pick(i)
+  // is true, merging neighbours with the same span into one rect.
+  function spans(c, i0, i1, topOf, botOf, pick) {
+    var run = -1, rt = 0, rb = 0, q = 1 / HI;
+    for (var i = i0; i <= i1; i++) {
+      var on = i < i1 && pick(i), tp = on ? topOf(i) : 0, bt = on ? botOf(i) : 0;
+      if (run >= 0 && (!on || tp !== rt || bt !== rb)) { c.fillRect(run * q, rt * q, (i - run) * q, (rb - rt) * q); run = -1; }
+      if (on && bt > tp && run < 0) { run = i; rt = tp; rb = bt; }
+    }
   }
+
+  var wlY0 = 0;
+  function topRow(i) { return wlTop[i]; }
+  function rowBelowTop(i) { return wlTop[i] + 1; }
+  function capTop(i) { return wlTop[i] - 1; }
+  function lineY0(i) { return wlY0; }
+  function bandTop(i) { return Math.max(wlTop[i] + 1, wlY0); }
+  function bandBot(i) { return wlBand[i]; }
+  function raised(i) { return wlTop[i] + 1 < wlY0; }
+  function isFoam(i) { return (wlCls[i] & LINE_FOAM) !== 0; }
+  function isHi(i) { return (wlCls[i] & LINE_HI) !== 0; }
+  function isCrest(i) { return (wlCls[i] & CREST) !== 0; }
+  function all() { return true; }
+  function menBot(i) { return wlTop[i] + 2; }
+  function tirTop(i) { return wlBand[i] + 1 + Math.round((wlTop[i] - wlY0) * -0.7); }
+  function tirBot(i) { return tirTop(i) + 1; }
+
+  function drawWaterline(c, y, cols, light, under, i0, i1, k) {
+    if (y < -4 || y >= VIEW_H) return;
+    i0 = i0 || 0; i1 = i1 === undefined ? 640 : i1; k = k === undefined ? 1 : k;
+    var surf = G.gfx.surface, L = surf.amp() + 0.6, Y0 = Math.round(y * HI), lx = light.a > 0.05 ? light.x * HI : -1;
+    wlY0 = Y0;
+    for (var i = i0; i < i1; i++) {
+      var d = cols[i + 1], s = cols[i + 2] - cols[i], disp = Math.round(d + L), cls = 0;
+      if (disp < 0) disp = 0;
+      wlTop[i] = Y0 - disp;
+      var crest = d >= cols[i] && d >= cols[i + 2] && d > 0.4 * L;
+      var lit = lx >= 0 && (lx - i) * -s > 0 && Math.abs(s) > 0.08;
+      if (crest) cls |= CREST;
+      cls |= crest || lit || Math.abs(s) > 0.6 || Math.abs(s) < 0.05 ? LINE_FOAM : LINE_HI;
+      wlCls[i] = cls;
+      wlBand[i] = Y0 + 3 + Math.round(Math.max(0, d) * 0.6);
+    }
+    c.globalAlpha = k; c.fillStyle = P.water_lit;
+    spans(c, i0, i1, rowBelowTop, lineY0, raised);                   // the water raised above the line
+    c.globalAlpha = 0.6 * k;
+    spans(c, i0, i1, bandTop, bandBot, all);                        // the lit band
+    if (under > 0 && k === 1) {
+      c.globalAlpha = 0.3 * under; c.fillStyle = P.water_hi;
+      spans(c, i0, i1, tirTop, tirBot, all);                        // the underside's reflection
+    }
+    c.globalAlpha = 0.35 * k; c.fillStyle = P.water_dark;
+    spans(c, i0, i1, rowBelowTop, menBot, isCrest);                 // the meniscus
+    c.globalAlpha = k; c.fillStyle = P.water_foam;
+    spans(c, i0, i1, topRow, rowBelowTop, isFoam);                  // the surface row
+    c.globalAlpha = 0.5 * k;
+    spans(c, i0, i1, capTop, topRow, isCrest);                      // foam caps on crests
+    c.globalAlpha = k; c.fillStyle = P.water_hi;
+    spans(c, i0, i1, topRow, rowBelowTop, isHi);
+    c.globalAlpha = 1;
+  }
+
+  // Phase 20: the pier's posts stand in the water. Each gets a foam collar where the surface
+  // meets it and a dark wet band just above, both riding the surface's height there. The
+  // posts are where LANDMARKS.pier paints them: every 16 layer px from x - 64, 5 px wide.
+  function drawPosts(c, wy) {
+    var lms = loc.landmarks, surf = G.gfx.surface;
+    for (var j = 0; j < lms.length; j++) {
+      if (lms[j].kind !== 'pier' || (scen.landmarks && scen.landmarks.pier)) continue;
+      for (var k = 0; k < 8; k++) {
+        var px = lms[j].x + (-64 + 16 * k) / HI, sx = px - camPx;
+        if (sx < -4 || sx > VIEW_W + 4) continue;
+        var sy = Math.round((wy - surf.at(px + 1.25) / HI) * HI) / HI;
+        c.globalAlpha = 0.45; c.fillStyle = P.wood_deep; c.fillRect(sx, sy - 1, 2.5, 1);
+        c.globalAlpha = 0.7; c.fillStyle = P.water_foam; c.fillRect(sx - 0.5, sy, 3.5, 0.5);
+      }
+    }
+    c.globalAlpha = 1;
+  }
+
+  // Phase 20: where something floating sits: the waterline at world x, raised by the surface there.
+  function floatY(x) { return loc.waterY - G.gfx.surface.at(x) / HI; }
 
   var waterLight = { x: 0, a: 0, key: 'fog_mid', w: 4, mirror: 1 };
   function lightOnWater(h) {
@@ -1294,16 +1392,22 @@ G.scene.sailing = (function () {
     camPx = Math.round(run.cam.x * HI) / HI;
     camPy = Math.round(run.cam.y * HI) / HI;
     var a = run.uw.alpha, band = Math.round((loc.mirror || MIRROR) * (1 - a));
+    var cols = G.gfx.surface.fill(camPx), wl = lightOnWater(hourNow());
     drawBackdrop(ctx);
     // Phase 15: the split view. The cross-section is always there; at the surface a band of
     // mirror water covers its top, and shrinks to nothing as the view goes under (uw.alpha).
     // The mirror is only ever drawn with the camera at the surface (see underwater.js).
     G.scene.underwater.draw(ctx, loc, camPx, camPy, 1, run.boat.t);
-    if (band > 0) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, lightOnWater(hourNow()), band);
-    drawWaterline(ctx, wy - camPy + band, run.boat.t);
+    if (band > 0) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, wl, band, camPx);
+    drawWaterline(ctx, wy - camPy + band, cols, wl, band === 0 ? a : 0);
     ctx.drawImage(glint, camPx * HI, 0, VIEW_W * HI, 1, 0, wy - camPy, VIEW_W, 1 / HI);
+    drawPosts(ctx, wy - camPy);
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
+    if (band === 0) { // Phase 20: the hull sits in the water; the surface washes over its bottom
+      var hx = Math.round((run.boat.x - run.cam.x) * HI);
+      drawWaterline(ctx, wy - camPy, cols, wl, 0, Math.max(0, hx - 36), Math.min(640, hx + 36), 0.55);
+    }
     drawLift(ctx, run);
     drawMist(ctx);
     drawRain(ctx);
@@ -1321,6 +1425,7 @@ G.scene.sailing = (function () {
     skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
     rodPose: function () { return rodPose(G.state.run, [0, 0]); }, // debug: [angle, bend] now
     lift: function () { return plift.t; },
+    floatY: function (x) { return floatY(x); }, // Phase 20: the surface's height at world x, as floats sit on it
     rain: function () { return loc ? rainK() : 0; },
     light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
     fogAlpha: function () { return fogMul() / FOG_HEAD; },

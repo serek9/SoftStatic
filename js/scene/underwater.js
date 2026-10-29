@@ -384,6 +384,35 @@ G.scene.underwater = (function () {
     ctx.drawImage(cv, Math.round(camPx * HI), 0, VIEW_W * HI, H * HI, 0, wyS, VIEW_W, H);
   }
 
+  // Phase 20: caustics. Where the surface curves into a crest it focuses light: faint
+  // filaments hang down from those columns through the top CAUSTIC px (6 m), flickering by a
+  // hash of time, and where the bed is that shallow a bright dash lies on it. They follow the
+  // surface's columns (gfx/surface.js), so ripples throw caustics too.
+  var CAUSTIC = 24;
+  function drawCaustics(ctx, loc, camPx, wyS, alpha, t) {
+    if (wyS + CAUSTIC < 0) return;
+    var surf = G.gfx.surface, cols = surf.fill(camPx), thr = 0.35 * surf.swellCurve() + 0.004, tick = Math.floor(t * 3), q = 1 / HI;
+    ctx.fillStyle = P.water_foam; // water_hi is too close to the lit water to read
+    for (var i = 1; i < 639; i++) {
+      var k = cols[i] + cols[i + 2] - 2 * cols[i + 1];
+      if (k > -thr) continue;
+      if (k > cols[i - 1] + cols[i + 1] - 2 * cols[i] || k > cols[i + 1] + cols[i + 3] - 2 * cols[i + 2]) continue; // the focus only
+      var xw = camPx + i * q, hs = S.hash(Math.round(xw * HI), tick), sway = ((hs >> 3) & 3) - 1.5;
+      var str = Math.min(1, -k / (thr * 2.5));
+      for (var j = 0; j < 5; j++) {
+        if ((hs >> j) & 1) continue;
+        ctx.globalAlpha = alpha * 0.26 * str * (1 - j / 5);
+        ctx.fillRect(Math.round(i + sway * j * 0.5) * q, Math.round((wyS + 2 + j * 4.5) * HI) * q, q, 2.5 * q * (3 - (j >> 1)));
+      }
+      var bed = bottomAt(loc, xw);
+      if (bed < CAUSTIC) {
+        ctx.globalAlpha = alpha * 0.4 * str * (1 - bed / CAUSTIC);
+        ctx.fillRect(i * q - q, Math.round((wyS + bed - 1) * HI) * q, 3 * q, q);
+      }
+    }
+    ctx.globalAlpha = alpha;
+  }
+
   // camPx, camPy: the rounded camera (half pixels). alpha: how far the fade has got. t: time in seconds.
   function draw(ctx, loc, camPx, camPy, alpha, t) {
     var t0 = performance.now(), set = prepare(loc), H = set.H, HH = H * HI, wyS = loc.waterY - camPy;
@@ -410,6 +439,7 @@ G.scene.underwater = (function () {
     drawCone(ctx, loc, camPx, wyS, alpha);
     ctx.globalAlpha = alpha;
     drawLayer(ctx, set.bottom, camPx, wyS, H);
+    drawCaustics(ctx, loc, camPx, wyS, alpha, t);
     drawLayer(ctx, set.weeds[WEED_SEQ[Math.floor(t * 1.5) % 4]], camPx, wyS, H);
     drawHeavy(ctx, loc, camPx, camPy, alpha);
     drawFish(ctx, loc, camPx, camPy, t);
@@ -440,11 +470,12 @@ G.scene.underwater = (function () {
   // ---- Bite, hook, fight, landing (7.1-7.5) --------------------------------------------
   var HOOKED_BEAT = 0.3;  // s between the hook-set and the fight
   var LAND_TIME = 0.9;    // s to lift the fish out beside the boat
+  var SHALLOW = 16;       // px (4 m): a hooked fish pulling above this churns the surface (Phase 20)
   var biteIn = { reel: false, auto: false }, fightIn = { reel: false };
 
   function createCatch() {
     return {
-      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0, drip: -1 },
+      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0, drip: -1, wet: 0, churn: 0 },
       heavy: { state: 0, t: 0, x: 0, y: 0, dir: 1, hum: 0 } // 7.7: 0 none yet this cast, 1 passing, 2 done
     };
   }
@@ -452,7 +483,7 @@ G.scene.underwater = (function () {
   // The fish on the bite is hooked: roll its size, start the fight, scatter the rest.
   function hook(run) {
     var b = run.bite, f = run.school.fish[b.slot], sp = G.data.fish[f.sp], h = run.hook, boatB = run.boat;
-    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1;
+    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; // wet: 1 until it leaves the water
     fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
     h.depth = f.y;
@@ -478,6 +509,7 @@ G.scene.underwater = (function () {
       h.x = h.x0 + (tx - h.x0) * u;
       h.y = h.y0 + (ty - h.y0) * u;
       h.face = b.x > h.x ? 1 : -1;
+      if (h.wet > 0 && h.y < 0) { h.wet = 0; G.gfx.surface.poke(h.x, 0.6, 3); } // Phase 20: it breaks the surface
       // Audit P1-4: once out of the water the fish sheds droplets along its arc.
       var k = Math.floor(h.lift * 12);
       if (k !== h.drip && h.y < 0) { h.drip = k; fx.emit('splash', h.x, loc.waterY + h.y + 2, 2); }
@@ -485,7 +517,11 @@ G.scene.underwater = (function () {
       var frac = F.D / F.D0;
       tx = b.x + b.facing * (UW.reach + Math.min(frac * h.dist, 140)); // 140 px: boat and fish share the screen
       ty = h.depth * Math.min(1, frac);
-      if (F.mode === 'pull') { h.thrash += dt * 14; tx += Math.sin(h.thrash) * 3; ty += Math.cos(h.thrash * 1.3) * 2; }
+      if (F.mode === 'pull') {
+        h.thrash += dt * 14; tx += Math.sin(h.thrash) * 3; ty += Math.cos(h.thrash * 1.3) * 2;
+        // Phase 20: a fish pulling near the surface (above 4 m) churns it, harder the shallower.
+        if (h.y < SHALLOW) { h.churn += dt * 5; if (h.churn >= 1) { h.churn -= 1; G.gfx.surface.poke(h.x, 0.4 * (1 - h.y / SHALLOW), 2); } }
+      }
       h.x += (tx - h.x) * Math.min(1, 5 * dt);
       h.y += (ty - h.y) * Math.min(1, 4 * dt);
       h.y = clamp(h.y, 2, bottomAt(loc, h.x) - 2);
@@ -510,14 +546,17 @@ G.scene.underwater = (function () {
       biteIn.auto = run.passive.on; // passive mode hooks by itself (V3.5)
       var biting = run.bite.slot >= 0;
       if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
-      else if (!biting && run.bite.slot >= 0) fx.ripple(run.cast.x1, loc.waterY + 1, 1, 7, 0.6); // audit P1-4: a ring where the line goes in
+      else if (!biting && run.bite.slot >= 0) { // audit P1-4: a ring where the line goes in, and a dent (Phase 20)
+        fx.ripple(run.cast.x1, loc.waterY + 1, 1, 7, 0.6);
+        G.gfx.surface.poke(run.cast.x1, 0.3, 1.5);
+      }
     } else if (fsm === 'hooked') {
       run.hook.t += dt;
       if (run.hook.t >= HOOKED_BEAT) G.core.state.go(run, 'fighting');
     } else if (fsm === 'fighting') {
       fightIn.reel = run.passive.on ? F.autoPlayer(run.fight, G.sim.passive.P.skill, G.rng) === 1 : inp.held('action'); // 12.2
       var res = F.step(run.fight, fightIn, dt, G.rng, G.data);
-      if (run.fight.slipped) fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); // the soft slip sound: audio/engine.js
+      if (run.fight.slipped) { fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); G.gfx.surface.poke(run.hook.x, 0.5); } // the soft slip sound: audio/engine.js
       if (res === F.WIN) {
         run.hook.x0 = run.hook.x; run.hook.y0 = run.hook.y;
         G.core.state.go(run, 'landing');

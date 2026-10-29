@@ -237,6 +237,19 @@ G.core.debug = (function () {
     fog: function () {
       var sc = G.scene.sailing, w = sc.waterLight();
       return { alpha: +sc.fogAlpha().toFixed(3), moon: sc.moon(), light: { x: w.x, a: +w.a.toFixed(2), key: w.key } };
+    },
+    // dbg.surface() returns the water surface's ripple energy, its lowest and highest ripple
+    // (view px), the swell's height now and the step's cost (Phase 20).
+    surface: function () {
+      var s = G.gfx.surface.stats;
+      return { energy: +s.energy.toFixed(4), min: +s.min.toFixed(3), max: +s.max.toFixed(3), swell: +G.gfx.surface.amp().toFixed(3), ms: +s.ms.toFixed(4) };
+    },
+    // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
+    poke: function (x, s) {
+      var b = G.state.run.boat;
+      if (x === undefined) x = b.x + b.facing * 40;
+      G.gfx.surface.poke(x, s === undefined ? 1 : s);
+      return x;
     }
   };
   if (on) window.dbg = dbg;
