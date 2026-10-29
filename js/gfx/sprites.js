@@ -19,7 +19,16 @@ G.gfx.sprites = (function () {
     flesh: '#b07868', flesh_dark: '#6e423a',
     blood: '#6a0f18', crimson: '#a0182a',
     neon_red: '#e0403a', neon_teal: '#3ad0c0', signal_amber: '#e8a830', lamp_glow: '#f0d890',
-    black: '#000000'
+    black: '#000000',
+    // Phase 15 (visual detail): the lit top of the water, the waterline, and the painted world.
+    water_lit: '#2a5260', water_foam: '#6f97a2',
+    mount_far: '#262844', mount_mid: '#2e3050', mount_lit: '#47466a', mount_haze: '#3a3c5c',
+    pine_dark: '#111a20', pine_mid: '#1a2830', pine_lit: '#2b4043',
+    leaf_dim: '#45261d', leaf_rust: '#83391f', leaf_gold: '#a8742a', birch: '#8c8a82',
+    reed_dark: '#2f2a20', reed: '#4f4430', reed_hi: '#6f6040',
+    rock_dark: '#1b1e25', rock: '#30343e', rock_lit: '#4c5262',
+    dog_dark: '#6e4c2a', dog: '#a87b45', dog_hi: '#cfae78',
+    coat_dark: '#2a3426', coat: '#3f4d36', coat_hi: '#5b6b48', cap: '#7a3326'
   };
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.

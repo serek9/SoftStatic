@@ -6,114 +6,135 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.scene = G.scene || {};
 G.scene.dog = (function () {
   var S = G.gfx.sprites;
-  var MAP = { f: 'wood_hi', d: 'wood', e: 'ink', m: 'blood' };
+  // Phase 15: a larger, golden dog (12×10) sitting in the bow, facing the way the boat does.
+  var MAP = { d: 'dog_dark', D: 'dog', H: 'dog_hi', e: 'ink', n: 'ink', m: 'blood' };
   var POSES = ['idle', 'alert', 'point', 'look_down', 'stare', 'bark', 'pet', 'sleep'];
   var SPRITE = {};
 
   var ALERT = [
-    '......d.d..',
-    '......dff..',
-    '......feffe',
-    'd.....fff..',
-    '.d...ff....',
-    '..dffff....',
-    '..fffff....',
-    '..f.f.f....'
+    '.......d.d..',
+    '.......dDd..',
+    '.......DDeDn',
+    '.......DHHHH',
+    '........DD..',
+    'd.....DDHD..',
+    '.d...DDDHD..',
+    '..dDDDDDHD..',
+    '..DDDDDDDD..',
+    '..DD.D.DD...'
   ];
 
   var FRAMES = {
     idle: [[
-      '.......d...',
-      '......dff..',
-      '......feffe',
-      '......fff..',
-      'd....ff....',
-      '.dfffff....',
-      '..fffff....',
-      '..f.f.f....'
+      '............',
+      '.......ddd..',
+      '.......DDeDn',
+      '.......DHHHH',
+      '........DD..',
+      'd.....DDHD..',
+      '.d...DDDHD..',
+      '..dDDDDDHD..',
+      '..DDDDDDDD..',
+      '..DD.D.DD...'
     ]],
     alert: [ALERT],
-    // Standing, head low and forward, tail straight, front paw lifted.
+    // Standing, head low and forward, tail straight out, a front paw lifted.
     point: [[
-      '...........',
-      '.......d...',
-      '......dff..',
-      'ddd...feffe',
-      '...ffffff..',
-      '...ffffff..',
-      '...f.f..f..',
-      '...f.f.....'
+      '............',
+      '............',
+      '........ddd.',
+      '.......dDDen',
+      'ddd....DHHHH',
+      '...DDDDDDHD.',
+      '...DDDDDDHD.',
+      '...DHDDDDD..',
+      '...D.D..D...',
+      '...D.D......'
     ]],
     look_down: [[
-      '...........',
-      '.......d...',
-      '......dff..',
-      '......ffff.',
-      'd....fffef.',
-      '.dfffff.fe.',
-      '..fffff....',
-      '..f.f.f....'
+      '............',
+      '............',
+      '.......dd...',
+      '......dDDD..',
+      'd.....DDDDD.',
+      '.d...DDDHeD.',
+      '..dDDDDDHDn.',
+      '..DDDDDDDD..',
+      '..DDDDDDDD..',
+      '..DD.D.DD...'
     ]],
     // Head turned away toward the shore: no eye shows.
     stare: [[
-      '......d.d..',
-      '......dfd..',
-      '......fff..',
-      '......fff..',
-      'd....ff....',
-      '.dfffff....',
-      '..fffff....',
-      '..f.f.f....'
+      '........d.d.',
+      '........dDd.',
+      '........DDD.',
+      '........DDD.',
+      '........DD..',
+      'd.....DDHD..',
+      '.d...DDDHD..',
+      '..dDDDDDHD..',
+      '..DDDDDDDD..',
+      '..DD.D.DD...'
     ]],
     bark: [[
-      '......d.d..',
-      '......dff..',
-      '......feffe',
-      'd.....ffmm.',
-      '.d...ff....',
-      '..dffff....',
-      '..fffff....',
-      '..f.f.f....'
+      '.......d.d..',
+      '.......dDd..',
+      '.......DDeDn',
+      '.......DDmm.',
+      '........DD..',
+      'd.....DDHD..',
+      '.d...DDDHD..',
+      '..dDDDDDHD..',
+      '..DDDDDDDD..',
+      '..DD.D.DD...'
     ], ALERT],
     // Audit P1-6: being petted. Eyes shut, ears back, the tail wagging.
     pet: [[
-      '...........',
-      '......dd...',
-      '......fdffe',
-      'd.....fff..',
-      '.d...ff....',
-      '..dffff....',
-      '..fffff....',
-      '..f.f.f....'
+      '............',
+      '.......dd...',
+      '.......DDdDn',
+      '.......DHHHH',
+      'd.......DD..',
+      '.d....DDHD..',
+      '..d..DDDHD..',
+      '...DDDDDHD..',
+      '..DDDDDDDD..',
+      '..DD.D.DD...'
     ], [
-      '...........',
-      '......dd...',
-      '......fdffe',
-      '......fff..',
-      'dd...ff....',
-      '..dffff....',
-      '..fffff....',
-      '..f.f.f....'
+      '............',
+      '.......dd...',
+      '.......DDdDn',
+      '.......DHHHH',
+      '........DD..',
+      '......DDHD..',
+      '.....DDDHD..',
+      'dddDDDDDHD..',
+      '..DDDDDDDD..',
+      '..DD.D.DD...'
     ]],
     // Audit P2-2: asleep in the bow while passive mode fishes. It breathes.
     sleep: [[
-      '...........',
-      '...........',
-      '...........',
-      '.......dd..',
-      '......fdffe',
-      'ddfffffff..',
-      '.ffffffff..',
-      '...........'
+      '............',
+      '............',
+      '............',
+      '............',
+      '............',
+      '.......dddD.',
+      '......DDdDDn',
+      'ddDDDDDDDDD.',
+      '.DDDDDDDDHH.',
+      '............'
     ], [
-      '...........',
-      '...........',
-      '...........',
-      '...........',
-      '.......ddd.',
-      'ddffffffdfe',
-      '.ffffffff..',
-      '...........'
+      '............',
+      '............',
+      '............',
+      '............',
+      '............',
+      '............',
+      '.......dddDn',
+      'ddDDDDDDDdD.',
+      '.DDDDDDDDHH.',
+      '............'
     ]]
   };
 

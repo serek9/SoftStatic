@@ -16,12 +16,13 @@ G.data.locations.creek = {
   start: 160,
 
   layers: [
-    { id: 'hills', kind: 'ridge', parallax: 0.12, color: 'night_blue', base: 86, amp: 16 },
+    { id: 'hills', kind: 'mountains', parallax: 0.1, base: 92, amp: 30, color: 'mount_mid', lit: 'mount_lit', dark: 'night_deep', haze: 'fog_dark' },
     { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 88, h: 14, color: 'fog_mid', alpha: 0.22, drift: 0.8 },
-    { id: 'forest', kind: 'treeline', parallax: 0.35, color: 'night_deep', base: 102, height: 24 },
+    { id: 'forest', kind: 'forest', parallax: 0.35, base: 104, height: 26, gap: [2, 7], mix: { pine: 0.6, round: 0.25, birch: 0.15 },
+      keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' }, round: { dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'wood_dark' }, birch: { bark: 'birch', dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'birch' } } },
     { id: 'trunks', kind: 'trunks', parallax: 0.55, color: 'night_ink', crown: 'moss_dark', top: 18, gap: [26, 70] },
     { id: 'fog_near', kind: 'fog', parallax: 0.6, y: 100, h: 10, color: 'fog_light', alpha: 0.12, drift: 1.6 },
-    { id: 'bank', kind: 'shore', parallax: 0.7, color: 'night_ink', detail: 'moss_dark', height: 5 },
+    { id: 'bank', kind: 'bank', parallax: 0.7, height: 5, reeds: 1, rockEvery: 30, reedH: 14 },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
 

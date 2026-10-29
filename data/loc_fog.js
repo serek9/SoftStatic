@@ -16,13 +16,20 @@ G.data.locations.fog = {
   start: 180,
 
   // Back to front. Every layer is baked once and only drawn with drawImage.
+  // Phase 15: painted layers (js/gfx/paint.js): far peaks, a nearer ridge with the tower and
+  // the mast, a pine forest, tall pines and birches near the water, and a reedy, rocky shore.
   layers: [
-    { id: 'ridge', kind: 'ridge', parallax: 0.12, color: 'night_blue', base: 94, amp: 12,
+    { id: 'peaks', kind: 'mountains', parallax: 0.05, base: 92, amp: 50, color: 'mount_far', lit: 'mount_lit', dark: 'night_deep', haze: 'mount_haze' },
+    { id: 'fog_high', kind: 'fog', parallax: 0.08, y: 66, h: 22, color: 'fog_mid', alpha: 0.16, drift: 0.7 },
+    { id: 'ridge', kind: 'mountains', parallax: 0.14, base: 102, amp: 24, color: 'mount_mid', lit: 'mount_lit', dark: 'night_deep', haze: 'fog_dark', featureKey: 'night_deep',
       features: [{ kind: 'tower', x: 120 }, { kind: 'mast', x: 330 }] },
-    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 82, h: 20, color: 'fog_mid', alpha: 0.32, drift: 1.2 },
-    { id: 'trees', kind: 'treeline', parallax: 0.35, color: 'night_deep', base: 106, height: 15 },
-    { id: 'fog_near', kind: 'fog', parallax: 0.45, y: 99, h: 12, color: 'fog_light', alpha: 0.16, drift: 2.4 },
-    { id: 'shore', kind: 'shore', parallax: 0.6, color: 'night_ink', detail: 'moss_dark', height: 4 },
+    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 84, h: 20, color: 'fog_mid', alpha: 0.32, drift: 1.2 },
+    { id: 'trees', kind: 'forest', parallax: 0.3, base: 106, height: 17, gap: [2, 6], mix: { pine: 1 },
+      keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' } } },
+    { id: 'fog_near', kind: 'fog', parallax: 0.42, y: 97, h: 12, color: 'fog_light', alpha: 0.16, drift: 2.4 },
+    { id: 'woods', kind: 'forest', parallax: 0.5, base: 110, height: 36, gap: [8, 46], mix: { pine: 1 },
+      keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' }, birch: { bark: 'birch', dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'birch' } } },
+    { id: 'shore', kind: 'bank', parallax: 0.6, height: 4, reeds: 0.8, rockEvery: 38 },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
 

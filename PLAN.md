@@ -2,7 +2,7 @@
 
 > **FOR THE CODING AGENT:** Read **§0 Shared Conventions** first, then ONLY the task or section named in your assignment. Implement nothing that is not named in the task.
 
-**Status:** Plan final and approved. **Phases 1–14 are done (Milestones A, B and C reached),** together with the improvement audit (see §8). Each phase starts only after explicit authorization. Progress, architecture as built, decisions, known issues and the exact next task are in **§8 Project Status**, which is updated at the end of every phase.
+**Status:** Plan final and approved. **Phases 1–14 are done (Milestones A, B and C reached),** together with the improvement audit and Phase 15, visual detail (see §8). Each phase starts only after explicit authorization. Progress, architecture as built, decisions, known issues and the exact next task are in **§8 Project Status**, which is updated at the end of every phase.
 
 ---
 
@@ -396,6 +396,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | Audit batch 5: Life (P2) | Done | `Audit batch 5: Life` | P2-1 ambient life, P2-2 passive presentation, P2-3 underwater |
 | Audit batch 6: Polish (P3) | Done | `Audit batch 6: Polish` | P3-1 drizzle, P3-2 still mode, P3-4 the 8.4 minors. P3-3 (a committed screenshot script) left out: it needs Playwright, a dependency the project does not have |
 | 14 Content and polish | Done | `Phase 14: Content and polish` | **Milestone C reached.** 36 species, final balance, touch, performance, save migrations |
+| 15 Visual detail | Done | `Phase 15: Visual detail` | Asked for by the user on 2026-10-29 (not in §4), against reference shots of Cast n Chill: tasks 15.1–15.6 in 8.3 #74–80 |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -556,6 +557,22 @@ These are interpretations and additions made while building, where the spec abov
 72. **Performance (14.7):** the loop measures update and draw time and the worst frame each second (overlay and `G.core.loop.stats`). In headless Chromium at 1280×720 every case ran at 60 fps: Fogbound surface at night, draw 1.07 ms, worst frame 4.7 ms; with an anomaly, drizzle and fog at unease 1, 0.97 / 4.9 ms; underwater with 8 fish and the lantern cone, 0.43 / 2.1 ms; the Pines with its signal, neon and lamps in the owl window, 1.21 / 6.6 ms. The reflection pass took 1.26 ms at most (3.4's budget is 2 ms). Nothing needed optimising.
 73. **Save migrations (14.8):** `node tools/balance.js --saves` builds a save shaped as each milestone wrote it (the `defaults()` of Phases 1, 7, 8, 9, 10 and 12, from git history, with some play in them). Each goes through the real export string and import, then is checked against today's defaults (gear, flags, settings), the economy, the unlock checks, a passive plan and the journal's species. A damaged string is refused. No save field changed in Phase 14 or in the audit, so the version stays 4. The vm context now has `TextEncoder`, `TextDecoder`, `btoa` and `atob`, which the export string uses.
 
+**Phase 15, visual detail (2026-10-29).** The user asked for a phase to lift the overall look to the level of detail of five Cast n Chill screenshots they supplied (painted mountains and forests, a split view with a bright waterline, clear reflections, a visible boat, fisher and dog, detailed underwater scenes). It is not in §4, so its tasks are defined here: 15.1 split view, 15.2 painted layers, 15.3 the light of the hour, 15.4 boat, fisher and dog, 15.5 landmarks, 15.6 underwater. All of it is presentation: no sim or save change.
+
+74. **Split view (15.1):** the cross-section is always drawn. At the surface a band of mirror water (`loc.mirror`, default 34 px) covers its top; the band shrinks to nothing as `uw.alpha` rises, which replaces the opening wipe of 8.3 #64. A bright waterline (`water_foam`, with a slow small wave, and a lit row of `water_lit` under it) marks the cut. `water.draw` takes `band` and draws only those rows. The mirror is clearer (alpha 0.5, was 0.35) and broken by 26 drifting horizontal streaks. The invariant of 8.3 #6 holds: the mirror is only drawn with the camera at the surface.
+75. **Painted layers (15.2), in a new file `js/gfx/paint.js`** (`G.gfx.paint`; the user's request for the phase covered it). All painters are baked once from the layer's seeded stream:
+    - `mountains`: ridged noise in three octaves, faces lit by the slope averaged over 9 columns, a few soft gully shadows, a haze at the foot, and the old ridge's features (the tower, the mast).
+    - `forest`: tiered, jagged pines lit on the left and speckled; round trees made of dithered leaf clumps; birches.
+    - `shore` (layer kind `bank`): shaded boulders, reed clumps with cattails, grass.
+    - Clouds: one level mask (shadow, body, lit) with streaks, baked in four colourings: night, grey, dusk, and the rim alone.
+
+    Fogbound has far peaks and a ridge with the tower, a pine forest, tall pines by the water, and a reedy shore. The creek has hills and a mixed forest. The Pines have mountains, an autumn forest, and tall autumn trees and pines near the water. The Red Room keeps its curtains. Painters set `fillStyle` only when the key changes and fill runs of one key, so a water now bakes in 60–75 ms at the travel fade's full black (boot: 124 ms in all).
+76. **The light of the hour (15.3):** every painted layer except fog is also baked graded: night (`night_deep` at 0.55, source-atop) and grey hours (`fog_dark` at 0.35). These are drawn over the layer at the night share × 0.9 and the grey share × 0.7, so the land darkens and cools through the night and flattens at midday. Lights drawn after a layer (neon, lamps, the owl) are not graded. `loc.grade: false` turns it off; the Red Room has it off.
+77. **Boat, fisher and dog (15.4):** a 34×8 shaded rowboat with a rust stripe and an outboard motor at the stern; a 10×13 fisher in a red cap and a field jacket, hands on the rod; a 12×10 golden dog in the bow, with every pose redrawn (idle, alert, point, look down, stare, bark, pet, sleep). The rod is 22 px from the hands (`ROD {len 22, baseX 3, baseY -6}`). The lantern now hangs from a pole at the stern, the wake starts at the stern (19 px), and the hull's shadow is wider. 14 new palette keys (`mount_*`, `pine_*`, `leaf_*`, `birch`, `reed*`, `rock*`, `dog*`, `coat*`, `cap`, `water_lit`, `water_foam`); `water_*` keys stay under the ceiling.
+78. **Landmarks (15.5):** the pier has lit, braced posts, a deck of planks with gaps, a rail and a lamp post. The channel markers are rusted buoys (float, lattice cage, bell, a dead lamp). The wreck shows its ribs. The water tower has bracing, seams and a lit side. The pier is still the same plank for plank in both waters (it paints from its own seed, 8.3 #39).
+79. **Underwater (15.6):** the gradient runs from `water_lit` near the surface through blue-green to the deep (2 px steps). A far layer (parallax 0.6, wrapping every 640 px) holds broad rock formations with lit rims and kelp. The bed is lit along its top and speckled with sand, and the boulders are shaded (`u.sand` and `u.rocks` can override the colours).
+80. **Sky (15.1):** 28 bands (was 14), each edge dithered over two rows.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -621,13 +638,16 @@ Audit batch 6 checks (headless Chromium, `?debug&seed=11`): at unease 1 the firs
 
 Phase 14 checks: `--validate --strict` OK with 9 species per water and every hint true. On a fresh save (headless Chromium, `?debug&seed=11`), moving toward x 860 on Fogbound makes the dog bark at `cold_hole`. The map shows the Red Room's text "It opens to someone who has caught what rises at 03:33 in The Pines.", sells the creek, and travel works; a creek cast gave a Snag Trout card, and the journal printed "Stays near the surface." for `depth:shallow`. Touch on an emulated phone (844×390, landscape): holding the right edge moved the boat 180 → 208, holding the middle cast and then reeled in, the J button opened the journal and ESC closed it, M opened the map and the bottom zone moved its selection, TAB started passive. The performance figures are in 8.3 #72. No page errors.
 
+Phase 15 checks: `--validate` OK, `--replay 12345` still `2593400009` (identical), `--pacing` and `--passive` unchanged, `--saves` all PASS. In headless Chromium every water was screenshotted at 19:00, 23:00, 06:00 and 12:00, and travel baked the creek in 61 ms, the Pines in 73 ms and the Red Room in 63 ms (the worst frame after each was under 4 ms). The scene ran at 60 fps with 1.7 ms of drawing and a 1.2–1.9 ms reflection pass. The audit batch 3 and 5 browser checks and the `?gallery`, `?compact` and plain boots all passed again with the new art. No page errors.
+
 ### 8.6 Next task
 
-**Every phase in §4 is done (Milestone C),** and so is the improvement audit (except its P3-3, which needs Playwright). There is no next task in the plan. Ideas, each needing the user's go-ahead:
-- Playtesting notes on feel and pacing. The model's margins are thin (8.4 #6).
+**Every phase in §4 is done (Milestone C), and so is Phase 15 (visual detail).** There is no next task in the plan. Ideas, each needing the user's go-ahead:
+- Playtesting notes on feel and pacing (8.4 #6).
 - Cabin costs in the pacing model.
 - A touch zone for petting the dog.
-- More content: further anomalies (the moon in the reflection only, audit §6), more shopkeeper lines, a fifth water.
+- Painted detail for the Red Room's curtains and the shop and cabin interiors, to match Phase 15.
+- More content (anomalies, shopkeeper lines, a fifth water).
 
 ---
 

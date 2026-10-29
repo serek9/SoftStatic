@@ -30,6 +30,7 @@ G.data.locations.red = {
   landmarks: [],
   // Indoors: no stars, moon, clouds or dusk glow (presentation only).
   sky: { stars: false, moon: false, clouds: false, glow: false },
+  grade: false, // the room's light does not follow the hour
 
   // The structures that move. Each one's spot goes wherever it stands.
   movers: [

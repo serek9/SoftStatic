@@ -9,7 +9,7 @@ G.scene.sailing = (function () {
   var boat = G.scene.boat, dog = G.scene.dog, fx = G.gfx.fx;
 
   var CAM = { k: 4, look: 0.5, lookMax: 40 }; // smoothing 1/s, look-ahead s, max look-ahead px
-  var SKY_BANDS = 14;
+  var SKY_BANDS = 28; // Phase 15: finer steps (was 14), each edge dithered over two rows
 
   var loc = null, layers = [], glint = null;
   var boundsByLoc = {};          // loc id -> landmark id -> [x0, x1] as painted
@@ -78,10 +78,15 @@ G.scene.sailing = (function () {
 
   var FEATURES = {
     tower: function (ctx, x, top) {
+      var body = ctx.fillStyle;
       ctx.fillRect(x - 4, top - 12, 1, 12); ctx.fillRect(x + 4, top - 12, 1, 12);
       ctx.fillRect(x - 4, top - 7, 9, 1);
+      for (var q = 0; q < 5; q++) { ctx.fillRect(x - 4 + q * 2, top - 12 + q, 1, 1); ctx.fillRect(x + 4 - q * 2, top - 12 + q, 1, 1); } // bracing
       ctx.fillRect(x - 6, top - 20, 13, 8);
       ctx.fillRect(x - 5, top - 21, 11, 1); ctx.fillRect(x - 3, top - 22, 7, 1);
+      ctx.fillStyle = P.night_blue; ctx.fillRect(x - 6, top - 20, 2, 8); ctx.fillRect(x - 5, top - 21, 3, 1); // the lit side
+      ctx.fillStyle = P.night_ink; for (q = 0; q < 13; q += 3) ctx.fillRect(x - 6 + q, top - 16, 1, 4); // seams
+      ctx.fillStyle = body;
     },
     mast: function (ctx, x, top) {
       ctx.fillRect(x, top - 34, 1, 34);
@@ -91,38 +96,61 @@ G.scene.sailing = (function () {
   };
 
   var LANDMARKS = {
+    // Phase 15: the landmarks repainted with shading. The pier: posts lit on one side and
+    // braced, a deck of planks with gaps, a rail, and a lamp post at the end.
     pier: function (ctx, x, wy, rng) {
       var x0 = x - 34, x1 = x + 34, deck = wy - 7, px;
-      ctx.fillStyle = P.wood_dark;
-      for (px = x0 + 2; px <= x1 - 3; px += 8) ctx.fillRect(px, deck + 2, 2, wy - deck - 2);
-      ctx.fillRect(x0, deck + 2, x1 - x0 + 1, 1);
+      for (px = x0 + 2; px <= x1 - 3; px += 8) {
+        ctx.fillStyle = P.wood_dark; ctx.fillRect(px, deck + 2, 2, wy - deck - 2);
+        ctx.fillStyle = P.wood; ctx.fillRect(px, deck + 2, 1, wy - deck - 2);
+        if (px + 8 <= x1 - 3) { ctx.fillStyle = P.wood_dark; for (var q = 0; q < 4; q++) { ctx.fillRect(px + 2 + q, deck + 2 + q, 1, 1); ctx.fillRect(px + 7 - q, deck + 2 + q, 1, 1); } }
+      }
+      ctx.fillStyle = P.wood_dark; ctx.fillRect(x0, deck + 2, x1 - x0 + 1, 1);
+      for (px = x0; px <= x1; px += 3) {
+        if (rng.next() < 0.1) continue; // a missing plank
+        ctx.fillStyle = P[rng.next() < 0.3 ? 'wood_hi' : 'wood']; ctx.fillRect(px, deck, 2, 2);
+        ctx.fillStyle = P.wood_hi; ctx.fillRect(px, deck, 2, 1);
+      }
       ctx.fillStyle = P.wood;
-      for (px = x0; px <= x1; px += 2) if (rng.next() > 0.12) ctx.fillRect(px, deck, 2, 2);
-      for (px = x0 + 4; px <= x1 - 8; px += 12) if (rng.next() > 0.3) ctx.fillRect(px, deck - 4, 1, 4);
-      ctx.fillRect(x0 + 4, deck - 4, 22, 1);
-      ctx.fillStyle = P.stone;
-      ctx.fillRect(x1 - 3, deck - 16, 1, 16); ctx.fillRect(x1 - 6, deck - 16, 4, 1);
-      ctx.fillStyle = P.rust;
-      ctx.fillRect(x1 - 7, deck - 15, 2, 2);
+      for (px = x0 + 4; px <= x1 - 8; px += 12) if (rng.next() > 0.3) { ctx.fillRect(px, deck - 5, 1, 5); ctx.fillStyle = P.wood_hi; ctx.fillRect(px, deck - 5, 1, 1); ctx.fillStyle = P.wood; }
+      ctx.fillRect(x0 + 4, deck - 5, 22, 1);
+      ctx.fillStyle = P.stone; ctx.fillRect(x1 - 3, deck - 18, 1, 18); ctx.fillRect(x1 - 7, deck - 18, 5, 1);
+      ctx.fillStyle = P.stone_hi; ctx.fillRect(x1 - 3, deck - 18, 1, 6);
+      ctx.fillStyle = P.rust; ctx.fillRect(x1 - 8, deck - 17, 3, 2);
+      ctx.fillStyle = P.rust_hi; ctx.fillRect(x1 - 8, deck - 17, 1, 1);
       return [x0, x1];
     },
+    // A rusted channel buoy: a float at the waterline, a lattice cage, a dead lamp on top.
     marker: function (ctx, x, wy, rng) {
-      ctx.fillStyle = P.rust_dark; ctx.fillRect(x - 1, wy - 18, 2, 18);
-      ctx.fillStyle = P.rust; ctx.fillRect(x, wy - 18, 1, 14);
-      ctx.fillStyle = P.rust_hi; ctx.fillRect(x - 2, wy - 23, 5, 5);
-      ctx.fillStyle = P.rust_dark; ctx.fillRect(x - 2, wy - 21, 5, 1);
-      for (var i = 0; i < 4; i++) ctx.fillRect(x - 1 + rng.int(0, 1), wy - rng.int(4, 16), 1, rng.int(1, 3));
-      return [x - 2, x + 2];
+      var y;
+      ctx.fillStyle = P.rust_dark; ctx.fillRect(x - 5, wy - 4, 11, 4);
+      ctx.fillStyle = P.rust; ctx.fillRect(x - 5, wy - 4, 11, 1); ctx.fillRect(x - 4, wy - 3, 9, 1);
+      ctx.fillStyle = P.rust_hi; ctx.fillRect(x - 4, wy - 4, 3, 1);
+      for (y = 0; y < 14; y++) {
+        var hw = 4 - Math.floor(y / 5);
+        ctx.fillStyle = P.rust; ctx.fillRect(x - hw, wy - 5 - y, 1, 1); ctx.fillRect(x + hw, wy - 5 - y, 1, 1);
+        if ((y & 3) === 0) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x - hw, wy - 5 - y, hw * 2 + 1, 1); }
+        if (y % 4 === 2) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x - hw + 1 + (y & 1), wy - 5 - y, 1, 1); ctx.fillRect(x + hw - 1 - (y & 1), wy - 5 - y, 1, 1); }
+      }
+      ctx.fillStyle = P.rust_hi; ctx.fillRect(x - 2, wy - 20, 5, 2);
+      ctx.fillStyle = P.stone_dark; ctx.fillRect(x - 1, wy - 23, 3, 3);
+      ctx.fillStyle = P.stone; ctx.fillRect(x - 1, wy - 23, 1, 1);
+      ctx.fillStyle = P.rust_dark; ctx.fillRect(x - 1, wy - 12, 3, 3); // the bell
+      for (var i = 0; i < 5; i++) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x - 3 + rng.int(0, 6), wy - rng.int(6, 16), 1, rng.int(1, 3)); }
+      return [x - 5, x + 5];
     },
+    // A sunk boat: the bow up out of the water, ribs showing, planks lit along the top.
     wreck: function (ctx, x, wy) {
-      var x0 = x - 12, i, top;
-      for (i = 0; i < 24; i++) {
-        top = wy - 1 - Math.round(Math.max(0, i - 4) * 0.55);
+      var x0 = x - 14, i, top;
+      for (i = 0; i < 28; i++) {
+        top = wy - 1 - Math.round(Math.max(0, i - 5) * 0.55);
         ctx.fillStyle = P.wood_dark; ctx.fillRect(x0 + i, top, 1, wy - top);
         ctx.fillStyle = P.wood; ctx.fillRect(x0 + i, top, 1, 1);
-        if (i >= 6 && i % 4 === 2) ctx.fillRect(x0 + i, top - 3, 1, 3);
+        if (i % 3 === 0) { ctx.fillStyle = P.wood; ctx.fillRect(x0 + i, top + 3, 1, Math.max(0, wy - top - 4)); }
+        if (i >= 7 && i % 4 === 3) { ctx.fillStyle = P.wood_hi; ctx.fillRect(x0 + i, top - 4, 1, 4); ctx.fillStyle = P.wood_dark; ctx.fillRect(x0 + i, top - 5, 1, 1); }
       }
-      return [x0, x0 + 23];
+      ctx.fillStyle = P.rust; ctx.fillRect(x0 + 22, wy - 14, 2, 2);
+      return [x0, x0 + 27];
     },
     // 11.1: a decaying cabin on stilts at the water's edge; its roof sags by lm.sag px.
     cabin: function (ctx, x, wy, rng, lm) {
@@ -173,6 +201,14 @@ G.scene.sailing = (function () {
   };
 
   var PAINT = {
+    // Phase 15: the painted layers (js/gfx/paint.js). Mountains carry the ridge's features.
+    mountains: function (ctx, L, w, wy, rng) {
+      var tops = G.gfx.paint.mountains(ctx, L, w, wy, rng);
+      ctx.fillStyle = P[L.featureKey || L.color];
+      for (var i = 0; i < (L.features || []).length; i++) { var f = L.features[i]; FEATURES[f.kind](ctx, f.x, tops[f.x]); }
+    },
+    forest: function (ctx, L, w, wy, rng) { G.gfx.paint.forest(ctx, L, w, wy, rng); },
+    bank: function (ctx, L, w, wy, rng) { G.gfx.paint.shore(ctx, L, w, wy, rng); },
     ridge: function (ctx, L, w, wy, rng) {
       var p1 = rng.range(0, 6.28), p2 = rng.range(0, 6.28), walk = 0, tops = new Int16Array(w);
       ctx.fillStyle = P[L.color];
@@ -275,13 +311,30 @@ G.scene.sailing = (function () {
   function bakeLayer(L, i) {
     var w = VIEW_W + Math.ceil((loc.width - VIEW_W) * L.parallax), wy = loc.waterY;
     var rng = new G.core.rng.Rng(loc.seed * 31 + i), paint = (scen.paint && scen.paint[L.kind]) || PAINT[L.kind];
+    var key = 'loc:' + loc.id + ':' + L.id, fog = L.kind === 'fog', cv = B.cached(key, function () {
+      return B.layer(w, wy, function (ctx) { paint(ctx, L, w, wy, rng); });
+    });
+    // Phase 15: the light of the hour. Each painted layer is also baked graded for night
+    // (cooler and darker) and for the grey hours (flatter), and drawn over itself by the
+    // night and grey shares; lights drawn after a layer (neon, lamps) are not graded.
+    function graded(tag, k, a) {
+      return B.cached(key + ':' + tag, function () {
+        return B.layer(w, wy, function (ctx) {
+          ctx.drawImage(cv, 0, 0);
+          ctx.globalCompositeOperation = 'source-atop';
+          ctx.globalAlpha = a; ctx.fillStyle = P[k]; ctx.fillRect(0, 0, w, wy);
+          ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        });
+      });
+    }
+    var grade = !fog && loc.grade !== false;
     return {
       id: L.id,
       p: L.parallax,
-      fog: L.kind === 'fog', w: w, drift: L.drift || 0,
-      cv: B.cached('loc:' + loc.id + ':' + L.id, function () {
-        return B.layer(w, wy, function (ctx) { paint(ctx, L, w, wy, rng); });
-      })
+      fog: fog, w: w, drift: L.drift || 0,
+      cv: cv,
+      night: grade ? graded('night', 'night_deep', 0.55) : null,
+      grey: grade ? graded('grey', 'fog_dark', 0.35) : null
     };
   }
 
@@ -711,8 +764,9 @@ G.scene.sailing = (function () {
       var y0 = Math.floor(i * wy / SKY_BANDS), y1 = Math.floor((i + 1) * wy / SKY_BANDS);
       ctx.fillStyle = skyRGB[i];
       ctx.fillRect(0, y0, VIEW_W, y1 - y0);
-      if (i + 1 < SKY_BANDS) {
+      if (i + 1 < SKY_BANDS) { // the next band reaches up into this one: 1 in 4, then 1 in 2
         ctx.fillStyle = skyRGB[i + 1];
+        for (x = (i & 3); x < VIEW_W; x += 4) ctx.fillRect(x, y1 - 2, 1, 1);
         for (x = (i & 1); x < VIEW_W; x += 2) ctx.fillRect(x, y1 - 1, 1, 1);
       }
     }
@@ -763,32 +817,14 @@ G.scene.sailing = (function () {
       });
     });
     if (o.clouds === false) { sky.clouds = null; return; }
-    // One cloud shape baked in four colours: night body, grey body, dusk body, dusk underside.
-    var KEYS = ['night_blue', 'fog_mid', 'dusk_plum', 'dusk_rose'];
+    // Phase 15: one field of puffy clouds (gfx/paint.js cloudMask) baked in four colourings
+    // (shadow, body, lit): night, grey, dusk, and the dusk rim light alone.
+    var mask = null;
+    function maskOnce() { return mask || (mask = G.gfx.paint.cloudMask(CLOUD_W, wy, new G.core.rng.Rng(loc.seed * 13 + 5), 9)); }
+    var KEYS = [['night_deep', 'night_blue', 'dusk_violet'], ['fog_dark', 'fog_mid', 'fog_light'], ['dusk_violet', 'dusk_plum', 'dusk_rose'], [null, null, 'dusk_amber']];
     sky.clouds = KEYS.map(function (k, ki) {
       return B.cached('loc:' + id + ':cloud' + ki, function () {
-        return B.layer(CLOUD_W, wy, function (ctx) {
-          var rng = new G.core.rng.Rng(loc.seed * 13 + 5), n = rng.int(7, 10);
-          ctx.fillStyle = P[k];
-          for (var c = 0; c < n; c++) {
-            var cx = rng.int(0, CLOUD_W - 1), cy = rng.int(10, Math.round(wy * 0.5)), len = rng.int(40, 130), th = rng.int(2, 5);
-            for (var r = -th; r <= th; r++) {
-              var hw = Math.round(len / 2 * Math.sqrt(1 - (r * r) / ((th + 1) * (th + 1))));
-              var under = r >= th - 1;
-              for (var x = cx - hw; x < cx + hw;) {
-                var seg = rng.int(4, 26), gap = rng.next() < 0.3 ? rng.int(1, 5) : 0;
-                ctx.globalAlpha = rng.range(0.5, 1);
-                if (ki < 3 || under) {
-                  var xx = ((x % CLOUD_W) + CLOUD_W) % CLOUD_W, ww = Math.min(seg, cx + hw - x);
-                  ctx.fillRect(xx, cy + r, ww, 1);
-                  if (xx + ww > CLOUD_W) ctx.fillRect(xx - CLOUD_W, cy + r, ww, 1);
-                }
-                x += seg + gap;
-              }
-            }
-          }
-          ctx.globalAlpha = 1;
-        });
+        return B.layer(CLOUD_W, wy, function (ctx) { G.gfx.paint.paintMask(ctx, maskOnce(), CLOUD_W, wy, k); });
       });
     });
   }
@@ -834,7 +870,7 @@ G.scene.sailing = (function () {
       S.draw(c, 'moon', moonPt[0] - 3, moonPt[1] - 3, 0, false);
     }
     if (sky.clouds) {
-      var ox = camPx * CLOUD_P + t * CLOUD_DRIFT, cw = [n * 0.55, g * 0.45, d * 0.6, d * 0.5];
+      var ox = camPx * CLOUD_P + t * CLOUD_DRIFT, cw = [n * 0.8, g * 0.6, d * 0.85, d * 0.55];
       for (var i = 0; i < 4; i++) {
         if (cw[i] <= 0.01) continue;
         c.globalAlpha = Math.min(1, cw[i]);
@@ -1174,7 +1210,8 @@ G.scene.sailing = (function () {
   }
 
   function drawBackdrop(c) {
-    var wy = loc.waterY, run = G.state.run, fa = fogMul() / FOG_HEAD;
+    var wy = loc.waterY, run = G.state.run, fa = fogMul() / FOG_HEAD, hh = hourNow();
+    var lightN = nightF(hh) * 0.9, lightG = greyF(hh) * 0.7;
     drawSky(c);
     for (var i = 0; i < layers.length; i++) {
       var L = layers[i], ox = Math.round(camPx * L.p);
@@ -1182,7 +1219,12 @@ G.scene.sailing = (function () {
         c.globalAlpha = fa;
         drawWrapped(c, L.cv, L.w, ox + run.boat.t * L.drift, -camPy, wy);
         c.globalAlpha = 1;
-      } else c.drawImage(L.cv, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+      } else {
+        c.drawImage(L.cv, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+        if (L.night && lightN > 0.02) { c.globalAlpha = lightN; c.drawImage(L.night, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy); }
+        if (L.grey && lightG > 0.02) { c.globalAlpha = lightG; c.drawImage(L.grey, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy); }
+        c.globalAlpha = 1;
+      }
       if (scen.afterLayer) scen.afterLayer(c, L.id, ox, camPy, run, loc);
     }
     var nf = nightF(hourNow());
@@ -1208,6 +1250,17 @@ G.scene.sailing = (function () {
   function drawAbove(c) { drawBackdrop(c); drawBoat(c, mirrorFisher()); drawMist(c); }
 
   // The light on the water (audit P1-3): a path under the moon, or under the glow at dusk.
+  // The waterline between the mirror and the cross-section: a bright line with a slow small
+  // wave, and a lit row of water under it.
+  var MIRROR = 34;
+  function drawWaterline(c, y, t) {
+    if (y < 0 || y >= VIEW_H) return;
+    c.fillStyle = P.water_lit; c.globalAlpha = 0.6; c.fillRect(0, y + 1, VIEW_W, 2); c.globalAlpha = 1;
+    c.fillStyle = P.water_foam;
+    c.fillRect(0, y, VIEW_W, 1);
+    for (var x = ((Math.floor(t * 6) % 9) - 9); x < VIEW_W; x += 9) c.fillRect(x, y - 1, 4, 1);
+  }
+
   var waterLight = { x: 0, a: 0, key: 'fog_mid', w: 4, mirror: 1 };
   function lightOnWater(h) {
     var d = duskF(h) * (sky.glow ? 1 : 0), m = moonPt[2];
@@ -1225,11 +1278,14 @@ G.scene.sailing = (function () {
     refreshSky(hourNow());
     camPx = Math.round(run.cam.x);
     camPy = Math.round(run.cam.y);
-    var a = run.uw.alpha;
+    var a = run.uw.alpha, band = Math.round((loc.mirror || MIRROR) * (1 - a));
     drawBackdrop(ctx);
+    // Phase 15: the split view. The cross-section is always there; at the surface a band of
+    // mirror water covers its top, and shrinks to nothing as the view goes under (uw.alpha).
     // The mirror is only ever drawn with the camera at the surface (see underwater.js).
-    if (a < 1) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, lightOnWater(hourNow()));
-    if (a > 0) G.scene.underwater.draw(ctx, loc, camPx, camPy, a, run.boat.t);
+    G.scene.underwater.draw(ctx, loc, camPx, camPy, 1, run.boat.t);
+    if (band > 0) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, lightOnWater(hourNow()), band);
+    drawWaterline(ctx, wy - camPy + band, run.boat.t);
     ctx.drawImage(glint, camPx, 0, VIEW_W, 1, 0, wy - camPy, VIEW_W, 1);
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
