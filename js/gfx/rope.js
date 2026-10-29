@@ -4,7 +4,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // the rod tip and point N-1 at the lure (or the fish's mouth). Its rest length is how much
 // line is out; the scene sets it every step (paying out, slack, reeling, tension). In the air
 // the line falls and drags; on the water it floats, then sinks from the lure end; under it,
-// strong drag and a slow sink. Segments only resist stretching, so a long line hangs slack
+// strong drag, a slow sink and the current (Phase 22). Segments only resist stretching, so a long line hangs slack
 // and a short one pulls straight. Visual only: no randomness, stepped in update() at the
 // fixed dt, nothing allocated after load.
 G.gfx = G.gfx || {};
@@ -25,7 +25,7 @@ G.gfx.rope = (function () {
     rest: 0,          // px of line out
     ax: 0, ay: 0,     // the rod tip
     bx: 0, by: 0,     // the far end's anchor (PINNED)
-    flowX: 0,         // px/s of current on points under water (TODO(P22.2): Phase 22 fills this; 0 until then)
+    flow: null,       // Phase 22: fn(x, depth) -> px/s of current on points in the water (null: still)
     pull: 0,          // 0..1: tension straightening the line toward the line between its ends
     taut: 0, sagMax: 0, span: 0, ms: 0
   };
@@ -64,11 +64,12 @@ G.gfx.rope = (function () {
         x[i] += vx * a; y[i] += vy * a + K.g * dt * dt;
       } else if (wet[i] >= 0) {                               // lying on the surface
         wet[i] += dt;
-        x[i] += vx * (1 - 4 * dt); y[i] = s;
+        x[i] += vx * (1 - 4 * dt) + (st.flow ? st.flow(x[i], 0) * 4 * dt * dt : 0); y[i] = s;
         if (wet[i] > K.float0 + (K.float1 - K.float0) * (1 - i / (N - 1))) wet[i] = -1;
       } else {                                                // under water
         var w = 1 - K.waterDrag * dt;
-        x[i] += vx * w + st.flowX * dt * K.waterDrag * dt; y[i] += vy * w + K.waterG * dt * dt;
+        // The current carries it: its speed settles at the flow there (drag × flow as a force).
+        x[i] += vx * w + (st.flow ? st.flow(x[i], y[i] - s) * K.waterDrag * dt * dt : 0); y[i] += vy * w + K.waterG * dt * dt;
         if (y[i] < s) y[i] = s;
       }
     }

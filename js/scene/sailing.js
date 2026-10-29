@@ -354,7 +354,7 @@ G.scene.sailing = (function () {
     // latched: clock windows open when the lure landed (D1), cleared when it is reeled in.
     // boost: what the landing spot is worth for this cast (anomaly and spots, 10.1/10.3).
     // tw: seconds the lure has been in the water (the creek's current, 11.1).
-    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, tw: 0, latched: {},
+    run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, tw: 0, latched: {}, spotsIn: 0,
       boost: { attract: 1, rare: 1, legend: 1 } };
     run.school = G.sim.fish_ai.createSchool(G.data);
     run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
@@ -457,9 +457,27 @@ G.scene.sailing = (function () {
       c.tw = 0;
       G.sim.clock.latch(c.latched, G.state.save.clock, G.data.windows);
       G.sim.unease.castBoost(run.anom, run.spots, c.x1, G.data, c.boost); // casting at a delta or a spot counts now
+      c.spotsIn = 0;
+      for (var si = 0; si < run.spots.length && si < 31; si++) if (Math.abs(c.x1 - run.spots[si].x) <= run.spots[si].r) c.spotsIn |= 1 << si;
       c.bait = G.sim.economy.useBait(G.state.save, G.data); // one bait goes on per cast
       if (scen.landed) scen.landed(run, loc);
       G.core.state.go(run, 'sinking');
+    }
+  }
+
+  // Phase 22 (22.5): a lure the current carries into a spot gains that spot's boost, as if it
+  // had landed there (10.3), once per spot per cast; what it had where it landed stays until
+  // it is reeled in. c.spotsIn has a bit for each spot already counted.
+  function driftIntoSpots(run) {
+    var c = run.cast, sp = run.spots;
+    for (var i = 0; i < sp.length && i < 31; i++) {
+      var s = sp[i];
+      if ((c.spotsIn & (1 << i)) || Math.abs(c.x1 - s.x) > s.r) continue;
+      c.spotsIn |= 1 << i;
+      if (s.attract) c.boost.attract *= s.attract;
+      if (s.rare) c.boost.rare *= s.rare;
+      if (s.legend) c.boost.legend *= s.legend;
+      if (G.core.debug) G.core.debug.log('the lure drifted into ' + s.id);
     }
   }
 
@@ -503,6 +521,7 @@ G.scene.sailing = (function () {
       case 'waiting':
       case 'interest':
         G.scene.underwater.lureStep(run, dt, loc);
+        driftIntoSpots(run);
         break;
     }
   }
@@ -577,6 +596,8 @@ G.scene.sailing = (function () {
   var ropeFsm = '', ropeLure = false, ropeT = 0, nibT = 0, slipT = 0;
 
   function surfY(x) { return floatY(x); }
+  // Phase 22: the current on the line, the same as on the lure and the weeds (underwater.flow).
+  function ropeFlow(x, depth) { return G.scene.underwater.flow(loc, depth); }
 
   // Where the lure is drawn (world px), the same in update and draw.
   function lurePos(run, out) {
@@ -655,6 +676,7 @@ G.scene.sailing = (function () {
     }
     rope.setRest(r);
     rope.st.pull = pull;
+    rope.st.flow = ropeFlow;
     rope.step(dt, surfY);
   }
 
@@ -689,7 +711,7 @@ G.scene.sailing = (function () {
     if (end) { lx = end[0]; ly = end[1]; }
     else if (ropeLure) { lx = rope.x[rope.N - 1] - camPx; ly = rope.y[rope.N - 1] - camPy; }
     else return;
-    ctx.drawImage(tinyArt('lure'), Math.round(lx * HI) / HI - 1.5, Math.round(ly * HI) / HI - 1.5, 3, 3);
+    G.scene.underwater.drawLure(ctx, c.bait || run.gearFx.bait, lx, ly); // Phase 22: the bait's own body
   }
 
   // The rope as a polyline: solid in the air, dotted and fainter under the surface (R3), a
@@ -1277,6 +1299,8 @@ G.scene.sailing = (function () {
     var move = run.fsm === 'sailing' && !pv.on && !toggled ? inp.move() : 0;
     boat.step(b, move, dt, loc.width);
     ropeStep(run, dt); // Phase 21: after everything that moves the rod tip, the lure or the fish
+    G.scene.underwater.bodyStep(run, dt, loc); // Phase 22: the lure's heading and flutter
+    fx.setFlow(G.scene.underwater.flow(loc, 8)); // bubbles drift with the water
     // 7.6: the dog reads interest and the heavy-fish flag only while the lure is fishing.
     var fishing = FISHING[run.fsm] === 1;
     run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' || passiveFighting(run) ? 0.5 : 0);
@@ -1558,7 +1582,8 @@ if (G.core.debug) G.core.debug.addLine(function () {
 if (G.core.debug) G.core.debug.addLine(function () {
   var run = G.state.run, loc = G.scene.sailing.loc(), m = G.scene.sailing.scenery(), c = run.cast;
   if (!loc) return 'scenery: -';
-  var drift = loc.drift && G.scene.underwater.UNDER[run.fsm] ? '  current ' + loc.drift(c.seed, c.tw, c.ly - loc.waterY, false).toFixed(2) + ' px/s at ' + c.tw.toFixed(1) + ' s' : '';
+  var bd = G.scene.underwater.body();
+  var drift = loc.drift && G.scene.underwater.UNDER[run.fsm] ? '  current ' + bd.flow.toFixed(2) + ' px/s at ' + c.tw.toFixed(1) + ' s  flow x/y ' + G.scene.underwater.flow(loc, 0).toFixed(2) + '/0  lure angle ' + bd.angle + '  flutter ' + bd.flutter : '';
   return 'scenery ' + (loc.scenery || 'none') + (m && m.debugLine ? '  ' + m.debugLine(run) : '') + drift;
 });
 

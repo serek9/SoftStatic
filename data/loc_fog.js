@@ -5,6 +5,19 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // (a layer with parallax p is 320 + (width - 320) × p wide). Depths are pixels (metres = px × 0.25).
 G.data = G.data || {};
 G.data.locations = G.data.locations || {};
+
+// Phase 22: the lakes' current, a slow wind drift. px/s the lure drifts at t s after landing,
+// on the cast with this seed, at depth px (onBottom: it only creeps), with wind 0..1 (the
+// grey hours). Its direction turns slowly (once in `period` s) from a phase set by the seed;
+// it builds over `ramp` s and slows with depth (slack: the share lost at maxDepth). Pure, like
+// the creek's drift (11.1): a cast's path is fixed by its seed, the clock and the fixed dt.
+G.data.lakeDrift = function (L, seed, t, depth, onBottom, wind) {
+  var c = L.current, ph = (Math.imul(seed | 0, 0x9e3779b1) >>> 0) / 4294967296 * 6.2832;
+  var dir = Math.tanh(3 * Math.cos(ph + t * 6.2832 / c.period));
+  var v = (c.speed + c.wind * (wind || 0)) * (1 - Math.exp(-t / c.ramp)) * dir;
+  v *= 1 - c.slack * Math.min(1, Math.max(0, depth) / L.maxDepth);
+  return v * (onBottom ? c.bottom : 1);
+};
 G.data.locations.fog = {
   id: 'fog',
   name: 'Fogbound Lake',
@@ -18,6 +31,9 @@ G.data.locations.fog = {
   // waves are [wavelength px, speed px/s, share of amp]; mirror scales how much it shivers
   // the reflection. Fogbound is low and slow.
   swell: { amp: 1.3, mirror: 0.8, waves: [[96, 9, 0.5], [41, -6, 0.3], [23, 4, 0.2]] },
+  // Phase 22: a slow wind drift (G.data.lakeDrift above); lake: true, no current streaks.
+  current: { lake: true, speed: 0.4, wind: 0.35, ramp: 4, period: 240, slack: 0.75, bottom: 0.2 },
+  drift: function (seed, t, depth, onBottom, wind) { return G.data.lakeDrift(this, seed, t, depth, onBottom, wind); },
 
   // Back to front. Every layer is baked once and only drawn with drawImage.
   // Phase 15: painted layers (js/gfx/paint.js): far peaks, a nearer ridge with the tower and
