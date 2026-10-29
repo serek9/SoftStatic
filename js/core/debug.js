@@ -226,6 +226,9 @@ G.core.debug = (function () {
       return { hour: h, top: sc.skyColor(h, 0, [0, 0, 0]), horizon: sc.skyColor(h, 1, [0, 0, 0]), maxLum: +max.toFixed(1),
         ceiling: +S.CEILING.toFixed(1), safe: max <= S.CEILING + 0.001, night: +L.night.toFixed(2), grey: +L.grey.toFixed(2), dusk: +L.dusk.toFixed(2) };
     },
+    // dbg.audio() returns the audio context's state, the gains, the limiter and the last events;
+    // dbg.audio(ev) plays one sound by name (no name: the list).
+    audio: function (ev) { return ev === undefined ? G.audio.engine.info() : G.audio.engine.play(ev); },
     // dbg.fog() returns the alpha fog layers and the mist are drawn at now, the moon and the light on the water.
     fog: function () {
       var sc = G.scene.sailing, w = sc.waterLight();

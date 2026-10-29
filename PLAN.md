@@ -391,7 +391,8 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 11 Locations 2–4 | Done | `5c9b3c8` | Creek (current), Pines (set pieces), Red Room (moving structures, unlock), scenery hook, the shared pier. No fish there yet (14.2–14.4) |
 | 12 Passive and the tape | Done | `Phase 12: Passive and the tape` | `sim/passive.js` (61.6% of active income), live mode on TAB, time away, the tape with phantoms, `?compact`, one tab owns the save |
 | Audit batch 1: Atmosphere | Done | `Audit batch 1: Atmosphere` | From [SOFTSTATIC_IMPROVEMENT_AUDIT.md](SOFTSTATIC_IMPROVEMENT_AUDIT.md) (approved by the user 2026-10-29): sky, fog and mist, water light, visible gear, the map gate for unstocked waters, the creek canopy. Visual only (plus the map gate); replay and pacing unchanged |
-| 13 Audio | **Next** | | Start with task 13.1 (see 8.6), with the audit's P0-1 cues |
+| 13 Audio (audit batch 2) | Done | `Audit batch 2: Audio` | 13.1–13.4 in `js/audio/engine.js`, with the audit's P0-1 cues (bite, run, drag, reel, tension) |
+| Audit batch 3: Feel | **Next** | | P1-4 feedback, P1-6 the dog, P1-7 calm HUD (see 8.6) |
 | 14 Content and polish | Not started | | Milestone C |
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -529,6 +530,10 @@ These are interpretations and additions made while building, where the spec abov
 54. **Map gate (audit P0-2):** a water no species lives in (`G.ui.map.stocked(id)`) cannot be bought; the map says "The water is still settling. Nothing lives here yet." A water already bought stays open. UI only: `economy.canUnlock` and the pacing model are unchanged. It lifts by itself when 14.2–14.4 add the rosters.
 55. **The creek's canopy (P2-5, done early):** the `trunks` painter no longer draws loose crowns (they read as floating lollipops); trunks run off the top of the view and a ragged `moss_dark` canopy edge runs along the top.
 
+56. **Audio (Phase 13 and audit P0-1), all in `js/audio/engine.js`:** the context is created on the first key, click or touch (a modifier key alone is not a user activation in Chrome, so the first real key starts it) and suspended while the tab is hidden. Buses: music 0.45, ambience 0.75, effects 0.9, into a master gain (`volume × 0.8`, 0 when muted or while another tab owns the save) and a `DynamicsCompressor` limiter (−6 dB, ratio 20, attack 3 ms). Every one-shot has an attack of at least 5 ms and a peak gain of 0.12 or less. `index.html` calls `G.audio.engine.step(dt)` after every fixed step; the engine **reads state only** and plays what changed since the last step. So nothing in the sim knows about audio, and the replay and pacing are unchanged.
+57. **What plays (13.2–13.4):** ambience: wind (stronger in the grey hours), still water, lapping that grows with boat speed, a drone whose third tone goes out of tune with unease (+12 to +67 cents), the creek's stream, the Pines lot's 60 Hz hum (it drops out when the stuttering lamp does: `scenery.pines.lampLit(t)`, now shared by the drawing and the hum), night crickets at the creek and the Pines, a foghorn on Fogbound every 2–4 min and distant clanks on Fogbound and the creek (timing from `G.vrng`). Indoors (shop, cabin) the ambience goes through a 520 Hz low-pass. Effects: charge click, cast whoosh, landing splash, bite "plip" (panned to the line), hook-set, the run (a falling hiss when the fight turns from tired to pull), the slip, snap and escape, landing drips, card page, a soft sting for rare and legendary catches, the coin on a sale, the shop's purchase, menu pages, the heavy-fish line hum, the owl's two calls with an answer from the far shore, the traffic light's relay click, radio static on travel. Reel clicks while reeling (11/s) and the drag ratchet while a running fish takes line (26/s). The tension tone rises 160→420 Hz with T. The Pines play slow chords (Dm9, G13, Cmaj9, A7♭9), one every 4.5 s, each voice detuned and wobbling more as unease rises. The pause menu ducks the effects to 0.3.
+58. **Allocation note:** Web Audio one-shots need new source nodes, so each sound allocates a few nodes when it plays. These are events, not per-frame work. The per-step path only calls `setTargetAtTime` on existing nodes.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -538,11 +543,11 @@ No crashes or failing checks are known. Open items, roughly by importance:
 | 1 | ~~"Fog thickens in grey hours" (§0.8) is not built~~ Done in audit batch 1 (8.3 #51) | `js/scene/sailing.js` | Closed |
 | 2 | The creek, the Pines and the Red Room have no fish yet (since audit batch 1 the map does not sell them until they do, 8.3 #54), so the school stays empty there (the lure, drift, anomalies and the dog's stare all work). Their legendary spots wait for a legendary species, like Fogbound's | `data/fish.js` | 14.2–14.4 |
 | 3 | Placeholder roster limits: the journal's heavy-fish margin note cannot appear (no Fogbound fish is heavier than the starter rod's 3 kg); the dog never barks (no legendary); and the hidden spot's rare ×2 only pays inside the owl window (the only rare fish is window-only). Measured coins per hour at `reed_gap` vs open water: ×1.44 at 02:45, ×1.10 at 23:00. Each was checked with injected data or at the window | `data/fish.js` | 14.1 |
-| 4 | Volume and mute are saved and shown in the pause menu, but there is no audio yet | `js/ui/menu.js` | 13.1 |
+| 4 | ~~No audio yet~~ Done (8.3 #56) | `js/audio/engine.js` | Closed |
 | 5 | `tooHeavyNear` is recomputed only when a fish spawns, so after a rod upgrade it can stay stale until the next spawn | `js/sim/fish_ai.js` | Minor; fix when touched (7.6/7.7 behaviour) |
 | 6 | Pacing: location 2 median is 32 min, low in the 30–50 band. Hollow pike (an unease fish, about 150 coins each) make early income jumpy. Escapes are about 0% in fight sims. Cabin costs are not in the pacing model yet | `data/fish.js`, `data/gear.js` | 14.5 |
 | 7 | Hollow pike lands only ~51% at skill 0.8 with the starter line, by design (strength 1.6 > line 1.0) | `data/fish.js` | Review in 14.5 |
-| 8 | No sound: the slip sound, the heavy-fish line hum and the owl's cry are marked | `js/scene/underwater.js`, `js/scene/sailing.js` | 13.3 |
+| 8 | ~~No sound for the slip, the line hum and the owl~~ Done (8.3 #57) | `js/audio/engine.js` | Closed |
 | 9 | Anomaly cooldowns live in run state, so a reload resets them. Harmless, since anomalies only help, but noted | `js/sim/unease.js` | Leave unless it matters |
 | 10 | The per-phase Node and browser checks were not committed. Phases 1, 6, 7 and 8 used Node scripts in a temporary folder. Phases 9 and 10 used a headless-Brave DevTools driver plus Node checks (shop lines, anomaly scheduler, spot value, late hints), in the session scratchpad. `tools/balance.js` covers validation, replay and pacing; the rest can be rebuilt from the §4 "Done when" column | — | Optional: a `tools/` browser check |
 | 11 | Testing note: many `getImageData` reads on the game canvas make Chrome move it off the GPU, and the page drops to 16–40 fps until reloaded. This only affects pixel-reading tests; the game never reads pixels back. (The 9.3 check reads offscreen canvases from `journal.render()` instead.) | — | Keep pixel tests short, or reload after them |
@@ -550,7 +555,7 @@ No crashes or failing checks are known. Open items, roughly by importance:
 | 13 | The Red Room unlock accepts a catch in any window, not a specific fish (8.3 #34) | `data/loc_red.js` | 14.4 (with the pacing model) |
 | 14 | The pacing model still fishes only Fogbound, even after it buys the other waters | `tools/balance.js` | 14.5 |
 | 15 | The shop drains Fogbound's unease (`ui/shop.js` passes `loc: 'fog'`), whichever water you came from; 8.3 #23 says "the current location's". Harmless now that the shop is on the Fogbound shore, but the two disagree | `js/ui/shop.js` | Decide when touched |
-| 16 | No sound for the fluorescent lamp's hum or the Pines' jazz | `js/scene/scenery.js` | 13.2, 13.4 |
+| 16 | ~~No hum or jazz in the Pines~~ Done (8.3 #57) | `js/audio/engine.js` | Closed |
 | 17 | In the Pines at 02:47 and 03:33 two owls show: the perched one opens its eyes, and the window owl appears on its own snag | `js/scene/sailing.js` | Minor; could hand the cue to the perched owl |
 | 18 | Passive income swings a lot from seed to seed (0.36–0.84 of active over 60 min): a single Hollow Pike is worth ~150 coins. The mean is on target | `data/fish.js` | 14.5 |
 | 19 | On the creek, the Pines and the Red Room every passive cycle is "Nothing bit" until they have fish | `data/fish.js` | 14.2–14.4 |
@@ -583,29 +588,21 @@ Phase 12 checks. Node: `--passive` as above. Browser (headless Brave, fresh save
 
 Audit batch 1 checks (headless Chromium via Playwright, `?debug&seed=7`, fresh save): `dbg.sky(h)` for h = 0..23.75 in 0.25 steps is always `safe` (brightest 124.9 at 12:00 against the ceiling 147.9). Horizon at 03:00 [29, 36, 64], 06:00 [130, 78, 97], 12:00 [119, 125, 141] (grey, overcast), 19:00 [176, 104, 62]. `dbg.fog().alpha` at unease 0: 0.467 at 22:00, 0.833 at 12:00; at unease 1: 0.667 and 1. At 01:00 the moon is up (alpha 1, screen y 20) and the light path is under it (`fog_mid`, a 0.55). Reflection pass 0.40 ms. After `dbg.buy('lantern')`, `dbg.buy('depthFinder')` and two rods, the boat shows the lantern, its halo (also in the mirror), the finder's light and a rust rod. On a fresh save the map refuses the creek, the Pines and the Red Room with the settling message. No page errors.
 
+Audit batch 2 checks (headless Chromium, `?debug&seed=11`, fresh save): `dbg.audio()` reports "none (waiting for the first key or click)" until a key; after it the state is `running` with no console warnings. Master 0.64 at volume 0.8, 0 when muted, 0.4 at volume 0.5. Drone and wind at 03:00 0.05 and 0.012; at 12:00 0.025 and 0.037. The drone's out-of-tune voice is 12.2 cents off at unease 0 and 66 at unease 1. A forced catch logged `splash, plip, hook, slip, land, card`, then `coin` on the sale; `owl_eel` logged `sting`. At 02:47 the owl logged `owl`. In the Pines the log shows `relay` clicks and a `chord`. The pause menu ducks the effects bus to 0.27. Tension tone 243→409 Hz as T rose 0.37→0.87. Limiter −6 dB, ratio 20. Baselines unchanged.
+
 ### 8.6 Next task
 
-**Task 13.1 Audio engine**, in the §7 template:
+**Audit batch 3: Feel** (audit P1-4, P1-6, P1-7; the user asked on 2026-10-29 for the audit to be built batch by batch). Read the audit's §6 (P1-4, P1-6, P1-7) and §9 for the checks.
 
 ```
-Read: §0 Shared Conventions (0.14: no sudden loud sound, the limiter stays on), then §4 Task 13.1
-  only, plus V11 (audio). Also 8.3 above (decisions 17, 20: settings and overlays) and 8.4 (#4).
-Files you may touch: js/audio/engine.js (new; add it to index.html in the audio slot, where
-  the TODO(P13.1) comment is), js/ui/menu.js (only to drop its TODO(P13.1) once the engine
-  reads the settings).
-Do: G.audio.engine: a Web Audio context created and resumed on the first user input (key or
-  click; never before, so no autoplay warning), a master gain fed by music, ambience and
-  effects buses, a compressor as the always-on limiter before the destination, and volume and
-  mute read from save.settings (changes apply at once). No sounds yet beyond what the check
-  needs: 13.2 to 13.4 add them. Nothing in js/sim; the engine only reads state.
-Done when: no autoplay warning in the console on load; the context starts on the first key;
-  dbg hooks show the context state, bus gains, master gain and the limiter; mute and volume
-  from the pause menu change the master gain; node tools/balance.js --validate, --replay,
-  --pacing and --passive still pass.
-Report: what changed, the check output, any TODO stubs left; then update §8 (8.1, 8.4, 8.6).
+Files: js/scene/underwater.js (bite ring, hook burst, landing droplets), js/scene/sailing.js
+  (rod-tip dip), js/ui/card.js (eased slide-in), js/scene/dog.js + js/scene/sailing.js (pet the
+  dog with S/↓ while stopped, or a click on the dog), js/ui/hud.js (fade when idle).
+Do: what the audit §6 says for each; no hitstop or shake; no save change.
+Done when: the audit §9 rows for P1-4, P1-6, P1-7 pass; all four baselines unchanged.
 ```
 
-After 13.1, the rest of Phase 13 follows §4 in order: 13.2 ambience, 13.3 effects (including the TODO(P13.3) and TODO(P13.2) sounds already marked), 13.4 the Pines jazz and radio static. Then Phase 14 (content and polish, Milestone C).
+After batch 3: batch 5 (P2: ambient life, passive presentation, underwater dip, fish readability), then P3 and Phase 14 (rosters, balance, touch, performance, migrations).
 
 ---
 

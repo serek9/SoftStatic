@@ -884,7 +884,7 @@ G.scene.sailing = (function () {
   function mirrorFisher() { var A = G.state.run.anom; return !(A.on && A.what === 'empty_boat' && anomalyAlpha(A) > 0.5); }
 
   // 10.4: when the clock passes a window's cue, an owl calls from a snag on the shore in
-  // view, and the dog looks up. TODO(P13.3): the owl cry sound.
+  // view, and the dog looks up. audio/engine.js plays the cry at OWL.cry.
   function owlStep(run, save, hour0, dt) {
     var o = run.owl, k = G.sim.clock.cueCrossed(hour0, save.clock, G.data.windows);
     if (k >= 0) {

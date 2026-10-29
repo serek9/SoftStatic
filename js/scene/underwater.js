@@ -354,7 +354,7 @@ G.scene.underwater = (function () {
     } else if (fsm === 'fighting') {
       fightIn.reel = run.passive.on ? F.autoPlayer(run.fight, G.sim.passive.P.skill, G.rng) === 1 : inp.held('action'); // 12.2
       var res = F.step(run.fight, fightIn, dt, G.rng, G.data);
-      if (run.fight.slipped) fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); // TODO(P13.3): the soft slip sound
+      if (run.fight.slipped) fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); // the soft slip sound: audio/engine.js
       if (res === F.WIN) {
         run.hook.x0 = run.hook.x; run.hook.y0 = run.hook.y;
         G.core.state.go(run, 'landing');
@@ -385,7 +385,7 @@ G.scene.underwater = (function () {
       hv.state = 1; hv.t = 0; hv.dir = G.vrng.next() < 0.5 ? -1 : 1;
       hv.x = run.cast.x1 - hv.dir * 200; hv.y = run.cast.ly - G.scene.sailing.loc().waterY + 14; hv.hum = 0.6;
       if (G.core.debug) G.core.debug.log('something heavier circles here');
-      // TODO(P13.3): the single line hum sound.
+      // The single line hum is played by audio/engine.js when hv.state turns 1.
     }
     if (hv.state === 1) {
       hv.t += dt; hv.x += hv.dir * 40 * dt; hv.hum = Math.max(0, hv.hum - dt);

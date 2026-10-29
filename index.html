@@ -63,7 +63,8 @@
 <script src="js/ui/map.js"></script>
 <script src="js/ui/cabin.js"></script>
 <script src="js/ui/tape.js"></script>
-<!-- audio: TODO(P13.1) -->
+<!-- audio -->
+<script src="js/audio/engine.js"></script>
 
 <!-- boot -->
 <script>
@@ -126,7 +127,7 @@
 
   // An open overlay (pause, journal, map, tape) takes the step and the scene waits (9.2).
   G.core.loop.start({
-    update: function (dt) { if (!G.ui.menu.update(dt)) G.core.state.update(dt); },
+    update: function (dt) { if (!G.ui.menu.update(dt)) G.core.state.update(dt); G.audio.engine.step(dt); },
     draw: function (ctx) { G.core.state.draw(ctx); G.ui.menu.draw(ctx); },
     idle: idle,
     // ?compact: halve the full picture onto the page canvas (smoothed, so 1 px lines survive).
