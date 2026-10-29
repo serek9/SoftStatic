@@ -28,7 +28,9 @@ G.gfx.sprites = (function () {
     reed_dark: '#2f2a20', reed: '#4f4430', reed_hi: '#6f6040',
     rock_dark: '#1b1e25', rock: '#30343e', rock_lit: '#4c5262',
     dog_dark: '#6e4c2a', dog: '#a87b45', dog_hi: '#cfae78',
-    coat_dark: '#2a3426', coat: '#3f4d36', coat_hi: '#5b6b48', cap: '#7a3326'
+    coat_dark: '#2a3426', coat: '#3f4d36', coat_hi: '#5b6b48', cap: '#7a3326',
+    // The bait shop's painted interior: the lit side of a face.
+    skin_hi: '#cf9a82'
   };
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.

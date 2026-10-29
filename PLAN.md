@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-10-28, after Phase 12 (Passive and the tape). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-10-29, after Phase 16 (the bait shop's look). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -397,6 +397,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | Audit batch 6: Polish (P3) | Done | `Audit batch 6: Polish` | P3-1 drizzle, P3-2 still mode, P3-4 the 8.4 minors. P3-3 (a committed screenshot script) left out: it needs Playwright, a dependency the project does not have |
 | 14 Content and polish | Done | `Phase 14: Content and polish` | **Milestone C reached.** 36 species, final balance, touch, performance, save migrations |
 | 15 Visual detail | Done | `Phase 15: Visual detail` | Asked for by the user on 2026-10-29 (not in §4), against reference shots of Cast n Chill: tasks 15.1–15.6 in 8.3 #74–80 |
+| 16 The bait shop's look | Done | `Phase 16: Bait shop look` | Asked for by the user on 2026-10-29 (not in §4), against a reference shot of a pixel-art tackle shop: 8.3 #81 |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -573,6 +574,15 @@ These are interpretations and additions made while building, where the spec abov
 79. **Underwater (15.6):** the gradient runs from `water_lit` near the surface through blue-green to the deep (2 px steps). A far layer (parallax 0.6, wrapping every 640 px) holds broad rock formations with lit rims and kelp. The bed is lit along its top and speckled with sand, and the boulders are shaded (`u.sand` and `u.rocks` can override the colours).
 80. **Sky (15.1):** 28 bands (was 14), each edge dithered over two rows.
 
+**Phase 16, the bait shop's look (2026-10-29).** The user asked for the shop to look like a reference screenshot (a painted tackle-shop interior with a large shopkeeper behind the counter on the left, a tabbed item panel on the right). Presentation only, all in `js/ui/shop.js` plus one palette key (`skin_hi`); no sim, data or save change.
+
+81. **The shop, as built (16):**
+    - The left 200 px are one baked layer (`shop:room`, about 35 ms, baked on the first visit): vertical planks lit by a hanging green-shaded lamp and falling into dark at the edges; a shelf with a radio and books; two trophies drawn from the roster at 2× (`gloam_perch`, and `hollow_pike` for the stranger one); an oval BAIT & TACKLE sign; a pegboard of lure packets; a calendar, the fog window and tackle boxes on the right wall; the counter with a cubby of jars and an OPEN LATE notice; on it the keeper's hands, the register (its clock reads 3:33), a jar of worms, a bell and a notepad.
+    - The keeper is painted with shaded ellipses and capsules (grey bun, round glasses, plum cardigan, canvas apron with a stitched fish). She blinks on the old rhythm, and her mouth moves while her line is revealing; both are drawn over the bake from the scene's time.
+    - The speech bubble sits beside her head, its tail running from its lower corner toward her face.
+    - The panel: a tab per shelf (the shelves of 8.3 #23 are unchanged, and so are W/S for the shelf and A/D for the item), the shelf's name and the coins, the selected item at 2× in a tile with its name and price, the effect text, the status or the last message, and the shelf's items as bevelled 22 px tiles: the selected one framed in amber, a teal mark on the bait or equipment in use, the count in stock on baits. New 16×16 item icons (`shopi_*`); the tabs use small icons.
+    - `G.ui.shop.text()` now returns the name, status and message as wrapped lines; `select` and `act` still return strings.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -642,11 +652,11 @@ Phase 15 checks: `--validate` OK, `--replay 12345` still `2593400009` (identical
 
 ### 8.6 Next task
 
-**Every phase in §4 is done (Milestone C), and so is Phase 15 (visual detail).** There is no next task in the plan. Ideas, each needing the user's go-ahead:
+**Every phase in §4 is done (Milestone C), and so are Phase 15 (visual detail) and Phase 16 (the bait shop's look).** There is no next task in the plan. Ideas, each needing the user's go-ahead:
 - Playtesting notes on feel and pacing (8.4 #6).
 - Cabin costs in the pacing model.
 - A touch zone for petting the dog.
-- Painted detail for the Red Room's curtains and the shop and cabin interiors, to match Phase 15.
+- Painted detail for the Red Room's curtains and the cabin interior, to match Phase 15 and the shop (Phase 16).
 - More content (anomalies, shopkeeper lines, a fifth water).
 
 ---
