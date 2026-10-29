@@ -32,6 +32,7 @@ node tools/balance.js --replay 12345             # determinism
 node tools/balance.js --pacing                   # economy against the V8 targets
 node tools/balance.js --passive                  # passive income share and time away
 node tools/balance.js --saves                    # saves from every milestone still load
+node tools/balance.js --fight                    # how fights end by player and gear (Phase 23)
 ```
 
 On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`.
