@@ -10,6 +10,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.scene = G.scene || {};
 G.scene.underwater = (function () {
   var VIEW_W = 320, VIEW_H = 180;
+  var HI = 2; // bakes at HI × the world's resolution, as the sailing scene does (8.3 #89)
   var S = G.gfx.sprites, B = G.gfx.bake, P = S.PALETTE, fx = G.gfx.fx;
 
   var UW = {
@@ -30,8 +31,10 @@ G.scene.underwater = (function () {
   var mx = new Float32Array(MN), my = new Float32Array(MN), mp = new Float32Array(MN);
   var motesReady = false;
   // Background silhouettes (V3.4): far, dark, drifting; never interact with anything.
-  var BGN = 4, BG_SPR = ['fishsil_base_carp', 'fishsil_base_pike', 'fishsil_base_catfish', 'fishsil_base_trout'];
+  var BGN = 4, BG_BASE = ['carp', 'pike', 'catfish', 'trout'];
   var bx = new Float32Array(BGN), by = new Float32Array(BGN), bv = new Float32Array(BGN);
+  // Phase 19: streaks the current carries along where a water has one (loc.current, the creek).
+  var CN = 22, cx = new Float32Array(CN), cy = new Float32Array(CN), cl = new Float32Array(CN);
   var stats = { ms: 0 };
   var FAR_W = 640; // the far underwater layer wraps every FAR_W px (Phase 15)
 
@@ -58,125 +61,185 @@ G.scene.underwater = (function () {
     return prof;
   }
 
-  // Bakes (once per location) the gradient strip, bottom, three weed frames and a light shaft.
+  // Bakes (once per location) the gradient strip, bottom, three weed frames, the far layer and
+  // a light shaft. Phase 19: like the sailing scene (8.3 #89) everything is baked at HI times
+  // the world's resolution and drawn at 1/HI size, under the pixel-art rules of 8.3 #84: flat
+  // clusters of a few keys per material, outlines where things need separating, texture as
+  // deliberate strokes (strata, grain, bark), never dither or speckle.
   function prepare(loc) {
     var set = sets[loc.id];
     if (set) return set;
     var u = loc.underwater, w = loc.width, H = loc.maxDepth + 24, key = 'loc:' + loc.id + ':uw_';
+    var WH = w * HI, HH = H * HI, A = G.gfx.paint;
     var prof = makeProfile(loc), rng = new G.core.rng.Rng(loc.seed * 31 + 201);
     set = sets[loc.id] = { id: loc.id, H: H, prof: prof, camMax: Math.max(0, loc.waterY + loc.maxDepth + UW.bottomPad - VIEW_H) };
 
+    // The bed's top row for every layer column: the world profile, interpolated between world
+    // columns, where the lure (3 px tall, centred on its depth) rests.
+    var top = new Int16Array(WH), X;
+    for (X = 0; X < WH; X++) {
+      var x0 = Math.min(w - 1, Math.floor(X / HI)), x1 = Math.min(w - 1, x0 + 1), fr = X / HI - x0;
+      top[X] = Math.round((prof[x0] + (prof[x1] - prof[x0]) * fr + 1.5) * HI);
+    }
+    function topAt(X) { return top[clamp(Math.round(X), 0, WH - 1)]; }
+
     set.grad = B.cached(key + 'grad', function () {
-      return B.layer(1, H, function (ctx) {
-        for (var y = 0; y < H; y += 2) {
-          var f = y / H;
+      return B.layer(1, HH, function (ctx) {
+        for (var y = 0; y < HH; y += 4) {
+          var f = y / HH;
           // Phase 15: lit teal near the surface, through blue-green, to the deep.
           ctx.fillStyle = f < 0.3 ? lerpRGB('water_lit', 'water_mid', f / 0.3) : (f < 0.65 ? lerpRGB('water_mid', 'water_dark', (f - 0.3) / 0.35) : lerpRGB('water_dark', 'water_deep', (f - 0.65) / 0.35));
-          ctx.fillRect(0, y, 1, 2);
+          ctx.fillRect(0, y, 1, 4);
         }
       });
     });
 
     set.bottom = B.cached(key + 'bottom', function () {
-      return B.layer(w, H, function (ctx) {
-        var x, top;
-        var D = G.gfx.paint.dither;
-        for (x = 0; x < w; x++) {
-          top = prof[x] + 2; // the lure (3 px tall, centred on its depth) rests on this row
-          ctx.fillStyle = P[u.silt]; ctx.fillRect(x, top, 1, H - top);
-          ctx.fillStyle = P[u.rock]; ctx.fillRect(x, top, 1, 1);
-          // Phase 15: the bed is lit along its top and speckled with sand and grit below.
-          ctx.fillStyle = P[u.sand || 'wood'];
-          for (var yy = top + 1; yy < Math.min(H, top + 4); yy++) if (D(x, yy, 0.5 - (yy - top) * 0.12)) ctx.fillRect(x, yy, 1, 1);
-          if (rng.next() < 0.12) ctx.fillRect(x, top + rng.int(4, 12), 1, 1);
-        }
-        // Boulders, shaded: lit on the top left, dark below (Phase 15; they were flat blocks).
-        var RK = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' };
-        for (var i = 0; i < w / 18; i++) {
-          x = rng.int(4, w - 12);
-          var rw = rng.int(3, 8), rh = rng.int(2, 5), base = 1e9;
-          for (var k = -rw; k <= rw; k++) base = Math.min(base, prof[clamp(x + k, 0, w - 1)] + 3);
-          for (var by2 = -rh; by2 <= 0; by2++) for (var bx2 = -rw; bx2 <= rw; bx2++) {
-            if ((bx2 * bx2) / (rw * rw) + (by2 * by2) / (rh * rh) > 1) continue;
-            var l = (-bx2 / rw - by2 / rh) * 0.5 + rng.range(-0.2, 0.2);
-            ctx.fillStyle = P[l > 0.45 ? RK.lit : (l > -0.05 ? RK.mid : RK.dark)];
-            ctx.fillRect(x + bx2, base + by2, 1, 1);
+      return B.layer(WH, HH, function (ctx) {
+        A.reset();
+        var sand = u.sand || 'wood', SAND = [S.shift(sand, -1), sand, u.sand ? S.shift(sand, 1) : 'wood_mid'];
+        var silt = u.silt, siltDark = S.shift(silt, -1), ph = rng.range(0, 6.28);
+        // The strata follow a smoothed bed (a running mean of the top over 41 columns), so they
+        // lie in long, calm bands under the bumps instead of copying each one.
+        var sum = new Float64Array(WH + 1), sm = new Float32Array(WH), R = 20;
+        for (X = 0; X < WH; X++) sum[X + 1] = sum[X] + top[X];
+        for (X = 0; X < WH; X++) { var lo = Math.max(0, X - R), hi = Math.min(WH, X + R + 1); sm[X] = (sum[hi] - sum[lo]) / (hi - lo); }
+        // The bed: a lit rim, a band of sand, then silt that darkens a step two strata down,
+        // with grain strokes along some of the seams between strata.
+        A.area(ctx, 0, 0, WH, HH, function (x, y) {
+          var d = y - top[x];
+          if (d < 0) return '';
+          if (d < 2) return SAND[2];
+          if (d < 6) return SAND[1];
+          var s = y - sm[x] + 3 * Math.sin(x * 0.013 + ph) + 2 * Math.sin(x * 0.041), band = Math.floor(s / 10), seam = s - band * 10;
+          if (seam < 1 && band > 0 && A.hash2(Math.floor(x / 9), band) < 0.4) return band < 2 ? SAND[0] : silt;
+          return band < 2 ? silt : siltDark;
+        });
+        // Boulders, outlined and shaded in flat clusters, lit from the top left; some carry moss.
+        var RK = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' }, rim = S.shift(RK.dark, -1);
+        var ramp = [RK.dark, RK.mid, RK.lit], i, n;
+        for (i = 0; i < w / 18; i++) {
+          var bxw = rng.int(4, w - 12) * HI, rw = rng.int(3, 8) * HI, rh = rng.int(2, 5) * HI, base = 1e9;
+          for (var k = -rw; k <= rw; k += 2) base = Math.min(base, topAt(bxw + k) + 2);
+          var bcy = Math.round(base - rh * 0.3);
+          A.blob(ctx, bxw, bcy, rw + 1, rh + 1, [rim]);
+          A.blob(ctx, bxw, bcy, rw, rh, ramp, { rim: 0.3 });
+          A.line(ctx, rim, bxw + rng.int(-rw >> 1, 0), bcy - rng.int(0, rh >> 1), bxw + rng.int(1, rw >> 1), bcy + rng.int(1, rh >> 1));
+          if (rng.next() < 0.4) {
+            var mw = rng.int(3, rw);
+            A.box(ctx, u.weedDark, bxw - (mw >> 1) - 1, Math.round(base - rh * 1.3) + 1, mw, 2);
+            A.box(ctx, u.weed, bxw - (mw >> 1), Math.round(base - rh * 1.3), mw - 3, 1);
           }
         }
-        // 11.1: submerged branches standing up from the bottom to depth s.top (0: the surface).
-        var snags = u.snags || [];
-        for (var n = 0; n < snags.length; n++) {
-          var sn = snags[n], foot = prof[clamp(sn.x, 0, w - 1)] + 2, lean = rng.next() < 0.5 ? -1 : 1;
-          ctx.fillStyle = P.wood_dark;
-          for (var y = foot; y >= sn.top; y--) {
-            var h = foot - y, bx = sn.x + Math.round(lean * Math.sin(h * 0.05) * 6);
-            ctx.fillRect(bx, y, h < 12 ? 3 : 2, 1);
-            if (h > 6 && h % 11 === 0) {
-              var side = (h / 11) % 2 ? lean : -lean, len = rng.int(4, 9);
-              for (var q = 1; q <= len; q++) ctx.fillRect(bx + side * q, y - (q >> 1), 1, 1);
+        // Pebbles strewn along the bed's top.
+        for (X = rng.int(4, 30); X < WH - 4; X += rng.int(14, 46)) {
+          var pr = rng.range(1.5, 3.2), pt = Math.round(top[X] + 1 - pr * 0.4);
+          A.blob(ctx, X, pt, pr + 1, pr * 0.7 + 1, [rim]);
+          A.blob(ctx, X, pt, pr, pr * 0.7, ramp, { rim: 0 });
+        }
+        // 11.1: submerged branches standing up from the bottom to depth s.top (0: the surface):
+        // a tapering trunk in four bark keys (outline, shadow, bark, lit left edge) with notches,
+        // and side branches with twigs.
+        var snags = u.snags || [], BARK = ['wood_deep', 'wood_dark', 'wood', 'wood_mid'];
+        for (n = 0; n < snags.length; n++) {
+          var sn = snags[n], sx = sn.x * HI, foot = topAt(sx) + 2, lean = rng.next() < 0.5 ? -1 : 1, tip = sn.top * HI, len = foot - tip;
+          for (var y = foot; y >= tip; y--) {
+            var h = foot - y, cx = Math.round(sx + lean * Math.sin(h * 0.025) * 12), tw = Math.max(3, Math.round(7 - 4 * h / Math.max(1, len)));
+            A.box(ctx, BARK[0], cx - 1, y, tw + 2, 1);
+            A.box(ctx, BARK[1], cx, y, tw, 1);
+            A.box(ctx, BARK[2], cx, y, tw - 1, 1);
+            A.box(ctx, BARK[3], cx, y, 1, 1);
+            if (h % 9 === 4 && tw > 3) A.box(ctx, BARK[1], cx + 1, y, 2, 1); // a notch in the bark
+            if (h > 12 && h % 22 === 0) {
+              var side = (h / 22) % 2 ? lean : -lean, bl = rng.int(8, 18), ex = cx + (side > 0 ? tw : -1) + side * bl, ey = y - (bl >> 1);
+              A.line(ctx, BARK[0], cx + (side > 0 ? tw : -1), y + 1, ex, ey + 1);
+              A.line(ctx, BARK[2], cx + (side > 0 ? tw : -1), y, ex, ey);
+              A.line(ctx, BARK[1], ex - side * (bl >> 1), ey + (bl >> 2), ex - side * (bl >> 1) + side * 3, ey + (bl >> 2) - 5); // a twig
             }
           }
         }
+        A.reset();
       });
     });
 
-    // Weed strands, baked in three lean frames (-1, 0, 1) and cycled slowly.
+    // Weed strands, baked in three lean frames (-1, 0, 1) and cycled slowly: a stem two
+    // pixels wide, lit on one side, with blades that alternate up it.
     var strands = [], n = Math.round(w * u.weedDensity);
-    for (var s = 0; s < n; s++) strands.push({ x: rng.int(2, w - 3), h: rng.int(6, 22), dark: rng.next() < 0.5 });
+    for (var s = 0; s < n; s++) strands.push({ x: rng.int(2, w - 3) * HI + rng.int(0, 1), h: rng.int(6, 22) * HI, dark: rng.next() < 0.5, ph: rng.range(0, 6.28) });
     set.weeds = [];
     for (var f = 0; f < 3; f++) {
       set.weeds.push(B.cached(key + 'weeds' + f, (function (lean) {
         return function () {
-          return B.layer(w, H, function (ctx) {
+          return B.layer(WH, HH, function (ctx) {
+            A.reset();
             for (var i = 0; i < strands.length; i++) {
-              var st = strands[i], base = prof[st.x] + 2;
-              ctx.fillStyle = P[st.dark ? u.weedDark : u.weed];
+              var st = strands[i], base = topAt(st.x) + 1, k0 = st.dark ? u.weedDark : u.weed, k1 = st.dark ? u.weed : S.shift(u.weed, 1);
               for (var y = 0; y < st.h; y++) {
-                var dx = Math.round(lean * 2 * Math.pow(y / st.h, 1.5));
-                ctx.fillRect(st.x + dx, base - 1 - y, 1, 1);
-                if (y > 2 && y % 4 === 0) ctx.fillRect(st.x + dx + (y % 8 === 0 ? 1 : -1), base - 1 - y, 1, 1);
+                var q = y / st.h, dx = Math.round(lean * 4 * Math.pow(q, 1.5) + Math.sin(y * 0.18 + st.ph) * 1.5 * q), yy = base - 1 - y;
+                A.box(ctx, k0, st.x + dx, yy, 2, 1);
+                A.box(ctx, k1, st.x + dx, yy, 1, 1);
+                if (y > 4 && y % 7 === 0 && y < st.h - 3) {
+                  var sd = (y / 7) % 2 ? 1 : -1, bl = 3 + ((y * 3 + st.x) % 3);
+                  for (var b = 1; b <= bl; b++) A.px(ctx, b === bl ? k1 : k0, st.x + dx + (sd > 0 ? 1 + b : -b), yy - (b >> 1));
+                }
               }
             }
+            A.reset();
           });
         };
       })(f - 1)));
     }
 
     // Phase 15: far rock formations and kelp, a wrapping layer behind everything (parallax
-    // 0.6), in the water's own darker blues with lit rims on their left faces.
+    // 0.6), in the water's own darker blues: a lit rim on their left faces, the body, and a
+    // deeper band low down.
     set.far = B.cached(key + 'far', function () {
-      return B.layer(FAR_W, H, function (ctx) {
-        var r2 = new G.core.rng.Rng(loc.seed * 31 + 202), D = G.gfx.paint.dither, n = r2.int(6, 9), m, x, y;
-        for (m = 0; m < n; m++) {
-          var cx = r2.int(0, FAR_W - 1), hw = r2.int(40, 110), peak = Math.round(H * r2.range(0.4, 0.8));
+      var FW = FAR_W * HI;
+      return B.layer(FW, HH, function (ctx) {
+        A.reset();
+        var r2 = new G.core.rng.Rng(loc.seed * 31 + 202), nf = r2.int(6, 9), m, y;
+        for (m = 0; m < nf; m++) {
+          var cx = r2.int(0, FW - 1), hw = r2.int(40, 110) * HI, peak = Math.round(HH * r2.range(0.4, 0.8)), ph = r2.range(0, 6.28);
           for (var dx = -hw; dx <= hw; dx++) {
-            var X = ((cx + dx) % FAR_W + FAR_W) % FAR_W, t = peak + Math.round((H - peak) * Math.pow(Math.abs(dx) / hw, 2.4) + r2.range(-1, 1));
-            for (y = t; y < H; y++) {
-              var k = 'water_dark';
-              if (dx < 0 && y - t < 2) k = 'water_mid';
-              else if ((y - t) > 6 && D(X, y, 0.25)) k = 'water_deep';
-              ctx.fillStyle = P[k]; ctx.fillRect(X, y, 1, 1);
-            }
+            var Xw = ((cx + dx) % FW + FW) % FW, t = peak + Math.round((HH - peak) * Math.pow(Math.abs(dx) / hw, 2.4) + Math.sin(dx * 0.09 + ph) * 2);
+            var deep = t + 22 + Math.round(Math.sin(dx * 0.03 + ph) * 6);
+            A.box(ctx, 'water_dark', Xw, t, 1, HH - t);
+            if (dx < 0) A.box(ctx, 'water_mid', Xw, t, 1, dx < -hw * 0.3 ? 4 : 2);
+            if (deep < HH) A.box(ctx, 'water_deep', Xw, deep, 1, HH - deep);
           }
         }
-        ctx.fillStyle = P.water_mid;
         for (m = 0; m < 10; m++) {
-          var kx = r2.int(0, FAR_W - 1), kh = r2.int(Math.round(H * 0.3), Math.round(H * 0.8)), ph = r2.range(0, 6.28);
-          for (y = 0; y < kh; y++) ctx.fillRect(((kx + Math.round(Math.sin(y * 0.15 + ph) * 2)) % FAR_W + FAR_W) % FAR_W, H - 1 - y, 1, 1);
+          var kx = r2.int(0, FW - 1), kh = r2.int(Math.round(HH * 0.3), Math.round(HH * 0.8)), kp = r2.range(0, 6.28);
+          for (y = 0; y < kh; y++) {
+            var kxx = ((kx + Math.round(Math.sin(y * 0.075 + kp) * 4)) % FW + FW) % FW;
+            A.box(ctx, 'water_mid', kxx, HH - 1 - y, 2, 1);
+            if (y > 6 && y % 12 === 0) { var sd = (y / 12) % 2 ? 1 : -1; A.box(ctx, 'water_mid', kxx + (sd > 0 ? 2 : -4), HH - 1 - y - 1, 4, 1); }
+          }
         }
+        A.reset();
       });
     });
 
+    // A shaft of light: a slanting wedge in four flat steps of alpha, fading downward.
     set.shaft = B.cached(key + 'shaft', function () {
-      return B.layer(28, 70, function (ctx) {
+      return B.layer(28 * HI, 70 * HI, function (ctx) {
         ctx.fillStyle = P.water_hi;
-        for (var y = 0; y < 70; y++) {
-          ctx.globalAlpha = 0.22 * (1 - y / 70);
-          ctx.fillRect(Math.round(y * 0.3), y, 6 + Math.round(y / 14), 1);
+        var SH = 70 * HI;
+        for (var y = 0; y < SH; y++) {
+          ctx.globalAlpha = [0.22, 0.16, 0.1, 0.05][Math.floor(y * 4 / SH)];
+          ctx.fillRect(Math.round(y * 0.3), y, 12 + Math.round(y / 14), 1);
         }
         ctx.globalAlpha = 1;
       });
     });
+
+    // The water's roster as swimmers, every frame both ways in colour and as a silhouette,
+    // baked now (at the travel fade's black) rather than the first time each fish shows.
+    var FG = G.gfx.fishgen;
+    for (var i = 0; i < G.data.fish.length; i++) {
+      if (G.data.fish[i].locations.indexOf(loc.id) < 0) continue;
+      for (var q = 0; q < FG.frameCount(G.data.fish[i].look) * 4; q++) FG.swimmer(i, q >> 2, (q & 2) > 0, (q & 1) > 0);
+    }
     return set;
   }
 
@@ -248,11 +311,15 @@ G.scene.underwater = (function () {
     if (!motesReady) {
       for (var i = 0; i < MN; i++) { mx[i] = G.vrng.range(0, 1200); my[i] = G.vrng.range(0, set.H); mp[i] = G.vrng.range(0, 6.28); }
       for (var b = 0; b < BGN; b++) { bx[b] = G.vrng.range(0, 640); by[b] = G.vrng.range(20, loc.maxDepth - 10); bv[b] = G.vrng.range(2, 5) * (G.vrng.next() < 0.5 ? -1 : 1); }
+      for (var c = 0; c < CN; c++) { cx[c] = G.vrng.range(0, VIEW_W + 40); cy[c] = G.vrng.range(0.05, 0.9); cl[c] = G.vrng.range(4, 11); }
       motesReady = true;
     }
     if (uw.alpha > 0) {
       for (var j = 0; j < MN; j++) { mp[j] += dt * 0.8; my[j] += dt * 1.5; mx[j] += Math.sin(mp[j]) * 2 * dt; }
       for (var k = 0; k < BGN; k++) bx[k] += bv[k] * dt;
+      var cur = loc.current;
+      // Faster than the lure drifts (the eye needs it), slower with depth, as the drift is.
+      if (cur) for (var q = 0; q < CN; q++) cx[q] += cur.dir * cur.speed * 4 * (1 - cur.slack * cy[q]) * dt;
     }
   }
 
@@ -261,90 +328,110 @@ G.scene.underwater = (function () {
 
   // Fish (6.8). Reads the AI state only. Wrongness w makes the movement wrong too, all
   // decided by a hash of (fish, 1/8 s time bucket) so it never changes any state:
-  //   twitch: a 1 px jerk; uneven fins: the tail beat drifts out of step;
+  //   twitch: a one-pixel jerk; uneven fins: the tail beat drifts out of step;
   //   reversing: from w >= 2, a beat drawn facing backwards while still moving forwards;
-  //   shimmer: from w = 3, glitch frames.
+  //   shimmer: from w = 3 (or static), glitch frames.
+  // Phase 19: each fish is a swimmer (fishgen.swimmer), painted at swimming size in the view's
+  // pixels with its own ink outline, so the old 1 px silhouette ring is gone.
   function drawFish(ctx, loc, camPx, camPy, t) {
     var school = G.state.run.school, FG = G.gfx.fishgen, night = !G.sim.clock.isGrey(G.state.save.clock || 0);
     if (!school) return;
     for (var i = 0; i < school.fish.length; i++) {
       var f = school.fish[i];
       if (!f.active) continue;
-      var sp = G.data.fish[f.sp], w = sp.look.wrongness;
+      var look = G.data.fish[f.sp].look, w = look.wrongness;
       // Deeper than gearFx.nightDepth at night (no lantern): only a silhouette.
-      var name = night && f.y > G.state.run.gearFx.nightDepth ? FG.silhouette(f.sp) : FG.sprite(f.sp), d = S.get(name);
+      var dark = night && f.y > G.state.run.gearFx.nightDepth;
       var h = S.hash(f.uid, Math.floor(t * 8));
       var face = f.vx < -0.5 ? -1 : (f.vx > 0.5 ? 1 : f.dir);
       if (w >= 2 && (h & 63) < 2 + 2 * w) face = -face;
       var jx = 0, jy = 0;
-      if (w >= 1 && ((h >>> 6) & 31) < w * 3) { jx = ((h >>> 11) & 1) ? 1 : -1; jy = ((h >>> 12) & 1) ? 1 : 0; }
+      if (w >= 1 && ((h >>> 6) & 31) < w * 3) { jx = ((h >>> 11) & 1) ? 0.5 : -0.5; jy = ((h >>> 12) & 1) ? 0.5 : 0; }
       var fr = Math.floor(t * (2 + Math.abs(f.vx) / 6) + (w ? ((h >>> 13) & 3) * 0.3 * w : 0)) & 1;
-      if (d.n > 2 && ((h >>> 15) & 15) < w * 2) fr = 2;
-      var fxs = Math.round(f.x - camPx - d.w / 2) + jx, fys = Math.round(loc.waterY - camPy + f.y - d.h / 2) + jy;
-      if (name !== FG.silhouette(f.sp)) {
-        // P2-3: a dark 1 px outline (the silhouette drawn around it) so fish read at 1×.
-        var sil = FG.silhouette(f.sp), a0 = ctx.globalAlpha;
-        ctx.globalAlpha = a0 * 0.7;
-        S.draw(ctx, sil, fxs - 1, fys, fr, face < 0); S.draw(ctx, sil, fxs + 1, fys, fr, face < 0);
-        S.draw(ctx, sil, fxs, fys - 1, fr, face < 0); S.draw(ctx, sil, fxs, fys + 1, fr, face < 0);
-        ctx.globalAlpha = a0;
-      }
-      S.draw(ctx, name, fxs, fys, fr, face < 0);
+      if (FG.frameCount(look) > 2 && ((h >>> 15) & 15) < w * 2) fr = 2;
+      var cv = FG.swimmer(f.sp, fr, dark, face < 0);
+      drawSwimmer(ctx, cv, f.x - camPx + jx, loc.waterY - camPy + f.y + jy);
     }
   }
 
-  // P2-3: the boat's lantern at night throws a faint cone down into the water from the bow.
-  var cone = null;
+  // Draws a swimmer's canvas (view pixels) centred on world point (x, y): its middle across,
+  // its body's middle row down.
+  function drawSwimmer(ctx, cv, x, y) {
+    ctx.drawImage(cv, Math.round((x - cv.width / (2 * HI)) * HI) / HI, Math.round((y - cv.midY / HI) * HI) / HI, cv.width / HI, cv.height / HI);
+  }
+
+  // P2-3: the boat's lantern at night throws a faint cone down into the water from the bow,
+  // in four flat steps of alpha.
+  var cone = null, CONE_HW = 30; // half its width at the bottom, world px
   function drawCone(ctx, loc, camPx, wyS, alpha) {
     var g = G.state.save.gear, run = G.state.run;
     if (!g.lantern || G.sim.clock.isGrey(G.state.save.clock || 0)) return;
-    if (!cone) cone = B.layer(61, 70, function (c) {
+    if (!cone) cone = B.layer(CONE_HW * 2 * HI + 1, 70 * HI, function (c) {
       c.fillStyle = P.water_hi;
-      for (var y = 0; y < 70; y++) {
-        var hw = 2 + Math.round(y * 0.42);
-        c.globalAlpha = Math.round(0.3 * (1 - y / 70) * 10) / 10;
-        c.fillRect(30 - hw, y, hw * 2 + 1, 1);
+      var CH = 70 * HI, mid = CONE_HW * HI;
+      for (var y = 0; y < CH; y++) {
+        var hw = 4 + Math.round(y * 0.42);
+        c.globalAlpha = [0.3, 0.22, 0.14, 0.07][Math.floor(y * 4 / CH)];
+        c.fillRect(mid - hw, y, hw * 2 + 1, 1);
       }
     });
     ctx.globalAlpha = alpha;
-    ctx.drawImage(cone, Math.round(run.boat.x + run.boat.facing * 13 - camPx) - 30, wyS);
+    ctx.drawImage(cone, Math.round((run.boat.x + run.boat.facing * 13 - camPx) * HI) / HI - CONE_HW, wyS, cone.width / HI, cone.height / HI);
   }
 
-  // camPx, camPy: the rounded camera. alpha: how far the fade has got. t: time in seconds.
+  // A HI-res layer (a location's width) scrolled to camPx, drawn at screen y wyS.
+  function drawLayer(ctx, cv, camPx, wyS, H) {
+    ctx.drawImage(cv, Math.round(camPx * HI), 0, VIEW_W * HI, H * HI, 0, wyS, VIEW_W, H);
+  }
+
+  // camPx, camPy: the rounded camera (half pixels). alpha: how far the fade has got. t: time in seconds.
   function draw(ctx, loc, camPx, camPy, alpha, t) {
-    var t0 = performance.now(), set = prepare(loc), H = set.H, wyS = loc.waterY - camPy;
+    var t0 = performance.now(), set = prepare(loc), H = set.H, HH = H * HI, wyS = loc.waterY - camPy;
     // Phase 15: the cross-section is always drawn (the mirror band covers its top while
     // sailing), so the old opening wipe (audit P2-3) is the band shrinking instead.
     ctx.globalAlpha = alpha;
-    ctx.drawImage(set.grad, 0, 0, 1, H, 0, wyS, VIEW_W, H);
+    ctx.drawImage(set.grad, 0, 0, 1, HH, 0, wyS, VIEW_W, H);
 
     var every = loc.underwater.shaftEvery, par = camPx * 0.8, k0 = Math.floor(par / every) - 1;
     for (var k = k0; k < k0 + 4; k++) {
       ctx.globalAlpha = alpha * (0.55 + 0.45 * Math.sin(t * 0.6 + k * 1.7));
-      ctx.drawImage(set.shaft, Math.round(k * every + 40 - par), wyS);
+      ctx.drawImage(set.shaft, Math.round((k * every + 40 - par) * HI) / HI, wyS, set.shaft.width / HI, set.shaft.height / HI);
     }
     // The far formations (Phase 15), wrapping, behind the silhouettes.
-    var fo = ((Math.round(camPx * 0.6) % FAR_W) + FAR_W) % FAR_W, fw = Math.min(VIEW_W, FAR_W - fo);
+    var FW = FAR_W * HI, VW = VIEW_W * HI, fo = ((Math.round(camPx * 0.6 * HI) % FW) + FW) % FW, fw = Math.min(VW, FW - fo);
     ctx.globalAlpha = alpha * 0.85;
-    ctx.drawImage(set.far, fo, 0, fw, H, 0, wyS, fw, H);
-    if (fw < VIEW_W) ctx.drawImage(set.far, 0, 0, VIEW_W - fw, H, fw, wyS, VIEW_W - fw, H);
+    ctx.drawImage(set.far, fo, 0, fw, HH, 0, wyS, fw / HI, H);
+    if (fw < VW) ctx.drawImage(set.far, 0, 0, VW - fw, HH, fw / HI, wyS, (VW - fw) / HI, H);
     ctx.globalAlpha = alpha * 0.3;
     for (var b = 0; b < BGN; b++) {
       var bxs = ((bx[b] - camPx * 0.5) % 640 + 640) % 640 - 160; // parallax 0.5, wrapping
-      S.draw(ctx, BG_SPR[b], Math.round(bxs), Math.round(wyS + by[b]), Math.floor(t * 2 + b) & 1, bv[b] < 0);
+      drawSwimmer(ctx, G.gfx.fishgen.baseSwimmer(BG_BASE[b], 1, Math.floor(t * 2 + b) & 1, true, bv[b] < 0), bxs, wyS + by[b]);
     }
     drawCone(ctx, loc, camPx, wyS, alpha);
     ctx.globalAlpha = alpha;
-    ctx.drawImage(set.bottom, camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
-    ctx.drawImage(set.weeds[WEED_SEQ[Math.floor(t * 1.5) % 4]], camPx, 0, VIEW_W, H, 0, wyS, VIEW_W, H);
+    drawLayer(ctx, set.bottom, camPx, wyS, H);
+    drawLayer(ctx, set.weeds[WEED_SEQ[Math.floor(t * 1.5) % 4]], camPx, wyS, H);
     drawHeavy(ctx, loc, camPx, camPy, alpha);
     drawFish(ctx, loc, camPx, camPy, t);
 
-    ctx.globalAlpha = alpha * 0.5;
     ctx.fillStyle = P.water_hi;
+    var cur = loc.current;
+    if (cur) {
+      // The current: short streaks, each two dashes, drifting downstream (parallax 1).
+      ctx.fillStyle = P.water_foam;
+      ctx.globalAlpha = alpha * 0.3;
+      var span = VIEW_W + 40;
+      for (var c = 0; c < CN; c++) {
+        var sx = Math.round((((cx[c] - camPx) % span + span) % span - 20) * HI) / HI, sy = Math.round((wyS + 3 + cy[c] * loc.maxDepth) * HI) / HI, L = Math.round(cl[c]);
+        ctx.fillRect(sx, sy, L, 0.5);
+        ctx.fillRect(sx + L + 1.5, sy, Math.max(1, L >> 2), 0.5);
+      }
+      ctx.fillStyle = P.water_hi;
+    }
+    ctx.globalAlpha = alpha * 0.5;
     for (var i = 0; i < MN; i++) {
       var x = ((mx[i] - camPx * 0.9) % VIEW_W + VIEW_W) % VIEW_W;
-      ctx.fillRect(Math.round(x), Math.round(wyS + 2 + (my[i] % (H - 4))), 1, 1);
+      ctx.fillRect(Math.round(x * HI) / HI, Math.round((wyS + 2 + (my[i] % (H - 4))) * HI) / HI, 0.5, 0.5);
     }
     ctx.globalAlpha = 1;
     stats.ms = performance.now() - t0;
@@ -471,16 +558,13 @@ G.scene.underwater = (function () {
 
   function resetHeavy(run) { run.heavy.state = 0; run.heavy.hum = 0; }
 
+  // The heavy shadow: a bare catfish painted at twice the swimming size (never a scaled sprite).
   function drawHeavy(ctx, loc, camPx, camPy, alpha) {
     var hv = G.state.run.heavy;
     if (!hv || hv.state !== 1) return;
-    var fade = Math.min(1, hv.t / 1.5, (10 - hv.t) / 1.5), d = S.get('fishsil_base_catfish');
+    var fade = Math.min(1, hv.t / 1.5, (10 - hv.t) / 1.5);
     ctx.globalAlpha = alpha * 0.55 * Math.max(0, fade);
-    ctx.save();
-    ctx.translate(Math.round(hv.x - camPx - d.w), Math.round(loc.waterY - camPy + hv.y - d.h));
-    ctx.scale(2, 2);
-    S.draw(ctx, 'fishsil_base_catfish', 0, 0, Math.floor(hv.t * 1.5) & 1, hv.dir < 0);
-    ctx.restore();
+    drawSwimmer(ctx, G.gfx.fishgen.baseSwimmer('catfish', 2, Math.floor(hv.t * 1.5) & 1, true, hv.dir < 0), hv.x - camPx, loc.waterY - camPy + hv.y);
     ctx.globalAlpha = alpha;
   }
 
@@ -488,21 +572,21 @@ G.scene.underwater = (function () {
   function drawHooked(ctx, loc, camPx, camPy, t) {
     var run = G.state.run, fsm = run.fsm;
     if (fsm !== 'hooked' && fsm !== 'fighting' && fsm !== 'landing') return;
-    var h = run.hook, name = G.gfx.fishgen.sprite(h.sp), d = S.get(name), w = G.data.fish[h.sp].look.wrongness;
+    var h = run.hook, FG = G.gfx.fishgen, look = G.data.fish[h.sp].look, w = look.wrongness;
     var pull = fsm !== 'landing' && run.fight.mode === 'pull';
     var hh = S.hash(h.uid, Math.floor(t * 8)), jx = 0, jy = 0;
-    if (pull) { jx = (hh & 1) ? 1 : -1; jy = (hh & 2) ? 1 : 0; }             // thrash
-    else if (w && ((hh >>> 6) & 31) < w * 3) jx = (hh & 1) ? 1 : -1;          // wrongness twitch
+    if (pull) { jx = (hh & 1) ? 1 : -1; jy = (hh & 2) ? 0.5 : 0; }            // thrash
+    else if (w && ((hh >>> 6) & 31) < w * 3) jx = (hh & 1) ? 0.5 : -0.5;      // wrongness twitch
     var fr = Math.floor(t * (pull ? 10 : 2)) & 1;
-    if (d.n > 2 && ((hh >>> 15) & 15) < w * 2) fr = 2;
-    S.draw(ctx, name, Math.round(h.x - camPx - d.w / 2) + jx, Math.round(loc.waterY - camPy + h.y - d.h / 2) + jy, fr, h.face < 0);
+    if (FG.frameCount(look) > 2 && ((hh >>> 15) & 15) < w * 2) fr = 2;
+    drawSwimmer(ctx, FG.swimmer(h.sp, fr, false, h.face < 0), h.x - camPx + jx, loc.waterY - camPy + h.y + jy);
   }
 
   // Screen position of the hooked fish's mouth (where the line ties on), written into out.
   function mouth(loc, camPx, camPy, out) {
-    var h = G.state.run.hook, d = S.get(G.gfx.fishgen.sprite(h.sp));
-    out[0] = Math.round(h.x - camPx + h.face * (d.w / 2 - 1));
-    out[1] = Math.round(loc.waterY - camPy + h.y);
+    var h = G.state.run.hook, cv = G.gfx.fishgen.swimmer(h.sp, 0, false, h.face < 0);
+    out[0] = Math.round((h.x - camPx - cv.width / (2 * HI)) * HI) / HI + (cv.mouthX + 0.5) / HI;
+    out[1] = Math.round((loc.waterY - camPy + h.y - cv.midY / HI) * HI) / HI + (cv.mouthY + 0.5) / HI;
     return out;
   }
 

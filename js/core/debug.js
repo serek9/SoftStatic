@@ -242,17 +242,22 @@ G.core.debug = (function () {
   if (on) window.dbg = dbg;
 
   // `?gallery`: pages of everything the gfx layer can draw. A/D or arrows change page.
+  // Phase 19: native 640×360. The fish pages show the swimmers as the underwater view draws
+  // them (rest, tail flick, shimmer, flipped, silhouette): every species, then every part on
+  // every base, one base per page.
   var gallery = (function () {
     var pages = [], page = 0, t = 0, emitT = 0;
     var SAMPLE = 'The quick brown fox jumps over the lazy dog.';
-    var CELL_W = 80, CELL_H = 42, COLS = 4, ROWS = 4;
+    var SPECIES_PER = 20; // 4 columns × 5 rows of 160×64 cells
 
     function enter() {
-      if (G.gfx.fishgen) G.gfx.fishgen.defineGallery(); // every part on every base
-      var names = G.gfx.sprites.names, per = COLS * ROWS;
+      var FG = G.gfx.fishgen, i;
       pages = ['palette', 'font'];
-      for (var i = 0; i < names.length; i += per) pages.push('sprites:' + i);
-      pages.push('fx');
+      if (FG && G.data.fish) {
+        for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
+        for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
+      }
+      pages.push('sprites', 'fx');
       page = 0; t = 0;
     }
 
@@ -274,56 +279,85 @@ G.core.debug = (function () {
       G.gfx.fx.update(dt);
     }
 
+    // One swimmer cell: the frames in turn, the same flipped, and the silhouette. sp is a
+    // species index, or a part on the base `base` ('' for the bare base).
+    function art(sp, base, fr, sil, flip) { return base ? G.gfx.fishgen.partSwimmer(base, sp, fr, sil, flip) : G.gfx.fishgen.swimmer(sp, fr, sil, flip); }
+    function swimCell(ctx, sp, base, n, label, x0, y0, cw, ch) {
+      var F = G.gfx.sprites.fine, fr = Math.floor(t * 3) % n, a = art(sp, base, fr, false, false), b = art(sp, base, fr, false, true), c = art(sp, base, fr, true, false);
+      ctx.fillStyle = G.gfx.sprites.PALETTE.water_dark;
+      ctx.fillRect(x0, y0, cw - 4, ch - 4);
+      var yy = y0 + 4 + Math.max(0, (ch - 20 - a.height) >> 1);
+      ctx.drawImage(a, x0 + 3, yy);
+      ctx.drawImage(b, x0 + 6 + a.width, yy);
+      if (9 + a.width * 2 + c.width < cw - 4) ctx.drawImage(c, x0 + 9 + a.width * 2, yy);
+      else if (yy + a.height + c.height < y0 + ch - 18) ctx.drawImage(c, x0 + 3, yy + a.height);
+      F.drawText(ctx, label, x0 + 3, y0 + ch - 16, 'fog_light');
+    }
+
     function draw(ctx) {
-      var S = G.gfx.sprites, P = S.PALETTE, name = pages[page];
+      var S = G.gfx.sprites, F = S.fine, P = S.PALETTE, FG = G.gfx.fishgen, name = pages[page], arg = name.split(':')[1];
       ctx.fillStyle = P.night_ink;
-      ctx.fillRect(0, 0, 320, 180);
-      S.drawText(ctx, 'GALLERY  ' + name.split(':')[0] + '  ' + (page + 1) + '/' + pages.length + '   A/D: page', 4, 2, 'dusk_high');
+      ctx.fillRect(0, 0, 640, 360);
+      F.drawText(ctx, 'GALLERY  ' + name.split(':')[0] + (arg && isNaN(+arg) ? ' ' + arg : '') + '  ' + (page + 1) + '/' + pages.length + '   A/D: page', 8, 4, 'dusk_high');
 
       if (name === 'palette') {
         var keys = Object.keys(P);
         for (var i = 0; i < keys.length; i++) {
-          var cx = 4 + Math.floor(i / 14) * 106, cy = 13 + (i % 14) * 11;
+          var cx = 8 + Math.floor(i / 22) * 158, cy = 22 + (i % 22) * 15;
           ctx.fillStyle = P[keys[i]];
-          ctx.fillRect(cx, cy, 8, 8);
-          S.drawText(ctx, keys[i] + (S.SKY_WATER.test(keys[i]) ? '*' : ''), cx + 11, cy + 1, 'fog_light');
+          ctx.fillRect(cx, cy, 12, 12);
+          F.drawText(ctx, keys[i] + (S.SKY_WATER.test(keys[i]) ? '*' : ''), cx + 16, cy + 2, 'fog_light');
         }
-        S.drawText(ctx, '* sky/water: never brighter than ' + S.CEILING_KEY, 4, 171, 'fog_mid');
+        F.drawText(ctx, '* sky/water: never brighter than ' + S.CEILING_KEY, 8, 346, 'fog_mid');
       } else if (name === 'font') {
         for (var c = 32; c < 127; c++) {
           var k = c - 32;
-          S.drawText(ctx, String.fromCharCode(c), 6 + (k % 24) * 12, 14 + Math.floor(k / 24) * 10, 'bone');
+          F.drawText(ctx, String.fromCharCode(c), 12 + (k % 32) * 19, 24 + Math.floor(k / 32) * 16, 'bone');
         }
         for (var j = 0; j < 4; j++) {
-          S.drawText(ctx, 'jitter ' + (j / 3).toFixed(2), 4, 66 + j * 14, 'fog_mid');
-          S.drawText(ctx, SAMPLE, 60, 66 + j * 14, 'paper', j / 3, 7);
+          F.drawText(ctx, 'jitter ' + (j / 3).toFixed(2), 8, 100 + j * 18, 'fog_mid');
+          F.drawText(ctx, SAMPLE, 100, 100 + j * 18, 'paper', j / 3, 7);
         }
-        S.drawText(ctx, 'width of sample: ' + S.measure(SAMPLE) + ' px', 4, 126, 'fog_mid');
-      } else if (name.indexOf('sprites:') === 0) {
-        var start = +name.split(':')[1], names = S.names;
-        for (var s = start; s < Math.min(names.length, start + COLS * ROWS); s++) {
-          var cell = s - start, x0 = 4 + (cell % COLS) * CELL_W, y0 = 13 + Math.floor(cell / COLS) * CELL_H;
-          var d = S.get(names[s]), f = Math.floor(t * 3);
-          ctx.save();
-          ctx.beginPath(); ctx.rect(x0, y0, CELL_W - 2, CELL_H - 2); ctx.clip();
-          S.draw(ctx, names[s], x0, y0, f, false);
-          S.draw(ctx, names[s], x0 + d.w + 4, y0, f, true);
-          S.drawText(ctx, names[s] + ' ' + d.w + 'x' + d.h + ' x' + d.n, x0, y0 + CELL_H - 10, 'fog_light');
-          ctx.restore();
+        F.drawText(ctx, 'width of sample: ' + F.measure(SAMPLE) + ' px', 8, 176, 'fog_mid');
+        F.drawText(ctx, 'the 320x180 font (drawn at 1x):', 8, 200, 'fog_mid');
+        S.drawText(ctx, SAMPLE, 8, 216, 'paper');
+      } else if (name.indexOf('fish:') === 0) {
+        var start = +arg, fish = G.data.fish;
+        for (var s = start; s < Math.min(fish.length, start + SPECIES_PER); s++) {
+          var cell = s - start;
+          swimCell(ctx, s, '', FG.frameCount(fish[s].look),
+            fish[s].id + ' w' + fish[s].look.wrongness + ' ' + fish[s].look.base, 8 + (cell % 4) * 158, 20 + Math.floor(cell / 4) * 66, 158, 66);
+        }
+      } else if (name.indexOf('parts:') === 0) {
+        var list = [''].concat(FG.PARTS);
+        for (var q = 0; q < list.length; q++) {
+          swimCell(ctx, list[q], arg, list[q] === 'static' ? 3 : 2, list[q] || 'bare', 8 + (q % 4) * 158, 20 + Math.floor(q / 4) * 84, 158, 84);
+        }
+      } else if (name === 'sprites') {
+        // Whatever is still a small sprite (drawn at 1×, its own size).
+        var names = S.names;
+        for (var m = 0; m < names.length; m++) {
+          var d = S.get(names[m]), x0 = 8 + (m % 4) * 158, y0 = 22 + Math.floor(m / 4) * 40;
+          S.draw(ctx, names[m], x0, y0, Math.floor(t * 3), false);
+          S.draw(ctx, names[m], x0 + d.w + 4, y0, Math.floor(t * 3), true);
+          F.drawText(ctx, names[m] + ' ' + d.w + 'x' + d.h + ' x' + d.n, x0, y0 + 22, 'fog_light');
         }
       } else if (name === 'fx') {
+        // The particles are drawn in world pixels, as the sailing scene draws them.
+        ctx.setTransform(2, 0, 0, 2, 0, 0);
         ctx.fillStyle = P.water_dark;
         ctx.fillRect(0, 110, 320, 70);
         G.gfx.fx.draw(ctx, 0, 0);
-        S.drawText(ctx, 'splash', 50 - (S.measure('splash') >> 1), 172, 'fog_mid');
-        S.drawText(ctx, 'wake', 130 - (S.measure('wake') >> 1), 172, 'fog_mid');
-        S.drawText(ctx, 'bubbles', 210 - (S.measure('bubbles') >> 1), 120, 'fog_mid');
-        S.drawText(ctx, 'dust', 280 - (S.measure('dust') >> 1), 80, 'fog_mid');
-        S.drawText(ctx, 'live ' + G.gfx.fx.count() + '/' + G.gfx.fx.MAX, 4, 14, 'fog_light');
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        F.drawText(ctx, 'splash', 100 - (F.measure('splash') >> 1), 344, 'fog_mid');
+        F.drawText(ctx, 'wake', 260 - (F.measure('wake') >> 1), 344, 'fog_mid');
+        F.drawText(ctx, 'bubbles', 420 - (F.measure('bubbles') >> 1), 240, 'fog_mid');
+        F.drawText(ctx, 'dust', 560 - (F.measure('dust') >> 1), 160, 'fog_mid');
+        F.drawText(ctx, 'live ' + G.gfx.fx.count() + '/' + G.gfx.fx.MAX, 8, 24, 'fog_light');
       }
     }
 
-    return { enter: enter, exit: function () { G.gfx.fx.clear(); }, update: update, draw: draw };
+    return { native: true, enter: enter, exit: function () { G.gfx.fx.clear(); }, update: update, draw: draw };
   })();
 
   return { on: on, addLine: addLine, log: log, error: error, dbg: dbg, gallery: gallery };
