@@ -244,6 +244,14 @@ G.core.debug = (function () {
       var s = G.gfx.surface.stats;
       return { energy: +s.energy.toFixed(4), min: +s.min.toFixed(3), max: +s.max.toFixed(3), swell: +G.gfx.surface.amp().toFixed(3), ms: +s.ms.toFixed(4) };
     },
+    // dbg.rope() returns the line (Phase 21): points, line out, how straight (taut, 1 = straight),
+    // the largest sag from the straight line between its ends (world px), how many points lie on
+    // the surface, and the step's cost.
+    rope: function () {
+      var s = G.gfx.rope.st, w = G.gfx.rope.wet, on = 0;
+      for (var i = 0; i < w.length; i++) if (w[i] > 0) on++;
+      return { mode: ['off', 'pinned', 'loose'][s.mode], n: G.gfx.rope.N, onSurface: on, len: +s.rest.toFixed(2), span: +s.span.toFixed(2), taut: +s.taut.toFixed(3), sagMax: +s.sagMax.toFixed(2), ms: +s.ms.toFixed(4) };
+    },
     // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
     poke: function (x, s) {
       var b = G.state.run.boat;

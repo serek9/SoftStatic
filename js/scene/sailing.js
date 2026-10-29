@@ -551,18 +551,111 @@ G.scene.sailing = (function () {
     return out;
   }
 
-  // 1 px line between two screen points (Bresenham). dotted draws every other pixel.
-  // A line in the view's pixels between world points (dotted: every other pixel pair).
+  // A line in the view's pixels between world points (dotted: every other pixel pair). The
+  // dotting runs on across calls (lineN), so a polyline of short segments dots evenly.
+  var lineN = 0;
   function line(ctx, x0, y0, x1, y1, dotted) {
     x0 = Math.round(x0 * HI); y0 = Math.round(y0 * HI); x1 = Math.round(x1 * HI); y1 = Math.round(y1 * HI);
-    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy, n = 0, q = 1 / HI;
+    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy, q = 1 / HI;
     for (;;) {
-      if (!dotted || (n++ & 3) < 2) ctx.fillRect(x0 * q, y0 * q, q, q);
+      if (!dotted || (lineN++ & 3) < 2) ctx.fillRect(x0 * q, y0 * q, q, q);
       if (x0 === x1 && y0 === y1) break;
       var e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
       if (e2 <= dx) { err += dx; y0 += sy; }
     }
+  }
+
+  // ---- The line as a rope (Phase 21) ---------------------------------------------------
+  // gfx/rope.js simulates it; this drives it. Point 0 is held at the rod tip and the last at
+  // the lure, the float or the fish's mouth, where they are drawn. The rest length is how
+  // much line is out: paid out behind the flying lure and as it sinks (slack), taken up when
+  // reeling, pulled in tight by a bite, and set by tension in the fight. After a snap or a
+  // thrown fish the far end is let go and the line is reeled in loose.
+  var rope = G.gfx.rope, ROPE = { reel: 90, loose: 35, looseMax: 4 };
+  var lurePt = [0, 0], tipW = [0, 0];
+  var ropeFsm = '', ropeLure = false, ropeT = 0, nibT = 0, slipT = 0;
+
+  function surfY(x) { return floatY(x); }
+
+  // Where the lure is drawn (world px), the same in update and draw.
+  function lurePos(run, out) {
+    var c = run.cast, b = run.boat, fsm = run.fsm;
+    if (fsm === 'casting') {
+      if (c.flying) { out[0] = c.lx; out[1] = c.ly; } else { boat.rodTip(b, b.x, loc.waterY, rodPose(run, pose)[0], out); }
+      return out;
+    }
+    if (fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') return G.scene.underwater.mouth(loc, 0, 0, out);
+    var lx = c.x1, ly = c.ly;
+    if (c.ly - loc.waterY < 1.5) ly = Math.min(ly, Math.round(floatY(c.x1) * HI) / HI);  // just in, the lure rides the surface
+    if (fsm !== 'sinking') lx += Math.round(Math.sin(b.t * 1.3) * 1.5);                   // the lure sways once it stops
+    if (run.bite.slot >= 0) ly += 2 + Math.round(Math.sin(run.bite.t * 18));             // bite cue: the line dips
+    else if (G.sim.fish_ai.interestLevel(run.school) >= 0.85) lx += Math.round(Math.sin(b.t * 40)); // nibbles
+    out[0] = lx; out[1] = ly;
+    return out;
+  }
+
+  // The float's place (world px) in passive mode; it rides the surface and a fish pulls it under.
+  function floatPos(run, out) {
+    var pv = run.passive, on = passiveFighting(run);
+    out[0] = pv.x + (on ? Math.round(Math.sin(pv.t * 31)) : 0);
+    out[1] = Math.round((floatY(pv.x) - 2 + (on ? 2 : 0)) * HI) / HI + 2; // the float's foot, where the line ties on
+    return out;
+  }
+
+  function ropeStep(run, dt) {
+    var fsm = run.fsm, st = rope.st, b = run.boat, F = run.fight, pv = run.passive;
+    var was = ropeFsm;
+    ropeFsm = fsm;
+    boat.rodTip(b, b.x, loc.waterY, rodPose(run, pose)[0], tipW);
+    // A snap or a thrown fish: the far end goes, and the line is reeled in loose.
+    if (fsm === 'sailing' && was === 'fighting' && st.mode === rope.PINNED) {
+      var snap = F.result === G.sim.fight.SNAP;
+      rope.loosen(snap ? 120 : 20);
+      ropeLure = !snap; ropeT = 0;
+    }
+    if (st.mode === rope.LOOSE) {
+      ropeT += dt;
+      rope.anchors(tipW[0], tipW[1], 0, 0);
+      rope.setRest(st.rest - ROPE.loose * dt);
+      rope.step(dt, surfY);
+      if (st.rest <= 2 || ropeT > ROPE.looseMax || fsm === 'charging') rope.off();
+      return;
+    }
+    var passive = fsm === 'sailing' && pv.on && pv.pl;
+    if (fsm !== 'casting' && !G.scene.underwater.UNDER[fsm] && !passive) { rope.off(); return; }
+    if (st.mode === rope.OFF || (fsm === 'casting' && was !== 'casting')) rope.reset(tipW[0], tipW[1]);
+    if (passive) floatPos(run, lurePt); else lurePos(run, lurePt);
+    rope.anchors(tipW[0], tipW[1], lurePt[0], lurePt[1]);
+    var dx = lurePt[0] - tipW[0], dy = lurePt[1] - tipW[1], span = Math.sqrt(dx * dx + dy * dy), r = st.rest, k, pull = 0;
+    if (passive) r = span * 1.06 + 2;
+    else if (fsm === 'casting') r = Math.max(r, span * 1.12 + 1);                    // paying out behind the lure
+    else if (fsm === 'sinking') r = Math.max(r, span * 1.06 + 4);                    // the bail is open as it sinks
+    else if (fsm === 'waiting' || fsm === 'interest') {
+      if (run.bite.slot >= 0) { r = span + (r - span) * Math.exp(-20 * dt); pull = 0.25; } // a bite pulls it tight
+      else if (G.core.input.held('action')) r = Math.max(span, r - ROPE.reel * dt);  // reeling takes up the slack first
+      else r = Math.max(r, span * 1.02);
+      nibT -= dt;
+      if (run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85 && nibT <= 0) {
+        nibT = 0.25 + 0.3 * G.vrng.next();
+        rope.twitch(6, (G.vrng.next() - 0.5) * 1.2, 0.8);                             // a nibble twitches the end
+      }
+    } else if (fsm === 'hooked' || fsm === 'landing') { r = span * 0.98; pull = 0.3; }
+    else if (fsm === 'fighting') {
+      // Pulling hard the line is straight; easing, or a tired fish, lets it sag.
+      if (F.slipped) slipT = 0.35;
+      slipT = Math.max(0, slipT - dt);
+      var taut = F.mode === 'pull' && F.T > 0.5 && slipT <= 0;
+      k = F.mode === 'pull' ? Math.max(0, 0.5 - F.T) * 0.12 : (1 - F.T) * 0.12 + 0.02;
+      if (slipT > 0) k += 0.15;
+      // Slack in proportion to the line out, and a little more near the boat, where it is short.
+      var target = taut ? span * 0.97 : span * (1 + k) + (F.mode === 'tired' ? 4 * (1 - F.T) : 0);
+      r += (target - r) * Math.min(1, (target < r ? 10 : 20) * dt);
+      if (taut) pull = 0.5 + 0.4 * F.T;
+    }
+    rope.setRest(r);
+    rope.st.pull = pull;
+    rope.step(dt, surfY);
   }
 
   // Marker, line and lure, in screen space.
@@ -576,70 +669,52 @@ G.scene.sailing = (function () {
       ctx.globalAlpha = 1;
       return;
     }
-    var under = G.scene.underwater.UNDER[fsm] === 1;
-    if (fsm === 'sailing' && run.passive.on && run.passive.pl) { drawPassiveLine(ctx, run, wy); return; }
-    if (fsm !== 'casting' && !under) return;
+    var st = rope.st;
+    if (st.mode === rope.OFF) return;
     rodPose(run, pose);
-    var sx = Math.round(b.x - run.cam.x);
-    boat.rodTip(b, sx, wy, pose[0], tip);
-    if (fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') { drawFightLine(ctx, run); return; }
-    var lx, ly;
-    ctx.globalAlpha = 0.6;
-    ctx.fillStyle = P.fog_light;
-    if (fsm === 'casting') {
-      if (c.flying) { lx = c.lx - camPx; ly = c.ly - camPy; } else { lx = tip[0]; ly = tip[1]; }
-      line(ctx, tip[0], tip[1], lx, ly, false);
-    } else {
-      // Above the water the line runs to where the lure went in; below it drops dotted to the lure.
-      var ex = c.x1 - camPx, hum = run.heavy.hum > 0 ? Math.round(Math.sin(b.t * 90)) : 0;
-      var ey = Math.round((floatY(c.x1) - camPy) * HI) / HI; // Phase 20: the line goes in where the surface is
-      lx = ex; ly = c.ly - camPy;
-      if (c.ly - loc.waterY < 1.5) ly = Math.min(ly, ey);      // just in, the lure rides the surface
-      if (fsm !== 'sinking') lx += Math.round(Math.sin(b.t * 1.3) * 1.5);      // the lure sways once it stops
-      if (run.bite.slot >= 0) ly += 2 + Math.round(Math.sin(run.bite.t * 18)); // bite cue: the line dips
-      else if (G.sim.fish_ai.interestLevel(run.school) >= 0.85) lx += Math.round(Math.sin(b.t * 40)); // nibbles
-      line(ctx, tip[0], tip[1], ex, ey, false);
-      line(ctx, ex + hum, ey, lx + hum, ly, true); // hum: the line shivers once for a heavy fish
+    boat.rodTip(b, Math.round(b.x - run.cam.x), wy, pose[0], tip);
+    var passive = fsm === 'sailing' && run.passive.on && run.passive.pl, fight = fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing';
+    var end = null;
+    if (st.mode === rope.PINNED) {
+      end = passive ? floatPos(run, lurePt) : lurePos(run, lurePt);
+      end[0] -= camPx; end[1] -= camPy;
     }
-    ctx.globalAlpha = 1;
+    var F = run.fight, key = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : F.T) : 'fog_light';
+    var vib = fsm === 'fighting' && F.mode === 'pull' ? (0.4 + 0.9 * F.T) * Math.sin(b.t * 47) : 0; // the taut line hums
+    var hum = run.heavy.hum > 0 ? Math.round(Math.sin(b.t * 90)) : 0;
+    drawRope(ctx, end, key, fight ? 0.85 : 0.6, vib, hum);
+    if (passive) { ctx.drawImage(tinyArt('float'), Math.round(end[0] * HI) / HI - 1, end[1] - 3, 2, 4); return; }
+    if (fight) return;
+    var lx, ly;
+    if (end) { lx = end[0]; ly = end[1]; }
+    else if (ropeLure) { lx = rope.x[rope.N - 1] - camPx; ly = rope.y[rope.N - 1] - camPy; }
+    else return;
     ctx.drawImage(tinyArt('lure'), Math.round(lx * HI) / HI - 1.5, Math.round(ly * HI) / HI - 1.5, 3, 3);
   }
 
-  // 12.2: the passive line runs to a float; while a fish is on, the float pulls under and shakes.
-  function drawPassiveLine(ctx, run, wy) {
-    var pv = run.passive, b = run.boat, on = passiveFighting(run);
-    rodPose(run, pose);
-    boat.rodTip(b, Math.round(b.x - run.cam.x), wy, pose[0], tip);
-    // Phase 20: the float rides the surface (floatY); a fish pulls it under and shakes it.
-    var fxs = pv.x - camPx + (on ? Math.round(Math.sin(pv.t * 31)) : 0), fy = Math.round((floatY(pv.x) - camPy - 2 + (on ? 2 : 0)) * HI) / HI;
-    ctx.globalAlpha = 0.6; ctx.fillStyle = P.fog_light;
-    line(ctx, tip[0], tip[1], fxs, fy, false);
-    ctx.globalAlpha = 1;
-    ctx.drawImage(tinyArt('float'), Math.round(fxs * HI) / HI - 1, fy - 1, 2, 4);
-  }
-
-  // 7.4: pulling, the line runs straight and shakes; tired, it sags. The tint warms with
-  // tension (amber, then red) but the shape carries the meaning.
-  var mouthPt = [0, 0];
-  function drawFightLine(ctx, run) {
-    var F = run.fight, pull = run.fsm !== 'landing' && F.mode === 'pull';
-    G.scene.underwater.mouth(loc, camPx, camPy, mouthPt);
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = P[G.ui.hud.tensionKey(run.fsm === 'landing' ? 0 : F.T)];
-    var mx = (tip[0] + mouthPt[0]) / 2, my = (tip[1] + mouthPt[1]) / 2;
-    if (pull) {
-      var shake = Math.round(Math.sin(run.boat.t * 47));
-      line(ctx, tip[0], tip[1], mx + shake, my, false);
-      line(ctx, mx + shake, my, mouthPt[0], mouthPt[1], false);
-    } else {
-      var sag = 3 + 12 * (1 - F.T), steps = 24, px = tip[0], py = tip[1];
-      for (var i = 1; i <= steps; i++) {
-        var u = i / steps, v = 1 - u;
-        var qx = v * v * tip[0] + 2 * u * v * mx + u * u * mouthPt[0];
-        var qy = v * v * tip[1] + 2 * u * v * (my + sag) + u * u * mouthPt[1];
-        line(ctx, px, py, qx, qy, false);
-        px = qx; py = qy;
+  // The rope as a polyline: solid in the air, dotted and fainter under the surface (R3), a
+  // standing wave of vib px when it is pulled taut, and a lit pixel on segments turned to the
+  // light. The ends are drawn where the rod tip and the lure are drawn.
+  var ropeLight = { x: -1, a: 0 };
+  function drawRope(ctx, end, key, alpha, vib, hum) {
+    var X = rope.x, Y = rope.y, n = rope.N, px = tip[0], py = tip[1], lit = ropeLight.a > 0.05;
+    ctx.fillStyle = P[key];
+    lineN = 0;
+    for (var i = 1; i < n; i++) {
+      var qx = X[i] - camPx, qy = Y[i] - camPy;
+      if (i === n - 1 && end) { qx = end[0]; qy = end[1]; }
+      var u = i / (n - 1), wave = vib * Math.sin(u * 6.2832);
+      if (wave) { var ddx = X[i] - X[i - 1], ddy = Y[i] - Y[i - 1], dl = Math.sqrt(ddx * ddx + ddy * ddy) || 1; qx += -ddy / dl * wave; qy += ddx / dl * wave; }
+      var below = (Y[i - 1] + Y[i]) / 2 > floatY((X[i - 1] + X[i]) / 2) + 0.5;
+      ctx.globalAlpha = below ? alpha * 0.75 : alpha;
+      if (below && hum) { line(ctx, px + hum, py, qx + hum, qy, true); }
+      else line(ctx, px, py, qx, qy, below);
+      if (lit && !below && (i & 1) && (qx - px) * (ropeLight.x - (px + qx) / 2) * (py - qy) < 0) {
+        ctx.globalAlpha = Math.min(1, ropeLight.a * 1.6); ctx.fillStyle = P.bone;
+        ctx.fillRect(Math.round((px + qx) * HI / 2) / HI, Math.round((py + qy) * HI / 2) / HI, 1 / HI, 1 / HI);
+        ctx.fillStyle = P[key];
       }
+      px = qx; py = qy;
     }
     ctx.globalAlpha = 1;
   }
@@ -1201,6 +1276,7 @@ G.scene.sailing = (function () {
     }
     var move = run.fsm === 'sailing' && !pv.on && !toggled ? inp.move() : 0;
     boat.step(b, move, dt, loc.width);
+    ropeStep(run, dt); // Phase 21: after everything that moves the rod tip, the lure or the fish
     // 7.6: the dog reads interest and the heavy-fish flag only while the lure is fishing.
     var fishing = FISHING[run.fsm] === 1;
     run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' || passiveFighting(run) ? 0.5 : 0);
@@ -1393,6 +1469,7 @@ G.scene.sailing = (function () {
     camPy = Math.round(run.cam.y * HI) / HI;
     var a = run.uw.alpha, band = Math.round((loc.mirror || MIRROR) * (1 - a));
     var cols = G.gfx.surface.fill(camPx), wl = lightOnWater(hourNow());
+    ropeLight.x = wl.x; ropeLight.a = wl.a;
     drawBackdrop(ctx);
     // Phase 15: the split view. The cross-section is always there; at the surface a band of
     // mirror water covers its top, and shrinks to nothing as the view goes under (uw.alpha).
@@ -1425,7 +1502,8 @@ G.scene.sailing = (function () {
     skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
     rodPose: function () { return rodPose(G.state.run, [0, 0]); }, // debug: [angle, bend] now
     lift: function () { return plift.t; },
-    floatY: function (x) { return floatY(x); }, // Phase 20: the surface's height at world x, as floats sit on it
+    floatY: function (x) { return floatY(x); },
+    lureAt: function () { var r = G.state.run, o = [0, 0]; return r.passive.on && r.passive.pl ? floatPos(r, o) : lurePos(r, o); }, // debug: where the rope's far end is held // Phase 20: the surface's height at world x, as floats sit on it
     rain: function () { return loc ? rainK() : 0; },
     light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
     fogAlpha: function () { return fogMul() / FOG_HEAD; },
