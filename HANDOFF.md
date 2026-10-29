@@ -1,6 +1,6 @@
 # SoftStatic: Handoff
 
-How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-29, after Phase 22 of the realism phases ([PLAN_REALISM.md](PLAN_REALISM.md)), merged to `origin/main` by pull request.
+How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-29, after Phase 23 of the realism phases ([PLAN_REALISM.md](PLAN_REALISM.md)), merged to `origin/main` by pull request.
 
 ## State in one paragraph
 
@@ -33,6 +33,7 @@ Phases 1 to 12 of [PLAN.md](PLAN.md) are built, checked and committed, one commi
 | 20 Living water surface | `4fe07f5` | `js/gfx/surface.js`: a swell per water plus rippling; the waterline drawn from it; a mirror broken by ripples; caustics; floats, the line's entry and the pier posts riding the surface |
 | 21 The line as a rope | `4dfd50a` | `js/gfx/rope.js`: the line as a 48-point Verlet chain, slack until a bite, tight under tension, loose after a snap or escape; drawn solid in the air and dotted under water |
 | 22 Current and the lure | `Phase 22: Current and the lure` | A current on every water (`loc.drift`, the lakes' `G.data.lakeDrift`); the line bows in it and lifts the lure; the lure's body (heading, flutter, a sprite per bait); weeds, motes, bubbles and streaks move with the water; drifting into a spot counts |
+| 23 A fight you can lose | `Phase 23: A fight you can lose` | The hook hold H: head shakes and jumps work the hook loose on a slack line (V4 change, R2); `jumps` on eight species; the auto-player keeps tension; `--fight`; `--pacing` over 20 seeds; `incomeMult` 0.63; new replay hash |
 
 ## Architecture
 
@@ -47,7 +48,7 @@ js/gfx/              bake.js sprites.js paint.js fx.js water.js surface.js rope.
 js/scene/            boat.js dog.js underwater.js scenery.js sailing.js
 js/audio/            engine.js
 js/ui/               hud.js card.js menu.js journal.js shop.js map.js cabin.js tape.js
-tools/balance.js     --validate | --replay <seed> | --pacing | --passive | --saves
+tools/balance.js     --validate | --replay <seed> | --pacing | --passive | --saves | --fight
 ```
 
 - **Realism phases (20–25, [PLAN_REALISM.md](PLAN_REALISM.md)):** `G.gfx.surface` is a height field along the water in view pixels (swell from `loc.swell`, ripples from `poke(x, s, width)`); the waterline, the mirror's row shifts, the caustics and everything that floats read it (`sailing.floatY(x)`). `G.gfx.rope` is the line: `sailing.ropeStep` sets its anchors and rest length by state every update, and `drawRope` draws it. `underwater.flow(loc, depth)` is the current now, from the same `loc.drift` as the lure; the rope, the weeds, motes, bubbles and streaks use it, and `underwater.bodyStep`/`drawLure` give the lure its heading and bait sprite.
@@ -58,14 +59,14 @@ tools/balance.js     --validate | --replay <seed> | --pacing | --passive | --sav
 - **State:** `G.state.save` is saved. `G.state.run` is never saved and holds the boat, camera, cast (with its spot boost), school, fight, hook, the active anomaly, the owl, the spots as they stand (the Red Room moves them), the scenery module's state, passive mode and so on. The boot script fishes time away (`G.ui.tape.away`) before the first frame.
 - **Saves:** localStorage key `softstatic_save_v1`, save format version 4 (migrations from v1). They are stored per browser, so they do not travel with git.
 - **Keys:** A/D or arrows sail, Space (or mouse) casts and reels, W/S or ↑/↓ move in menus, Enter confirms, Esc goes back, P pauses, J journal, M map, TAB passive. URL flags: `?debug`, `?seed=N`, `?gallery`, `?compact`.
-- **Debug:** with `?debug`, the console has `dbg.state, hour, unease, tp, cast, lure, give(id, quick), land, spawn, dog, rod, money, buy, caught, save, wipe, sprite, fx, ui(name), travel(id), restore, anomaly(id), passive(on), away(seconds), tape(i), surface(), poke(x, s), rope(), lureBody()`.
+- **Debug:** with `?debug`, the console has `dbg.state, hour, unease, tp, cast, lure, give(id, quick), land, spawn, dog, rod, money, buy, caught, save, wipe, sprite, fx, ui(name), travel(id), restore, anomaly(id), passive(on), away(seconds), tape(i), surface(), poke(x, s), rope(), lureBody(), fight()`.
 
 ## How to continue on another computer
 
 1. **Clone** the repository: `git clone https://github.com/serek9/SoftStatic.git`.
 2. **Install Node** (any recent LTS; developed on v26) and **Python 3** to serve the files. VS Code Live Server works too. No `npm install` is needed: there are no dependencies.
 3. **Run the game:** `python3 -m http.server 5517 --bind 127.0.0.1` (on Windows, `python`), then open `http://127.0.0.1:5517/?debug`.
-4. **Check that everything works:** `node tools/balance.js --validate`, `node tools/balance.js --replay 12345` (hash `2593400009`), `node tools/balance.js --pacing`, `node tools/balance.js --passive`, `node tools/balance.js --saves`. All should end with OK or PASS and exit 0 (expected output in PLAN.md §8.5).
+4. **Check that everything works:** `node tools/balance.js --validate`, `node tools/balance.js --replay 12345` (hash `2038881623` since Phase 23), `node tools/balance.js --pacing`, `node tools/balance.js --passive`, `node tools/balance.js --fight`, `node tools/balance.js --saves`. All should end with OK or PASS and exit 0 (expected output in PLAN.md §8.5).
 5. **Claude Code:** open the folder and Claude will read [CLAUDE.md](CLAUDE.md). To resume, read PLAN.md §8.6 (the next realism phase in [PLAN_REALISM.md](PLAN_REALISM.md)). Visual work is checked with screenshots: in a cloud session, Playwright's Chromium against the local server (`?debug&seed=N`, then `dbg.hour(h)`, `dbg.tp(x)`, `dbg.ui(name)`, `G.scene.sailing.load(id)`). Claude's memory and settings are per machine and are not in git; everything it needs is in PLAN.md, CLAUDE.md and this file.
 6. **Moving a save:** saves stay in each browser (and only one tab plays a save at a time; an older tab waits until clicked). In the game, press P, choose **Export save** (it copies the save string, or shows it to copy), and on the other machine choose **Import save** and paste it (between casts). The console equivalents are `G.core.save.exportString(G.state.save)` and `G.ui.menu.importSave(s)`.
 
@@ -73,19 +74,20 @@ tools/balance.js     --validate | --replay <seed> | --pacing | --passive | --sav
 
 ## Pending work
 
-**Every phase in PLAN.md §4 is done** (Milestone C), and so is the improvement audit. So are Phases 15–19, which took the whole game to 640×360, and the realism Phases 20–22. Next is Phase 23 (a fight you can lose) in [PLAN_REALISM.md](PLAN_REALISM.md). There are no `TODO(Px.y)` markers in the code. Known issues are PLAN.md §8.4 (#24: the journal's first opening costs one ~90 ms frame; #25: three unused old sprites; #26: the reflection pass measures 2.1–2.4 ms in headless Chromium against a 2 ms budget, to re-measure on the reference laptop).
+**Every phase in PLAN.md §4 is done** (Milestone C), and so is the improvement audit. So are Phases 15–19, which took the whole game to 640×360, and the realism Phases 20–23. Next is Phase 24 (the boat under way) in [PLAN_REALISM.md](PLAN_REALISM.md). There are no `TODO(Px.y)` markers in the code. Known issues are PLAN.md §8.4 (#24: the journal's first opening costs one ~90 ms frame; #25: three unused old sprites; #26: the reflection pass measures 2.1–2.4 ms in headless Chromium against a 2 ms budget, to re-measure on the reference laptop).
 
 **Checks outside the repo:** the Phase 15–21 screenshot and check scripts (Playwright, in the session scratchpad), the per-phase Node scripts (Phases 1, 6, 7, 8) and the Phase 9–12 browser checks (a small headless-Brave DevTools driver in Node, plus Node checks of the shop lines, anomaly scheduler, spot value, late hints and the creek's drift; Phase 12's TAB-in-every-state, tape and two-tab checks) lived in temporary folders and are not in git. The checks that matter long-term are in `tools/balance.js`; the results of the rest are recorded in PLAN.md §8.5.
 
 ## Decisions and departures from the plan
 
-The full, numbered list is PLAN.md §8.3 (115 entries). The ones most likely to surprise:
+The full, numbered list is PLAN.md §8.3 (121 entries). The ones most likely to surprise:
 
 - **640×360 instead of 320×180** (user's decision, 2026-10-29): the sim still uses 320×180 world pixels; only drawing changed, so the replay hash and balance did not move.
 - **Pixel-art rules for new art** (§8.3 #84): no `ctx.scale` of art (except the sailing scene's half-size drawing of 2× bakes), no dithering, no random speckle, 3–6 flat keys per material, light that steps with planks or logs.
 - **Realism phases (20–25)** were asked for by the user and planned in [PLAN_REALISM.md](PLAN_REALISM.md), with five approved spec deviations (R1–R5): new files `surface.js` and `rope.js`, a fight that can be lost on a slack line, a simulated line instead of a vertical dotted one, a current on every water, and an optional `jumps` field on fish.
 - **The rope never moves the lure:** the lure's path is the sim's, and the rope is pinned to where the lure is drawn, so the replay hash did not change. Reeling takes up the slack fast instead of delaying the lure.
 - **Every water has a current now** (the lakes a slow wind drift, the Red Room one that turns round every 23 s). The live game's lure drifts; the balance models do not, so the baselines did not move. A lure that drifts into a spot gains its boost.
+- **Fish can get away on a slack line** (Phase 23, a change to V4 approved by the user): head shakes and jumps work the hook loose when tension is under 0.12. A careful player lands about 97%, a careless one about 70%; a loss is quiet, never a fail screen. This moved the replay hash and the pacing; `--pacing` now uses 20 seeds because 5 were too noisy, and passive's `incomeMult` is 0.63.
 - **Rusty** is an original shopkeeper in the spirit of the reference, not a copy; the shop's lines are still `data/dialogue.js`.
 
 - **Debug overlay and red errors are page text**, not canvas text. Save export/import also uses the browser's own prompt dialog when the clipboard is unavailable.

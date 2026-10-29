@@ -252,6 +252,13 @@ G.core.debug = (function () {
       for (var i = 0; i < w.length; i++) if (w[i] > 0) on++;
       return { mode: ['off', 'pinned', 'loose'][s.mode], n: G.gfx.rope.N, onSurface: on, len: +s.rest.toFixed(2), span: +s.span.toFixed(2), taut: +s.taut.toFixed(3), sagMax: +s.sagMax.toFixed(2), ms: +s.ms.toFixed(4) };
     },
+    // dbg.fight() returns the fight now (Phase 23): tension, distance, stamina, mode, the hook
+    // hold H, whether the fish shakes its head or jumps, the slips; null with no fish on.
+    fight: function () {
+      var F = G.state.run.fight;
+      if (!F.active) return null;
+      return { T: +F.T.toFixed(3), D: +F.D.toFixed(3), S: +F.S.toFixed(3), mode: F.mode, H: +F.H.toFixed(3), shake: F.shake > 0, jump: F.jump > 0, slips: F.slips };
+    },
     // dbg.lureBody() returns the lure's heading (degrees: 0 right, 90 down, 180 left), its
     // flutter 0..1, its velocity (px/s) and the current at it (Phase 22).
     lureBody: function () { return G.scene.underwater.body(); },

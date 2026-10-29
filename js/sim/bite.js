@@ -48,5 +48,13 @@ G.sim.bite = (function () {
     return NONE;
   }
 
-  return { B: B, NONE: NONE, HOOK: HOOK, MISS: MISS, create: create, reset: reset, step: step, miss: miss };
+  // Phase 23: the hook hold a hook-set gives, from how long the bite had waited (t s):
+  // 1 at once, holdLate at the window's end; passive mode always holdPassive.
+  function hold(t, auto, data) {
+    var k = data.gear.fight;
+    if (auto) return k.holdPassive;
+    return 1 - (1 - k.holdLate) * Math.min(1, Math.max(0, t) / B.hookWindow);
+  }
+
+  return { B: B, NONE: NONE, HOOK: HOOK, MISS: MISS, create: create, reset: reset, step: step, miss: miss, hold: hold };
 })();

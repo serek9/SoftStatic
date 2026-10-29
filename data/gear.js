@@ -48,7 +48,15 @@ G.data.gear = {
     pullRise: 0.5, easeFall: 0.7, run: 0.03,
     tiredRise: 0.06, release: 0.45, recover: 0.03,
     slipT: 0.6, slipD: 0.1, escape: 3,
-    d0: 0.6
+    d0: 0.6,
+    // Phase 23 (R2): the hook hold and what works it loose. hold*: H at the hook-set (late,
+    // passive); slackT: below this T the line is slack; holdLoss and jumpLoss: H lost per s in
+    // a shake or a jump on a slack line; shakes last shakeLen0..1 s, every shakeGap0..1 s
+    // divided by the fish's speed; shakeRise: extra T per s reeling in one; jumps: chance per s
+    // = fish.jumps × jumpRate when D < 0.5, jumpLen s long, a jump above jumpHigh adds jumpSpike T/s.
+    holdLate: 0.7, holdPassive: 0.85, slackT: 0.12, holdLoss: 0.7, jumpLoss: 0.6,
+    shakeLen0: 0.4, shakeLen1: 1.0, shakeGap0: 1.2, shakeGap1: 3, shakeRise: 0.25,
+    jumpRate: 0.25, jumpLen: 1, jumpHigh: 0.6, jumpSpike: 0.6
   },
 
   // Prices (V8): base × rarityMult × sizeFactor, sizeFactor from sizeMin to sizeMax.
@@ -65,5 +73,5 @@ G.data.gear = {
   ],
 
   // Passive mode earns this share of active income (D5). The only place it is set.
-  passive: { incomeMult: 0.6 }
+  passive: { incomeMult: 0.63 } // Phase 23: was 0.6; the fight change moved passive to 56.8% of active
 };

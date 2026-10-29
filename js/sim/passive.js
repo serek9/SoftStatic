@@ -55,7 +55,7 @@ G.sim.passive = (function () {
     if (pl.sp < 0) { pl.result = EMPTY; pl.total = pl.wait; return pl; }
 
     var sp = data.fish[pl.sp], F = G.sim.fight, st = ps.fight, inp = { reel: false }, r = F.NONE;
-    F.start(st, pl.sp, sp, fx, rng, data); // hooked by itself (V3.5)
+    F.start(st, pl.sp, sp, fx, rng, data, G.sim.bite.hold(0, true, data)); // hooked by itself (V3.5), at the passive hold (Phase 23)
     while (r === F.NONE && pl.fightT < P.fightMax) {
       inp.reel = F.autoPlayer(st, P.skill, rng) === 1;
       r = F.step(st, inp, DT, rng, data);

@@ -5,6 +5,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // the swimming AI moves at speed × 10 px/s), awareness in px,
 // caution 0..1 (chance to back off after nibbling), mass in kg (typical weight;
 // the rod's mass limit is checked against it, D4).
+// jumps 0..1 (optional, Phase 23): how often it leaps while pulling near the boat (fight.js).
 G.data = G.data || {};
 
 G.data.windows = [
@@ -62,7 +63,7 @@ G.data.fish = [
   // Needs high unease: only after sitting still a long while at night.
   {
     id: 'hollow_pike', name: 'Hollow Pike', rarity: 'uncommon', locations: ['fog'],
-    habitat: { depthMin: 4, depthMax: 16 }, speed: 2.2, strength: 1.6, fatigue: 0.08, mass: 2.8,
+    habitat: { depthMin: 4, depthMax: 16 }, speed: 2.2, strength: 1.6, fatigue: 0.08, mass: 2.8, jumps: 0.6,
     lengthCm: [55, 95], weightKg: [1.6, 4.0], awareness: 70, caution: 0.6,
     baitLikes: ['minnow', 'worm'], timeLikes: [22, 23, 0, 1, 2, 3, 4], windows: [], uneaseMin: 0.6, price: 60,
     desc: 'It only comes once you have waited. It knows you waited.', hintRefs: ['unease'],
@@ -89,7 +90,7 @@ G.data.fish = [
   // Legendary of the cold hole (the dog barks there). Needs a rod for 9 kg.
   {
     id: 'sleeper', name: 'The Sleeper', rarity: 'legendary', locations: ['fog'],
-    habitat: { depthMin: 18, depthMax: 24 }, speed: 1.8, strength: 2.2, fatigue: 0.05, mass: 9,
+    habitat: { depthMin: 18, depthMax: 24 }, speed: 1.8, strength: 2.2, fatigue: 0.05, mass: 9, jumps: 0.4,
     lengthCm: [120, 180], weightKg: [6, 12], awareness: 80, caution: 0.7,
     baitLikes: ['minnow', 'unlabelled'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0.3, price: 30,
     desc: 'It sleeps with its eyes open, over the cold hole past the wreck. They are not fish eyes.', hintRefs: ['spot:cold_hole', 'depth:deep'],
@@ -130,7 +131,7 @@ G.data.fish = [
   },
   {
     id: 'zipper_pike', name: 'Zipped Pike', rarity: 'uncommon', locations: ['creek'],
-    habitat: { depthMin: 6, depthMax: 14 }, speed: 2.0, strength: 1.5, fatigue: 0.08, mass: 3.2,
+    habitat: { depthMin: 6, depthMax: 14 }, speed: 2.0, strength: 1.5, fatigue: 0.08, mass: 3.2, jumps: 0.6,
     lengthCm: [60, 90], weightKg: [2.0, 4.5], awareness: 62, caution: 0.55,
     baitLikes: ['minnow'], timeLikes: [], windows: [], uneaseMin: 0, price: 30,
     desc: 'The zipper runs from gill to tail. It was closed when I caught it. Minnows, only minnows.', hintRefs: ['bait:minnow'],
@@ -154,7 +155,7 @@ G.data.fish = [
   },
   {
     id: 'ash_trout', name: 'Ash Trout', rarity: 'rare', locations: ['creek'],
-    habitat: { depthMin: 4, depthMax: 12 }, speed: 1.8, strength: 1.3, fatigue: 0.08, mass: 1.6,
+    habitat: { depthMin: 4, depthMax: 12 }, speed: 1.8, strength: 1.3, fatigue: 0.08, mass: 1.6, jumps: 0.4,
     lengthCm: [40, 65], weightKg: [1.0, 2.4], awareness: 66, caution: 0.6,
     baitLikes: ['minnow', 'worm'], timeLikes: [1, 2, 3, 4], windows: [], uneaseMin: 0.4, price: 85,
     desc: 'Two tails, and it swims with both. It comes after one in the morning, once the creek has gone quiet around you.', hintRefs: ['unease', 'hour:night'],
@@ -163,7 +164,7 @@ G.data.fish = [
   // Legendary of the black pool. Needs a rod for 8 kg.
   {
     id: 'grandmother', name: 'Grandmother', rarity: 'legendary', locations: ['creek'],
-    habitat: { depthMin: 12, depthMax: 16 }, speed: 1.2, strength: 2.0, fatigue: 0.04, mass: 8,
+    habitat: { depthMin: 12, depthMax: 16 }, speed: 1.2, strength: 2.0, fatigue: 0.04, mass: 8, jumps: 0.3,
     lengthCm: [110, 160], weightKg: [5.5, 11], awareness: 70, caution: 0.7,
     baitLikes: ['minnow', 'unlabelled'], timeLikes: [], windows: [], uneaseMin: 0, price: 32,
     desc: 'Older than the cabins. Bark grows on her back. She lives in the black pool between them.', hintRefs: ['spot:black_pool', 'depth:deep'],
@@ -220,7 +221,7 @@ G.data.fish = [
   },
   {
     id: 'signal_pike', name: 'Signal Pike', rarity: 'uncommon', locations: ['pines'],
-    habitat: { depthMin: 10, depthMax: 22 }, speed: 2.1, strength: 1.7, fatigue: 0.08, mass: 4.2,
+    habitat: { depthMin: 10, depthMax: 22 }, speed: 2.1, strength: 1.7, fatigue: 0.08, mass: 4.2, jumps: 0.6,
     lengthCm: [70, 105], weightKg: [2.8, 5.6], awareness: 64, caution: 0.6,
     baitLikes: ['minnow'], timeLikes: [], windows: [], uneaseMin: 0, price: 50,
     desc: 'It strikes on the yellow. Bring minnows, and watch the light: when it hurries, so does the pike.', hintRefs: ['bait:minnow'],
@@ -238,7 +239,7 @@ G.data.fish = [
   // Legendary of the drowned lane. Needs the longest rod (14 kg).
   {
     id: 'feathered_muskie', name: 'Feathered Muskie', rarity: 'legendary', locations: ['pines'],
-    habitat: { depthMin: 16, depthMax: 28 }, speed: 2.0, strength: 2.4, fatigue: 0.05, mass: 14,
+    habitat: { depthMin: 16, depthMax: 28 }, speed: 2.0, strength: 2.4, fatigue: 0.05, mass: 14, jumps: 0.8,
     lengthCm: [130, 190], weightKg: [9, 18], awareness: 78, caution: 0.7,
     baitLikes: ['minnow', 'unlabelled'], timeLikes: [], windows: [], uneaseMin: 0, price: 35,
     desc: 'The owl watches the water for it. Feathers where the scales should be. It keeps to the lane where the road goes under.', hintRefs: ['spot:lane_deep', 'bait:unlabelled'],
@@ -312,7 +313,7 @@ G.data.fish = [
   // Legendary, window-only (02:47), over the floor drain. Needs the longest rod (16 kg).
   {
     id: 'the_dreamer', name: 'The Dreamer', rarity: 'legendary', locations: ['red'],
-    habitat: { depthMin: 14, depthMax: 20 }, speed: 1.4, strength: 2.3, fatigue: 0.04, mass: 16,
+    habitat: { depthMin: 14, depthMax: 20 }, speed: 1.4, strength: 2.3, fatigue: 0.04, mass: 16, jumps: 0.2,
     lengthCm: [140, 200], weightKg: [10, 20], awareness: 72, caution: 0.7,
     baitLikes: ['unlabelled', 'minnow'], timeLikes: [], windows: ['owl_247'], uneaseMin: 0, price: 40,
     desc: 'Two of it, joined at the side, dreaming the same dream. It wakes over the drain in the floor when the owl calls at 02:47.', hintRefs: ['spot:floor_drain', 'window:owl_247'],
@@ -343,6 +344,7 @@ G.data.validateFish = function (fish, ref) {
     }
     if (!f.habitat || !num(f.habitat.depthMin) || !num(f.habitat.depthMax) || f.habitat.depthMin < 0 || f.habitat.depthMin >= f.habitat.depthMax) errs.push(p + 'habitat');
     ['speed', 'strength', 'fatigue', 'mass', 'awareness', 'price'].forEach(function (k) { if (!num(f[k]) || f[k] <= 0) errs.push(p + k); });
+    if (f.jumps !== undefined && !(num(f.jumps) && f.jumps >= 0 && f.jumps <= 1)) errs.push(p + 'jumps (0..1, optional; Phase 23)');
     if (!num(f.caution) || f.caution < 0 || f.caution > 1) errs.push(p + 'caution');
     if (!pair(f.lengthCm)) errs.push(p + 'lengthCm');
     if (!pair(f.weightKg)) errs.push(p + 'weightKg');

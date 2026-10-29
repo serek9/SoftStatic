@@ -503,7 +503,7 @@ G.scene.underwater = (function () {
 
   function createCatch() {
     return {
-      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0, drip: -1, wet: 0, churn: 0 },
+      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0, drip: -1, wet: 0, churn: 0, air: false },
       heavy: { state: 0, t: 0, x: 0, y: 0, dir: 1, hum: 0 } // 7.7: 0 none yet this cast, 1 passing, 2 done
     };
   }
@@ -511,14 +511,15 @@ G.scene.underwater = (function () {
   // The fish on the bite is hooked: roll its size, start the fight, scatter the rest.
   function hook(run) {
     var b = run.bite, f = run.school.fish[b.slot], sp = G.data.fish[f.sp], h = run.hook, boatB = run.boat;
-    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; // wet: 1 until it leaves the water
+    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false; // wet: 1 until it leaves the water
     fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
     h.depth = f.y;
     h.q = G.rng.next();
     h.len = Math.round((sp.lengthCm[0] + (sp.lengthCm[1] - sp.lengthCm[0]) * h.q) * 10) / 10;
     h.w = Math.round((sp.weightKg[0] + (sp.weightKg[1] - sp.weightKg[0]) * Math.pow(h.q, 1.3)) * 100) / 100;
-    G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data); // gearFx: lineStrength, reelSpeed
+    // gearFx: lineStrength, reelSpeed; Phase 23: the hook hold from how long the bite had waited
+    G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data, G.sim.bite.hold(b.t, run.passive.on, G.data));
     f.active = false;
     G.sim.fish_ai.scatter(run.school);
     G.sim.bite.reset(b);
@@ -550,9 +551,17 @@ G.scene.underwater = (function () {
         // Phase 20: a fish pulling near the surface (above 4 m) churns it, harder the shallower.
         if (h.y < SHALLOW) { h.churn += dt * 5; if (h.churn >= 1) { h.churn -= 1; G.gfx.surface.poke(h.x, 0.4 * (1 - h.y / SHALLOW), 2); } }
       }
+      // Phase 23: a jump lifts it clear of the water in an arc and drops it back.
+      var jl = G.data.gear.fight.jumpLen;
+      if (F.jump > 0) ty = -14 * Math.sin(Math.PI * (1 - F.jump / jl));
       h.x += (tx - h.x) * Math.min(1, 5 * dt);
-      h.y += (ty - h.y) * Math.min(1, 4 * dt);
-      h.y = clamp(h.y, 2, bottomAt(loc, h.x) - 2);
+      h.y += (ty - h.y) * Math.min(1, (F.jump > 0 ? 14 : 4) * dt);
+      h.y = clamp(h.y, F.jump > 0 ? -16 : 2, bottomAt(loc, h.x) - 2);
+      var air = h.y < 0;
+      if (air !== h.air) { // out of the water, or back in: a splash and a dent in the surface
+        h.air = air;
+        fx.splash(h.x, loc.waterY, air ? 0.5 : 0.8);
+      }
       var away = h.x >= b.x ? 1 : -1;
       h.face = F.mode === 'pull' ? away : -away;
     }
@@ -791,6 +800,12 @@ if (G.core.debug) G.core.debug.addLine(function () {
     G.scene.underwater.stats.ms.toFixed(2) + ' ms';
 });
 
+if (G.core.debug) G.core.debug.addLine(function () {
+  var F = G.state.run.fight;
+  if (!F || !F.active) return 'fight -';
+  return 'fight ' + F.mode + '  T ' + F.T.toFixed(2) + '  D ' + F.D.toFixed(2) + '  S ' + F.S.toFixed(2) + '  H ' + F.H.toFixed(2) +
+    (F.shake > 0 ? '  SHAKE' : '') + (F.jump > 0 ? '  JUMP' : '') + '  slips ' + F.slips; // Phase 23
+});
 if (G.core.debug) G.core.debug.addLine(function () {
   var school = G.state.run.school, s = '', n = 0;
   if (!school) return 'fish: -';

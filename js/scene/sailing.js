@@ -558,6 +558,7 @@ G.scene.sailing = (function () {
         out[0] = CAST.waitAngle + 8 - 10 * F.T;
         out[1] = F.mode === 'pull' ? 4 + 5 * F.T : 1 + 2 * F.T;
         if (run.fsm === 'hooked') out[1] += 6 * (1 - Math.min(1, run.hook.t / 0.3)); // the hook-set snaps the rod (P1-4)
+        if (F.shake > 0) { out[0] -= 5 * Math.abs(Math.sin(run.boat.t * 26)); out[1] += 2; } // Phase 23: a head shake knocks the tip
         break;
       case 'landing':
         out[0] = 70; out[1] = 2;
@@ -666,13 +667,16 @@ G.scene.sailing = (function () {
       // Pulling hard the line is straight; easing, or a tired fish, lets it sag.
       if (F.slipped) slipT = 0.35;
       slipT = Math.max(0, slipT - dt);
-      var taut = F.mode === 'pull' && F.T > 0.5 && slipT <= 0;
+      var taut = F.mode === 'pull' && F.T > 0.45 && slipT <= 0; // from 0.45, so it is straight by 0.5
       k = F.mode === 'pull' ? Math.max(0, 0.5 - F.T) * 0.12 : (1 - F.T) * 0.12 + 0.02;
       if (slipT > 0) k += 0.15;
       // Slack in proportion to the line out, and a little more near the boat, where it is short.
       var target = taut ? span * 0.97 : span * (1 + k) + (F.mode === 'tired' ? 4 * (1 - F.T) : 0);
       r += (target - r) * Math.min(1, (target < r ? 10 : 20) * dt);
       if (taut) pull = 0.5 + 0.4 * F.T;
+      // Phase 23: a head shake jerks the line near the fish.
+      nibT -= dt;
+      if (F.shake > 0 && nibT <= 0) { nibT = 0.12; k = taut ? 0.3 : 1; rope.twitch(10, (G.vrng.next() - 0.5) * 3 * k, (G.vrng.next() - 0.5) * 2 * k); } // less on a taut line
     }
     rope.setRest(r);
     rope.st.pull = pull;

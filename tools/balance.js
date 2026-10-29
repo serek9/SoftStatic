@@ -7,6 +7,7 @@
 //                                                 prints its hash and fails if the runs differ
 //   node tools/balance.js --passive               passive income against active (V7: 60% ±5%),
 //                                                 and time away fished twice gives the same result
+//   node tools/balance.js --fight                 how fights end by player and gear tier (Phase 23)
 // It loads the same files index.html loads, in the same order, into a vm context.
 'use strict';
 const vm = require('vm'), fs = require('fs'), path = require('path');
@@ -111,7 +112,8 @@ function validate(G, opts) {
   if (!g.baits.some(b => b.label === false && b.rareBoost > 1)) err('bait: the unlabelled shelf item must be a real rare bait');
   if (!(g.lantern.nightDepth > g.nightDepth)) err('lantern: must show deeper fish than without it');
   if (!(g.depthFinder.bands > 0)) err('depth finder: needs depth bands');
-  ['pull0', 'pull1', 'tired0', 'tired1', 'pullRise', 'easeFall', 'run', 'tiredRise', 'release', 'recover', 'slipT', 'slipD', 'escape', 'd0']
+  ['pull0', 'pull1', 'tired0', 'tired1', 'pullRise', 'easeFall', 'run', 'tiredRise', 'release', 'recover', 'slipT', 'slipD', 'escape', 'd0',
+    'holdLate', 'holdPassive', 'slackT', 'holdLoss', 'jumpLoss', 'shakeLen0', 'shakeLen1', 'shakeGap0', 'shakeGap1', 'shakeRise', 'jumpRate', 'jumpLen', 'jumpHigh', 'jumpSpike']
     .forEach(k => { if (!(typeof g.fight[k] === 'number' && g.fight[k] > 0)) err('fight constant ' + k); });
 
   // D5: passive.incomeMult is set once, in data/gear.js, and nowhere else.
@@ -249,7 +251,7 @@ function session(G, seed, opts) {
           const f = school.fish[bite.slot], sp = data.fish[f.sp], q = rng.next();
           st.cur = { sp: f.sp, id: sp.id, q, len: sp.lengthCm[0] + (sp.lengthCm[1] - sp.lengthCm[0]) * q, w: sp.weightKg[0] + (sp.weightKg[1] - sp.weightKg[0]) * Math.pow(q, 1.3),
             price: S.economy.price(sp, q, data), hintRefs: sp.hintRefs, windowCatch: Object.keys(latched)[0] || null };
-          S.fight.start(fight, f.sp, sp, fx, rng, data);
+          S.fight.start(fight, f.sp, sp, fx, rng, data, S.bite.hold(bite.t, false, data)); // Phase 23: the hold from the hook-set time
           f.active = false; S.fish_ai.scatter(school); S.bite.reset(bite);
           lure.active = false; st.phase = 'fight'; st.t = 0; h(f.sp);
         } else if (st.t >= P.giveUp) { lure.active = false; st.phase = 'reel'; st.t = 0; }
@@ -305,7 +307,10 @@ const TARGETS = [
 ];
 
 function pacing() {
-  const seeds = [11, 22, 33, 44, 55], rows = [];
+  // 20 seeds (Phase 23): over 5, the median moved by 7 minutes whenever the random stream was
+  // reshuffled (the creek: 46.1 before Phase 23 and 53.5 after, though 20 seeds give 51.5 and 46.3).
+  const seeds = [], rows = [];
+  for (let i = 1; i <= 20; i++) seeds.push(i * 11);
   for (const seed of seeds) {
     const s = session(load(), seed);
     s.run(8 * 3600, st => st.events.some(e => e.what === 'red'));
@@ -431,6 +436,56 @@ function passiveCheck() {
   return pass && same ? 0 : 1;
 }
 
+// ---- --fight --------------------------------------------------------------------------------
+// Phase 23: how fights end, by how they are fought, on each gear tier, over every species the
+// tier's rod can hold (N fights each, hooked 0.5 s into the bite). Players: always reeling,
+// never reeling, tapping (holding and letting go for random spans of 0.1–0.5 s), and the
+// auto-player at several skills. Ends: landed, snapped, thrown (the hook worked loose on a
+// slack line), run out (D held at 1 for 3 s). Targets (PLAN_REALISM.md 23.4) on all tiers together.
+
+function fightCheck() {
+  const G = load(), F = G.sim.fight, d = G.data, g = d.gear, N = 60;
+  const hold = G.sim.bite.hold(P.hookDelay, false, d);
+  const players = [
+    ['always', () => 1], ['never', () => 0],
+    ['tapping', (st, rng, m) => { if ((m.left -= DT) <= 0) { m.on = !m.on; m.left = rng.range(0.1, 0.5); } return m.on ? 1 : 0; }],
+    ['skill 0.2', (st, rng) => F.autoPlayer(st, 0.2, rng)], ['skill 0.5', (st, rng) => F.autoPlayer(st, 0.5, rng)],
+    ['skill 0.8', (st, rng) => F.autoPlayer(st, 0.8, rng)], ['skill 0.85', (st, rng) => F.autoPlayer(st, 0.85, rng)]
+  ];
+  const all = {};
+  console.log('hook hold at a 0.5 s hook-set: ' + hold.toFixed(3) + '  (instant 1, late ' + g.fight.holdLate + ', passive ' + g.fight.holdPassive + ')');
+  console.log('tier  player       landed  snapped  thrown  run out  (s to a loss)');
+  for (let tier = 0; tier < g.rods.length; tier++) {
+    const gear = { lineStrength: g.lines[tier].strength, reelSpeed: g.reels[tier].speed };
+    const fish = d.fish.filter(f => f.mass <= g.rods[tier].maxMass);
+    for (const [name, play] of players) {
+      const rng = new G.core.rng.Rng(4242 + tier), n = { win: 0, snap: 0, thrown: 0, run: 0, lossT: 0 };
+      for (const f of fish) for (let i = 0; i < N; i++) {
+        const st = F.create(), m = { on: false, left: 0 };
+        F.start(st, d.fish.indexOf(f), f, gear, rng, d, hold);
+        let r = F.NONE, steps = 0;
+        while (r === F.NONE && steps < 60 * 600) { r = F.step(st, { reel: play(st, rng, m) === 1 }, DT, rng, d); steps++; }
+        if (r === F.WIN) n.win++; else { n.lossT += st.t; if (r === F.SNAP) n.snap++; else if (st.thrown) n.thrown++; else n.run++; }
+      }
+      const tot = fish.length * N, a = all[name] || (all[name] = { win: 0, snap: 0, thrown: 0, run: 0, lossT: 0, tot: 0 });
+      ['win', 'snap', 'thrown', 'run', 'lossT'].forEach(k => { a[k] += n[k]; }); a.tot += tot;
+      const pc = k => (100 * n[k] / tot).toFixed(1).padStart(6) + '%';
+      console.log(String(tier).padEnd(6) + name.padEnd(12) + pc('win') + ' ' + pc('snap') + ' ' + pc('thrown') + ' ' + pc('run') + '   ' + (tot - n.win ? (n.lossT / (tot - n.win)).toFixed(1) : '-'));
+    }
+  }
+  const rate = (k, w) => all[k][w] / all[k].tot, loss = k => all[k].tot - all[k].win;
+  const checks = [
+    ['skill 0.85 lands at least 90%', rate('skill 0.85', 'win') >= 0.9, (100 * rate('skill 0.85', 'win')).toFixed(1) + '%'],
+    ['skill 0.5 lands 65-80%', rate('skill 0.5', 'win') >= 0.65 && rate('skill 0.5', 'win') <= 0.8, (100 * rate('skill 0.5', 'win')).toFixed(1) + '%'],
+    ['skill 0.5: a third of its losses or more are thrown hooks', all['skill 0.5'].thrown >= loss('skill 0.5') / 3, (100 * all['skill 0.5'].thrown / Math.max(1, loss('skill 0.5'))).toFixed(1) + '% of losses'],
+    ['tapping lands 70% or less', rate('tapping', 'win') <= 0.7, (100 * rate('tapping', 'win')).toFixed(1) + '%'],
+    ['never reeling loses every fish in 5-10 s', all.never.win === 0 && all.never.lossT / all.never.tot >= 5 && all.never.lossT / all.never.tot <= 10, (all.never.lossT / all.never.tot).toFixed(1) + ' s, ' + all.never.win + ' landed']
+  ];
+  let ok = true;
+  for (const [what, pass, got] of checks) { console.log((pass ? 'PASS ' : 'FAIL ') + what + ': ' + got); ok = ok && pass; }
+  return ok ? 0 : 1;
+}
+
 // ---- Main ---------------------------------------------------------------------------------
 
 if (require.main === module) {
@@ -450,11 +505,12 @@ if (require.main === module) {
   if (args.includes('--pacing')) code = pacing() || code;
   if (args.includes('--saves')) code = savesCheck() || code;
   if (args.includes('--passive')) code = passiveCheck() || code;
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --replay <seed> [minutes]');
+  if (args.includes('--fight')) code = fightCheck() || code;
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --replay <seed> [minutes]');
     code = 2;
   }
   process.exit(code);
 }
 
-module.exports = { load, validate, session, replay, pacing, passiveCheck, savesCheck, PLAN, P };
+module.exports = { load, validate, session, replay, pacing, passiveCheck, savesCheck, fightCheck, PLAN, P };
