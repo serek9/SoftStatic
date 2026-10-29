@@ -6,9 +6,11 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // casts the top-right says how to start passive mode, and while it is on, what it just
 // caught (12.2). Every string is rebuilt only when the value it shows changes, never per frame.
 G.ui = G.ui || {};
+// Phase 18: drawn in the 640×360 view's pixels with the fine font (it switches the view to
+// native for itself, since the sailing scene that calls it draws in world pixels).
 G.ui.hud = (function () {
-  var S = G.gfx.sprites;
-  var X = 4, Y = 4;
+  var S = G.gfx.sprites, F = S.fine, V = G.core.view;
+  var X = 8, Y = 8;
   var lastTenths = -1, depthStr = '';
   var lastMin = -1, clockStr = '';
   var lastCoins = -1, coinStr = '';
@@ -32,6 +34,12 @@ G.ui.hud = (function () {
   function alpha() { return idle < IDLE ? 1 : Math.max(0, 1 - (idle - IDLE) / FADE); }
 
   S.def('hud_coin', { a: 'signal_amber', h: 'lamp_glow', d: 'rust_hi' }, ['.aa.', 'ahad', 'aaad', '.dd.']);
+  // The coin at 640×360: brass, lit on the top left, a stamped centre (8×8).
+  var coin = null;
+  function coinImg() {
+    var A = G.gfx.paint;
+    return coin || (coin = G.gfx.bake.layer(8, 8, function (c) { A.reset(); A.blob(c, 4, 4, 3.6, 3.6, ['rust', 'leaf_gold', 'brass_hi'], { bias: 0.1, rim: 0 }); A.box(c, 'rust', 3, 3, 2, 2); A.px(c, 'brass_hi', 2, 2); A.reset(); }));
+  }
 
   // Depth in metres for a depth in pixels (§0.10).
   function metres(px) { return px * 0.25; }
@@ -76,24 +84,24 @@ G.ui.hud = (function () {
   // Line tint for fight tension (7.4): plain, then amber, then red. Secondary to the line's shape.
   function tensionKey(T) { return T < 0.5 ? 'fog_light' : (T < 0.8 ? 'signal_amber' : 'neon_red'); }
 
-  // Text with a 1 px ink shadow, so it reads over the fog and the sky at 1×.
+  // Text with a 1 px ink shadow, so it reads over the fog and the sky.
   function label(ctx, s, x, y, key) {
-    S.drawText(ctx, s, x + 1, y + 1, 'ink');
-    S.drawText(ctx, s, x, y, key);
+    F.drawText(ctx, s, x + 1, y + 1, 'ink');
+    F.drawText(ctx, s, x, y, key);
   }
 
   // Depth finder (V8): ticks every `bands` metres down the left edge, labelled every other one.
   // Labels stay below the clock and coins.
   var bandLabels = [];
   function drawBands(ctx, run, waterY, bands) {
-    var top = waterY - Math.round(run.cam.y), step = bands * 4; // px per band
+    var top = (waterY - run.cam.y) * 2, step = bands * 8; // view px per band (4 world px a metre)
     ctx.fillStyle = S.PALETTE.fog_mid;
-    for (var i = 1; top + i * step < 180; i++) {
-      var y = top + i * step;
-      ctx.fillRect(0, y, i % 2 ? 2 : 4, 1);
-      if (i % 2 === 0 && y > Y + 22) {
+    for (var i = 1; top + i * step < 360; i++) {
+      var y = Math.round(top + i * step);
+      ctx.fillRect(0, y, i % 2 ? 4 : 8, 1);
+      if (i % 2 === 0 && y > Y + 40) {
         if (!bandLabels[i]) bandLabels[i] = (i * bands) + 'm';
-        S.drawText(ctx, bandLabels[i], 6, y - 3, 'fog_mid');
+        F.drawText(ctx, bandLabels[i], 11, y - 4, 'fog_mid');
       }
     }
   }
@@ -102,25 +110,28 @@ G.ui.hud = (function () {
 
   function draw(ctx, run, waterY) {
     if (G.ui.card.isOpen() || G.core.compact || still) return;
-    var save = G.state.save, s = clockText(save.clock || 0), cx = X + S.measure(s) + 6, a = alpha();
+    V.begin(ctx, true);
+    var save = G.state.save, s = clockText(save.clock || 0), cx = X + F.measure(s) + 9, a = alpha();
     if (a > 0) {
       ctx.globalAlpha = a;
       label(ctx, s, X, Y, 'fog_light');
-      S.draw(ctx, 'hud_coin', cx, Y + 1, 0, false);
-      label(ctx, coinText(save.coins), cx + 6, Y, 'paper');
-      label(ctx, baitText(save, run.gearFx.bait), X, Y + 9, 'fog_light');
+      ctx.drawImage(coinImg(), cx, Y);
+      label(ctx, coinText(save.coins), cx + 12, Y, 'paper');
+      label(ctx, baitText(save, run.gearFx.bait), X, Y + 14, 'fog_light');
       var pv = run.passive;
       if (pv.on) {
-        label(ctx, PASSIVE_ON, 316 - S.measure(PASSIVE_ON), Y, 'signal_amber');
-      } else if (run.fsm === 'sailing' && !tabUsed) S.drawText(ctx, PASSIVE_OFF, 316 - S.measure(PASSIVE_OFF), Y, 'fog_mid'); // also a button (14.6)
+        label(ctx, PASSIVE_ON, 632 - F.measure(PASSIVE_ON), Y, 'signal_amber');
+      } else if (run.fsm === 'sailing' && !tabUsed) F.drawText(ctx, PASSIVE_OFF, 632 - F.measure(PASSIVE_OFF), Y, 'fog_mid'); // also a button (14.6)
       ctx.globalAlpha = 1;
     }
-    if (run.passive.on && run.passive.noteT > 0) label(ctx, run.passive.note, 316 - S.measure(run.passive.note), Y + 9, 'paper');
+    if (run.passive.on && run.passive.noteT > 0) label(ctx, run.passive.note, 632 - F.measure(run.passive.note), Y + 14, 'paper');
 
-    if (!G.scene.underwater.UNDER[run.fsm]) return;
-    if (run.gearFx.depthBands && run.uw.alpha >= 1) drawBands(ctx, run, waterY, run.gearFx.depthBands);
-    s = depthText(Math.max(0, run.cast.ly - waterY));
-    label(ctx, s, 316 - S.measure(s), Y, 'fog_light');
+    if (G.scene.underwater.UNDER[run.fsm]) {
+      if (run.gearFx.depthBands && run.uw.alpha >= 1) drawBands(ctx, run, waterY, run.gearFx.depthBands);
+      s = depthText(Math.max(0, run.cast.ly - waterY));
+      label(ctx, s, 632 - F.measure(s), Y, 'fog_light');
+    }
+    V.begin(ctx, false);
   }
 
   // 14.6: the on-screen buttons (TAB, J, M, P, ESC), over menus too (index.html draws them
@@ -129,13 +140,15 @@ G.ui.hud = (function () {
     var I = G.core.input;
     if (G.core.compact || still || !I.showButtons()) return;
     var B = I.BUTTONS, P = S.PALETTE;
+    V.begin(ctx, true);
     for (var i = 0; i < B.length; i++) {
       var b = B[i], on = I.held(b.act);
-      ctx.globalAlpha = 0.7; ctx.fillStyle = P.ink; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.7; ctx.fillStyle = P.ink; ctx.fillRect(b.x + 1, b.y, b.w - 2, b.h); ctx.fillRect(b.x, b.y + 1, b.w, b.h - 2); ctx.globalAlpha = 1;
       ctx.fillStyle = P[on ? 'signal_amber' : 'fog_dark'];
-      ctx.fillRect(b.x, b.y, b.w, 1); ctx.fillRect(b.x, b.y + b.h - 1, b.w, 1); ctx.fillRect(b.x, b.y, 1, b.h); ctx.fillRect(b.x + b.w - 1, b.y, 1, b.h);
-      S.drawText(ctx, b.label, b.x + ((b.w - S.measure(b.label)) >> 1), b.y + 2, on ? 'signal_amber' : 'fog_light');
+      ctx.fillRect(b.x + 1, b.y, b.w - 2, 1); ctx.fillRect(b.x + 1, b.y + b.h - 1, b.w - 2, 1); ctx.fillRect(b.x, b.y + 1, 1, b.h - 2); ctx.fillRect(b.x + b.w - 1, b.y + 1, 1, b.h - 2);
+      F.drawText(ctx, b.label, b.x + ((b.w - F.measure(b.label)) >> 1), b.y + 5, on ? 'signal_amber' : 'fog_light');
     }
+    V.begin(ctx, false);
   }
 
   // What the HUD shows right now (dbg checks compare these against the save).
@@ -143,5 +156,5 @@ G.ui.hud = (function () {
     return { clock: clockStr, coins: coinStr, bait: baitStr, depth: G.scene.underwater.UNDER[G.state.run.fsm] ? depthStr : '' };
   }
 
-  return { metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, alpha: alpha, drawButtons: drawButtons, isStill: function () { return still; }, draw: draw, shown: shown };
+  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, alpha: alpha, drawButtons: drawButtons, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

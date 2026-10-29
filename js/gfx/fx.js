@@ -84,17 +84,18 @@ G.gfx.fx = (function () {
     }
   }
 
-  // Draws every live particle as one pixel, fading with life, offset by the camera.
+  // Draws every live particle as one pixel of the 640×360 view (half a world pixel; Phase 18),
+  // fading with life, offset by the camera.
   function draw(ctx, camX, camY) {
     var P = G.gfx.sprites.PALETTE;
     ctx.fillStyle = P.water_hi;
     for (var j = 0; j < rn; j++) {
       var a = rlife[j] / rmax[j], rad = rr1[j] - (rr1[j] - rr0[j]) * a, ry = Math.max(1, rad * 0.22);
-      var steps = Math.min(48, Math.ceil(rad * 2) + 4), cx = rxw[j] - camX, cy = ryw[j] - camY;
+      var steps = Math.min(96, Math.ceil(rad * 4) + 8), cx = rxw[j] - camX, cy = ryw[j] - camY;
       ctx.globalAlpha = a;
       for (var s = 0; s < steps; s++) {
         var ang = s * 6.2832 / steps;
-        ctx.fillRect(Math.round(cx + Math.cos(ang) * rad), Math.round(cy + Math.sin(ang) * ry), 1, 1);
+        ctx.fillRect(Math.round((cx + Math.cos(ang) * rad) * 2) / 2, Math.round((cy + Math.sin(ang) * ry) * 2) / 2, 0.5, 0.5);
       }
     }
     for (var k = 0; k < SPEC.length; k++) {
@@ -102,7 +103,7 @@ G.gfx.fx = (function () {
       for (var i = 0; i < n; i++) {
         if (kind[i] !== k) continue;
         ctx.globalAlpha = life[i] / max[i];
-        ctx.fillRect((x[i] - camX) | 0, (y[i] - camY) | 0, 1, 1);
+        ctx.fillRect(Math.round((x[i] - camX) * 2) / 2, Math.round((y[i] - camY) * 2) / 2, 0.5, 0.5);
       }
     }
     ctx.globalAlpha = 1;

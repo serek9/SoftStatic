@@ -5,55 +5,96 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // bait shop and the cabin. Choosing one fades to black, does the switch while the screen
 // is dark (a location bakes all it draws in sailing.load, the first time only), then fades
 // in. Opening a location spends its cost (economy.unlock) and autosaves (§0.12).
+// Phase 18: drawn in the 640×360 view's pixels: a folded paper chart with the waters as
+// painted lakes (shallows, a shore line), pines and peaks around them, a dotted route, a
+// compass, the shop and the cabin as little houses and the boat where you are.
 G.ui = G.ui || {};
 G.ui.map = (function () {
-  var S = G.gfx.sprites, P = S.PALETTE, M = G.ui.menu, E = G.sim.economy;
-  var CX = 8, CY = 8, CW = 304, CH = 164, FADE = 0.35;
+  var S = G.gfx.sprites, P = S.PALETTE, M = G.ui.menu, E = G.sim.economy, F = S.fine, A = G.gfx.paint;
+  var CX = 16, CY = 16, CW = 608, CH = 328, FADE = 0.35;
 
   // Where each stop sits on the chart (presentation only), in map order.
   var STOPS = [
-    { id: 'fog', kind: 'loc', x: 84, y: 92, rx: 34, ry: 15, fill: 'fog_light' },
-    { id: 'creek', kind: 'loc', x: 150, y: 50, rx: 30, ry: 7, fill: 'fog_light' },
-    { id: 'pines', kind: 'loc', x: 216, y: 98, rx: 27, ry: 13, fill: 'fog_light' },
-    { id: 'red', kind: 'loc', x: 272, y: 48, rx: 20, ry: 11, fill: 'dusk_rose' },
-    { id: 'shop', kind: 'shop', x: 38, y: 122 },
-    { id: 'cabin', kind: 'cabin', x: 120, y: 124 }
+    { id: 'fog', kind: 'loc', x: 168, y: 184, rx: 68, ry: 30, fill: 'fog_light' },
+    { id: 'creek', kind: 'loc', x: 300, y: 100, rx: 60, ry: 14, fill: 'fog_light' },
+    { id: 'pines', kind: 'loc', x: 432, y: 196, rx: 54, ry: 26, fill: 'fog_light' },
+    { id: 'red', kind: 'loc', x: 544, y: 96, rx: 40, ry: 22, fill: 'dusk_rose' },
+    { id: 'shop', kind: 'shop', x: 76, y: 244 },
+    { id: 'cabin', kind: 'cabin', x: 240, y: 248 }
   ];
 
-  S.def('map_boat', { w: 'wood', d: 'ink' }, ['..d..', '.dd..', 'wwwww', '.www.']);
-  S.def('map_house', { r: 'rust', w: 'wood', k: 'ink' }, ['..r..', '.rrr.', 'rrrrr', '.wkw.', '.wkw.']);
-
+  // The chart, baked once: paper with fold creases, the route, the lakes, trees and peaks,
+  // the compass and the title.
   function paintChart(ctx) {
-    var rng = new G.core.rng.Rng(7717), i, y;
-    ctx.fillStyle = P.paper; ctx.fillRect(0, 0, CW, CH);
-    ctx.fillStyle = P.bone;
-    for (i = 0; i < 120; i++) ctx.fillRect(rng.int(0, CW - 1), rng.int(0, CH - 1), rng.int(1, 3), 1); // grain
-    // Route between the waters, dotted.
-    ctx.fillStyle = P.wood_hi;
+    var rng = new G.core.rng.Rng(7717), i, x, y;
+    A.reset();
+    A.area(ctx, 0, 0, CW, CH, function (xx, yy) {
+      var fx = xx % (CW / 4), fy = yy % (CH / 2);
+      if (fx === 0 || fy === 0) return 'paper_dark';                                   // folds
+      if (fx === 1 || fy === 1) return 'cream';
+      var edge = Math.min(xx, CW - 1 - xx, yy, CH - 1 - yy);
+      return edge < 3 ? 'paper_dark' : (edge < 6 ? 'paper' : 'bone');
+    });
+    // Peaks along the top and pines scattered over the land.
+    for (i = 0; i < 9; i++) {
+      var mx = 30 + i * 66 + rng.int(-10, 10), my = 52 + rng.int(-6, 8), mh = rng.int(14, 22);
+      for (y = 0; y < mh; y++) { A.box(ctx, 'paper_dark', mx - y, my - mh + y, y + 1, 1); A.box(ctx, 'reed_hi', mx + 1, my - mh + y, y, 1); }
+      A.box(ctx, 'cream', mx - 2, my - mh + 2, 3, 2);
+    }
+    for (i = 0; i < 70; i++) {
+      var tx = rng.int(20, CW - 20), ty = rng.int(70, CH - 30), near = false;
+      for (var k = 0; k < STOPS.length; k++) { var st = STOPS[k]; if (st.kind === 'loc' && Math.abs(tx - st.x + CX) < st.rx + 10 && Math.abs(ty - st.y + CY) < st.ry + 12) near = true; }
+      if (near) continue;
+      for (y = 0; y < 7; y++) A.box(ctx, y % 3 === 2 ? 'moss_dark' : 'moss', tx - (y >> 1), ty + y, (y >> 1) * 2 + 1, 1);
+      A.px(ctx, 'wood_dark', tx, ty + 7);
+    }
+    // The route between the waters, dotted.
     for (i = 0; i < STOPS.length - 1; i++) {
       var a = STOPS[i], b = STOPS[i + 1];
       if (a.kind !== 'loc' && b.kind !== 'loc') continue;
-      for (var u = 0; u <= 1; u += 0.02) {
-        if ((u * 50 | 0) % 2) continue;
-        ctx.fillRect(Math.round(a.x - CX + (b.x - a.x) * u), Math.round(a.y - CY + (b.y - a.y) * u + Math.sin(u * 3.14) * 6), 1, 1);
+      for (var u = 0; u <= 1; u += 0.006) {
+        if ((u * 160 | 0) % 3) continue;
+        A.box(ctx, 'rust', Math.round(a.x - CX + (b.x - a.x) * u), Math.round(a.y - CY + (b.y - a.y) * u + Math.sin(u * 3.14) * 12), 2, 2);
       }
     }
-    // Each water as a rough blob with an ink shore.
+    // Each water as a lake: an ink shore, a band of shallows, deeper water inside.
     for (i = 0; i < STOPS.length; i++) {
       var s = STOPS[i];
       if (s.kind !== 'loc') continue;
-      for (y = -s.ry; y <= s.ry; y++) {
-        var hw = Math.round(s.rx * Math.sqrt(1 - (y * y) / (s.ry * s.ry)) + rng.range(-1.5, 1.5));
-        if (hw <= 0) continue;
-        ctx.fillStyle = P.wood; ctx.fillRect(s.x - CX - hw - 1, s.y - CY + y, hw * 2 + 3, 1);
-        ctx.fillStyle = P[s.fill]; ctx.fillRect(s.x - CX - hw, s.y - CY + y, hw * 2 + 1, 1);
+      var wob = [rng.range(0, 6.28), rng.range(0, 6.28)];
+      for (y = -s.ry - 2; y <= s.ry + 2; y++) for (x = -s.rx - 3; x <= s.rx + 3; x++) {
+        var ang = Math.atan2(y / s.ry, x / s.rx), r = 1 + 0.08 * Math.sin(ang * 3 + wob[0]) + 0.05 * Math.sin(ang * 5 + wob[1]);
+        var e = Math.sqrt((x * x) / (s.rx * s.rx) + (y * y) / (s.ry * s.ry)) / r;
+        if (e > 1.06) continue;
+        var key = e > 1 ? 'wood' : (e > 0.82 ? (s.fill === 'dusk_rose' ? 'dusk_rose' : 'fog_light') : (s.fill === 'dusk_rose' ? 'crimson' : 'fog_mid'));
+        if (e <= 0.82 && e > 0.55 && (x + y * 3) % 23 === 0) key = 'fog_light';
+        A.px(ctx, key, s.x - CX + x, s.y - CY + y);
       }
     }
-    // Fog banks drifting across the paper.
-    ctx.fillStyle = P.stone_hi; ctx.globalAlpha = 0.25;
-    for (i = 0; i < 14; i++) ctx.fillRect(rng.int(0, CW - 40), rng.int(10, CH - 30), rng.int(20, 60), 1);
-    ctx.globalAlpha = 1;
-    S.drawText(ctx, 'THE WATERS', 8, 6, 'ink');
+    // A compass rose in the corner.
+    var cxr = CW - 50, cyr = CH - 64;
+    for (i = -14; i <= 14; i++) { A.px(ctx, 'wood', cxr + i, cyr); A.px(ctx, 'wood', cxr, cyr + i); }
+    for (i = 0; i < 6; i++) { A.box(ctx, 'rust', cxr - (5 - i) / 2 | 0, cyr - 14 + i * 2, 6 - i, 2); }
+    F.bold(ctx, 'N', cxr - 2, cyr - 26, 'wood_dark');
+    F.bold(ctx, 'THE WATERS', 16, 12, 'wood_deep');
+    A.reset();
+  }
+
+  // Little painted marks for the chart: a house (shop, cabin) and the boat.
+  var marks = {};
+  function mark(kind) {
+    if (marks[kind]) return marks[kind];
+    return (marks[kind] = G.gfx.bake.layer(14, 14, function (c) {
+      A.reset();
+      if (kind === 'house') {
+        for (var y = 0; y < 6; y++) A.box(c, y < 2 ? 'rust_hi' : 'rust', 6 - y, y, y * 2 + 2, 1);
+        A.slab(c, 2, 6, 10, 7, ['wood_dark', 'wood', 'wood_mid']); A.box(c, 'ink', 6, 9, 2, 4); A.box(c, 'lamp_glow', 3, 8, 2, 2);
+      } else {
+        A.box(c, 'ink', 6, 1, 1, 7); A.box(c, 'cream', 7, 2, 4, 4);
+        for (var x = 0; x < 12; x++) A.box(c, x === 0 || x === 11 ? 'wood_dark' : 'wood', 1 + x, 9, 1, x > 1 && x < 10 ? 3 : 2);
+      }
+      A.reset();
+    }));
   }
 
   var chart = null, sel = 0, phase = 'map', t = 0, dest = null, lastMs = 0, lastDest = '';
@@ -96,8 +137,10 @@ G.ui.map = (function () {
     if (r === E.OK) info.hint = 'SPACE pay and travel'; else info.key = 'rust';
   }
 
+  var names = [], nameW = [];
   function open() {
-    if (!chart) chart = G.gfx.bake.cached('map:chart', function () { return G.gfx.bake.layer(CW, CH, paintChart); });
+    if (!chart) chart = G.gfx.bake.cached('map:chart640', function () { return G.gfx.bake.layer(CW, CH, paintChart); });
+    for (var k = 0; k < STOPS.length; k++) { names[k] = stopName(STOPS[k]); nameW[k] = F.measureBold(names[k]); }
     sel = 0;
     for (var i = 0; i < STOPS.length; i++) if (STOPS[i].id === G.state.run.loc) sel = i;
     phase = 'map'; t = 0; dest = null;
@@ -145,31 +188,36 @@ G.ui.map = (function () {
   function draw(ctx) {
     if (phase === 'in') { M.dim(ctx, 1 - t / FADE); return; }
     M.dim(ctx, 0.6);
-    M.panel(ctx, CX, CY, CW, CH, 'wood_dark', 'paper');
+    ctx.fillStyle = P.ink; ctx.fillRect(CX - 2, CY - 2, CW + 4, CH + 4);
     ctx.drawImage(chart, CX, CY);
     for (var i = 0; i < STOPS.length; i++) {
       var s = STOPS[i], on = i === sel;
       var open = s.kind !== 'loc' || !!G.state.save.unlocks[s.id];
       if (s.kind === 'loc') {
-        ctx.fillStyle = P[open ? 'ink' : 'wood_hi']; ctx.fillRect(s.x - 1, s.y - 1, 3, 3);
-      } else S.draw(ctx, 'map_house', s.x - 2, s.y - 4, 0, false);
-      if (s.id === G.state.run.loc) S.draw(ctx, 'map_boat', s.x - 2, s.y - 6, 0, false);
-      var name = stopName(s), lx = s.x - (S.measure(name) >> 1);
-      S.drawText(ctx, name, lx, s.y + (s.ry || 4) + 3, on ? 'rust' : (open ? 'ink' : 'wood'));
+        ctx.fillStyle = P[open ? 'ink' : 'wood_hi']; ctx.fillRect(s.x - 2, s.y - 2, 5, 5);
+        if (open) { ctx.fillStyle = P.cream; ctx.fillRect(s.x - 1, s.y - 1, 3, 3); }
+      } else ctx.drawImage(mark('house'), s.x - 7, s.y - 10);
+      if (s.id === G.state.run.loc) ctx.drawImage(mark('boat'), s.x - 6, s.y - 18);
+      var name = names[i], lx = s.x - (nameW[i] >> 1), ly = s.y + (s.ry || 8) + 6;
+      if (on) { ctx.fillStyle = P.paper_dark; ctx.fillRect(lx - 4, ly - 2, nameW[i] + 8, 13); }
+      F.bold(ctx, name, lx, ly, on ? 'rust' : (open ? 'wood_deep' : 'wood'));
       if (on) {
         ctx.fillStyle = P.signal_amber;
-        ctx.fillRect(s.x - 5, s.y - 5, 3, 1); ctx.fillRect(s.x + 3, s.y - 5, 3, 1);
-        ctx.fillRect(s.x - 5, s.y + 5, 3, 1); ctx.fillRect(s.x + 3, s.y + 5, 3, 1);
+        ctx.fillRect(s.x - 10, s.y - 10, 6, 2); ctx.fillRect(s.x + 5, s.y - 10, 6, 2);
+        ctx.fillRect(s.x - 10, s.y + 9, 6, 2); ctx.fillRect(s.x + 5, s.y + 9, 6, 2);
       }
     }
-    M.panel(ctx, CX + 4, CY + CH - 24, CW - 8, 20, 'wood', 'ink');
-    S.drawText(ctx, info.name, CX + 8, CY + CH - 21, 'bone');
-    if (info.hint) S.drawText(ctx, info.hint, CX + CW - 8 - S.measure(info.hint), CY + CH - 21, 'signal_amber');
-    S.drawText(ctx, info.status, CX + 8, CY + CH - 12, info.key === 'rust' ? 'rust_hi' : 'fog_light');
+    var py = CY + CH - 46;
+    ctx.fillStyle = P.wood_mid; ctx.fillRect(CX + 8, py - 1, CW - 16, 40);
+    ctx.fillStyle = P.wood_deep; ctx.fillRect(CX + 9, py, CW - 18, 38);
+    F.bold(ctx, info.name, CX + 18, py + 7, 'bone');
+    if (info.hint) F.bold(ctx, info.hint, CX + CW - 18 - F.measureBold(info.hint), py + 7, 'signal_amber');
+    F.drawText(ctx, info.status, CX + 18, py + 22, info.key === 'rust' ? 'rust_hi' : 'fog_light');
     if (phase === 'out') M.dim(ctx, t / FADE);
   }
 
   return {
+    native: true,
     open: open, update: update, draw: draw, STOPS: STOPS, verdict: verdict, stocked: stocked,
     // dbg: travel to a stop id through the same path as the menu (fade included).
     travel: function (id) {

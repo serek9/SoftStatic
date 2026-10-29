@@ -121,10 +121,11 @@
   canvas.addEventListener('mousedown', reclaim);
   window.addEventListener('keydown', reclaim);
   function idle(c) {
-    V.begin(c, false);
+    var F = G.gfx.sprites.fine, A = 'Fishing in another tab.', B = 'Click to fish here.';
+    V.begin(c, true);
     G.ui.menu.dim(c, 0.75);
-    G.ui.menu.centre(c, 'Fishing in another tab.', 160, 78, 'fog_light');
-    G.ui.menu.centre(c, 'Click to fish here.', 160, 90, 'fog_mid');
+    F.bold(c, A, 320 - (F.measureBold(A) >> 1), 156, 'fog_light');
+    F.drawText(c, B, 320 - (F.measure(B) >> 1), 176, 'fog_mid');
   }
 
   // An open overlay (pause, journal, map, tape) takes the step and the scene waits (9.2).

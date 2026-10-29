@@ -4,9 +4,13 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // A location names its module with loc.scenery; sailing.js calls it through its scenery
 // hook (the parts are listed there). update() and landed() change only run.scen and
 // run.spots; the draw parts only read them. Painters run once, when the location bakes.
+// Phase 18: painters work in layer pixels (HI = 2 per world pixel, the data's lengths
+// already scaled), and the live parts draw in the 640×360 view's pixels (native()).
 G.scene = G.scene || {};
 G.scene.scenery = (function () {
-  var S = G.gfx.sprites, P = S.PALETTE, C = G.sim.clock;
+  var S = G.gfx.sprites, P = S.PALETTE, C = G.sim.clock, A = G.gfx.paint, F = S.fine, HI = 2;
+  var STONES = ['stone_dark', 'stone', 'stone_hi', 'stone_lit'], WOOD = ['wood_deep', 'wood_dark', 'wood', 'wood_mid'];
+  var RUSTY = ['rust_dark', 'rust', 'rust_hi'];
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
@@ -20,11 +24,15 @@ G.scene.scenery = (function () {
     return null;
   }
 
+  // Live drawing in the view's pixels: the scene draws in world pixels through the view's ×2.
+  function native(c) { c.save(); c.scale(1 / HI, 1 / HI); }
+
   // ---- The Pines (11.2) ------------------------------------------------------------
-  // Geometry shared by the painters and the live parts, relative to each feature's x.
-  var DINER = { w: 26, h: 9, signX: 18, signW: 11, signH: 5 };
-  var LOT = { w: 44, lampGap: 14, lampH: 10 };
-  var SIGNAL = { pole: 12, top: 30, boxH: 8 }; // pole offset, its height, the housing's height
+  // Geometry shared by the painters and the live parts, in layer pixels, relative to each
+  // feature's x (the data's x times HI).
+  var DINER = { w: 56, h: 18, signX: 36, signW: 24, signH: 11 };
+  var LOT = { w: 88, lampGap: 28, lampH: 22 };
+  var SIGNAL = { pole: 24, top: 60, boxH: 18 }; // pole offset, its height, the housing's height
 
   // How often (s per blink) the traffic light blinks at this hour: sig.period most of the
   // night, sig.fast inside a clock window, and closing in on fast through the `lead` game
@@ -45,33 +53,31 @@ G.scene.scenery = (function () {
 
   var pines = {
     paint: {
-      // The far shore: a low dark bank, the diner with its sign, the lot with its lamps.
+      // The far shore: a low dark bank with a few far trees, the diner with its long lit
+      // window and its sign, the parking lot with painted bays and lamp posts.
       farshore: function (ctx, L, w, wy, rng) {
-        var x, i, f;
-        ctx.fillStyle = P[L.color];
-        for (x = 0; x < w; x++) {
-          var top = L.base + (rng.next() < 0.3 ? rng.int(-1, 0) : 0);
-          ctx.fillRect(x, top, 1, wy - top);
-        }
+        var x, i, f, t = 0;
+        for (x = 0; x < w; x++) { t = clamp(t + rng.int(-1, 1), -2, 1); A.box(ctx, L.color, x, L.base + t, 1, wy - L.base - t); }
+        for (x = rng.int(0, 20); x < w; x += rng.int(10, 30)) A.pine(ctx, x, L.base + 1, rng.int(8, 16), { dark: L.color, mid: 'night_blue', lit: 'night_blue', trunk: L.color }, rng);
         for (i = 0; i < L.features.length; i++) {
           f = L.features[i];
           if (f.kind === 'diner') {
             var dx = f.x, dy = L.base - DINER.h;
-            ctx.fillStyle = P.stone_dark; ctx.fillRect(dx, dy, DINER.w, DINER.h);
-            ctx.fillStyle = P.stone; ctx.fillRect(dx - 1, dy - 1, DINER.w + 2, 1);
-            ctx.fillStyle = P.dusk_amber;
-            for (x = dx + 2; x < dx + DINER.w - 3; x += 4) ctx.fillRect(x, dy + 3, 3, 2); // the long window
-            ctx.fillStyle = P.stone_dark;
-            ctx.fillRect(dx + DINER.signX + 5, dy - 7, 1, 6);                                 // sign post
-            ctx.fillStyle = P.ink; ctx.fillRect(dx + DINER.signX, dy - 7 - DINER.signH, DINER.signW, DINER.signH);
+            A.box(ctx, 'night_deep', dx - 6, dy - 4, DINER.w + 12, DINER.h + 4);            // clear the trees behind it
+            A.slab(ctx, dx, dy, DINER.w, DINER.h, ['ink', 'stone_dark', 'stone', 'stone_hi']);
+            A.box(ctx, 'stone_hi', dx - 2, dy - 2, DINER.w + 4, 2); A.box(ctx, 'stone_lit', dx - 2, dy - 2, DINER.w + 4, 1);
+            for (x = dx + 4; x < dx + DINER.w - 8; x += 7) { A.box(ctx, 'dusk_amber', x, dy + 5, 6, 5); A.box(ctx, 'dusk_high', x, dy + 5, 6, 1); }   // the long window
+            A.box(ctx, 'rust_dark', dx + DINER.w - 7, dy + 6, 5, DINER.h - 6);               // the door
+            A.box(ctx, 'stone_lit', dx, dy + 13, DINER.w, 1);                              // the chrome strip
+            A.box(ctx, 'stone_dark', dx + DINER.signX + 10, dy - 14, 2, 12);                // sign post
+            A.box(ctx, 'ink', dx + DINER.signX, dy - 14 - DINER.signH, DINER.signW, DINER.signH);
           } else if (f.kind === 'lot') {
-            ctx.fillStyle = P.stone_dark; ctx.fillRect(f.x, L.base - 1, LOT.w, 2);
-            ctx.fillStyle = P.stone;
-            for (x = f.x + 2; x < f.x + LOT.w; x += 5) ctx.fillRect(x, L.base - 1, 1, 1);    // painted bays
+            A.box(ctx, 'stone_dark', f.x, L.base - 2, LOT.w, 4); A.box(ctx, 'stone', f.x, L.base - 2, LOT.w, 1);
+            for (x = f.x + 4; x < f.x + LOT.w; x += 10) A.box(ctx, 'stone_hi', x, L.base - 1, 1, 2);   // painted bays
             for (var k = 0; k < f.lamps; k++) {
-              var lx = f.x + 4 + k * LOT.lampGap;
-              ctx.fillRect(lx, L.base - LOT.lampH, 1, LOT.lampH - 1);
-              ctx.fillRect(lx - 1, L.base - LOT.lampH, 3, 1);
+              var lx = f.x + 8 + k * LOT.lampGap;
+              A.box(ctx, 'stone', lx, L.base - LOT.lampH, 2, LOT.lampH - 1);
+              A.box(ctx, 'stone', lx - 3, L.base - LOT.lampH, 8, 2); A.box(ctx, 'stone_hi', lx - 3, L.base - LOT.lampH, 8, 1);
             }
           }
         }
@@ -82,39 +88,37 @@ G.scene.scenery = (function () {
       // A blinking traffic light over the water: a pole in the lake, an arm, the housing.
       signal: function (ctx, x, wy) {
         var px = x + SIGNAL.pole, top = wy - SIGNAL.top;
-        ctx.fillStyle = P.stone_dark;
-        ctx.fillRect(px, top, 2, SIGNAL.top);
-        ctx.fillRect(x, top, px - x + 1, 1);
-        ctx.fillRect(x, top + 1, 1, 2);                                   // the hanger
-        ctx.fillStyle = P.ink; ctx.fillRect(x - 2, top + 3, 5, SIGNAL.boxH);
-        ctx.fillStyle = P.stone_dark;
-        ctx.fillRect(x - 1, top + 4, 3, 2); ctx.fillRect(x - 1, top + 7, 3, 2); // lamp holes
-        return [x - 2, px + 1];
+        A.slab(ctx, px, top, 4, SIGNAL.top, STONES);
+        A.box(ctx, 'stone_dark', x, top, px - x + 2, 2); A.box(ctx, 'stone', x, top, px - x + 2, 1);
+        A.box(ctx, 'stone_dark', x, top + 2, 2, 4);
+        A.slab(ctx, x - 5, top + 6, 11, SIGNAL.boxH, ['ink', 'ink', 'stone_dark', 'stone']);
+        A.blob(ctx, x, top + 10, 2.5, 2.5, ['ink', 'rust_dark']); A.blob(ctx, x, top + 18, 2.5, 2.5, ['ink', 'rust_dark']); // lamp holes
+        A.box(ctx, 'ink', x - 4, top + 7, 9, 1);                                                   // visors
+        return [x - 5, px + 4];
       },
       // An abandoned road running down into the lake, with its guardrail and a rusted sign.
       road: function (ctx, x, wy) {
-        var x0 = x - 44, i;
-        for (i = 0; i <= 54; i++) {
-          var y = wy - 9 + Math.round(i * 9 / 54);
-          ctx.fillStyle = P.stone_dark; ctx.fillRect(x0 + i, y, 1, 3);
-          if (i % 6 < 3) { ctx.fillStyle = P.dusk_amber; ctx.fillRect(x0 + i, y + 1, 1, 1); } // the faded centre line
-          if (i % 7 === 0 && i < 40) { ctx.fillStyle = P.stone; ctx.fillRect(x0 + i, y - 3, 1, 3); }
-          if (i < 40) { ctx.fillStyle = P.stone_hi; ctx.fillRect(x0 + i, y - 3, 1, 1); }
+        var x0 = x - 88, i;
+        for (i = 0; i <= 108; i++) {
+          var y = wy - 18 + Math.round(i * 18 / 108);
+          A.box(ctx, 'stone_dark', x0 + i, y, 1, 6); A.px(ctx, 'stone', x0 + i, y);
+          if (i % 12 < 6) A.box(ctx, 'dusk_amber', x0 + i, y + 3, 1, 1);                         // the faded centre line
+          if (i % 14 === 0 && i < 80) A.slab(ctx, x0 + i, y - 7, 2, 7, STONES);
+          if (i < 80) { A.box(ctx, 'stone_hi', x0 + i, y - 6, 1, 2); A.px(ctx, 'stone', x0 + i, y - 4); }
         }
-        ctx.fillStyle = P.stone; ctx.fillRect(x0 + 6, wy - 22, 1, 13);
-        ctx.fillStyle = P.rust_hi;
-        for (i = 0; i < 3; i++) ctx.fillRect(x0 + 6 - i, wy - 25 + i, i * 2 + 1, 1);
-        for (i = 0; i < 2; i++) ctx.fillRect(x0 + 5 + i, wy - 22 + i, 3 - i * 2, 1);
-        return [x0, x + 10];
+        A.slab(ctx, x0 + 12, wy - 44, 2, 26, STONES);
+        for (i = 0; i < 8; i++) A.box(ctx, i < 2 ? 'rust_dark' : 'rust_hi', x0 + 13 - i, wy - 52 + i, i * 2 + 1, 1);
+        A.box(ctx, 'ink', x0 + 12, wy - 49, 2, 4); A.px(ctx, 'ink', x0 + 12, wy - 47);
+        return [x0, x + 20];
       },
       // A dead tree at the water's edge with a bare branch for the owl.
       owl_branch: function (ctx, x, wy, rng) {
-        ctx.fillStyle = P.wood_dark;
-        ctx.fillRect(x, wy - 38, 2, 38);
-        ctx.fillRect(x + 2, wy - 27, 12, 1);
-        ctx.fillRect(x - 6, wy - 33, 6, 1);
-        for (var i = 0; i < 4; i++) ctx.fillRect(x + rng.int(-1, 2), wy - rng.int(10, 36), 1, 2);
-        return [x - 6, x + 14];
+        A.area(ctx, x, wy - 76, 4, 76, function (xx, yy) { return xx === x ? 'wood' : ((yy + xx * 5) % 13 === 0 ? 'wood' : 'wood_dark'); });
+        A.box(ctx, 'wood_dark', x + 4, wy - 54, 24, 2); A.box(ctx, 'wood', x + 4, wy - 54, 24, 1);
+        A.box(ctx, 'wood_dark', x - 12, wy - 66, 12, 2);
+        A.line(ctx, 'wood_dark', x - 12, wy - 66, x - 18, wy - 72); A.line(ctx, 'wood_dark', x + 26, wy - 54, x + 32, wy - 60);
+        for (var i = 0; i < 6; i++) A.box(ctx, 'wood_deep', x + rng.int(0, 3), wy - rng.int(16, 72), 1, 3);
+        return [x - 18, x + 32];
       }
     },
 
@@ -141,42 +145,45 @@ G.scene.scenery = (function () {
     },
 
     afterLayer: function (c, id, ox, oy, run, loc) {
-      var s = run.scen, k, x, y;
+      var s = run.scen, k, x, y, oxN = Math.round(ox * HI), oyN = Math.round(oy * HI);
       if (id === 'farshore') {
-        // Neon: mostly lit, dropping out for a beat now and then (a hash of time, no RNG).
-        var dx = s.diner.x - ox + DINER.signX, dy = s.far.base - DINER.h - 7 - DINER.signH - oy;
+        native(c);
+        // Neon: EAT in red on the sign, mostly lit, dropping out for a beat now and then.
+        var dx = s.diner.x * HI - oxN + DINER.signX, dy = s.far.base * HI - DINER.h - 14 - DINER.signH - oyN;
         if ((S.hash(17, Math.floor(s.t * 8)) & 31) > 1) {
-          c.globalAlpha = 0.25; c.fillStyle = P.neon_red; c.fillRect(dx - 1, dy - 1, DINER.signW + 2, DINER.signH + 2);
+          c.globalAlpha = 0.22; c.fillStyle = P.neon_red; c.fillRect(dx - 3, dy - 3, DINER.signW + 6, DINER.signH + 6);
           c.globalAlpha = 1;
           c.fillRect(dx, dy, DINER.signW, 1); c.fillRect(dx, dy + DINER.signH - 1, DINER.signW, 1);
           c.fillRect(dx, dy, 1, DINER.signH); c.fillRect(dx + DINER.signW - 1, dy, 1, DINER.signH);
-          c.fillStyle = P.neon_teal; c.fillRect(dx + 3, dy + 2, 4, 1); c.fillRect(dx + 7, dy + 2, 1, 1);
+          F.drawText(c, 'EAT', dx + ((DINER.signW - F.measure('EAT')) >> 1), dy + 2, 'neon_teal');
         }
         // The lot's fluorescent lamps; the middle one has a bad starter and stutters in bursts.
         for (k = 0; k < s.lot.lamps; k++) {
-          var lit = true;
-          if (k === 1) lit = lampLit(s.t);
-          if (!lit) continue;
-          x = s.lot.x + 4 + k * LOT.lampGap - ox; y = s.far.base - LOT.lampH - oy;
-          c.fillStyle = P.lamp_glow; c.fillRect(x - 1, y + 1, 3, 1);
-          c.globalAlpha = 0.12; c.fillStyle = P.fog_light;
-          for (var r = 2; r < LOT.lampH; r++) c.fillRect(x - (r >> 1), y + r, (r >> 1) * 2 + 1, 1);
+          if (k === 1 && !lampLit(s.t)) continue;
+          x = s.lot.x * HI + 8 + k * LOT.lampGap - oxN; y = s.far.base * HI - LOT.lampH - oyN;
+          c.fillStyle = P.lamp_glow; c.fillRect(x - 2, y + 2, 6, 1);
+          c.globalAlpha = 0.1; c.fillStyle = P.fog_light;
+          for (var r = 3; r < LOT.lampH; r++) c.fillRect(x + 1 - (r >> 1), y + r, (r >> 1) * 2, 1);
           // Audit P2-1: two moths circling each lit lamp, never quite in step.
-          c.globalAlpha = 0.8; c.fillStyle = P.paper;
+          c.globalAlpha = 0.85; c.fillStyle = P.paper;
           for (var mth = 0; mth < 2; mth++) {
             var ang = s.t * (2.3 + mth * 0.7) + k * 2 + mth * 3;
-            c.fillRect(Math.round(x + Math.cos(ang) * (3 + mth)), Math.round(y + 1 + Math.sin(ang * 1.3) * 2), 1, 1);
+            c.fillRect(Math.round(x + 1 + Math.cos(ang) * (6 + mth * 2)), Math.round(y + 3 + Math.sin(ang * 1.3) * 4), 1, 1);
           }
           c.globalAlpha = 1;
         }
+        c.restore();
       } else if (id === 'marks') {
-        x = s.sig.x - ox; y = loc.waterY - SIGNAL.top + 3 - oy;
+        native(c);
+        x = s.sig.x * HI - oxN; y = loc.waterY * HI - SIGNAL.top + 6 - oyN;
         if (s.on) {
-          c.globalAlpha = 0.2; c.fillStyle = P.signal_amber; c.fillRect(x - 3, y - 1, 7, 7);
-          c.globalAlpha = 1; c.fillRect(x - 1, y + 1, 3, 2);
+          c.globalAlpha = 0.18; c.fillStyle = P.signal_amber; c.fillRect(x - 9, y - 3, 19, 15); c.fillRect(x - 6, y - 6, 13, 21);
+          c.globalAlpha = 1; c.fillRect(x - 2, y + 2, 5, 4); c.fillStyle = P.lamp_glow; c.fillRect(x - 1, y + 2, 2, 1);
         }
-        // The owl on its branch opens its eyes while a clock window is open (the sprite is sailing.js's).
-        S.draw(c, 'owl', s.owl.x + 4 - ox, loc.waterY - 34 - oy, s.eyes ? 1 : 0, false);
+        c.restore();
+        // The owl on its branch opens its eyes while a clock window is open (sailing.js paints it).
+        var owl = G.scene.sailing.owl(s.eyes);
+        c.drawImage(owl, s.owl.x + 6 - ox - owl.width / HI / 2, loc.waterY - 27 - owl.height / HI - oy + 1, owl.width / HI, owl.height / HI);
       }
     },
 
@@ -192,52 +199,54 @@ G.scene.scenery = (function () {
   // ---- Red Room Reservoir (11.3) ------------------------------------------------------
   var MOVE_FADE = 2; // s a structure takes to fade out where it was and in where it is now
 
-  // The structures, standing in the water with their feet at wy (the caller sets the alpha).
+  // The structures, standing in the water with their feet at wy, painted once each in the
+  // view's pixels and drawn at their place (the caller sets the alpha).
   var MOVERS = {
-    floor_lamp: function (c, x, wy) {
-      c.fillStyle = P.stone; c.fillRect(x, wy - 22, 1, 21); c.fillRect(x - 2, wy - 1, 5, 1);
-      c.fillStyle = P.dusk_rose;
-      for (var r = 0; r < 5; r++) c.fillRect(x - 2 - (r >> 1), wy - 28 + r, 5 + (r >> 1) * 2, 1);
-      c.fillStyle = P.lamp_glow; c.fillRect(x - 3, wy - 23, 7, 1);
-    },
-    armchair: function (c, x, wy) {
-      c.fillStyle = P.blood; c.fillRect(x - 5, wy - 13, 3, 12); c.fillRect(x - 5, wy - 6, 11, 4);
-      c.fillStyle = P.crimson; c.fillRect(x - 4, wy - 12, 1, 6); c.fillRect(x - 2, wy - 7, 8, 1); c.fillRect(x + 4, wy - 9, 2, 3);
-      c.fillStyle = P.wood_dark; c.fillRect(x - 5, wy - 2, 1, 2); c.fillRect(x + 5, wy - 2, 1, 2);
-    },
-    statue: function (c, x, wy) {
-      c.fillStyle = P.stone; c.fillRect(x - 4, wy - 5, 9, 5);
-      c.fillStyle = P.stone_hi;
-      c.fillRect(x - 1, wy - 19, 3, 3); c.fillRect(x - 2, wy - 16, 5, 7); c.fillRect(x - 2, wy - 9, 2, 4); c.fillRect(x + 1, wy - 9, 2, 4);
-      c.fillRect(x + 3, wy - 15, 1, 5);
-      c.fillStyle = P.bone; c.fillRect(x, wy - 18, 1, 1);
-    }
+    floor_lamp: { w: 24, h: 60, paint: function (c) {
+      A.slab(c, 11, 14, 2, 44, STONES); A.slab(c, 6, 56, 12, 3, STONES);
+      for (var r = 0; r < 12; r++) for (var x = -5 - (r >> 1); x <= 5 + (r >> 1); x++) A.px(c, r === 11 ? 'blood' : (x < -2 - (r >> 1) ? 'rug_hi' : (x > 3 + (r >> 2) ? 'blood' : 'dusk_rose')), 12 + x, 2 + r);
+      A.box(c, 'lamp_glow', 6, 14, 13, 2);
+    } },
+    armchair: { w: 26, h: 28, paint: function (c) {
+      A.slab(c, 2, 2, 8, 22, ['ink', 'blood', 'crimson', 'rug_hi']); A.slab(c, 2, 13, 22, 9, ['ink', 'blood', 'crimson', 'rug_hi']);
+      A.slab(c, 18, 8, 6, 8, ['ink', 'blood', 'crimson', 'rug_hi']); A.box(c, 'rug_hi', 10, 14, 8, 1);
+      A.box(c, 'wood_dark', 3, 22, 2, 5); A.box(c, 'wood_dark', 21, 22, 2, 5);
+    } },
+    statue: { w: 20, h: 40, paint: function (c) {
+      A.slab(c, 1, 30, 18, 10, STONES);
+      A.blob(c, 10, 5, 3.5, 3.5, STONES, { bias: 0.15 });
+      A.slab(c, 6, 9, 9, 13, STONES); A.slab(c, 6, 22, 4, 8, STONES); A.slab(c, 11, 22, 4, 8, STONES); A.slab(c, 15, 10, 2, 10, STONES);
+      A.px(c, 'bone', 9, 4);
+    } }
   };
+  var moverCv = {};
+  function moverImg(kind) {
+    var m = MOVERS[kind];
+    return moverCv[kind] || (moverCv[kind] = G.gfx.bake.layer(m.w, m.h, function (c) { A.reset(); m.paint(c); A.reset(); }));
+  }
 
   var red = {
     paint: {
-      // Heavy curtains where the mist would be: folded panels to a wavy hem, with gaps.
+      // Heavy curtains where the mist would be: deep folds to a wavy hem, with gaps.
       curtain: function (ctx, L, w, wy, rng) {
-        for (var x0 = rng.int(-20, 0); x0 < w;) {
-          var pw = rng.int(L.panel[0], L.panel[1]), ph = rng.range(0, 6.28);
+        for (var x0 = rng.int(-40, 0); x0 < w;) {
+          var pw = rng.int(L.panel[0], L.panel[1]), ph = rng.range(0, 6.28), fold = rng.range(9, 13);
           for (var x = Math.max(0, x0); x < Math.min(w, x0 + pw); x++) {
-            var f = Math.sin((x - x0) * 0.9 + ph) + 0.4 * Math.sin((x - x0) * 0.23);
-            var hem = L.hem + Math.round(Math.abs(Math.sin((x - x0) * 0.07)) * 3);
-            ctx.fillStyle = P[f > 0.75 ? L.hi : (f > -0.3 ? L.color : L.dark)];
-            ctx.fillRect(x, 0, 1, Math.min(hem, wy));
+            var u = (x - x0) / fold * 6.283 + ph, f = Math.sin(u) + 0.35 * Math.sin(u * 0.27);
+            var hem = L.hem + Math.round(Math.abs(Math.sin((x - x0) * 0.035)) * 6);
+            var k = f > 0.8 ? L.hi : (f > -0.1 ? L.color : (f > -0.8 ? L.dark : 'ink'));
+            A.box(ctx, k, x, 0, 1, Math.min(hem, wy));
+            A.px(ctx, f > 0 ? L.dark : 'ink', x, Math.min(hem, wy) - 1);
           }
           x0 += pw + rng.int(L.gap[0], L.gap[1]);
         }
       },
-      // The zigzag floor for a shore.
+      // The zigzag floor for a shore: black and bone chevrons.
       zigzag: function (ctx, L, w, wy) {
-        for (var y = 0; y < L.height; y++) {
-          var shift = Math.abs((y % 6) - 3);
-          for (var x = 0; x < w; x++) {
-            ctx.fillStyle = P[(((x + shift) / 3) | 0) & 1 ? L.color : L.alt];
-            ctx.fillRect(x, wy - L.height + y, 1, 1);
-          }
-        }
+        A.area(ctx, 0, wy - L.height, w, L.height, function (x, y) {
+          var r = y - (wy - L.height), shift = Math.abs((r % 12) - 6);
+          return (((x + shift) / 6) | 0) & 1 ? L.color : L.alt;
+        });
       }
     },
 
@@ -272,9 +281,9 @@ G.scene.scenery = (function () {
       if (id !== 'marks') return;
       var s = run.scen, u = clamp(s.t / MOVE_FADE, 0, 1), wy = loc.waterY - oy;
       for (var i = 0; i < loc.movers.length; i++) {
-        var draw = MOVERS[loc.movers[i].kind];
-        if (u < 1) { c.globalAlpha = 1 - u; draw(c, Math.round(s.from[i] - ox), wy); }
-        c.globalAlpha = u; draw(c, Math.round(s.xs[i] - ox), wy);
+        var img = moverImg(loc.movers[i].kind), w = img.width / HI, h = img.height / HI;
+        if (u < 1) { c.globalAlpha = 1 - u; c.drawImage(img, Math.round((s.from[i] - ox) * HI) / HI - w / 2, wy - h, w, h); }
+        c.globalAlpha = u; c.drawImage(img, Math.round((s.xs[i] - ox) * HI) / HI - w / 2, wy - h, w, h);
       }
       c.globalAlpha = 1;
     },

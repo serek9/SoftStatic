@@ -5,11 +5,16 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.scene = G.scene || {};
 G.scene.sailing = (function () {
   var VIEW_W = 320, VIEW_H = 180;
+  // Phase 18: the scene still works in world pixels (the sim's units, 320×180 on screen),
+  // drawn through the view's ×2 transform; but everything it draws is baked at HI times that
+  // resolution and drawn at 1/HI size, and anything drawn live is drawn in half pixels, so
+  // the picture is in the 640×360 view's own pixels. The camera moves in half pixels too.
+  var HI = 2;
   var S = G.gfx.sprites, B = G.gfx.bake, P = S.PALETTE;
   var boat = G.scene.boat, dog = G.scene.dog, fx = G.gfx.fx;
 
   var CAM = { k: 4, look: 0.5, lookMax: 40 }; // smoothing 1/s, look-ahead s, max look-ahead px
-  var SKY_BANDS = 28; // Phase 15: finer steps (was 14), each edge dithered over two rows
+  var SKY_BANDS = 40; // Phase 18: flat bands, 5–6 px each at 640×360 (Phase 15 had 28, dithered)
 
   var loc = null, layers = [], glint = null;
   var boundsByLoc = {};          // loc id -> landmark id -> [x0, x1] as painted
@@ -55,15 +60,21 @@ G.scene.sailing = (function () {
     for (var i = 0; i < n; i++) {
       var y = ((S.hash(i, 22) % 200) + t * 110) % (wy + 12) - 6;
       var x = (S.hash(i, 21) % 340) - 10 - Math.round(y * 0.15);
-      c.fillRect(x, Math.round(y), 1, 2);
+      c.fillRect(x, Math.round(y * HI) / HI, 0.5, 2);
     }
     c.globalAlpha = 1;
   }
   var plift = { t: -1, sp: -1, x0: 0 }, PLIFT = 0.9;
-  S.def('bat', { k: 'night_ink' }, [['k...k', '.kkk.'], ['.....', 'kkkkk']]);
-
-  S.def('lure', { r: 'rust_hi', b: 'bone' }, ['.r.', 'rbr', '.r.']);
-  S.def('float', { r: 'neon_red', b: 'bone' }, ['r', 'r', 'b']); // the passive line's float (12.2)
+  // Small things painted in the view's pixels (Phase 18): the lure, the passive line's float
+  // (12.2), the bat's two wing beats.
+  var TINY = {
+    lure: [6, 6, function (c) { A.blob(c, 3, 3, 2.5, 1.6, ['rust_dark', 'rust_hi', 'flame'], { bias: 0.1 }); A.px(c, 'bone', 4, 2); A.px(c, 'ink', 5, 3); A.px(c, 'stone_hi', 1, 5); A.px(c, 'stone_hi', 2, 5); }],
+    float: [4, 8, function (c) { A.box(c, 'stone_hi', 1, 0, 1, 1); A.blob(c, 2, 3, 1.6, 2, ['blood', 'neon_red'], { bias: 0.2 }); A.blob(c, 2, 5.5, 1.6, 1.5, ['paper', 'bone'], { bias: 0.1 }); A.box(c, 'ink', 1, 7, 2, 1); }],
+    bat0: [12, 6, function (c) { A.box(c, 'night_ink', 5, 2, 2, 3); A.line(c, 'night_ink', 5, 2, 0, 0); A.line(c, 'night_ink', 6, 2, 11, 0); A.line(c, 'night_ink', 4, 3, 1, 1); A.line(c, 'night_ink', 7, 3, 10, 1); }],
+    bat1: [12, 6, function (c) { A.box(c, 'night_ink', 5, 1, 2, 3); A.line(c, 'night_ink', 5, 2, 0, 4); A.line(c, 'night_ink', 6, 2, 11, 4); A.line(c, 'night_ink', 4, 2, 1, 3); A.line(c, 'night_ink', 7, 2, 10, 3); }]
+  };
+  var tinyCv = {};
+  function tinyArt(k) { return tinyCv[k] || (tinyCv[k] = B.layer(TINY[k][0], TINY[k][1], function (c) { A.reset(); TINY[k][2](c); A.reset(); })); }
   // 10.4: the owl that calls at a clock window's cue. Its eyes are open in frame 1.
   S.def('owl', { o: 'stone', d: 'stone_dark', e: 'signal_amber', k: 'ink' }, [
     ['o...o', 'ooooo', 'okook', 'ooooo', 'odddo', '.ddd.', '.k.k.'],
@@ -75,127 +86,119 @@ G.scene.sailing = (function () {
   // ---- Layer painters ------------------------------------------------------
   // Each paints one baked layer of height waterY; rng is a private, seeded stream, so a
   // location always bakes the same picture without touching G.rng or G.vrng.
+  // Phase 18: layers are baked at HI (2) times the world's resolution, and every painter
+  // below works in those layer pixels (the data's lengths are scaled by scaleL).
 
+  var A = G.gfx.paint, WOOD = ['wood_deep', 'wood_dark', 'wood', 'wood_mid', 'wood_hi'], RUSTY = ['rust_dark', 'rust', 'rust_hi'];
+  var STONES = ['stone_dark', 'stone', 'stone_hi', 'stone_lit'];
+
+  // Features on a ridge, in its colour (key) with a lit side (lit): the fire tower and a mast.
   var FEATURES = {
-    tower: function (ctx, x, top) {
-      var body = ctx.fillStyle;
-      ctx.fillRect(x - 4, top - 12, 1, 12); ctx.fillRect(x + 4, top - 12, 1, 12);
-      ctx.fillRect(x - 4, top - 7, 9, 1);
-      for (var q = 0; q < 5; q++) { ctx.fillRect(x - 4 + q * 2, top - 12 + q, 1, 1); ctx.fillRect(x + 4 - q * 2, top - 12 + q, 1, 1); } // bracing
-      ctx.fillRect(x - 6, top - 20, 13, 8);
-      ctx.fillRect(x - 5, top - 21, 11, 1); ctx.fillRect(x - 3, top - 22, 7, 1);
-      ctx.fillStyle = P.night_blue; ctx.fillRect(x - 6, top - 20, 2, 8); ctx.fillRect(x - 5, top - 21, 3, 1); // the lit side
-      ctx.fillStyle = P.night_ink; for (q = 0; q < 13; q += 3) ctx.fillRect(x - 6 + q, top - 16, 1, 4); // seams
-      ctx.fillStyle = body;
+    tower: function (ctx, x, top, key, lit) {
+      var legH = 26, y0 = top - legH, i;
+      for (i = 0; i < legH; i++) { A.px(ctx, key, x - 9 + (i >> 3), top - i); A.px(ctx, key, x + 9 - (i >> 3), top - i); }
+      for (i = 0; i < 3; i++) { var yy = top - 8 - i * 8; A.line(ctx, key, x - 8 + i, yy, x + 8 - i, yy - 7); A.line(ctx, key, x + 8 - i, yy, x - 8 + i, yy - 7); A.box(ctx, key, x - 8 + i, yy, 17 - i * 2, 1); }
+      A.box(ctx, key, x - 12, y0 - 14, 25, 14);
+      A.box(ctx, lit, x - 12, y0 - 14, 4, 14);
+      A.box(ctx, 'night_ink', x - 6, y0 - 11, 14, 6); A.box(ctx, key, x + 1, y0 - 11, 1, 6);
+      for (i = 0; i < 6; i++) A.box(ctx, key, x - 13 + i, y0 - 15 - i, 27 - i * 2, 1);
+      A.box(ctx, key, x, y0 - 22, 1, 2);
     },
-    mast: function (ctx, x, top) {
-      ctx.fillRect(x, top - 34, 1, 34);
-      ctx.fillRect(x - 2, top - 28, 5, 1); ctx.fillRect(x - 1, top - 18, 3, 1);
-      for (var i = 1; i < 10; i++) { ctx.fillRect(x - i, top - 30 + i * 3, 1, 1); ctx.fillRect(x + i, top - 30 + i * 3, 1, 1); }
+    mast: function (ctx, x, top, key, lit) {
+      A.box(ctx, key, x, top - 68, 2, 68); A.box(ctx, lit, x, top - 68, 1, 68);
+      for (var i = 0; i < 9; i++) { A.box(ctx, key, x - 3, top - 64 + i * 7, 8, 1); }
+      for (i = 1; i < 22; i++) { A.px(ctx, key, x - i, top - 60 + i * 3); A.px(ctx, key, x + 1 + i, top - 60 + i * 3); }
+      A.box(ctx, 'blood', x, top - 70, 2, 2);
     }
   };
 
+  // Landmarks stand on the water at the boat's distance; each paints in layer pixels around
+  // x and returns its extent [x0, x1] in layer pixels.
   var LANDMARKS = {
-    // Phase 15: the landmarks repainted with shading. The pier: posts lit on one side and
-    // braced, a deck of planks with gaps, a rail, and a lamp post at the end.
+    // The pier: posts braced in X, a deck of planks with gaps and missing boards, a rail,
+    // and a lamp post at the end with a rusted head.
     pier: function (ctx, x, wy, rng) {
-      var x0 = x - 34, x1 = x + 34, deck = wy - 7, px;
-      for (px = x0 + 2; px <= x1 - 3; px += 8) {
-        ctx.fillStyle = P.wood_dark; ctx.fillRect(px, deck + 2, 2, wy - deck - 2);
-        ctx.fillStyle = P.wood; ctx.fillRect(px, deck + 2, 1, wy - deck - 2);
-        if (px + 8 <= x1 - 3) { ctx.fillStyle = P.wood_dark; for (var q = 0; q < 4; q++) { ctx.fillRect(px + 2 + q, deck + 2 + q, 1, 1); ctx.fillRect(px + 7 - q, deck + 2 + q, 1, 1); } }
+      var x0 = x - 68, x1 = x + 68, deck = wy - 14, px, q;
+      for (px = x0 + 4; px <= x1 - 6; px += 16) {
+        A.slab(ctx, px, deck + 4, 5, wy - deck - 3, WOOD);
+        if (px + 16 <= x1 - 6) for (q = 0; q < 9; q++) { A.px(ctx, 'wood_dark', px + 5 + q, deck + 5 + q * 0.5 | 0); A.px(ctx, 'wood_dark', px + 15 - q, deck + 5 + q * 0.5 | 0); }
       }
-      ctx.fillStyle = P.wood_dark; ctx.fillRect(x0, deck + 2, x1 - x0 + 1, 1);
-      for (px = x0; px <= x1; px += 3) {
-        if (rng.next() < 0.1) continue; // a missing plank
-        ctx.fillStyle = P[rng.next() < 0.3 ? 'wood_hi' : 'wood']; ctx.fillRect(px, deck, 2, 2);
-        ctx.fillStyle = P.wood_hi; ctx.fillRect(px, deck, 2, 1);
+      A.box(ctx, 'wood_deep', x0, deck + 3, x1 - x0 + 1, 2);
+      for (px = x0; px <= x1; px += 7) {
+        if (rng.next() < 0.1) continue;                                 // a missing plank
+        var k = rng.next() < 0.3 ? 'wood_hi' : 'wood_mid';
+        A.box(ctx, k, px, deck, 6, 3); A.box(ctx, 'wood_lit', px, deck, 6, 1); A.box(ctx, 'wood', px + 5, deck + 1, 1, 2);
       }
-      ctx.fillStyle = P.wood;
-      for (px = x0 + 4; px <= x1 - 8; px += 12) if (rng.next() > 0.3) { ctx.fillRect(px, deck - 5, 1, 5); ctx.fillStyle = P.wood_hi; ctx.fillRect(px, deck - 5, 1, 1); ctx.fillStyle = P.wood; }
-      ctx.fillRect(x0 + 4, deck - 5, 22, 1);
-      ctx.fillStyle = P.stone; ctx.fillRect(x1 - 3, deck - 18, 1, 18); ctx.fillRect(x1 - 7, deck - 18, 5, 1);
-      ctx.fillStyle = P.stone_hi; ctx.fillRect(x1 - 3, deck - 18, 1, 6);
-      ctx.fillStyle = P.rust; ctx.fillRect(x1 - 8, deck - 17, 3, 2);
-      ctx.fillStyle = P.rust_hi; ctx.fillRect(x1 - 8, deck - 17, 1, 1);
+      for (px = x0 + 8; px <= x1 - 16; px += 24) if (rng.next() > 0.25) { A.slab(ctx, px, deck - 12, 3, 12, WOOD); }
+      A.box(ctx, 'wood_mid', x0 + 8, deck - 11, 48, 2); A.box(ctx, 'wood_hi', x0 + 8, deck - 11, 48, 1);
+      A.slab(ctx, x1 - 7, deck - 38, 3, 38, STONES);
+      A.box(ctx, 'stone', x1 - 15, deck - 38, 10, 2);
+      A.slab(ctx, x1 - 18, deck - 37, 7, 5, RUSTY); A.box(ctx, 'fog_dark', x1 - 17, deck - 33, 5, 2);
       return [x0, x1];
     },
-    // A rusted channel buoy: a float at the waterline, a lattice cage, a dead lamp on top.
+    // A rusted channel buoy: a float at the waterline, a lattice cage, a dead lamp, a bell.
     marker: function (ctx, x, wy, rng) {
-      var y;
-      ctx.fillStyle = P.rust_dark; ctx.fillRect(x - 5, wy - 4, 11, 4);
-      ctx.fillStyle = P.rust; ctx.fillRect(x - 5, wy - 4, 11, 1); ctx.fillRect(x - 4, wy - 3, 9, 1);
-      ctx.fillStyle = P.rust_hi; ctx.fillRect(x - 4, wy - 4, 3, 1);
-      for (y = 0; y < 14; y++) {
-        var hw = 4 - Math.floor(y / 5);
-        ctx.fillStyle = P.rust; ctx.fillRect(x - hw, wy - 5 - y, 1, 1); ctx.fillRect(x + hw, wy - 5 - y, 1, 1);
-        if ((y & 3) === 0) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x - hw, wy - 5 - y, hw * 2 + 1, 1); }
-        if (y % 4 === 2) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x - hw + 1 + (y & 1), wy - 5 - y, 1, 1); ctx.fillRect(x + hw - 1 - (y & 1), wy - 5 - y, 1, 1); }
+      var y, i;
+      A.blob(ctx, x, wy - 4, 12, 6, RUSTY, { bias: 0.05 });
+      for (y = 0; y < 30; y++) {
+        var hw = Math.round(9 - y * 0.18);
+        A.px(ctx, 'rust', x - hw, wy - 9 - y); A.px(ctx, 'rust_hi', x - hw + 1, wy - 9 - y); A.px(ctx, 'rust_dark', x + hw, wy - 9 - y);
+        if (y % 8 === 0) A.box(ctx, 'rust_dark', x - hw, wy - 9 - y, hw * 2 + 1, 1);
+        if (y % 8 === 4) { A.line(ctx, 'rust_dark', x - hw, wy - 9 - y + 4, x + hw, wy - 9 - y - 4); }
       }
-      ctx.fillStyle = P.rust_hi; ctx.fillRect(x - 2, wy - 20, 5, 2);
-      ctx.fillStyle = P.stone_dark; ctx.fillRect(x - 1, wy - 23, 3, 3);
-      ctx.fillStyle = P.stone; ctx.fillRect(x - 1, wy - 23, 1, 1);
-      ctx.fillStyle = P.rust_dark; ctx.fillRect(x - 1, wy - 12, 3, 3); // the bell
-      for (var i = 0; i < 5; i++) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x - 3 + rng.int(0, 6), wy - rng.int(6, 16), 1, rng.int(1, 3)); }
-      return [x - 5, x + 5];
+      A.slab(ctx, x - 5, wy - 42, 11, 4, RUSTY);
+      A.slab(ctx, x - 3, wy - 49, 7, 7, STONES); A.box(ctx, 'fog_dark', x - 2, wy - 47, 5, 3);
+      A.blob(ctx, x, wy - 22, 3, 3, ['rust_dark', 'rust'], { bias: -0.1 });
+      for (i = 0; i < 6; i++) A.box(ctx, 'rust_dark', x - 6 + rng.int(0, 12), wy - rng.int(12, 34), 1, rng.int(2, 5)); // rust streaks
+      return [x - 12, x + 12];
     },
     // A sunk boat: the bow up out of the water, ribs showing, planks lit along the top.
     wreck: function (ctx, x, wy) {
-      var x0 = x - 14, i, top;
-      for (i = 0; i < 28; i++) {
-        top = wy - 1 - Math.round(Math.max(0, i - 5) * 0.55);
-        ctx.fillStyle = P.wood_dark; ctx.fillRect(x0 + i, top, 1, wy - top);
-        ctx.fillStyle = P.wood; ctx.fillRect(x0 + i, top, 1, 1);
-        if (i % 3 === 0) { ctx.fillStyle = P.wood; ctx.fillRect(x0 + i, top + 3, 1, Math.max(0, wy - top - 4)); }
-        if (i >= 7 && i % 4 === 3) { ctx.fillStyle = P.wood_hi; ctx.fillRect(x0 + i, top - 4, 1, 4); ctx.fillStyle = P.wood_dark; ctx.fillRect(x0 + i, top - 5, 1, 1); }
+      var x0 = x - 28, i, top;
+      for (i = 0; i < 56; i++) {
+        top = wy - 2 - Math.round(Math.max(0, i - 10) * 0.55);
+        for (var y = top; y < wy; y++) {
+          var d = y - top, k = d < 2 ? 'wood_hi' : (d < 4 ? 'wood_mid' : ((d >> 2) % 2 ? 'wood_dark' : 'wood'));
+          A.px(ctx, k, x0 + i, y);
+        }
+        if (i >= 14 && i % 8 === 6) { A.slab(ctx, x0 + i, top - 9, 2, 9, WOOD); A.px(ctx, 'wood_deep', x0 + i, top - 10); }
       }
-      ctx.fillStyle = P.rust; ctx.fillRect(x0 + 22, wy - 14, 2, 2);
-      return [x0, x0 + 27];
+      A.slab(ctx, x0 + 44, wy - 28, 4, 4, RUSTY);
+      return [x0, x0 + 55];
     },
-    // 11.1: a decaying cabin on stilts at the water's edge; its roof sags by lm.sag px.
+    // 11.1: a decaying cabin on stilts at the water's edge; its roof sags by lm.sag (world px).
     cabin: function (ctx, x, wy, rng, lm) {
-      var x0 = x - 16, x1 = x + 16, floor = wy - 6, top = floor - 16, sag = lm.sag || 1, i, r;
-      ctx.fillStyle = P.wood_dark;
-      for (i = x0 + 1; i <= x1 - 2; i += 6) ctx.fillRect(i, floor, 2, wy - floor); // stilts
-      ctx.fillRect(x0, top, x1 - x0 + 1, floor - top);
-      ctx.fillStyle = P.wood;
-      for (i = top + 1; i < floor; i += 3) {                                       // boards, some missing
-        for (var bx = x0; bx <= x1; bx += 4) if (rng.next() > 0.15) ctx.fillRect(bx, i, 4, 1);
+      var x0 = x - 32, x1 = x + 32, floor = wy - 12, top = floor - 32, sag = (lm.sag || 1) * 2, i, r;
+      for (i = x0 + 2; i <= x1 - 4; i += 12) A.slab(ctx, i, floor, 4, wy - floor, WOOD);
+      A.box(ctx, 'wood_deep', x0, top, x1 - x0 + 1, floor - top);
+      for (i = top + 1; i < floor; i += 5) for (var bx = x0; bx <= x1; bx += 9) if (rng.next() > 0.14) { A.box(ctx, 'wood', bx, i, 8, 4); A.box(ctx, 'wood_mid', bx, i, 8, 1); A.box(ctx, 'wood_dark', bx + 7, i, 1, 4); }
+      A.box(ctx, 'night_ink', x0 + 9, top + 8, 12, 10); A.box(ctx, 'wood_dark', x0 + 14, top + 8, 2, 10); A.box(ctx, 'wood_dark', x0 + 9, top + 12, 12, 2);
+      A.box(ctx, 'night_ink', x1 - 20, top + 9, 12, floor - top - 9); A.slab(ctx, x1 - 20, top + 9, 4, floor - top - 9, WOOD);
+      var peak = top - 20 + sag;
+      for (r = peak; r < top + 2; r++) {
+        var hw = Math.round(38 * (r - peak + 1) / (top + 2 - peak));
+        for (var xx = -hw; xx <= hw; xx++) A.px(ctx, (r - peak) % 4 === 3 ? 'rust_dark' : (xx < 0 ? 'rust' : 'rust_dark'), x + xx, r);
       }
-      ctx.fillStyle = P.night_ink;
-      ctx.fillRect(x0 + 5, top + 4, 6, 5);                                         // dark window
-      ctx.fillRect(x1 - 10, top + 5, 6, floor - top - 5);                          // the door, ajar
-      ctx.fillStyle = P.wood_dark; ctx.fillRect(x1 - 10, top + 5, 2, floor - top - 5);
-      ctx.fillStyle = P.stone_dark; ctx.fillRect(x0 + 8, top + 4, 1, 5); ctx.fillRect(x0 + 5, top + 6, 6, 1);
-      // Gable roof whose ridge has sunk.
-      var peak = top - 10 + sag;
-      ctx.fillStyle = P.rust_dark;
-      for (r = peak; r < top; r++) {
-        var hw = Math.round(19 * (r - peak + 1) / (top - peak));
-        ctx.fillRect(x - hw, r, hw * 2 + 1, 1);
-      }
-      ctx.fillStyle = P.night_ink;
-      for (i = 0; i < 4; i++) ctx.fillRect(x + rng.int(-10, 10), rng.int(peak + 3, top - 1), 1, 1); // holes
-      ctx.fillStyle = P.rust; ctx.fillRect(x + 8, peak - 1, 2, 6);                 // a leaning stovepipe
-      return [x - 19, x + 19];
+      for (i = 0; i < 6; i++) A.box(ctx, 'night_ink', x + rng.int(-20, 20), rng.int(peak + 6, top - 2), 2, 2); // holes
+      A.slab(ctx, x + 16, peak - 4, 4, 14, RUSTY);
+      return [x - 38, x + 38];
     },
     // 11.1: dead branches standing out of the water. They carry on down to the bottom in the
     // cross-section (underwater.snags).
     snag: function (ctx, x, wy, rng) {
-      var lean = rng.next() < 0.5 ? -1 : 1, h = rng.int(14, 22), lo = x, hi = x + 1, px, i, k;
-      ctx.fillStyle = P.wood_dark;
+      var lean = rng.next() < 0.5 ? -1 : 1, h = rng.int(28, 44), lo = x, hi = x + 3, px, i, k;
       for (i = 0; i < h; i++) {
         px = x + Math.round(lean * i * 0.45);
-        ctx.fillRect(px, wy - 1 - i, i < h * 0.6 ? 2 : 1, 1);
-        if (px < lo) lo = px;
-        if (px + 1 > hi) hi = px + 1;
+        var wdt = i < h * 0.4 ? 4 : (i < h * 0.75 ? 3 : 2);
+        A.box(ctx, 'wood_dark', px, wy - 1 - i, wdt, 1); A.px(ctx, 'wood', px, wy - 1 - i);
+        lo = Math.min(lo, px); hi = Math.max(hi, px + wdt);
         if (i === Math.floor(h / 3) || i === Math.floor(h * 2 / 3)) {
-          var len = rng.int(4, 7);
-          for (k = 1; k <= len; k++) ctx.fillRect(px - lean * k, wy - 1 - i - k, 1, 1);
+          var len = rng.int(8, 14);
+          for (k = 1; k <= len; k++) { A.px(ctx, 'wood_dark', px - lean * k, wy - 1 - i - k); A.px(ctx, 'wood_dark', px - lean * k, wy - i - k); }
           lo = Math.min(lo, px - len); hi = Math.max(hi, px + len);
         }
       }
-      ctx.fillStyle = P.stone_dark; ctx.fillRect(x - 3, wy - 1, 7, 1);
+      A.blob(ctx, x + 1, wy - 1, 7, 2, ['ink', 'stone_dark', 'stone'], { rim: 0 });
       return [lo, hi];
     }
   };
@@ -203,96 +206,75 @@ G.scene.sailing = (function () {
   var PAINT = {
     // Phase 15: the painted layers (js/gfx/paint.js). Mountains carry the ridge's features.
     mountains: function (ctx, L, w, wy, rng) {
-      var tops = G.gfx.paint.mountains(ctx, L, w, wy, rng);
-      ctx.fillStyle = P[L.featureKey || L.color];
-      for (var i = 0; i < (L.features || []).length; i++) { var f = L.features[i]; FEATURES[f.kind](ctx, f.x, tops[f.x]); }
+      var tops = A.mountains(ctx, L, w, wy, rng);
+      for (var i = 0; i < (L.features || []).length; i++) { var f = L.features[i]; FEATURES[f.kind](ctx, f.x, tops[f.x], L.featureKey || L.color, L.lit); }
     },
-    forest: function (ctx, L, w, wy, rng) { G.gfx.paint.forest(ctx, L, w, wy, rng); },
-    bank: function (ctx, L, w, wy, rng) { G.gfx.paint.shore(ctx, L, w, wy, rng); },
-    ridge: function (ctx, L, w, wy, rng) {
-      var p1 = rng.range(0, 6.28), p2 = rng.range(0, 6.28), walk = 0, tops = new Int16Array(w);
-      ctx.fillStyle = P[L.color];
-      for (var x = 0; x < w; x++) {
-        walk = (walk + rng.range(-0.6, 0.6)) * 0.96;
-        var top = Math.round(L.base - L.amp * (0.5 + 0.3 * Math.sin(x * 0.011 + p1) + 0.2 * Math.sin(x * 0.037 + p2)) + walk);
-        ctx.fillRect(x, top, 1, wy - top);
-        tops[x] = top;
-      }
-      for (var i = 0; i < (L.features || []).length; i++) {
-        var f = L.features[i];
-        FEATURES[f.kind](ctx, f.x, tops[f.x]);
-      }
-    },
+    forest: function (ctx, L, w, wy, rng) { A.forest(ctx, L, w, wy, rng); },
+    bank: function (ctx, L, w, wy, rng) { A.shore(ctx, L, w, wy, rng); },
+    // Fog (Phase 18): three soft bands, one inside the other, each with a slowly wandering top
+    // and bottom edge, filled flat at its own alpha, so the fog reads as banks of mist.
     fog: function (ctx, L, w, wy, rng) {
+      var a = Math.min(1, L.alpha * FOG_HEAD), mid = L.y + L.h / 2;
       ctx.fillStyle = P[L.color];
-      for (var y = 0; y < L.h; y++) {
-        var prof = 1 - Math.abs(2 * y / (L.h - 1) - 1);
-        for (var x = 0; x < w;) {
-          var len = rng.int(6, 40);
-          ctx.globalAlpha = Math.min(1, L.alpha * FOG_HEAD) * prof * rng.range(0.4, 1);
-          ctx.fillRect(x, L.y + y, len, 1);
-          x += len;
+      for (var b = 0; b < 3; b++) {
+        var half = L.h / 2 * (1 - b * 0.3), p1 = rng.range(0, 6.28), p2 = rng.range(0, 6.28), f1 = rng.range(0.004, 0.009), f2 = rng.range(0.013, 0.025);
+        ctx.globalAlpha = a * 0.4;
+        for (var x = 0; x < w; x += 2) {
+          var wob = Math.sin(x * f1 + p1) * half * 0.35 + Math.sin(x * f2 + p2) * half * 0.15, gap = Math.sin(x * f1 * 0.7 + p2) > 0.75 - b * 0.2;
+          if (gap && b > 0) continue;
+          var t0 = Math.round(mid - half + wob), t1 = Math.round(mid + half * 0.8 + wob * 0.5);
+          ctx.fillRect(x, t0, 2, Math.max(1, t1 - t0));
         }
       }
       ctx.globalAlpha = 1;
+      A.reset();
     },
-    treeline: function (ctx, L, w, wy, rng) {
-      ctx.fillStyle = P[L.color];
-      ctx.fillRect(0, L.base, w, wy - L.base);
-      for (var x = 0; x < w + 4;) {
-        var hgt = rng.int(Math.round(L.height * 0.5), Math.round(L.height * 1.2)), half = rng.int(2, 4);
-        for (var r = 0; r <= hgt; r++) {
-          var rh = Math.round(half * r / hgt);
-          ctx.fillRect(x - rh, L.base - hgt + r, rh * 2 + 1, 1);
-        }
-        x += rng.int(3, 8);
-        if (rng.next() < 0.08) x += rng.int(8, 20);
-      }
-    },
-    shore: function (ctx, L, w, wy, rng) {
-      var x, h;
-      ctx.fillStyle = P[L.color];
-      for (x = 0; x < w; x++) {
-        var top = wy - L.height + (rng.next() < 0.25 ? rng.int(-1, 1) : 0);
-        ctx.fillRect(x, top, 1, wy - top);
-      }
-      ctx.fillStyle = P[L.detail];
-      for (var i = 0; i < w / 5; i++) {
-        x = rng.int(0, w - 1); h = rng.int(2, 6);
-        ctx.fillRect(x, wy - L.height - h + 1, 1, h);
-      }
-      ctx.fillStyle = P.stone_dark;
-      for (i = 0; i < w / 60; i++) ctx.fillRect(rng.int(0, w - 4), wy - 2, rng.int(2, 4), 2);
-    },
-    // 11.1: the creek's near forest: straight trunks from above the view to the bank, a few
-    // broken branches, and (audit P2-5) the canopy as a ragged dark edge along the top of
+    // 11.1: the creek's near forest: straight trunks with lit edges and bark, broken
+    // branches, and (audit P2-5) the canopy as a ragged edge of leaf clumps along the top of
     // the view, so no crown floats loose in the sky.
     trunks: function (ctx, L, w, wy, rng) {
-      var cx, edge = 0;
-      ctx.fillStyle = P[L.crown];
+      var cx, edge = 4, leaf = [L.crownDark || 'night_ink', L.crown, L.crownLit || 'moss'];
       for (cx = 0; cx < w; cx++) {
-        edge = clamp(edge + rng.int(-1, 1), 2, L.top >> 1);
-        ctx.fillRect(cx, 0, 1, edge + (rng.next() < 0.15 ? rng.int(1, 4) : 0));
+        edge = clamp(edge + rng.int(-1, 1), 4, L.top);
+        A.box(ctx, leaf[0], cx, 0, 1, edge);
       }
-      for (var x = rng.int(0, 20); x < w; x += rng.int(L.gap[0], L.gap[1])) {
-        var tw = rng.int(2, 4), top = -1, b, k;
-        ctx.fillStyle = P[L.color];
-        ctx.fillRect(x, top, tw, wy - top);
+      for (var c = 0; c < w / 9; c++) A.blob(ctx, rng.int(0, w), rng.int(2, L.top), rng.int(5, 12), rng.int(4, 8), leaf, { rim: 0 });
+      for (var x = rng.int(0, 40); x < w; x += rng.int(L.gap[0], L.gap[1])) {
+        var tw = rng.int(5, 9), b, k;
+        A.area(ctx, x, 0, tw, wy, function (xx, yy) {
+          var u = xx - x;
+          if (u === 0) return L.color === 'night_ink' ? 'pine_dark' : L.color;
+          return (yy + u * 7) % 23 === 0 ? 'pine_mid' : L.color;
+        });
         for (b = 0; b < 3; b++) {
-          var by = rng.int(Math.max(4, top + 8), wy - 22), len = rng.int(3, 8), dir = rng.next() < 0.5 ? -1 : 1;
-          for (k = 0; k < len; k++) ctx.fillRect(dir < 0 ? x - 1 - k : x + tw + k, by - (k >> 1), 1, 1);
+          var by = rng.int(L.top + 10, wy - 40), len = rng.int(6, 16), dir = rng.next() < 0.5 ? -1 : 1;
+          for (k = 0; k < len; k++) { A.px(ctx, L.color, dir < 0 ? x - 1 - k : x + tw + k, by - (k >> 1)); A.px(ctx, L.color, dir < 0 ? x - 1 - k : x + tw + k, by - (k >> 1) + 1); }
         }
       }
     },
-    // A landmark with its own seed paints the same wherever it stands (the same pier in two lakes, 11.4).
+    // A landmark with its own seed paints the same wherever it stands (the same pier in two
+    // lakes, 11.4). Its extent is kept in world pixels (underwater.js and the debug use it).
     landmarks: function (ctx, L, w, wy, rng) {
       var b = boundsByLoc[loc.id] = {};
       for (var i = 0; i < loc.landmarks.length; i++) {
         var lm = loc.landmarks[i], paint = (scen.landmarks && scen.landmarks[lm.kind]) || LANDMARKS[lm.kind];
-        b[lm.id] = paint(ctx, lm.x, wy, lm.seed ? new G.core.rng.Rng(lm.seed) : rng, lm);
+        var e = paint(ctx, lm.x * HI, wy, lm.seed ? new G.core.rng.Rng(lm.seed) : rng, lm);
+        b[lm.id] = [Math.floor(e[0] / HI), Math.ceil(e[1] / HI)];
       }
     }
   };
+
+  // The data's lengths in layer pixels (Phase 18): a copy of L with them scaled by HI.
+  var LENGTHS = ['base', 'amp', 'height', 'y', 'h', 'top', 'reedH', 'rockEvery', 'hem'];
+  function scaleL(L) {
+    var o = {}, k, i;
+    for (k in L) o[k] = L[k];
+    for (i = 0; i < LENGTHS.length; i++) if (typeof L[LENGTHS[i]] === 'number') o[LENGTHS[i]] = L[LENGTHS[i]] * HI;
+    if (L.gap) o.gap = [L.gap[0] * HI, L.gap[1] * HI];
+    if (L.panel) o.panel = [L.panel[0] * HI, L.panel[1] * HI];
+    if (L.features) o.features = L.features.map(function (f) { var g = {}; for (var q in f) g[q] = f[q]; g.x = f.x * HI; return g; });
+    return o;
+  }
 
   // ---- Scenery modules (11.4) ---------------------------------------------------
   // loc.scenery names a module in G.scene.scenery (js/scene/scenery.js) for what baked
@@ -309,10 +291,10 @@ G.scene.sailing = (function () {
   var NO_SCENERY = {}, scen = NO_SCENERY;
 
   function bakeLayer(L, i) {
-    var w = VIEW_W + Math.ceil((loc.width - VIEW_W) * L.parallax), wy = loc.waterY;
+    var w = (VIEW_W + Math.ceil((loc.width - VIEW_W) * L.parallax)) * HI, wy = loc.waterY * HI;
     var rng = new G.core.rng.Rng(loc.seed * 31 + i), paint = (scen.paint && scen.paint[L.kind]) || PAINT[L.kind];
     var key = 'loc:' + loc.id + ':' + L.id, fog = L.kind === 'fog', cv = B.cached(key, function () {
-      return B.layer(w, wy, function (ctx) { paint(ctx, L, w, wy, rng); });
+      return B.layer(w, wy, function (ctx) { A.reset(); paint(ctx, scaleL(L), w, wy, rng); A.reset(); });
     });
     // Phase 15: the light of the hour. Each painted layer is also baked graded for night
     // (cooler and darker) and for the grey hours (flatter), and drawn over itself by the
@@ -351,12 +333,12 @@ G.scene.sailing = (function () {
     for (var i = 0; i < loc.layers.length; i++) layers.push(bakeLayer(loc.layers[i], i));
     var rng = new G.core.rng.Rng(loc.seed * 31 + 99);
     glint = B.cached('loc:' + id + ':glint', function () {
-      return B.layer(loc.width, 1, function (ctx, w) {
+      return B.layer(loc.width * HI, 1, function (ctx, w) {
         ctx.fillStyle = P.water_hi;
-        for (var x = rng.int(0, 10); x < w; x += rng.int(5, 18)) ctx.fillRect(x, 0, rng.int(1, 4), 1);
+        for (var x = rng.int(0, 20); x < w; x += rng.int(10, 36)) ctx.fillRect(x, 0, rng.int(2, 8), 1);
       });
     });
-    if (!skyCv) skyCv = B.canvas(VIEW_W, VIEW_H);
+    if (!skyCv) skyCv = B.canvas(VIEW_W * HI, VIEW_H * HI);
     skyKey = -1;
     bakeSky();
     bakeMist();
@@ -569,11 +551,12 @@ G.scene.sailing = (function () {
   }
 
   // 1 px line between two screen points (Bresenham). dotted draws every other pixel.
+  // A line in the view's pixels between world points (dotted: every other pixel pair).
   function line(ctx, x0, y0, x1, y1, dotted) {
-    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
-    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy, n = 0;
+    x0 = Math.round(x0 * HI); y0 = Math.round(y0 * HI); x1 = Math.round(x1 * HI); y1 = Math.round(y1 * HI);
+    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy, n = 0, q = 1 / HI;
     for (;;) {
-      if (!dotted || (n++ & 1) === 0) ctx.fillRect(x0, y0, 1, 1);
+      if (!dotted || (n++ & 3) < 2) ctx.fillRect(x0 * q, y0 * q, q, q);
       if (x0 === x1 && y0 === y1) break;
       var e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
@@ -588,9 +571,7 @@ G.scene.sailing = (function () {
       var mx = landingX(b, c.charge) - camPx;
       ctx.globalAlpha = 0.4;
       ctx.fillStyle = P.fog_light;
-      ctx.fillRect(mx - 2, wy + 1, 5, 1);
-      ctx.fillRect(mx - 3, wy + 2, 1, 1); ctx.fillRect(mx + 3, wy + 2, 1, 1);
-      ctx.fillRect(mx - 2, wy + 3, 5, 1);
+      for (var q = 0; q < 24; q++) { var an = q / 24 * 6.283; ctx.fillRect(Math.round((mx + Math.cos(an) * 4) * HI) / HI, Math.round((wy + 2 + Math.sin(an) * 1.2) * HI) / HI, 0.5, 0.5); }
       ctx.globalAlpha = 1;
       return;
     }
@@ -618,7 +599,7 @@ G.scene.sailing = (function () {
       line(ctx, ex + hum, wy, lx + hum, ly, true); // hum: the line shivers once for a heavy fish
     }
     ctx.globalAlpha = 1;
-    S.draw(ctx, 'lure', Math.round(lx) - 1, Math.round(ly) - 1, 0, false);
+    ctx.drawImage(tinyArt('lure'), Math.round(lx * HI) / HI - 1.5, Math.round(ly * HI) / HI - 1.5, 3, 3);
   }
 
   // 12.2: the passive line runs to a float; while a fish is on, the float pulls under and shakes.
@@ -630,7 +611,7 @@ G.scene.sailing = (function () {
     ctx.globalAlpha = 0.6; ctx.fillStyle = P.fog_light;
     line(ctx, tip[0], tip[1], fxs, fy, false);
     ctx.globalAlpha = 1;
-    S.draw(ctx, 'float', fxs, fy, 0, false);
+    ctx.drawImage(tinyArt('float'), Math.round(fxs * HI) / HI - 1, fy - 1, 2, 4);
   }
 
   // 7.4: pulling, the line runs straight and shakes; tired, it sags. The tint warms with
@@ -743,15 +724,15 @@ G.scene.sailing = (function () {
 
   function hourNow() { return G.sim.clock.wrap(G.state.save.clock || 0); }
 
-  // Rebakes the sky when the hour moves by 0.05 (3 real seconds): SKY_BANDS bands, each
-  // boundary softened by one dithered row of the next band's colour.
+  // Rebakes the sky when the hour moves by 0.05 (3 real seconds): SKY_BANDS flat bands
+  // (Phase 18: no dithered edges, the bands are fine enough at 640×360).
   var skyRGB = [];
   for (var sb = 0; sb < SKY_BANDS; sb++) skyRGB.push('');
   function refreshSky(hour) {
     var key = Math.floor(hour * 20);
     if (key === skyKey) return;
     skyKey = key;
-    var ctx = skyCv.getContext('2d'), wy = loc.waterY, i, x;
+    var ctx = skyCv.getContext('2d'), wy = loc.waterY * HI, i;
     skyLum = 0;
     for (i = 0; i < SKY_BANDS; i++) {
       skyColor(hour, i / (SKY_BANDS - 1), skyOut);
@@ -763,12 +744,7 @@ G.scene.sailing = (function () {
     for (i = 0; i < SKY_BANDS; i++) {
       var y0 = Math.floor(i * wy / SKY_BANDS), y1 = Math.floor((i + 1) * wy / SKY_BANDS);
       ctx.fillStyle = skyRGB[i];
-      ctx.fillRect(0, y0, VIEW_W, y1 - y0);
-      if (i + 1 < SKY_BANDS) { // the next band reaches up into this one: 1 in 4, then 1 in 2
-        ctx.fillStyle = skyRGB[i + 1];
-        for (x = (i & 3); x < VIEW_W; x += 4) ctx.fillRect(x, y1 - 2, 1, 1);
-        for (x = (i & 1); x < VIEW_W; x += 2) ctx.fillRect(x, y1 - 1, 1, 1);
-      }
+      ctx.fillRect(0, y0, VIEW_W * HI, y1 - y0);
     }
   }
 
@@ -782,59 +758,74 @@ G.scene.sailing = (function () {
   ]);
 
   function bakeSky() {
-    var o = sky.opt = loc.sky || {}, wy = loc.waterY, id = loc.id;
-    var sw = VIEW_W + Math.ceil((loc.width - VIEW_W) * SKYP);
-    function starField(seed, n, keyHi) {
+    var o = sky.opt = loc.sky || {}, wy = loc.waterY * HI, id = loc.id;
+    var sw = (VIEW_W + Math.ceil((loc.width - VIEW_W) * SKYP)) * HI;
+    // Stars: single pixels, denser high up; a few brighter ones with a small cross.
+    function starField(seed, n, crosses) {
       return B.layer(sw, wy, function (ctx) {
         var rng = new G.core.rng.Rng(seed);
         for (var i = 0; i < n; i++) {
-          var y = Math.floor(wy * 0.8 * rng.next() * rng.next()); // denser high up
-          ctx.fillStyle = P[rng.next() < 0.2 ? keyHi : 'fog_mid'];
-          ctx.fillRect(rng.int(0, sw - 1), y, 1, 1);
+          var y = Math.floor(wy * 0.8 * rng.next() * rng.next()), x = rng.int(2, sw - 3), hi = rng.next() < 0.25;
+          ctx.fillStyle = P[hi ? 'fog_light' : 'fog_mid'];
+          ctx.fillRect(x, y, 1, 1);
+          if (i < crosses) { ctx.fillStyle = P.fog_mid; ctx.fillRect(x - 2, y, 1, 1); ctx.fillRect(x + 2, y, 1, 1); ctx.fillRect(x, y - 2, 1, 1); ctx.fillRect(x, y + 2, 1, 1); ctx.fillStyle = P.fog_light; ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3); }
         }
       });
     }
-    sky.stars = o.stars === false ? null : B.cached('loc:' + id + ':stars', function () { return starField(loc.seed * 7 + 1, 70, 'fog_light'); });
-    sky.twinkle = o.stars === false ? null : B.cached('loc:' + id + ':twinkle', function () { return starField(loc.seed * 7 + 2, 18, 'fog_light'); });
-    sky.glow = o.glow === false ? null : B.cached('sky:glow', function () {
-      return B.layer(200, 46, function (ctx) {
+    sky.stars = o.stars === false ? null : B.cached('loc:' + id + ':stars', function () { return starField(loc.seed * 7 + 1, 160, 6); });
+    sky.twinkle = o.stars === false ? null : B.cached('loc:' + id + ':twinkle', function () { return starField(loc.seed * 7 + 2, 36, 3); });
+    // The glow where the sun went down: stepped rings of dusk_amber (alpha, never brighter).
+    sky.glow = o.glow === false ? null : B.cached('sky:glow2', function () {
+      return B.layer(400, 92, function (ctx) {
         ctx.fillStyle = P.dusk_amber;
-        for (var y = 0; y < 46; y++) for (var x = 0; x < 200; x++) {
-          var dx = (x - 100) / 100, dy = (45 - y) / 45, d = Math.sqrt(dx * dx + dy * dy);
+        for (var y = 0; y < 92; y++) for (var x = 0; x < 400; x++) {
+          var dx = (x - 200) / 200, dy = (91 - y) / 91, d = Math.sqrt(dx * dx + dy * dy);
           if (d >= 1) continue;
           ctx.globalAlpha = Math.round((1 - d) * 5) / 8;
           ctx.fillRect(x, y, 1, 1);
         }
       });
     });
-    sky.halo = B.cached('sky:halo', function () {
-      return B.layer(19, 19, function (ctx) {
+    // The moon's halo: two soft stepped rings.
+    sky.halo = B.cached('sky:halo2', function () {
+      return B.layer(49, 49, function (ctx) {
         ctx.fillStyle = P.fog_mid;
-        for (var y = 0; y < 19; y++) for (var x = 0; x < 19; x++) {
-          var d = Math.sqrt((x - 9) * (x - 9) + (y - 9) * (y - 9)) / 9.5;
-          if (d < 1) { ctx.globalAlpha = Math.round((1 - d) * 4) / 10; ctx.fillRect(x, y, 1, 1); }
+        for (var y = 0; y < 49; y++) for (var x = 0; x < 49; x++) {
+          var d = Math.sqrt((x - 24) * (x - 24) + (y - 24) * (y - 24)) / 24.5;
+          if (d < 1) { ctx.globalAlpha = d < 0.55 ? 0.28 : 0.14; ctx.fillRect(x, y, 1, 1); }
         }
       });
     });
+    // The moon: a disk lit from the side, with maria and a darker limb.
+    sky.moon = B.cached('sky:moon2', function () {
+      return B.layer(17, 17, function (ctx) {
+        A.reset();
+        A.blob(ctx, 8, 8, 7.5, 7.5, ['fog_mid', 'fog_light'], { bias: 0.15, rim: 0.3 });
+        A.blob(ctx, 6, 6, 2, 1.5, ['fog_mid'], { rim: 0 }); A.blob(ctx, 10, 10, 1.6, 1.3, ['fog_mid'], { rim: 0 }); A.px(ctx, 'fog_mid', 11, 5);
+        A.reset();
+      });
+    });
     if (o.clouds === false) { sky.clouds = null; return; }
-    // Phase 15: one field of puffy clouds (gfx/paint.js cloudMask) baked in four colourings
+    // Phase 15: one field of clouds (gfx/paint.js cloudMask) baked in four colourings
     // (shadow, body, lit): night, grey, dusk, and the dusk rim light alone.
-    var mask = null;
-    function maskOnce() { return mask || (mask = G.gfx.paint.cloudMask(CLOUD_W, wy, new G.core.rng.Rng(loc.seed * 13 + 5), 9)); }
+    var mask = null, CW = CLOUD_W * HI;
+    function maskOnce() { return mask || (mask = A.cloudMask(CW, wy, new G.core.rng.Rng(loc.seed * 13 + 5), 9, HI)); }
     var KEYS = [['night_deep', 'night_blue', 'dusk_violet'], ['fog_dark', 'fog_mid', 'fog_light'], ['dusk_violet', 'dusk_plum', 'dusk_rose'], [null, null, 'dusk_amber']];
     sky.clouds = KEYS.map(function (k, ki) {
       return B.cached('loc:' + id + ':cloud' + ki, function () {
-        return B.layer(CLOUD_W, wy, function (ctx) { G.gfx.paint.paintMask(ctx, maskOnce(), CLOUD_W, wy, k); });
+        return B.layer(CW, wy, function (ctx) { A.reset(); A.paintMask(ctx, maskOnce(), CW, wy, k); A.reset(); });
       });
     });
   }
 
-  // Draws cv (wrapping every w px) scrolled by ox, at screen y oy.
+  // Draws a HI-res cv (wrapping every w of its px) scrolled by ox world px, at screen y oy
+  // (world px), h world px tall.
   function drawWrapped(c, cv, w, ox, oy, h) {
-    ox = ((Math.round(ox) % w) + w) % w;
-    var first = Math.min(VIEW_W, w - ox);
-    c.drawImage(cv, ox, 0, first, h, 0, oy, first, h);
-    if (first < VIEW_W) c.drawImage(cv, 0, 0, VIEW_W - first, h, first, oy, VIEW_W - first, h);
+    var vw = VIEW_W * HI, hh = h * HI;
+    ox = ((Math.round(ox * HI) % w) + w) % w;
+    var first = Math.min(vw, w - ox);
+    c.drawImage(cv, ox, 0, first, hh, 0, oy, first / HI, h);
+    if (first < vw) c.drawImage(cv, 0, 0, vw - first, hh, first / HI, oy, (vw - first) / HI, h);
   }
 
   // Where the moon is on screen for this hour (x, y, alpha), written into out. It rises
@@ -844,37 +835,37 @@ G.scene.sailing = (function () {
     var o = sky.opt, up = h >= 19.5 ? h - 19.5 : h + 4.5;  // hours since it rose
     var u = up / 11;                                       // 0 rising .. 1 set (06:30)
     out[2] = o.moon === false || u <= 0 || u >= 1 ? 0 : Math.min(1, u * 8, (1 - u) * 8) * nightF(h);
-    out[0] = Math.round((o.moonX || 92) - camPx * SKYP);
-    out[1] = Math.round(loc.waterY - 14 - Math.sin(u * Math.PI) * (loc.waterY - 34)) - camPy;
+    out[0] = Math.round(((o.moonX || 92) - camPx * SKYP) * HI) / HI;
+    out[1] = Math.round((loc.waterY - 14 - Math.sin(u * Math.PI) * (loc.waterY - 34)) * HI) / HI - camPy;
     return out;
   }
 
   function drawSky(c) {
     var wy = loc.waterY, h = hourNow(), t = G.state.run.boat.t, n = nightF(h), d = duskF(h), g = greyF(h);
-    var sx = Math.round(camPx * SKYP);
-    c.drawImage(skyCv, 0, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+    var sx = Math.round(camPx * SKYP * HI);
+    c.drawImage(skyCv, 0, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
     if (sky.glow && d > 0) {
       c.globalAlpha = d * 0.55;
-      c.drawImage(sky.glow, Math.round((sky.opt.glowX || 230) - sx) - 100, wy - 46 - camPy);
+      c.drawImage(sky.glow, Math.round(((sky.opt.glowX || 230) - camPx * SKYP) * HI) / HI - 100, wy - 46 - camPy, 200, 46);
     }
     if (sky.stars && n > 0) {
       c.globalAlpha = n * (1 - 0.6 * g);
-      c.drawImage(sky.stars, sx, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+      c.drawImage(sky.stars, sx, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
       c.globalAlpha = n * (0.35 + 0.35 * Math.sin(t * 1.3));
-      c.drawImage(sky.twinkle, sx, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
+      c.drawImage(sky.twinkle, sx, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
     }
     moonAt(h, moonPt);
     if (moonPt[2] > 0) {
       c.globalAlpha = moonPt[2];                           // a faint halo, then the disk
-      c.drawImage(sky.halo, moonPt[0] - 9, moonPt[1] - 9);
-      S.draw(c, 'moon', moonPt[0] - 3, moonPt[1] - 3, 0, false);
+      c.drawImage(sky.halo, moonPt[0] - 12, moonPt[1] - 12, 24.5, 24.5);
+      c.drawImage(sky.moon, moonPt[0] - 4, moonPt[1] - 4, 8.5, 8.5);
     }
     if (sky.clouds) {
       var ox = camPx * CLOUD_P + t * CLOUD_DRIFT, cw = [n * 0.8, g * 0.6, d * 0.85, d * 0.55];
       for (var i = 0; i < 4; i++) {
         if (cw[i] <= 0.01) continue;
         c.globalAlpha = Math.min(1, cw[i]);
-        drawWrapped(c, sky.clouds[i], CLOUD_W, ox, -camPy, wy);
+        drawWrapped(c, sky.clouds[i], CLOUD_W * HI, ox, -camPy, wy);
       }
     }
     c.globalAlpha = 1;
@@ -896,8 +887,8 @@ G.scene.sailing = (function () {
   function bakeMist() {
     var m = loc.mist;
     mistCv = !m ? null : B.cached('loc:' + loc.id + ':mist', function () {
-      return B.layer(loc.width, loc.waterY, function (ctx) {
-        PAINT.fog(ctx, { y: loc.waterY - m.h + 1, h: m.h, color: m.color || 'fog_light', alpha: m.alpha }, loc.width, loc.waterY, new G.core.rng.Rng(loc.seed * 31 + 77));
+      return B.layer(loc.width * HI, loc.waterY * HI, function (ctx) {
+        PAINT.fog(ctx, { y: (loc.waterY - m.h + 1) * HI, h: m.h * HI, color: m.color || 'fog_light', alpha: m.alpha }, loc.width * HI, loc.waterY * HI, new G.core.rng.Rng(loc.seed * 31 + 77));
       });
     });
   }
@@ -905,7 +896,7 @@ G.scene.sailing = (function () {
   function drawMist(c) {
     if (!mistCv) return;
     c.globalAlpha = fogMul() / FOG_HEAD;
-    drawWrapped(c, mistCv, loc.width, camPx + G.state.run.boat.t * (loc.mist.drift || 0), -camPy, loc.waterY);
+    drawWrapped(c, mistCv, loc.width * HI, camPx + G.state.run.boat.t * (loc.mist.drift || 0), -camPy, loc.waterY);
     c.globalAlpha = 1;
   }
 
@@ -976,6 +967,26 @@ G.scene.sailing = (function () {
     if (o.t >= OWL.show) o.on = false;
   }
 
+  // 10.4: the owl, painted in the view's pixels: a round grey body, ear tufts, a pale face,
+  // the eyes shut or open (amber), a beak, feet on the branch. owl(open) gives its image.
+  var owlCv = [null, null];
+  function owl(open) {
+    var k = open ? 1 : 0;
+    return owlCv[k] || (owlCv[k] = B.layer(14, 18, function (c) {
+      A.reset();
+      A.blob(c, 7, 11, 6, 6.5, ['stone_dark', 'stone', 'stone_hi'], { bias: 0.05 });
+      A.blob(c, 7, 6, 5.5, 4.5, ['stone_dark', 'stone', 'stone_hi'], { bias: 0.1 });
+      A.px(c, 'stone', 2, 1); A.px(c, 'stone', 3, 2); A.px(c, 'stone', 11, 1); A.px(c, 'stone', 10, 2);
+      A.blob(c, 7, 6, 4, 3, ['stone', 'birch'], { rim: 0, bias: 0.2 });
+      if (open) { A.box(c, 'signal_amber', 4, 5, 2, 2); A.box(c, 'signal_amber', 8, 5, 2, 2); A.px(c, 'ink', 5, 6); A.px(c, 'ink', 9, 6); }
+      else { A.box(c, 'ink', 4, 6, 2, 1); A.box(c, 'ink', 8, 6, 2, 1); }
+      A.px(c, 'rust', 7, 8); A.px(c, 'rust_dark', 7, 9);
+      for (var y = 11; y < 16; y += 2) { A.px(c, 'stone_dark', 5, y); A.px(c, 'stone_dark', 8, y + 1); }
+      A.box(c, 'ink', 4, 17, 2, 1); A.box(c, 'ink', 8, 17, 2, 1);
+      A.reset();
+    }));
+  }
+
   function drawOwl(c) {
     var o = G.state.run.owl;
     if (!o || !o.on) return;
@@ -984,8 +995,9 @@ G.scene.sailing = (function () {
     c.globalAlpha = a;
     if (!o.perched) {
       c.fillStyle = P.wood_dark;
-      c.fillRect(sx, wy - 22, 1, 22); c.fillRect(sx - 4, wy - 15, 4, 1); c.fillRect(sx + 1, wy - 19, 3, 1);
-      S.draw(c, 'owl', sx - 2, wy - 29, o.t >= OWL.cry ? 1 : 0, false);
+      c.fillRect(sx, wy - 22, 1, 22); c.fillRect(sx - 4, wy - 15, 4, 0.5); c.fillRect(sx + 1, wy - 19, 3, 0.5);
+      c.fillStyle = P.wood; c.fillRect(sx, wy - 22, 0.5, 22);
+      c.drawImage(owl(o.t >= OWL.cry), sx - 3, wy - 30.5, 7, 9);
     }
     var u = (o.t - OWL.cry) / OWL.ring;
     if (u > 0 && u < 1) {
@@ -995,9 +1007,9 @@ G.scene.sailing = (function () {
         var rr = (u - ring * 0.25) * 30;
         if (rr <= 2) continue;
         c.globalAlpha = a * (1 - u) * 0.6;
-        for (var q = 0; q < 16; q++) {
-          var ang = q / 16 * 6.283;
-          c.fillRect(Math.round(sx + Math.cos(ang) * rr), Math.round(oy + Math.sin(ang) * rr * 0.6), 1, 1);
+        for (var q = 0; q < 40; q++) {
+          var ang = q / 40 * 6.283;
+          c.fillRect(Math.round((sx + Math.cos(ang) * rr) * HI) / HI, Math.round((oy + Math.sin(ang) * rr * 0.6) * HI) / HI, 0.5, 0.5);
         }
       }
     }
@@ -1102,7 +1114,7 @@ G.scene.sailing = (function () {
       var dir = (k & 1) ? 1 : -1, x = dir > 0 ? -20 + u / 0.35 * 360 : 340 - u / 0.35 * 360;
       var y = 58 + i * 12 + Math.sin(t * 5 + i) * 3 + Math.sin(t * 1.3 + k) * 5; // low, against the paler horizon
       c.globalAlpha = n;
-      S.draw(c, 'bat', Math.round(x), Math.round(y) - camPy, Math.floor(t * 10 + i) & 1, false);
+      c.drawImage(tinyArt((Math.floor(t * 10 + i) & 1) ? 'bat1' : 'bat0'), Math.round(x * HI) / HI, Math.round((y - camPy) * HI) / HI, 6, 3);
     }
     c.globalAlpha = 1;
   }
@@ -1118,7 +1130,7 @@ G.scene.sailing = (function () {
       var x = (S.hash(i, 11) % span) - Math.round(camPx * 0.7) + Math.sin(t * 0.5 + i) * 4;
       if (x < -2 || x > VIEW_W + 2) continue;
       c.globalAlpha = n * a * 0.8;
-      c.fillRect(Math.round(x), Math.round(wy - 4 - (S.hash(i, 12) % 12) + Math.sin(t * 0.8 + i * 2) * 2), 1, 1);
+      c.fillRect(Math.round(x * HI) / HI, Math.round((wy - 4 - (S.hash(i, 12) % 12) + Math.sin(t * 0.8 + i * 2) * 2) * HI) / HI, 0.5, 0.5);
     }
     c.globalAlpha = 1;
   }
@@ -1128,8 +1140,8 @@ G.scene.sailing = (function () {
     if (plift.t < 0) return;
     var u = plift.t / PLIFT, b = run.boat, tx = b.x + b.facing * 8;
     var x = plift.x0 + (tx - plift.x0) * u, y = loc.waterY - 2 - Math.sin(u * Math.PI) * 22;
-    var name = G.gfx.fishgen.sprite(plift.sp), d = S.get(name);
-    S.draw(c, name, Math.round(x - camPx - d.w / 2), Math.round(y - camPy - d.h / 2), 0, tx < plift.x0);
+    var pic = tx < plift.x0 ? G.gfx.fishgen.portraitFlipped(plift.sp, 30, 14) : G.gfx.fishgen.portrait(plift.sp, 30, 14, false), w = pic.width / HI, h = pic.height / HI;
+    c.drawImage(pic, Math.round((x - camPx - w / 2) * HI) / HI, Math.round((y - camPy - h / 2) * HI) / HI, w, h);
   }
 
   // True while a passive cycle's fish is on (the float pulls under, the rod bends).
@@ -1214,18 +1226,18 @@ G.scene.sailing = (function () {
     var lightN = nightF(hh) * 0.9, lightG = greyF(hh) * 0.7;
     drawSky(c);
     for (var i = 0; i < layers.length; i++) {
-      var L = layers[i], ox = Math.round(camPx * L.p);
+      var L = layers[i], oxN = Math.round(camPx * L.p * HI), vw = VIEW_W * HI, wh = wy * HI;
       if (L.fog) {
         c.globalAlpha = fa;
-        drawWrapped(c, L.cv, L.w, ox + run.boat.t * L.drift, -camPy, wy);
+        drawWrapped(c, L.cv, L.w, camPx * L.p + run.boat.t * L.drift, -camPy, wy);
         c.globalAlpha = 1;
       } else {
-        c.drawImage(L.cv, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy);
-        if (L.night && lightN > 0.02) { c.globalAlpha = lightN; c.drawImage(L.night, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy); }
-        if (L.grey && lightG > 0.02) { c.globalAlpha = lightG; c.drawImage(L.grey, ox, 0, VIEW_W, wy, 0, -camPy, VIEW_W, wy); }
+        c.drawImage(L.cv, oxN, 0, vw, wh, 0, -camPy, VIEW_W, wy);
+        if (L.night && lightN > 0.02) { c.globalAlpha = lightN; c.drawImage(L.night, oxN, 0, vw, wh, 0, -camPy, VIEW_W, wy); }
+        if (L.grey && lightG > 0.02) { c.globalAlpha = lightG; c.drawImage(L.grey, oxN, 0, vw, wh, 0, -camPy, VIEW_W, wy); }
         c.globalAlpha = 1;
       }
-      if (scen.afterLayer) scen.afterLayer(c, L.id, ox, camPy, run, loc);
+      if (scen.afterLayer) scen.afterLayer(c, L.id, oxN / HI, camPy, run, loc);
     }
     var nf = nightF(hourNow());
     bats(c, nf);
@@ -1255,10 +1267,13 @@ G.scene.sailing = (function () {
   var MIRROR = 34;
   function drawWaterline(c, y, t) {
     if (y < 0 || y >= VIEW_H) return;
-    c.fillStyle = P.water_lit; c.globalAlpha = 0.6; c.fillRect(0, y + 1, VIEW_W, 2); c.globalAlpha = 1;
+    var h = 1 / HI;
+    c.fillStyle = P.water_lit; c.globalAlpha = 0.6; c.fillRect(0, y + h, VIEW_W, 3 * h); c.globalAlpha = 1;
     c.fillStyle = P.water_foam;
-    c.fillRect(0, y, VIEW_W, 1);
-    for (var x = ((Math.floor(t * 6) % 9) - 9); x < VIEW_W; x += 9) c.fillRect(x, y - 1, 4, 1);
+    c.fillRect(0, y, VIEW_W, h);
+    for (var x = ((Math.floor(t * 6) % 9) - 9); x < VIEW_W; x += 4.5) c.fillRect(x, y - h, 2, h);
+    c.fillStyle = P.water_hi;
+    for (x = ((Math.floor(t * 4) % 13) - 13); x < VIEW_W; x += 6.5) c.fillRect(x + 2, y + h, 1.5, h);
   }
 
   var waterLight = { x: 0, a: 0, key: 'fog_mid', w: 4, mirror: 1 };
@@ -1276,8 +1291,8 @@ G.scene.sailing = (function () {
   function draw(ctx) {
     var run = G.state.run, wy = loc.waterY;
     refreshSky(hourNow());
-    camPx = Math.round(run.cam.x);
-    camPy = Math.round(run.cam.y);
+    camPx = Math.round(run.cam.x * HI) / HI;
+    camPy = Math.round(run.cam.y * HI) / HI;
     var a = run.uw.alpha, band = Math.round((loc.mirror || MIRROR) * (1 - a));
     drawBackdrop(ctx);
     // Phase 15: the split view. The cross-section is always there; at the surface a band of
@@ -1286,7 +1301,7 @@ G.scene.sailing = (function () {
     G.scene.underwater.draw(ctx, loc, camPx, camPy, 1, run.boat.t);
     if (band > 0) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, lightOnWater(hourNow()), band);
     drawWaterline(ctx, wy - camPy + band, run.boat.t);
-    ctx.drawImage(glint, camPx, 0, VIEW_W, 1, 0, wy - camPy, VIEW_W, 1);
+    ctx.drawImage(glint, camPx * HI, 0, VIEW_W * HI, 1, 0, wy - camPy, VIEW_W, 1 / HI);
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
     drawLift(ctx, run);
@@ -1299,6 +1314,7 @@ G.scene.sailing = (function () {
   }
 
   return {
+    HI: HI, owl: owl,
     load: load, tp: tp, enter: enter, exit: exit, setPassive: setPassive, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
