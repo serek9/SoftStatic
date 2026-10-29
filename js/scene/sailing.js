@@ -33,6 +33,32 @@ G.scene.sailing = (function () {
   // surface hints where fish are. Bats cross the night sky; fireflies blink along the creek's
   // bank. Passive mode lifts its catch out of the water. Timing is G.vrng or a hash of time.
   var riseT = 3, RISE_DEPTH = 16;
+
+  // Audit P3-1: a drizzle that comes with unease. From unease 0.45 (full at 0.8), in about
+  // one game hour in four (a hash of the hour and the place), fading in and out at the
+  // hour's edges. Streaks fall, rings open on the water and the reflection softens. Never in
+  // the Red Room. Presentation only: it reads unease and the clock.
+  var rainAcc = 0;
+  function rainK() {
+    if (sky.opt && sky.opt.clouds === false) return 0;
+    var save = G.state.save, c = save.clock || 0, hr = Math.floor(c), f = c - hr;
+    var k = clamp((G.sim.unease.get(save, loc.id) - 0.45) / 0.35, 0, 1);
+    if (k <= 0 || (S.hash(loc.seed, hr) & 3) !== 0) return 0;
+    return k * Math.min(1, f * 4, (1 - f) * 4);
+  }
+  var RAIN_N = 60;
+  function drawRain(c) {
+    var k = rainK();
+    if (k <= 0) return;
+    var t = G.state.run.boat.t, wy = loc.waterY - camPy, n = Math.round(RAIN_N * k);
+    c.fillStyle = P.fog_mid; c.globalAlpha = 0.4;
+    for (var i = 0; i < n; i++) {
+      var y = ((S.hash(i, 22) % 200) + t * 110) % (wy + 12) - 6;
+      var x = (S.hash(i, 21) % 340) - 10 - Math.round(y * 0.15);
+      c.fillRect(x, Math.round(y), 1, 2);
+    }
+    c.globalAlpha = 1;
+  }
   var plift = { t: -1, sp: -1, x0: 0 }, PLIFT = 0.9;
   S.def('bat', { k: 'night_ink' }, [['k...k', '.kkk.'], ['.....', 'kkkkk']]);
 
@@ -309,7 +335,7 @@ G.scene.sailing = (function () {
     run.gearFx = G.sim.economy.effects(G.state.save, G.data, {});
     run.anom = G.sim.unease.createAnomalies(); // the one active anomaly (10.1); never saved
     run.anomIn = { loc: id, hour: 0, unease: 0, boatX: 0, reach: 0, width: loc.width };
-    run.owl = { on: false, t: 0, x: 0, win: -1 };
+    run.owl = { on: false, t: 0, x: 0, win: -1, perched: false };
     run.spots = loc.spots || []; // where casts are worth more; a scenery module may move them
     run.scen = null;             // the scenery module's own run state
     if (scen.load) scen.load(run, loc);
@@ -324,6 +350,7 @@ G.scene.sailing = (function () {
   var FISHING = { sinking: 1, waiting: 1, interest: 1 };
 
   var rodMaxOverride = 0; // debug only (dbg.rod): 0 uses the rod's own limit
+  var lastRodMax = -1;
 
   function fishStep(run, dt) {
     var save = G.state.save, c = run.cast, li = run.lureIn, ctx = run.school.ctx, gx = run.gearFx;
@@ -338,6 +365,9 @@ G.scene.sailing = (function () {
     ctx.bait = li.bait;
     ctx.latched = c.latched;
     ctx.rodMaxMass = rodMaxOverride || gx.maxMass;
+    // 8.4 #5: after a rod change the too-heavy flag is worked out again at once (it used to
+    // wait for the next spawn). speciesWeights is pure and draws nothing from the RNG.
+    if (ctx.rodMaxMass !== lastRodMax) { lastRodMax = ctx.rodMaxMass; G.sim.fish_ai.speciesWeights(ctx); }
     ctx.attract = gx.attract * c.boost.attract;
     ctx.rareBoost = gx.rareBoost * c.boost.rare;
     ctx.legendBoost = c.boost.legend;
@@ -898,7 +928,9 @@ G.scene.sailing = (function () {
     var o = run.owl, k = G.sim.clock.cueCrossed(hour0, save.clock, G.data.windows);
     if (k >= 0) {
       o.on = true; o.t = 0; o.win = k;
-      o.x = clamp(run.cam.x + 250, 20, loc.width - 20);
+      // 8.4 #17: where an owl already sits (the Pines), that owl calls; elsewhere one comes.
+      o.perched = !!(run.scen && run.scen.owl);
+      o.x = o.perched ? run.scen.owl.x + 6 : clamp(run.cam.x + 250, 20, loc.width - 20);
       if (G.core.debug) G.core.debug.log('the owl calls (' + G.data.windows[k].id + ')');
     }
     if (!o.on) return;
@@ -912,10 +944,13 @@ G.scene.sailing = (function () {
     var o = G.state.run.owl;
     if (!o || !o.on) return;
     var sx = Math.round(o.x - camPx), wy = loc.waterY - camPy, a = Math.max(0, Math.min(1, o.t / OWL.fade, (OWL.show - o.t) / OWL.fade));
+    var oy = o.perched ? wy - 31 : wy - 26;
     c.globalAlpha = a;
-    c.fillStyle = P.wood_dark;
-    c.fillRect(sx, wy - 22, 1, 22); c.fillRect(sx - 4, wy - 15, 4, 1); c.fillRect(sx + 1, wy - 19, 3, 1);
-    S.draw(c, 'owl', sx - 2, wy - 29, o.t >= OWL.cry ? 1 : 0, false);
+    if (!o.perched) {
+      c.fillStyle = P.wood_dark;
+      c.fillRect(sx, wy - 22, 1, 22); c.fillRect(sx - 4, wy - 15, 4, 1); c.fillRect(sx + 1, wy - 19, 3, 1);
+      S.draw(c, 'owl', sx - 2, wy - 29, o.t >= OWL.cry ? 1 : 0, false);
+    }
     var u = (o.t - OWL.cry) / OWL.ring;
     if (u > 0 && u < 1) {
       // The call, as two soft rings spreading from the owl.
@@ -926,7 +961,7 @@ G.scene.sailing = (function () {
         c.globalAlpha = a * (1 - u) * 0.6;
         for (var q = 0; q < 16; q++) {
           var ang = q / 16 * 6.283;
-          c.fillRect(Math.round(sx + Math.cos(ang) * rr), Math.round(wy - 26 + Math.sin(ang) * rr * 0.6), 1, 1);
+          c.fillRect(Math.round(sx + Math.cos(ang) * rr), Math.round(oy + Math.sin(ang) * rr * 0.6), 1, 1);
         }
       }
     }
@@ -1096,6 +1131,8 @@ G.scene.sailing = (function () {
     if (run.fsm === 'sailing' && !pv.on && b.stopped && inp.pressed('down')) dog.pet(run.dog);
     fishStep(run, dt);
     riseStep(run, dt);
+    rainAcc += rainK() * 6 * dt; // rings where the drizzle meets the water
+    while (rainAcc >= 1) { rainAcc -= 1; fx.ripple(run.cam.x + G.vrng.next() * VIEW_W, loc.waterY + 1 + G.vrng.next() * 24, 0, 3, 0.5); }
     passiveStep(run, dt);
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
@@ -1171,9 +1208,10 @@ G.scene.sailing = (function () {
   function drawAbove(c) { drawBackdrop(c); drawBoat(c, mirrorFisher()); drawMist(c); }
 
   // The light on the water (audit P1-3): a path under the moon, or under the glow at dusk.
-  var waterLight = { x: 0, a: 0, key: 'fog_mid', w: 4 };
+  var waterLight = { x: 0, a: 0, key: 'fog_mid', w: 4, mirror: 1 };
   function lightOnWater(h) {
     var d = duskF(h) * (sky.glow ? 1 : 0), m = moonPt[2];
+    waterLight.mirror = 1 - 0.35 * rainK(); // drizzle softens the reflection
     if (m * 0.55 >= d * 0.45) {
       waterLight.x = moonPt[0]; waterLight.a = m * 0.55; waterLight.key = 'fog_mid'; waterLight.w = 3;
     } else {
@@ -1197,6 +1235,7 @@ G.scene.sailing = (function () {
     drawBoat(ctx);
     drawLift(ctx, run);
     drawMist(ctx);
+    drawRain(ctx);
     G.scene.underwater.drawHooked(ctx, loc, camPx, camPy, run.boat.t);
     drawCast(ctx);
     G.ui.hud.draw(ctx, run, wy);
@@ -1210,6 +1249,7 @@ G.scene.sailing = (function () {
     skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
     rodPose: function () { return rodPose(G.state.run, [0, 0]); }, // debug: [angle, bend] now
     lift: function () { return plift.t; },
+    rain: function () { return loc ? rainK() : 0; },
     light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
     fogAlpha: function () { return fogMul() / FOG_HEAD; },
     moon: function () { return { x: moonPt[0], y: moonPt[1], a: moonPt[2] }; },

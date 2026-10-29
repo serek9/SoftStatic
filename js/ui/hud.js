@@ -17,10 +17,12 @@ G.ui.hud = (function () {
   // out, no passive news) the corner text fades out over FADE s, and comes back at once. The
   // "TAB passive" hint goes away once passive has been used this session.
   var IDLE = 6, FADE = 1, idle = 0, seenCoins = -1, seenBait = '', tabUsed = false;
+  var still = false; // audit P3-2: H hides every corner until pressed again
 
   function update(dt, run) {
     var save = G.state.save, pv = run.passive;
     idle += dt;
+    if (G.core.input.pressed('still')) still = !still;
     if (pv.on) tabUsed = true;
     if (G.core.input.any() || run.fsm !== 'sailing' || pv.noteT > 0 || save.coins !== seenCoins || run.gearFx.bait !== seenBait) idle = 0;
     seenCoins = save.coins; seenBait = run.gearFx.bait;
@@ -99,7 +101,7 @@ G.ui.hud = (function () {
   var PASSIVE_ON = 'PASSIVE  TAB', PASSIVE_OFF = 'TAB passive';
 
   function draw(ctx, run, waterY) {
-    if (G.ui.card.isOpen() || G.core.compact) return;
+    if (G.ui.card.isOpen() || G.core.compact || still) return;
     var save = G.state.save, s = clockText(save.clock || 0), cx = X + S.measure(s) + 6, a = alpha();
     if (a > 0) {
       ctx.globalAlpha = a;
@@ -126,5 +128,5 @@ G.ui.hud = (function () {
     return { clock: clockStr, coins: coinStr, bait: baitStr, depth: G.scene.underwater.UNDER[G.state.run.fsm] ? depthStr : '' };
   }
 
-  return { metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, alpha: alpha, draw: draw, shown: shown };
+  return { metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, alpha: alpha, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

@@ -5,14 +5,15 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.input = (function () {
   // up, down and back move through menus (P9); sailing uses only left and right.
-  var NAMES = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back'];
+  var NAMES = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still'];
   var KEYS = {
     KeyA: 'left', ArrowLeft: 'left',
     KeyD: 'right', ArrowRight: 'right',
     KeyW: 'up', ArrowUp: 'up',
     KeyS: 'down', ArrowDown: 'down',
     Space: 'action', Enter: 'action',
-    KeyP: 'pause', KeyJ: 'journal', KeyM: 'map', Tab: 'passive', Escape: 'back'
+    KeyP: 'pause', KeyJ: 'journal', KeyM: 'map', Tab: 'passive', Escape: 'back',
+    KeyH: 'still' // audit P3-2: hide the HUD for a still picture
   };
 
   var acts = {};

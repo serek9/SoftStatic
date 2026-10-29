@@ -78,6 +78,7 @@ G.audio.engine = (function () {
     amb.water = gain(0, bus.amb); src.connect(filter('lowpass', 520, 0.7, amb.water));
     amb.lap = gain(0, bus.amb); src.connect(filter('bandpass', 720, 1.3, amb.lap));
     amb.stream = gain(0, bus.amb); src.connect(filter('bandpass', 1900, 0.6, amb.stream));
+    amb.rain = gain(0, bus.amb); src.connect(filter('highpass', 3200, 0.5, amb.rain)); // the drizzle (P3-1)
     amb.stat = gain(0, bus.sfx);
     amb.statBP = filter('bandpass', 2600, 0.5, amb.stat); src.connect(amb.statBP);
     // The drone: two low tones and a third that drifts out of tune as unease rises (V10.1).
@@ -314,6 +315,7 @@ G.audio.engine = (function () {
     set(amb.water.gain, red ? 0.01 : 0.03 + 0.01 * Math.sin(t * 0.8));
     set(amb.lap.gain, outside ? 0.004 + Math.min(1, vx / 42) * 0.06 : 0, 0.15);
     set(amb.stream.gain, loc === 'creek' ? 0.018 : 0);
+    set(amb.rain.gain, outside && G.scene.sailing.rain ? 0.035 * G.scene.sailing.rain() : 0, 0.8);
     set(amb.drone.gain, (red ? 0.06 : 0.025 + 0.025 * L.night) * (loc === 'pines' ? 0.6 : 1));
     set(amb.sour.detune, 12 + u * 55, 1.5);
     var lamp = loc === 'pines' && run.scen && G.scene.scenery.pines.lampLit ? G.scene.scenery.pines.lampLit(run.scen.t) : true;

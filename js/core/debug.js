@@ -231,6 +231,8 @@ G.core.debug = (function () {
     // dbg.audio() returns the audio context's state, the gains, the limiter and the last events;
     // dbg.audio(ev) plays one sound by name (no name: the list).
     audio: function (ev) { return ev === undefined ? G.audio.engine.info() : G.audio.engine.play(ev); },
+    // dbg.rain() returns the drizzle's strength now (0..1; audit P3-1).
+    rain: function () { return +G.scene.sailing.rain().toFixed(3); },
     // dbg.fog() returns the alpha fog layers and the mist are drawn at now, the moon and the light on the water.
     fog: function () {
       var sc = G.scene.sailing, w = sc.waterLight();

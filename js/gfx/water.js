@@ -82,7 +82,7 @@ G.gfx.water = (function () {
 
     ctx.fillStyle = G.gfx.sprites.PALETTE.water_dark;
     ctx.fillRect(0, waterY, VIEW_W, h);
-    ctx.globalAlpha = ALPHA;
+    ctx.globalAlpha = ALPHA * (light && light.mirror !== undefined ? light.mirror : 1);
     for (var r = 0; r < h; r++) {
       var amp = 1 + r / h; // 1 px at the surface, 2 px at the bottom
       var dx = Math.round(Math.sin(t * 1.7 + r * 0.55) * amp);
