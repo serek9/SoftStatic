@@ -688,7 +688,7 @@ Phase 18 checks: `--validate` OK, `--replay 12345` still `2593400009` (identical
 
 ### 8.6 Next task
 
-**None scheduled.** Every phase in §4 and every phase the user has asked for since (15–19) is done, and the whole game now draws at 640×360. The next phase waits for the user. Open items are in 8.4 (watch items #6, #18 and #20; optional #10, #24 and #25).
+**None scheduled.** Every phase in §4 and every phase the user has asked for since (15–19) is done, and the whole game now draws at 640×360. Phases 20–25 (realism: the water surface, the line as a rope, current and the lure, a fight you can lose, the boat under way, the sounds of fishing) are proposed in [PLAN_REALISM.md](PLAN_REALISM.md) and wait for the user's go-ahead and approval of its spec deviations R1–R5; the first would be 20.1. Open items are in 8.4 (watch items #6, #18 and #20; optional #10, #24 and #25).
 
 ---
 
