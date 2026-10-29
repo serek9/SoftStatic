@@ -39,16 +39,16 @@ G.core.input = (function () {
 
   function releaseAll() { for (var src in down) release(src); }
 
-  // 14.6: on-screen buttons (game pixels, 320×180), drawn by the HUD and hit-tested here, for
+  // 14.6: on-screen buttons (game pixels, 640×360 since Phase 18), drawn by the HUD and hit-tested here, for
   // touch and for the mouse. Touch elsewhere maps to zones: in play, the left and right
   // edges steer and the middle is the action (hold to charge or reel); in a menu, the edges
   // are left and right, the top and bottom middle are up and down, the centre is the action.
   var BUTTONS = [
-    { act: 'passive', label: 'TAB', x: 230, y: 166, w: 20, h: 11 },
-    { act: 'journal', label: 'J', x: 252, y: 166, w: 14, h: 11 },
-    { act: 'map', label: 'M', x: 268, y: 166, w: 14, h: 11 },
-    { act: 'pause', label: 'P', x: 284, y: 166, w: 14, h: 11 },
-    { act: 'back', label: 'ESC', x: 300, y: 166, w: 18, h: 11 }
+    { act: 'passive', label: 'TAB', x: 460, y: 332, w: 40, h: 22 },
+    { act: 'journal', label: 'J', x: 504, y: 332, w: 28, h: 22 },
+    { act: 'map', label: 'M', x: 536, y: 332, w: 28, h: 22 },
+    { act: 'pause', label: 'P', x: 568, y: 332, w: 28, h: 22 },
+    { act: 'back', label: 'ESC', x: 600, y: 332, w: 36, h: 22 }
   ];
   var touched = false, mouseNear = false;
 
@@ -69,15 +69,15 @@ G.core.input = (function () {
   function zone(gx, gy) {
     var b = hit(gx, gy);
     if (b) return b;
-    if (gx < 64) return 'left';
-    if (gx >= 256) return 'right';
-    if (inMenu()) { if (gy < 54) return 'up'; if (gy >= 126) return 'down'; }
+    if (gx < 128) return 'left';
+    if (gx >= 512) return 'right';
+    if (inMenu()) { if (gy < 108) return 'up'; if (gy >= 252) return 'down'; }
     return 'action';
   }
 
   function gamePt(canvas, cx, cy, out) {
     var r = canvas.getBoundingClientRect();
-    out[0] = (cx - r.left) / r.width * 320; out[1] = (cy - r.top) / r.height * 180;
+    out[0] = (cx - r.left) / r.width * 640; out[1] = (cy - r.top) / r.height * 360;
     return out;
   }
   var pt = [0, 0];
@@ -98,7 +98,7 @@ G.core.input = (function () {
       gamePt(canvas, e.clientX, e.clientY, pt);
       press('mouse0', (mouseNear || touched) && hit(pt[0], pt[1]) || 'action'); // a shown button, else the cast
     });
-    canvas.addEventListener('mousemove', function (e) { gamePt(canvas, e.clientX, e.clientY, pt); mouseNear = pt[1] >= 150 && pt[0] >= 220; });
+    canvas.addEventListener('mousemove', function (e) { gamePt(canvas, e.clientX, e.clientY, pt); mouseNear = pt[1] >= 300 && pt[0] >= 440; });
     canvas.style.touchAction = 'none';
     canvas.addEventListener('touchstart', function (e) {
       e.preventDefault();

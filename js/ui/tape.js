@@ -10,10 +10,11 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 //   - a phantom is a line in your own handwriting for a fish you never caught. The journal
 //     gains the entry (phantom: true) and it stays out of every count until you catch it.
 // The totals at the bottom count only what really happened.
+// Phase 18: drawn in the 640×360 view's pixels with the fine font.
 G.ui = G.ui || {};
 G.ui.tape = (function () {
-  var S = G.gfx.sprites, P = S.PALETTE, M = G.ui.menu;
-  var X = 18, Y = 22, ROWS = 12, PLAY = 0.15, AUTO = 6; // text left, first row, rows shown, s per line while playing
+  var S = G.gfx.sprites, P = S.PALETTE, M = G.ui.menu, F = S.fine;
+  var X = 36, Y = 44, ROWS = 12, ROW_H = 22, PLAY = 0.15, AUTO = 6; // text left, first row, rows shown, row height, s per line while playing
   var tape = null, rows = [], shown = 0, top = 0, t = 0, totals = '', head = '';
 
   function hhmm(h) {
@@ -69,31 +70,31 @@ G.ui.tape = (function () {
   function draw(ctx) {
     if (!tape) return;
     var frame = Math.floor(t * 12), i, y;
-    ctx.fillStyle = P.night_ink; ctx.fillRect(0, 0, 320, 180);
-    var band = Math.floor((t * 14) % 220) - 20;
+    ctx.fillStyle = P.night_ink; ctx.fillRect(0, 0, 640, 360);
+    var band = Math.floor((t * 28) % 440) - 40;
     ctx.fillStyle = P.fog_dark;
-    for (i = 0; i < 90; i++) {
+    for (i = 0; i < 160; i++) {
       var h = S.hash(frame, i);
-      ctx.globalAlpha = 0.35; ctx.fillRect(h % 320, band + ((h >>> 9) % 8), 1 + ((h >>> 13) & 7), 1);
+      ctx.globalAlpha = 0.35; ctx.fillRect(h % 640, band + ((h >>> 9) % 16), 2 + ((h >>> 13) & 15), 1);
     }
     ctx.globalAlpha = 1;
-    var slip = (S.hash(frame, 777) & 15) === 0 ? 1 : 0;
-    S.drawText(ctx, 'PLAY >', 8 + slip, 6, 'bone');
-    S.drawText(ctx, head, 312 - S.measure(head), 6, 'fog_light');
+    var slip = (S.hash(frame, 777) & 15) === 0 ? 2 : 0;
+    F.bold(ctx, 'PLAY >', 16 + slip, 12, 'bone');
+    F.drawText(ctx, head, 624 - F.measure(head), 12, 'fog_light');
     var end = Math.min(shown, top + ROWS);
     for (i = top; i < end; i++) {
       var r = rows[i];
-      y = Y + (i - top) * 11;
-      S.drawText(ctx, r.s, X + ((S.hash(frame, i) & 31) === 0 ? 1 : 0), y, r.key, r.hand ? 0.35 : 0, i * 13 + 5);
+      y = Y + (i - top) * ROW_H;
+      F.drawText(ctx, r.s, X + ((S.hash(frame, i) & 31) === 0 ? 2 : 0), y, r.key, r.hand ? 0.35 : 0, i * 13 + 5);
     }
-    if (top > 0) S.drawText(ctx, '^', 306, Y, 'fog_mid');
-    if (end < rows.length && shown >= rows.length) S.drawText(ctx, 'v', 306, Y + (ROWS - 1) * 11, 'fog_mid');
+    if (top > 0) F.drawText(ctx, '^', 612, Y, 'fog_mid');
+    if (end < rows.length && shown >= rows.length) F.drawText(ctx, 'v', 612, Y + (ROWS - 1) * ROW_H, 'fog_mid');
     // The counter runs from the start of the recording to its end as it plays.
     var at = rows.length ? Math.min(1, shown / rows.length) : 1;
-    S.drawText(ctx, 'SP ' + hhmm(tape.from + G.sim.clock.wrap(tape.to - tape.from) * at), 8, 164, 'fog_light');
-    S.drawText(ctx, totals, 312 - S.measure(totals), 164, 'bone');
+    F.drawText(ctx, 'SP ' + hhmm(tape.from + G.sim.clock.wrap(tape.to - tape.from) * at), 16, 332, 'fog_light');
+    F.bold(ctx, totals, 624 - F.measureBold(totals), 332, 'bone');
     ctx.fillStyle = P.black; ctx.globalAlpha = 0.3;
-    for (y = 0; y < 180; y += 2) ctx.fillRect(0, y, 320, 1); // scanlines
+    for (y = 0; y < 360; y += 2) ctx.fillRect(0, y, 640, 1); // scanlines
     ctx.globalAlpha = 1;
   }
 
@@ -109,6 +110,7 @@ G.ui.tape = (function () {
   }
 
   return {
+    native: true,
     show: show, open: open, update: update, draw: draw, away: away,
     rows: function () { return rows.map(function (r) { return r.s; }); },
     current: function () { return tape; }

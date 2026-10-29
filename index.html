@@ -15,7 +15,7 @@
 </style>
 </head>
 <body>
-<canvas id="game" width="320" height="180"></canvas>
+<canvas id="game" width="640" height="360"></canvas>
 
 <!-- Load order is fixed (§0.4): core → data → sim → gfx → scene → ui → audio → boot. -->
 <!-- core (debug first so it catches errors thrown while the other scripts load) -->
@@ -72,13 +72,13 @@
 (function () {
   var q = new URLSearchParams(location.search);
   // ?compact (12.5): a 160×90 view with no HUD for a second monitor, fishing passively. The
-  // game still draws at 320×180 into an offscreen canvas, which is halved onto the page.
+  // game still draws at 640×360 into an offscreen canvas, which is shrunk onto the page.
   G.core.compact = q.has('compact');
-  var W = G.core.compact ? 160 : 320, H = G.core.compact ? 90 : 180;
+  var V = G.core.view, W = G.core.compact ? 160 : V.W, H = G.core.compact ? 90 : V.H;
   var canvas = document.getElementById('game');
   canvas.width = W; canvas.height = H;
   var vctx = canvas.getContext('2d', { alpha: false });
-  var ctx = G.core.compact ? G.gfx.bake.canvas(320, 180).getContext('2d') : vctx;
+  var ctx = G.core.compact ? G.gfx.bake.canvas(V.W, V.H).getContext('2d') : vctx;
 
   // Largest whole-number scale that fits, measured in device pixels so every game
   // pixel maps to the same number of screen pixels. Below 1× it falls back to a
@@ -121,18 +121,25 @@
   canvas.addEventListener('mousedown', reclaim);
   window.addEventListener('keydown', reclaim);
   function idle(c) {
+    var F = G.gfx.sprites.fine, A = 'Fishing in another tab.', B = 'Click to fish here.';
+    V.begin(c, true);
     G.ui.menu.dim(c, 0.75);
-    G.ui.menu.centre(c, 'Fishing in another tab.', 160, 78, 'fog_light');
-    G.ui.menu.centre(c, 'Click to fish here.', 160, 90, 'fog_mid');
+    F.bold(c, A, 320 - (F.measureBold(A) >> 1), 156, 'fog_light');
+    F.drawText(c, B, 320 - (F.measure(B) >> 1), 176, 'fog_mid');
   }
 
   // An open overlay (pause, journal, map, tape) takes the step and the scene waits (9.2).
   G.core.loop.start({
     update: function (dt) { if (!G.ui.menu.update(dt)) G.core.state.update(dt); G.audio.engine.step(dt); },
-    draw: function (ctx) { G.core.state.draw(ctx); G.ui.menu.draw(ctx); G.ui.hud.drawButtons(ctx); },
+    // Each part draws in its own space (G.core.view): the scene, the overlay, the buttons.
+    draw: function (ctx) {
+      V.begin(ctx, G.core.state.native()); G.core.state.draw(ctx);
+      V.begin(ctx, G.ui.menu.native()); G.ui.menu.draw(ctx);
+      V.begin(ctx, false); G.ui.hud.drawButtons(ctx);
+    },
     idle: idle,
     // ?compact: halve the full picture onto the page canvas (smoothed, so 1 px lines survive).
-    present: G.core.compact ? function (c) { vctx.imageSmoothingEnabled = true; vctx.drawImage(c.canvas, 0, 0, 320, 180, 0, 0, W, H); vctx.imageSmoothingEnabled = false; } : null
+    present: G.core.compact ? function (c) { vctx.imageSmoothingEnabled = true; c.setTransform(1, 0, 0, 1, 0, 0); vctx.drawImage(c.canvas, 0, 0, V.W, V.H, 0, 0, W, H); vctx.imageSmoothingEnabled = false; } : null
   }, ctx);
 })();
 </script>

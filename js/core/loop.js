@@ -6,6 +6,15 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // While another tab owns the save (12.5, core/save.js) nothing steps: the frame still draws,
 // and hooks.idle(ctx) draws over it.
 G.core = G.core || {};
+
+// The view (Phase 17): the canvas is 640×360. Scenes and overlays marked `native: true` draw
+// in its own pixels; the others still draw in the 320×180 space of earlier phases, scaled
+// ×2 (their conversion is Phases 18 and 19). begin(ctx, native) sets the transform for one.
+G.core.view = {
+  W: 640, H: 360, LEGACY: 2,
+  begin: function (ctx, native) { var s = native ? 1 : 2; ctx.setTransform(s, 0, 0, s, 0, 0); }
+};
+
 G.core.loop = (function () {
   var DT = 1 / 60;
   var MAX_FRAME = 0.1;  // seconds of real time accepted per frame (6 steps)
