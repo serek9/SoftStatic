@@ -16,6 +16,8 @@ G.data.locations.pines = {
   maxDepth: 112,
   seed: 6271,
   start: 200,
+  // Phase 20: the surface's swell (view px; see loc_fog.js): a medium chop.
+  swell: { amp: 1.6, mirror: 0.9, waves: [[80, 11, 0.5], [37, -8, 0.3], [19, 6, 0.2]] },
   scenery: 'pines',
 
   layers: [

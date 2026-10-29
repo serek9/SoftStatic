@@ -19,6 +19,9 @@ G.data.locations.red = {
   maxDepth: 80,
   seed: 9001,
   start: 140,
+  // Phase 20: the surface's swell (view px; see loc_fog.js): almost dead flat, which is wrong
+  // for open water; the reflection barely moves.
+  swell: { amp: 0.15, mirror: 0.15, waves: [[140, 2, 0.7], [60, -1, 0.3]] },
   scenery: 'red',
 
   layers: [

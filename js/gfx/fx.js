@@ -111,8 +111,10 @@ G.gfx.fx = (function () {
 
   // A lure landing (V3.2): droplets thrown up and out, then two flat elliptical rings,
   // a quick small one and a slow wide one. y is the waterline; power 0..1 scales it.
+  // Phase 20: it also pokes the water's surface (gfx/surface.js), loaded after this file.
   function splash(px, y, power) {
     emit('splash', px, y - 1, 8 + Math.round(10 * power));
+    if (G.gfx.surface) G.gfx.surface.poke(px, 0.25 + 0.75 * power); // Phase 20: and dents the surface
     ripple(px, y + 2, 1, 7, 0.7);
     ripple(px, y + 3, 3, 12 + 8 * power, 1.6);
   }

@@ -38,13 +38,14 @@ G.gfx.water = (function () {
   // hash of time, so nothing is random and nothing is allocated per frame.
   var GLINTS = 16;
 
-  function drawGlints(ctx, waterY, h, t) {
-    var S = G.gfx.sprites, rows = Math.min(h - 1, 26);
+  function drawGlints(ctx, waterY, h, t, camX) {
+    var S = G.gfx.sprites, rows = Math.min(h - 1, 26), surf = G.gfx.surface, top = 0.15 * surf.amp();
     ctx.fillStyle = S.PALETTE.water_hi;
     for (var i = 0; i < GLINTS; i++) {
       var ph = S.hash(i, 3) & 255;
       if ((S.hash(i, Math.floor(t * 1.2 + ph / 64)) & 3) !== 0) continue;
       var x = ((S.hash(i, 1) % VIEW_W) + t * (0.6 + (ph & 7) * 0.15)) % VIEW_W;
+      if (surf.at(camX + x) < top) continue; // Phase 20: only where the swell is cresting
       var y = 1 + (S.hash(i, 2) % (rows * HI)) * H1;
       ctx.globalAlpha = 0.35 + 0.4 * (1 - y / rows);
       ctx.fillRect(Math.round(x * HI) * H1, waterY + y, (1 + (ph & 3) + (y < 6 ? 2 : 0)) * H1, H1);
@@ -71,11 +72,12 @@ G.gfx.water = (function () {
 
   // The light path under a low light (the moon, or the dusk glow): broken dashes every other
   // row, narrow at the horizon and wider nearer, swaying with the mirrored rows.
-  function drawPath(ctx, waterY, h, t, L) {
-    var S = G.gfx.sprites, tick = Math.floor(t * 4);
+  function drawPath(ctx, waterY, h, t, L, camX) {
+    var S = G.gfx.sprites, tick = Math.floor(t * 4), surf = G.gfx.surface, low = -0.3 * surf.amp();
     ctx.fillStyle = S.PALETTE[L.key];
     for (var r = 0; r < h; r += 1) {
       if ((S.hash(r, tick) & 7) === 0) continue;
+      if (surf.at(camX + L.x + r * 2.3) < low) continue; // Phase 20: the path breaks in the troughs
       var f = r / h, w = 1 + Math.round(L.w * f * HI) * H1;
       var dx = Math.round(Math.sin(t * 1.7 + r * 0.55) * (1 + f) * HI) * H1;
       ctx.globalAlpha = L.a * (1 - 0.75 * f);
@@ -84,12 +86,47 @@ G.gfx.water = (function () {
     ctx.globalAlpha = 1;
   }
 
+  // Phase 20: the mirrored rows shift with the surface (gfx/surface.js). The swell's shiver
+  // is a sine per row scaled by the water's `mirror` (a still water barely moves); the
+  // ripples bend it locally: each CH-px chunk of a row shifts by the ripples' slope under
+  // it, less further from the shore. Chunks with the same shift are drawn as one piece, and
+  // with no ripples a row is a single drawImage as before.
+  var CH = 32, NCH = VIEW_W * HI / CH, GAIN = 10, MAXS = 6;
+  var chunkF = new Float32Array(NCH);
+
+  // Fills chunkF for a camera at world x camX; true if any chunk shifts.
+  function chunkShifts(camX) {
+    var surf = G.gfx.surface, any = false;
+    for (var c = 0; c < NCH; c++) {
+      var x = camX + (c * CH + CH / 2) * H1, s = surf.rippleSlope(x), s1 = surf.rippleSlope(x - 5), s2 = surf.rippleSlope(x + 5);
+      if (Math.abs(s1) > Math.abs(s)) s = s1;
+      if (Math.abs(s2) > Math.abs(s)) s = s2;
+      s *= GAIN;
+      chunkF[c] = s > MAXS ? MAXS : (s < -MAXS ? -MAXS : s);
+      if (chunkF[c] >= 0.5 || chunkF[c] <= -0.5) any = true;
+    }
+    return any;
+  }
+
+  function rowBase(r, h, t) {
+    var amp = (1 + r / (h * HI)) * HI * G.gfx.surface.mirror(); // 2 px at the surface, 4 at the bottom (view pixels), × the water's mirror
+    return Math.round(Math.sin(t * 1.7 + r * 0.275) * amp);
+  }
+
+  // The shift (view px) of mirror row r (view rows from the waterline) at view column col,
+  // as draw() uses it: for checks. h is the water's height below the waterline (world px).
+  function rowShift(col, r, h, t, camX) {
+    chunkShifts(camX);
+    return rowBase(r, h, t) + Math.round(chunkF[Math.min(NCH - 1, Math.max(0, Math.floor(col / CH)))] * (1 - 0.4 * r / (h * HI)));
+  }
+
   // drawAbove(ctx) draws everything above the waterline in screen coordinates.
   // t is a time in seconds for the ripple of the mirrored rows.
   // light (optional): {x, a, key, w}, the light path on the water (a = 0 for none).
   // band (optional, Phase 15): only the top `band` rows are mirror; the cross-section shows
   // below them (sailing draws it first).
-  function draw(ctx, waterY, viewH, t, drawAbove, light, band) {
+  // camX (Phase 20): the camera's world x, where the surface is read.
+  function draw(ctx, waterY, viewH, t, drawAbove, light, band, camX) {
     var t0 = performance.now(), h = viewH - waterY, rows = band === undefined ? h : Math.min(h, band);
     if (h !== bufH) setup(h);
 
@@ -104,16 +141,24 @@ G.gfx.water = (function () {
     ctx.fillStyle = G.gfx.sprites.PALETTE.water_dark;
     ctx.fillRect(0, waterY, VIEW_W, rows);
     ctx.globalAlpha = ALPHA * (light && light.mirror !== undefined ? light.mirror : 1);
-    // Row by row in the view's pixels; each row of 1/HI world px shifts by a sine.
+    // Row by row in the view's pixels; each row of 1/HI world px shifts (see chunkShifts).
+    camX = camX || 0;
+    var dyn = chunkShifts(camX);
     for (var r = 0; r < rows * HI; r++) {
-      var amp = (1 + r / (h * HI)) * HI; // 2 px at the surface, 4 at the bottom (view pixels)
-      var dx = Math.round(Math.sin(t * 1.7 + r * 0.275) * amp);
-      ctx.drawImage(buf, PAD * HI - dx, r, VIEW_W * HI, 1, 0, waterY + r * H1, VIEW_W, H1);
+      var dx = rowBase(r, h, t);
+      if (!dyn) { ctx.drawImage(buf, PAD * HI - dx, r, VIEW_W * HI, 1, 0, waterY + r * H1, VIEW_W, H1); continue; }
+      var wr = 1 - 0.4 * r / (h * HI), c0 = 0, s0 = dx + Math.round(chunkF[0] * wr);
+      for (var c = 1; c <= NCH; c++) {
+        var s = c < NCH ? dx + Math.round(chunkF[c] * wr) : 1e9;
+        if (s === s0) continue;
+        ctx.drawImage(buf, PAD * HI - s0 + c0 * CH, r, (c - c0) * CH, 1, c0 * CH * H1, waterY + r * H1, (c - c0) * CH * H1, H1);
+        c0 = c; s0 = s;
+      }
     }
     ctx.globalAlpha = 1;
-    if (light && light.a > 0.01) drawPath(ctx, waterY, rows, t, light);
+    if (light && light.a > 0.01) drawPath(ctx, waterY, rows, t, light, camX);
     drawStreaks(ctx, waterY, rows, t);
-    drawGlints(ctx, waterY, rows, t);
+    drawGlints(ctx, waterY, rows, t, camX);
     if (rows > 0) ctx.drawImage(shade, 0, 0, VIEW_W * HI, rows * HI, 0, waterY, VIEW_W, rows);
     stats.ms = performance.now() - t0;
   }
@@ -151,7 +196,7 @@ G.gfx.water = (function () {
     ctx.globalAlpha = 1;
   }
 
-  return { ALPHA: ALPHA, draw: draw, setDeltas: setDeltas, drawDelta: drawDelta, stats: stats };
+  return { ALPHA: ALPHA, draw: draw, setDeltas: setDeltas, drawDelta: drawDelta, stats: stats, rowShift: rowShift };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {

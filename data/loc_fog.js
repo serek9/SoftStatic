@@ -14,6 +14,10 @@ G.data.locations.fog = {
   maxDepth: 96,
   seed: 4021,
   start: 180,
+  // Phase 20: the surface's swell, in the 640×360 view's pixels: amp is the largest height,
+  // waves are [wavelength px, speed px/s, share of amp]; mirror scales how much it shivers
+  // the reflection. Fogbound is low and slow.
+  swell: { amp: 1.3, mirror: 0.8, waves: [[96, 9, 0.5], [41, -6, 0.3], [23, 4, 0.2]] },
 
   // Back to front. Every layer is baked once and only drawn with drawImage.
   // Phase 15: painted layers (js/gfx/paint.js): far peaks, a nearer ridge with the tower and
