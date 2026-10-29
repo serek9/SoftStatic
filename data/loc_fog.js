@@ -54,7 +54,7 @@ G.data.locations.fog = {
     { id: 'pier_shade', kind: 'open', x: 300, r: 36 },
     { id: 'channel', kind: 'open', x: 560, r: 40 },
     { id: 'wreck_hollow', kind: 'open', x: 770, r: 30 },
-    { id: 'cold_hole', kind: 'legendary', x: 880, r: 22, legend: 4 },
+    { id: 'cold_hole', kind: 'legendary', x: 880, r: 22, legend: 4, where: 'over the cold hole, past the wreck' },
     { id: 'reed_gap', kind: 'hidden', x: 1110, r: 24, attract: 1.6, rare: 2 }
   ]
 };

@@ -2,7 +2,7 @@
 
 > **FOR THE CODING AGENT:** Read **§0 Shared Conventions** first, then ONLY the task or section named in your assignment. Implement nothing that is not named in the task.
 
-**Status:** Plan final and approved. **Phases 1–12 are done (Milestones A and B reached; all four locations, passive mode and the tape exist).** The next task is **13.1 the audio engine**; each phase starts only after explicit authorization. Progress, architecture as built, decisions, known issues and the exact next task are in **§8 Project Status**, which is updated at the end of every phase.
+**Status:** Plan final and approved. **Phases 1–14 are done (Milestones A, B and C reached),** together with the improvement audit (see §8). Each phase starts only after explicit authorization. Progress, architecture as built, decisions, known issues and the exact next task are in **§8 Project Status**, which is updated at the end of every phase.
 
 ---
 
@@ -395,7 +395,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | Audit batch 3: Feel | Done | `Audit batch 3: Feel` | P1-4 feedback, P1-6 petting the dog, P1-7 the HUD fades when idle |
 | Audit batch 5: Life (P2) | Done | `Audit batch 5: Life` | P2-1 ambient life, P2-2 passive presentation, P2-3 underwater |
 | Audit batch 6: Polish (P3) | Done | `Audit batch 6: Polish` | P3-1 drizzle, P3-2 still mode, P3-4 the 8.4 minors. P3-3 (a committed screenshot script) left out: it needs Playwright, a dependency the project does not have |
-| 14 Content and polish | **Next** | | See 8.6 |
+| 14 Content and polish | Done | `Phase 14: Content and polish` | **Milestone C reached.** 36 species, final balance, touch, performance, save migrations |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -549,6 +549,13 @@ These are interpretations and additions made while building, where the spec abov
 66. **Still mode (P3-2):** H (new input action `still`) hides the whole HUD until pressed again; the catch card still shows. For screenshots and for simply looking.
 67. **The 8.4 minors (P3-4):** #5: sailing re-runs the pure `speciesWeights` when the rod's limit changes, so `tooHeavyNear` follows a rod upgrade at once (no RNG is used; the replay is unchanged). #17: in the Pines the perched owl calls (its rings rise from it) instead of a second owl appearing (`owl.perched`). #15: kept as built; see #23.
 
+68. **The rosters (14.1–14.4):** 36 species, 9 per water (4 common, 3 uncommon, 1 rare, 1 legendary); the four placeholders keep their ids. Every hint is mechanically true and `--validate` now checks it. The hint kinds are `hour:grey` (timeLikes = the grey hours), `hour:night` (only night hours), `window:<id>`, `unease` (uneaseMin > 0), `bait:<id>` (in baitLikes), `depth:deep` (habitat reaches 60% of the water's depth), `depth:shallow` (8 m at most), `spot:<id>` (a legendary spot, which needs a `where` text) and `mover:<id>` (a rare-boosting mover; rare species only). The journal prints each kind. Each water's legendary lives at its legendary spot, so the dog's bark (10.3) is live everywhere. Each legendary needs a better rod (8–16 kg), and Fogbound's Wreck Catfish (3.6 kg) is heavier than the cane rod, so the heavy-fish hints (D4) show from the start. Commons get dearer from water to water (Fogbound 5–8, creek 8–12, Pines 20–27, Red Room 30–34).
+69. **The Red Room's key (V6, closes 8.3 #34):** `need: {windowCatch: 'owl_333', fish: 'three_thirty_three', text}`: the Pines' rare fish, which bites only in the 03:33 window and lives 20–28 m down. `economy.canUnlock` checks `need.fish` against the journal (a real catch, never a phantom). The map shows `need.text`. The cost is now 5500 (V6 says "about 6000"; 14.5).
+70. **Final balance (14.5):** the pacing model now moves to each water it opens (depth per water: Fogbound 8 m, creek 6, Pines 8) and, in the Pines, hunts the key: in or just before the 03:33 window it fishes at 24 m. Prices were set by that model. Passive's wait `base` went from 48 to 42 s, so that a cycle earns what a cast earns with the new rosters (1.044 before `incomeMult`, 62.6% after).
+71. **Touch and buttons (14.6):** `input.js` maps touches to zones: in play, the left 64 px steer left, the right 64 px steer right and the middle is the action (hold to charge or reel); in a menu, the shop or the cabin, the top and bottom middle are also up and down. Five on-screen buttons (TAB, J, M, P, ESC) at the bottom right are hit-tested in `input.js` and drawn by `hud.drawButtons` over everything (index.html). They show once a touch has been seen, or while the mouse is near them, and a mouse click on a shown button presses it instead of casting. The canvas has `touch-action: none`. Petting the dog stays on S/↓ (no touch zone).
+72. **Performance (14.7):** the loop measures update and draw time and the worst frame each second (overlay and `G.core.loop.stats`). In headless Chromium at 1280×720 every case ran at 60 fps: Fogbound surface at night, draw 1.07 ms, worst frame 4.7 ms; with an anomaly, drizzle and fog at unease 1, 0.97 / 4.9 ms; underwater with 8 fish and the lantern cone, 0.43 / 2.1 ms; the Pines with its signal, neon and lamps in the owl window, 1.21 / 6.6 ms. The reflection pass took 1.26 ms at most (3.4's budget is 2 ms). Nothing needed optimising.
+73. **Save migrations (14.8):** `node tools/balance.js --saves` builds a save shaped as each milestone wrote it (the `defaults()` of Phases 1, 7, 8, 9, 10 and 12, from git history, with some play in them). Each goes through the real export string and import, then is checked against today's defaults (gear, flags, settings), the economy, the unlock checks, a passive plan and the journal's species. A damaged string is refused. No save field changed in Phase 14 or in the audit, so the version stays 4. The vm context now has `TextEncoder`, `TextDecoder`, `btoa` and `atob`, which the export string uses.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -556,24 +563,24 @@ No crashes or failing checks are known. Open items, roughly by importance:
 | # | Issue | Where | Owner |
 |---|---|---|---|
 | 1 | ~~"Fog thickens in grey hours" (§0.8) is not built~~ Done in audit batch 1 (8.3 #51) | `js/scene/sailing.js` | Closed |
-| 2 | The creek, the Pines and the Red Room have no fish yet (since audit batch 1 the map does not sell them until they do, 8.3 #54), so the school stays empty there (the lure, drift, anomalies and the dog's stare all work). Their legendary spots wait for a legendary species, like Fogbound's | `data/fish.js` | 14.2–14.4 |
-| 3 | Placeholder roster limits: the journal's heavy-fish margin note cannot appear (no Fogbound fish is heavier than the starter rod's 3 kg); the dog never barks (no legendary); and the hidden spot's rare ×2 only pays inside the owl window (the only rare fish is window-only). Measured coins per hour at `reed_gap` vs open water: ×1.44 at 02:45, ×1.10 at 23:00. Each was checked with injected data or at the window | `data/fish.js` | 14.1 |
+| 2 | ~~No fish in the creek, the Pines and the Red Room~~ Done (8.3 #68); the map gate (8.3 #54) has lifted | `data/fish.js` | Closed |
+| 3 | ~~Placeholder roster limits~~ Done: legendaries bark, heavy hints show, the hidden spots' rare boost pays outside the window (8.3 #68) | `data/fish.js` | Closed |
 | 4 | ~~No audio yet~~ Done (8.3 #56) | `js/audio/engine.js` | Closed |
 | 5 | ~~`tooHeavyNear` stale after a rod upgrade~~ Fixed (8.3 #67) | `js/scene/sailing.js` | Closed |
-| 6 | Pacing: location 2 median is 32 min, low in the 30–50 band. Hollow pike (an unease fish, about 150 coins each) make early income jumpy. Escapes are about 0% in fight sims. Cabin costs are not in the pacing model yet | `data/fish.js`, `data/gear.js` | 14.5 |
+| 6 | Pacing margins are thin: creek median 46.1 min (band 30–50) and Red Room 338.5 (150–360). Cabin costs are still outside the model | `data/fish.js`, `tools/balance.js` | Watch when tuning |
 | 7 | Hollow pike lands only ~51% at skill 0.8 with the starter line, by design (strength 1.6 > line 1.0) | `data/fish.js` | Review in 14.5 |
 | 8 | ~~No sound for the slip, the line hum and the owl~~ Done (8.3 #57) | `js/audio/engine.js` | Closed |
 | 9 | Anomaly cooldowns live in run state, so a reload resets them. Harmless, since anomalies only help, but noted | `js/sim/unease.js` | Leave unless it matters |
 | 10 | The per-phase Node and browser checks were not committed. Phases 1, 6, 7 and 8 used Node scripts in a temporary folder. Phases 9 and 10 used a headless-Brave DevTools driver plus Node checks (shop lines, anomaly scheduler, spot value, late hints), in the session scratchpad. `tools/balance.js` covers validation, replay and pacing; the rest can be rebuilt from the §4 "Done when" column | — | Optional: a `tools/` browser check |
 | 11 | Testing note: many `getImageData` reads on the game canvas make Chrome move it off the GPU, and the page drops to 16–40 fps until reloaded. This only affects pixel-reading tests; the game never reads pixels back. (The 9.3 check reads offscreen canvases from `journal.render()` instead.) | — | Keep pixel tests short, or reload after them |
-| 12 | Menus are keyboard-only: the mouse only casts | `js/core/input.js` | 14.6 (touch and on-screen buttons) |
-| 13 | The Red Room unlock accepts a catch in any window, not a specific fish (8.3 #34) | `data/loc_red.js` | 14.4 (with the pacing model) |
-| 14 | The pacing model still fishes only Fogbound, even after it buys the other waters | `tools/balance.js` | 14.5 |
+| 12 | ~~Menus are keyboard-only~~ Done: touch zones and buttons (8.3 #71) | `js/core/input.js` | Closed |
+| 13 | ~~The Red Room accepts any window catch~~ Done: Three-Thirty-Three in 03:33 (8.3 #69) | `data/loc_red.js` | Closed |
+| 14 | ~~The pacing model fishes only Fogbound~~ Done: it moves and hunts the key (8.3 #70) | `tools/balance.js` | Closed |
 | 15 | ~~The shop's unease location~~ Settled: Fogbound's, where the shop stands (8.3 #23) | `js/ui/shop.js` | Closed |
 | 16 | ~~No hum or jazz in the Pines~~ Done (8.3 #57) | `js/audio/engine.js` | Closed |
 | 17 | ~~Two owls in the Pines~~ Fixed: the perched owl calls (8.3 #67) | `js/scene/sailing.js` | Closed |
 | 18 | Passive income swings a lot from seed to seed (0.36–0.84 of active over 60 min): a single Hollow Pike is worth ~150 coins. The mean is on target | `data/fish.js` | 14.5 |
-| 19 | On the creek, the Pines and the Red Room every passive cycle is "Nothing bit" until they have fish | `data/fish.js` | 14.2–14.4 |
+| 19 | ~~Passive catches nothing off Fogbound~~ Done with the rosters | `data/fish.js` | Closed |
 | 20 | Time away moves the game clock (8.3 #44). A player who closes the tab for a few minutes comes back hours later in game time, with a tape | `js/sim/passive.js` | Watch in play; `P.awayMin` is the knob |
 | 21 | Live passive shows only the float and the bending rod; there is no underwater view or fish on screen, and no sound | `js/scene/sailing.js` | 13.3 for sound; visuals optional |
 | 22 | Testing note: headless Brave runs no animation frames in background tabs, so a tab must be brought to the front (`Page.bringToFront`) before its loop can be checked | — | — |
@@ -586,12 +593,13 @@ Run these after any change. A different result means something changed.
 
 | Command | Expected |
 |---|---|
-| `node tools/balance.js --validate` | `validate: OK (4 warning(s))`: the rosters (Fogbound 4 of 9 species; creek, pines and red 0 of 9) |
-| `node tools/balance.js --replay 12345` | `hash 2265718513 / 2265718513, 16 catches, 18 casts`, then `PASS: identical` |
-| `node tools/balance.js --pacing` | All PASS. Medians: first upgrade 6.0 catches, creek 32.3 min, red 324.4 min |
-| `node tools/balance.js --passive` | `PASS passive income 61.6% of active` (1.026 before `incomeMult`), then time away 5 h: 184 caught, 16 lost, +3557 coins, phantom `owl_eel`, and `PASS time away` |
+| `node tools/balance.js --validate` | `validate: OK (0 warning(s))` (also with `--strict`) |
+| `node tools/balance.js --replay 12345` | `hash 2593400009 / 2593400009, 19 catches, 20 casts`, then `PASS: identical` |
+| `node tools/balance.js --pacing` | All PASS. Medians: first upgrade 6.0 catches, creek 46.1 min, red 338.5 min |
+| `node tools/balance.js --passive` | `PASS passive income 62.6% of active` (1.044 before `incomeMult`), time away 5 h: 191 caught, 9 lost, +2553 coins, and `PASS time away` |
+| `node tools/balance.js --saves` | 6 PASS lines (Phases 1, 7, 8, 9, 10, 12 load as v4) and the damaged string refused |
 
-The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here. Phases 9, 10, 11 and 12 and audit batch 1 left all of them unchanged. `--validate` also checks `data/anomalies.js` (schema, locations, durations of at most 60 s, effects) and, since Phase 11, every location file (fields, spots inside the world, at most one hidden spot, finite drift, `place` deterministic, in the world and spaced).
+The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here. Phases 9–12 and the audit batches left them unchanged; Phase 14 (the rosters, prices and passive `base`) changed all of them, as recorded above. `--validate` also checks `data/anomalies.js` (schema, locations, durations of at most 60 s, effects) and, since Phase 11, every location file (fields, spots inside the world, at most one hidden spot, finite drift, `place` deterministic, in the world and spaced).
 
 Phase 9 browser checks (headless, 320×180 at scale 1, `?debug&seed=N`): HUD strings match the save after `dbg.money`, `dbg.hour` and `dbg.buy('bait','minnow',5)`. P freezes the clock, and export then import through the menu restores coins, journal and clock. The journal at `dbg.unease(0)` vs `dbg.unease(1)` differs in 2510 px (1975 at 0.5; 0 between two renders at the same unease). Every special shop line is said exactly once in 200 visits (Node). Travel's switch at black takes 4 ms and its longest frame is 16.8 ms. Trophy facing is unchanged inside the cabin after `dbg.unease(1)` plus a restoration, and cabin level and kept fish persist across a reload.
 
@@ -611,25 +619,15 @@ Audit batch 5 checks (headless Chromium, `?debug&seed=11`): with four perch held
 
 Audit batch 6 checks (headless Chromium, `?debug&seed=11`): at unease 1 the first drizzle hour on Fogbound is 17:00 (`dbg.rain()` 1 at 17:30), 0 at unease 0. H hides the HUD and H again shows it. With a lure out, `dbg.rod(0.01)` makes `tooHeavyNear` true on the next step and `dbg.rod(0)` clears it, without a spawn. In the Pines at 02:47 the owl state is `perched` at x 1176 and the audio log shows `owl`. Baselines unchanged.
 
+Phase 14 checks: `--validate --strict` OK with 9 species per water and every hint true. On a fresh save (headless Chromium, `?debug&seed=11`), moving toward x 860 on Fogbound makes the dog bark at `cold_hole`. The map shows the Red Room's text "It opens to someone who has caught what rises at 03:33 in The Pines.", sells the creek, and travel works; a creek cast gave a Snag Trout card, and the journal printed "Stays near the surface." for `depth:shallow`. Touch on an emulated phone (844×390, landscape): holding the right edge moved the boat 180 → 208, holding the middle cast and then reeled in, the J button opened the journal and ESC closed it, M opened the map and the bottom zone moved its selection, TAB started passive. The performance figures are in 8.3 #72. No page errors.
+
 ### 8.6 Next task
 
-The improvement audit ([SOFTSTATIC_IMPROVEMENT_AUDIT.md](SOFTSTATIC_IMPROVEMENT_AUDIT.md)) is built (audit batches 1, 2 (Phase 13), 3, 5 and 6; its batch 4 is the rosters below). Only its P3-3 (a committed screenshot script) is left out, because it needs Playwright.
-
-**Next: Phase 14 (content and polish, Milestone C), starting with task 14.1 the Fogbound roster**, in the §7 template:
-
-```
-Read: §0, then §4 Task 14.1 only, plus V5 (fish schema and the wrongness generator) and
-  §2 (what each liminal element tells the player). Also 8.3 #3, #21, #30, #34 and 8.4 #2, #3.
-Files you may touch: data/fish.js.
-Do: the full Fogbound roster (4 common, 3 uncommon, 1 rare, 1 legendary), keeping the four
-  placeholders' ids where they fit; hint lines that carry real hints (hintRefs); one species
-  heavier than the starter rod (so the heavy-fish hints show); a legendary for the cold hole
-  (so the dog barks).
-Done when: --validate shows 9 species for fog; --pacing still passes (or the targets are
-  re-tuned in 14.5); record the new replay hash in 8.5.
-```
-
-Then 14.2–14.4 (each roster also lifts the map gate for its water, 8.3 #54), 14.5 balance, 14.6 touch, 14.7 performance, 14.8 migration tests.
+**Every phase in §4 is done (Milestone C),** and so is the improvement audit (except its P3-3, which needs Playwright). There is no next task in the plan. Ideas, each needing the user's go-ahead:
+- Playtesting notes on feel and pacing. The model's margins are thin (8.4 #6).
+- Cabin costs in the pacing model.
+- A touch zone for petting the dog.
+- More content: further anomalies (the moon in the reflection only, audit §6), more shopkeeper lines, a fifth water.
 
 ---
 

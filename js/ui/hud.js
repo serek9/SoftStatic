@@ -112,7 +112,7 @@ G.ui.hud = (function () {
       var pv = run.passive;
       if (pv.on) {
         label(ctx, PASSIVE_ON, 316 - S.measure(PASSIVE_ON), Y, 'signal_amber');
-      } else if (run.fsm === 'sailing' && !tabUsed) S.drawText(ctx, PASSIVE_OFF, 316 - S.measure(PASSIVE_OFF), Y, 'fog_mid'); // TODO(P14.6): a button to click
+      } else if (run.fsm === 'sailing' && !tabUsed) S.drawText(ctx, PASSIVE_OFF, 316 - S.measure(PASSIVE_OFF), Y, 'fog_mid'); // also a button (14.6)
       ctx.globalAlpha = 1;
     }
     if (run.passive.on && run.passive.noteT > 0) label(ctx, run.passive.note, 316 - S.measure(run.passive.note), Y + 9, 'paper');
@@ -123,10 +123,25 @@ G.ui.hud = (function () {
     label(ctx, s, 316 - S.measure(s), Y, 'fog_light');
   }
 
+  // 14.6: the on-screen buttons (TAB, J, M, P, ESC), over menus too (index.html draws them
+  // last). Shown once a touch has been seen, or while the mouse is near them.
+  function drawButtons(ctx) {
+    var I = G.core.input;
+    if (G.core.compact || still || !I.showButtons()) return;
+    var B = I.BUTTONS, P = S.PALETTE;
+    for (var i = 0; i < B.length; i++) {
+      var b = B[i], on = I.held(b.act);
+      ctx.globalAlpha = 0.7; ctx.fillStyle = P.ink; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.globalAlpha = 1;
+      ctx.fillStyle = P[on ? 'signal_amber' : 'fog_dark'];
+      ctx.fillRect(b.x, b.y, b.w, 1); ctx.fillRect(b.x, b.y + b.h - 1, b.w, 1); ctx.fillRect(b.x, b.y, 1, b.h); ctx.fillRect(b.x + b.w - 1, b.y, 1, b.h);
+      S.drawText(ctx, b.label, b.x + ((b.w - S.measure(b.label)) >> 1), b.y + 2, on ? 'signal_amber' : 'fog_light');
+    }
+  }
+
   // What the HUD shows right now (dbg checks compare these against the save).
   function shown() {
     return { clock: clockStr, coins: coinStr, bait: baitStr, depth: G.scene.underwater.UNDER[G.state.run.fsm] ? depthStr : '' };
   }
 
-  return { metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, alpha: alpha, isStill: function () { return still; }, draw: draw, shown: shown };
+  return { metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, alpha: alpha, drawButtons: drawButtons, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

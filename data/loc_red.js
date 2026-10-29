@@ -10,9 +10,10 @@ G.data.locations = G.data.locations || {};
 G.data.locations.red = {
   id: 'red',
   name: 'Red Room Reservoir',
-  cost: 6000,
-  // Also needs a fish landed on a cast latched in a clock window: 'any' window, or a window id.
-  need: { windowCatch: 'any' },
+  cost: 5500,
+  // Also needs (V6) a specific fish caught in a specific clock window: the Pines'
+  // Three-Thirty-Three, which bites only in the 03:33 window (economy.canUnlock).
+  need: { windowCatch: 'owl_333', fish: 'three_thirty_three', text: 'It opens to someone who has caught what rises at 03:33 in The Pines.' },
   width: 1100,
   waterY: 112,
   maxDepth: 80,
@@ -45,7 +46,7 @@ G.data.locations.red = {
 
   // These two stay put (the dog's stare and the legendary spot).
   spots: [
-    { id: 'floor_drain', kind: 'legendary', x: 560, r: 20, legend: 4 },
+    { id: 'floor_drain', kind: 'legendary', x: 560, r: 20, legend: 4, where: 'over the drain in the floor' },
     { id: 'hem', kind: 'hidden', x: 990, r: 22, attract: 1.6, rare: 2 }
   ],
 

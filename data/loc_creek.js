@@ -50,7 +50,7 @@ G.data.locations.creek = {
   spots: [
     { id: 'cabin_steps', kind: 'open', x: 250, r: 32 },
     { id: 'snag_eddy', kind: 'open', x: 470, r: 26 },
-    { id: 'black_pool', kind: 'legendary', x: 830, r: 22, legend: 4 },
+    { id: 'black_pool', kind: 'legendary', x: 830, r: 22, legend: 4, where: 'in the black pool between the cabins' },
     { id: 'undercut', kind: 'hidden', x: 1060, r: 24, attract: 1.6, rare: 2 }
   ],
 

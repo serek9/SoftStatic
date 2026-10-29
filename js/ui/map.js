@@ -91,7 +91,7 @@ G.ui.map = (function () {
     if (v === 'travel') { info.status = 'Open water.'; info.hint = 'SPACE travel'; return; }
     if (!stocked(s.id)) { info.status = 'The water is still settling. Nothing lives here yet.'; info.key = 'rust'; return; }
     var r = E.canUnlock(save, s.id, G.data);
-    if (r === E.LOCKED) { info.status = 'It opens to someone who has fished while the owl calls.'; info.key = 'rust'; return; }
+    if (r === E.LOCKED) { info.status = (L.need && L.need.text) || 'It opens to someone who has fished while the owl calls.'; info.key = 'rust'; return; }
     info.status = 'Opens for ' + L.cost + 'c.';
     if (r === E.OK) info.hint = 'SPACE pay and travel'; else info.key = 'rust';
   }

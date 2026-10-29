@@ -107,6 +107,8 @@ G.sim.economy = (function () {
       for (var k in save.flags.windowCatch) if (w === 'any' || k === w) met = true;
       if (!met) return LOCKED;
     }
+    var nf = L.need && L.need.fish; // a specific species caught (V6, Phase 14)
+    if (nf && !(save.journal[nf] && save.journal[nf].caught > 0)) return LOCKED;
     if (save.coins < L.cost) return POOR;
     return OK;
   }
