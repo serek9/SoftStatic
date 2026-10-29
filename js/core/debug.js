@@ -252,6 +252,12 @@ G.core.debug = (function () {
       for (var i = 0; i < w.length; i++) if (w[i] > 0) on++;
       return { mode: ['off', 'pinned', 'loose'][s.mode], n: G.gfx.rope.N, onSurface: on, len: +s.rest.toFixed(2), span: +s.span.toFixed(2), taut: +s.taut.toFixed(3), sagMax: +s.sagMax.toFixed(2), ms: +s.ms.toFixed(4) };
     },
+    // dbg.boat() returns the boat's motion (Phase 24): pitch (degrees, bow up positive: the
+    // spring from speeding up and stopping, plus the waves' tilt), heave (world px, up), speed, throttle, rpm, whether the motor runs, and how many pull-starts.
+    boat: function () {
+      var b = G.state.run.boat;
+      return { pitch: +b.show.toFixed(3), spring: +b.pitch.toFixed(3), wave: +b.wave.toFixed(3), heave: +b.heave.toFixed(3), vx: +b.vx.toFixed(2), throttle: +b.throttle.toFixed(3), rpm: Math.round(b.rpm), motor: b.motor, starts: b.starts, lean: +b.lean.toFixed(2) };
+    },
     // dbg.fight() returns the fight now (Phase 23): tension, distance, stamina, mode, the hook
     // hold H, whether the fish shakes its head or jumps, the slips; null with no fish on.
     fight: function () {
