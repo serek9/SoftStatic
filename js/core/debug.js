@@ -285,6 +285,12 @@ G.core.debug = (function () {
     // head down positive when swimming its way), frame (fishgen.FR), speed and vy (px/s),
     // len (world px); null when the slot is empty.
     fishBody: function (i) { return G.scene.underwater.fishBody(i === undefined ? 0 : i); },
+    // dbg.life() returns the life under water (Phase 48): crayfish (x, depth, walk/rest/back,
+    // a pending reaction), snails, the clouds (how far the furthest member is from its place,
+    // seconds since anything came near, overlapping pairs), the visitors, silt, timings.
+    // dbg.lifeSpawn('turtle' | 'eel' | 'dart') brings a visitor now.
+    life: function () { return G.scene.life.state(); },
+    lifeSpawn: function (kind) { return G.scene.life.spawn(kind); },
     // dbg.rodBody() returns the rod (Phase 31): load 0..1, dir (the line's pull, local: x
     // forward, y up), tip (world px), bendDeg (butt to tip, negative bends forward and down),
     // top3 and butt (shares of the bend in the top third and the lower half), tier, taper, ms.
