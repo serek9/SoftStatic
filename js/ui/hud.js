@@ -20,10 +20,14 @@ G.ui.hud = (function () {
   // "TAB passive" hint goes away once passive has been used this session.
   var IDLE = 6, FADE = 1, idle = 0, seenCoins = -1, seenBait = '', tabUsed = false;
   var still = false; // audit P3-2: H hides every corner until pressed again
+  // Phase 43: a short note under the bait (a lure lost), shown for NOTE s.
+  var NOTE = 4, note = '', noteT = 0;
+  function say(s) { note = s; noteT = NOTE; idle = 0; }
 
   function update(dt, run) {
     var save = G.state.save, pv = run.passive;
     idle += dt;
+    if (noteT > 0) noteT -= dt;
     if (G.core.input.pressed('still')) still = !still;
     if (pv.on) tabUsed = true;
     if (G.core.input.any() || run.fsm !== 'sailing' || pv.noteT > 0 || save.coins !== seenCoins || run.gearFx.bait !== seenBait) idle = 0;
@@ -125,6 +129,7 @@ G.ui.hud = (function () {
       ctx.globalAlpha = 1;
     }
     if (run.passive.on && run.passive.noteT > 0) label(ctx, run.passive.note, 632 - F.measure(run.passive.note), Y + 14, 'paper');
+    if (noteT > 0) { ctx.globalAlpha = Math.min(1, noteT); label(ctx, note, X, Y + 28, 'paper'); ctx.globalAlpha = 1; }
 
     if (G.scene.underwater.UNDER[run.fsm]) {
       if (run.gearFx.depthBands && run.uw.alpha >= 1) drawBands(ctx, run, waterY, run.gearFx.depthBands);
@@ -156,5 +161,5 @@ G.ui.hud = (function () {
     return { clock: clockStr, coins: coinStr, bait: baitStr, depth: G.scene.underwater.UNDER[G.state.run.fsm] ? depthStr : '' };
   }
 
-  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, alpha: alpha, drawButtons: drawButtons, isStill: function () { return still; }, draw: draw, shown: shown };
+  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, alpha: alpha, drawButtons: drawButtons, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

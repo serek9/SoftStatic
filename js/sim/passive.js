@@ -47,7 +47,9 @@ G.sim.passive = (function () {
     C.latch(ps.latched, save.clock, data.windows); // the lure lands now (D1)
     pl.wait = P.base / (fx.attract * ps.boost.attract) * rng.range(P.spread[0], P.spread[1]);
     c.loc = ps.loc; c.hour = C.advance(save.clock, pl.wait); c.unease = G.sim.unease.get(save, ps.loc);
-    c.depthM = Math.min(P.depthM, loc.maxDepth * 0.25 - 1); c.bait = bait; c.latched = ps.latched;
+    c.depthM = Math.min(P.depthM, loc.maxDepth * 0.25 - 1); c.bait = bait; c.lure = fx.lure; c.latched = ps.latched;
+    c.smallBoost = fx.smallBoost; c.smallMass = fx.smallMass; // Phase 43
+    if (fx.lure) c.depthM = fx.swim === 'top' ? fx.topDepthM : Math.min(c.depthM, fx.maxDepthM);  // a lure fishes its own depth
     c.rodMaxMass = fx.maxMass; c.attract = fx.attract; c.rareBoost = fx.rareBoost * ps.boost.rare; c.legendBoost = ps.boost.legend;
     c.maxDepthPx = loc.maxDepth;
     pl.sp = G.sim.fish_ai.pickSpecies(c, rng);

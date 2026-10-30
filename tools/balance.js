@@ -94,8 +94,9 @@ function validate(G, opts) {
   validateLocations(G, err);
 
   // Gear: 5 tiers each, tier 0 free, every tier dearer and better (V8: every item has an effect).
+  // Phase 43: the rods off the ladder (the ultralight wand) are checked on their own below.
   [['rods', ['castMax', 'maxMass', 'attract']], ['reels', ['speed']], ['lines', ['strength']]].forEach(([kind, fx]) => {
-    const t = g[kind];
+    const t = kind === 'rods' ? g.rods.filter(r => r.ladder !== false) : g[kind];
     if (!t || t.length !== 5) { err('gear ' + kind + ': needs 5 tiers'); return; }
     if (t[0].cost !== 0) err('gear ' + kind + ': tier 0 must be free');
     for (let i = 1; i < 5; i++) {
@@ -111,6 +112,28 @@ function validate(G, opts) {
     seenBait[key] = b.id;
   });
   if (!g.baits.some(b => b.label === false && b.rareBoost > 1)) err('bait: the unlabelled shelf item must be a real rare bait');
+  // Phase 43: every rod's power, action, small-fish numbers and look; the lures; fish.lures.
+  const PAL = G.gfx.sprites.PALETTE;
+  g.rods.forEach(r => {
+    if (typeof r.power !== 'string' || !(r.action >= 0 && r.action <= 4 && Number.isInteger(r.action))) err('rod ' + r.id + ': power and action 0..4');
+    if (!(r.smallHook > 0 && r.smallHook <= 1) || !(r.smallBoost >= 1)) err('rod ' + r.id + ': smallHook 0..1 and smallBoost >= 1');
+    if (!Array.isArray(r.look) || r.look.length !== 2 || !r.look.every(k => PAL[k])) err('rod ' + r.id + ': look must be two palette keys');
+  });
+  if (!g.rods.some(r => r.ladder === false && r.smallBoost > 1)) err('rods: needs a small-fish rod off the ladder');
+  if (!(g.rodSmall.frac > 0 && g.rodSmall.frac < 1 && g.rodSmall.mass > 0)) err('rodSmall');
+  const SWIM = ['mid', 'dive', 'bed', 'top', 'lift'], lureIds = (g.lures || []).map(l => l.id);
+  (g.lures || []).forEach(l => {
+    if (!(l.cost > 0 && l.pack >= 1 && l.attract > 0 && l.rareBoost >= 1 && SWIM.includes(l.swim) && l.sink >= 0 && l.maxDepthM >= 0)) err('lure ' + l.id + ': cost, pack, attract, rareBoost, swim, sink, maxDepthM');
+    if (g.baits.some(b => b.id === l.id)) err('lure ' + l.id + ': shares an id with a bait');
+  });
+  d.fish.forEach(f => {
+    if (!f.lures || typeof f.lures !== 'object') { err('fish ' + f.id + ': lures'); return; }
+    for (const k in f.lures) if (!lureIds.includes(k) || ![1, 2].includes(f.lures[k])) err('fish ' + f.id + ': lures.' + k + ' must be a lure id and 1 or 2');
+  });
+  // Every lure catches something in every water with the starting rod.
+  for (const id in d.locations) lureIds.forEach(l => {
+    if (!d.fish.some(f => f.locations.includes(id) && f.lures[l] && f.mass <= g.rods[0].maxMass && !f.windows.length)) err('lure ' + l + ': nothing in ' + id + ' takes it on the cane rod');
+  });
   if (!(g.lantern.nightDepth > g.nightDepth)) err('lantern: must show deeper fish than without it');
   if (!(g.depthFinder.bands > 0)) err('depth finder: needs depth bands');
   ['pull0', 'pull1', 'tired0', 'tired1', 'pullRise', 'easeFall', 'run', 'tiredRise', 'release', 'recover', 'slipT', 'slipD', 'escape', 'd0',
@@ -208,6 +231,22 @@ function session(G, seed, opts) {
     lure.active = false; st.phase = 'cast'; st.t = 0;
   }
 
+  // Phase 43 (--tackle): fish one water with one rod and one hook, the hook topped up and its
+  // cost counted (baits per cast, lures when the line snaps).
+  st.spent = 0;
+  if (opts && opts.loc) {
+    st.loc = opts.loc; uIn.loc = opts.loc; school.ctx.loc = opts.loc; school.ctx.maxDepthPx = data.locations[opts.loc].maxDepth; st.depthM = P.depthAt[opts.loc];
+    save.unlocks[opts.loc] = true; save.loc = opts.loc;
+  }
+  if (opts && opts.rod !== undefined) { save.gear.rods = [0, opts.rod]; save.gear.rod = opts.rod; save.gear.reel = save.gear.line = Math.min(4, opts.rod); }
+  function topUp() {
+    if (!opts || !opts.bait) return;
+    save.gear.bait = opts.bait;
+    const b = S.economy.baitById(opts.bait, data);
+    if (!b.unlimited && !(save.baits[b.id] > 0)) save.baits[b.id] = 99;
+    if (!b.unlimited && !b.swim) st.spent += b.cost;
+  }
+
   function h(v) { st.hash = (Math.imul(st.hash ^ (v | 0), 0x01000193) >>> 0); }
   function event(what) { st.events.push({ t: st.time, catches: st.catches, coins: save.coins, what }); }
 
@@ -228,21 +267,26 @@ function session(G, seed, opts) {
     const c = school.ctx;
     c.hour = save.clock; c.unease = S.unease.get(save, st.loc); c.bait = lure.bait; c.rodMaxMass = fx.maxMass;
     c.attract = fx.attract; c.rareBoost = fx.rareBoost; c.depthM = lure.y * 0.25;
+    c.lure = lure.lure = fx.lure; c.smallBoost = fx.smallBoost; c.smallMass = fx.smallMass; // Phase 43
     st.t += DT;
     switch (st.phase) {
       case 'cast':
         if (st.t >= P.castTime) {
           st.phase = 'sink'; st.t = 0; st.attempts++;
+          topUp();
           lure.active = true; lure.y = 0; lure.bait = S.economy.useBait(save, data);
           // The hunt: in the Pines, in (or just before) the key window, with the key not yet caught.
           const hunt = key && st.loc === 'pines' && !(save.journal[red.fish] && save.journal[red.fish].caught) &&
             G.sim.clock.wrap(save.clock) >= key.from - 0.05 && G.sim.clock.wrap(save.clock) < key.to;
           st.depthM = hunt ? P.huntDepthM : P.depthAt[st.loc];
+          S.economy.effects(save, data, fx);
+          // a lure fishes its own depth: fish rise to a surface lure; the player reels a plug down to its depth
+          if (fx.lure) st.depthM = fx.swim === 'top' ? fx.topDepthM : Math.min(st.depthM, fx.maxDepthM);
           S.clock.clearLatch(latched); S.clock.latch(latched, save.clock, data.windows);
         }
         break;
       case 'sink':
-        lure.y = Math.min(st.depthM * 4, lure.y + 12 * DT);
+        lure.y = Math.min(st.depthM * 4, lure.y + 12 * DT * (fx.lure ? Math.max(0.25, fx.sink) : 1));
         if (lure.y >= st.depthM * 4) { st.phase = 'wait'; st.t = 0; }
         break;
       case 'wait':
@@ -261,7 +305,10 @@ function session(G, seed, opts) {
         fIn.reel = S.fight.autoPlayer(fight, P.skill, rng) === 1;
         const r = S.fight.step(fight, fIn, DT, rng, data);
         if (r === S.fight.WIN) { st.phase = 'card'; st.t = 0; }
-        else if (r !== S.fight.NONE) { st.phase = 'reel'; st.t = 0; h(r); }
+        else if (r !== S.fight.NONE) {
+          if (r === S.fight.SNAP && S.economy.loseLure(save, lure.bait, data)) st.spent += S.economy.baitById(lure.bait, data).cost;
+          st.phase = 'reel'; st.t = 0; h(r);
+        }
         break;
       }
       case 'card':
@@ -285,6 +332,41 @@ function session(G, seed, opts) {
   }
 
   return { st, save, step, run(seconds, until) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) { step(); if (until && until(st, save)) break; } return st; } };
+}
+
+// ---- --tackle (Phase 43) ---------------------------------------------------------------------
+// Each hook (the live baits and the lures) fished for an hour at each water with the rod of
+// that stage (Fogbound the fibreglass, the creek the graphite, the Pines the lacquered, the
+// Red Room the long rod), 4 seeds: catches and coins an hour, net of what the hook cost.
+// Target: every lure earns 50-200% of what worms earn at every water.
+
+function tackleCheck() {
+  const G = load(), d = G.data, hooks = ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)), waters = { fog: 1, creek: 2, pines: 3, red: 4 };
+  const res = {};
+  console.log('net coins an hour (catches an hour) over 4 seeds x 60 min');
+  console.log('hook      ' + Object.keys(waters).map(w => w.padStart(16)).join(''));
+  for (const hk of hooks) {
+    let row = hk.padEnd(10);
+    res[hk] = {};
+    for (const w in waters) {
+      let coins = 0, catches = 0;
+      for (let sd = 1; sd <= 4; sd++) {
+        const s = session(G, sd * 97, { stay: true, shop: false, loc: w, rod: waters[w], bait: hk });
+        const c0 = s.save.coins; s.run(3600);
+        coins += s.save.coins - c0 - s.st.spent; catches += s.st.catches;
+      }
+      res[hk][w] = { coins: coins / 4, catches: catches / 4 };
+      row += (Math.round(coins / 4) + ' (' + (catches / 4).toFixed(1) + ')').padStart(16);
+    }
+    console.log(row);
+  }
+  let bad = 0;
+  for (const l of d.gear.lures) for (const w in waters) {
+    const r = res[l.id][w].coins / Math.max(1, res.worm[w].coins);
+    if (r < 0.5 || r > 2) { bad++; console.log('FAIL ' + l.id + ' at ' + w + ': ' + (100 * r).toFixed(0) + '% of worms'); }
+  }
+  console.log((bad ? 'FAIL' : 'PASS') + ' every lure earns 50-200% of worms at every water');
+  return bad ? 1 : 0;
 }
 
 // ---- --replay -----------------------------------------------------------------------------
@@ -384,6 +466,7 @@ function savesCheck() {
       try {
         const fx = E.effects(s, G.data, {});
         if (!(fx.maxMass > 0 && fx.castMax > 0)) probs.push('gear effects');
+        if (!Array.isArray(s.gear.rods) || !s.gear.rods.includes(s.gear.rod)) probs.push('the rod in hand is not owned');
         for (const id in G.data.locations) E.canUnlock(s, id, G.data);
         const ps = G.sim.passive.create(s, s.loc || 'fog', G.data);
         G.sim.passive.plan(ps, new G.core.rng.Rng(1), G.data);
@@ -456,8 +539,8 @@ function fightCheck() {
   const all = {};
   console.log('hook hold at a 0.5 s hook-set: ' + hold.toFixed(3) + '  (instant 1, late ' + g.fight.holdLate + ', passive ' + g.fight.holdPassive + ')');
   console.log('tier  player       landed  snapped  thrown  run out  (s to a loss)');
-  for (let tier = 0; tier < g.rods.length; tier++) {
-    const gear = { lineStrength: g.lines[tier].strength, reelSpeed: g.reels[tier].speed };
+  for (let tier = 0; tier < g.lines.length; tier++) { // the five ladder tiers (Phase 43: with the rod's small-fish hold)
+    const gear = { lineStrength: g.lines[tier].strength, reelSpeed: g.reels[tier].speed, maxMass: g.rods[tier].maxMass, smallHook: g.rods[tier].smallHook };
     const fish = d.fish.filter(f => f.mass <= g.rods[tier].maxMass);
     for (const [name, play] of players) {
       const rng = new G.core.rng.Rng(4242 + tier), n = { win: 0, snap: 0, thrown: 0, run: 0, lossT: 0 };
@@ -637,8 +720,9 @@ if (require.main === module) {
   if (args.includes('--passive')) code = passiveCheck() || code;
   if (args.includes('--fight')) code = fightCheck() || code;
   if (args.includes('--rod')) code = rodCheck() || code;
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --replay <seed> [minutes]');
+  if (args.includes('--tackle')) code = tackleCheck() || code;
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --replay <seed> [minutes]');
     code = 2;
   }
   process.exit(code);

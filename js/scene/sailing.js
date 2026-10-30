@@ -362,7 +362,7 @@ G.scene.sailing = (function () {
     // Phase 28: the current carries the fish as it carries the lure (the same pure function).
     run.school.ctx.flowAt = loc.drift ? function (x, depth) { return G.scene.underwater.flow(loc, depth); } : null;
     G.scene.underwater.bottomAt(loc, 0); // bakes the cross-section now
-    run.lureIn = { active: false, x: 0, y: 0, bait: '' };
+    run.lureIn = { active: false, x: 0, y: 0, bait: '', lure: false };
     run.uneaseIn = { loc: id, still: true, atShop: false };
     run.bite = G.sim.bite.create();
     run.fight = G.sim.fight.create();
@@ -397,11 +397,14 @@ G.scene.sailing = (function () {
     li.x = c.x1;
     li.y = c.ly - loc.waterY;
     li.bait = c.bait || gx.bait;
+    li.lure = G.sim.economy.isLure(li.bait, G.data); // Phase 43
     ctx.loc = loc.id;
     ctx.depthM = li.y * 0.25;
+    if (li.lure && gx.swim === 'top') ctx.depthM = Math.max(ctx.depthM, gx.topDepthM); // Phase 43: fish rise to a surface lure
     ctx.hour = save.clock;
     ctx.unease = G.sim.unease.get(save, loc.id);
-    ctx.bait = li.bait;
+    ctx.bait = li.bait; ctx.lure = li.lure;
+    ctx.smallBoost = gx.smallBoost; ctx.smallMass = gx.smallMass; // Phase 43: the ultralight rod
     ctx.latched = c.latched;
     ctx.rodMaxMass = rodMaxOverride || gx.maxMass;
     // 8.4 #5: after a rod change the too-heavy flag is worked out again at once (it used to
@@ -615,7 +618,7 @@ G.scene.sailing = (function () {
       if (run.fisher.tug) load += 0.18; // a nod: a stronger pull along the upright rod buckles it
     }
     var fsm = run.fsm, R = G.gfx.rod;
-    R.solve(pose[0] + b.show, load, dx, dy, b.facing, G.state.save.gear.rod || 0, dt, fsm === 'charging' || fsm === 'casting',
+    R.solve(pose[0] + b.show, load, dx, dy, b.facing, run.gearFx.rodAction || 0, dt, fsm === 'charging' || fsm === 'casting',
       fsm === 'charging' || (fsm === 'casting' && run.cast.t < CAST.flick) || pose[2] === ROD_DOWN);
     // The reel (32.4): the handle turns while line comes in, faster on a faster reel and slower
     // against tension; not while the drag gives line. The bail is open from the charge until

@@ -262,11 +262,14 @@ G.scene.underwater = (function () {
   // A location with a current (11.1, loc.drift) carries it downstream the whole time.
   function lureStep(run, dt, loc) {
     var c = run.cast, inp = G.core.input, wy = loc.waterY, bottom = bottomAt(loc, c.x1);
+    // Phase 43: a lure fishes its own depth: it sinks at gx.sink of a bait's speed, down to
+    // gx.maxDepthM m; a popper ('top') stays on the surface; a plug ('dive') dives as it is reeled.
+    var gx = run.gearFx, lure = gx.lure && c.bait === gx.bait, sinkK = lure ? gx.sink : 1, floorPx = lure ? Math.min(bottom, gx.maxDepthM * 4) : bottom;
     if (run.fsm === 'sinking') {
-      if (inp.pressed('action')) { G.core.state.go(run, 'waiting'); return; }
+      if (inp.pressed('action') || (lure && sinkK === 0)) { if (lure && sinkK === 0) c.ly = wy + (gx.swim === 'top' ? 0.5 : FLOAT); G.core.state.go(run, 'waiting'); return; }
       var depth = c.ly - wy;
-      depth += UW.sinkV * Math.min(1, 0.15 + (bottom - depth) / 6) * dt;
-      if (depth >= bottom) { depth = bottom; G.core.state.go(run, 'waiting'); }
+      depth += UW.sinkV * sinkK * Math.min(1, 0.15 + (bottom - depth) / 6) * dt;
+      if (depth >= floorPx) { depth = floorPx; G.core.state.go(run, 'waiting'); }
       c.ly = wy + depth;
       drift(c, loc, dt, depth >= bottom);
       c.ly = Math.min(c.ly, wy + bottomAt(loc, c.x1));
@@ -274,11 +277,16 @@ G.scene.underwater = (function () {
       c.bubT = (c.bubT || 0) - dt;
       if (c.bubT <= 0) { c.bubT = 0.4; fx.emit('bubbles', c.lx, c.ly - 2, 1); }
     } else if (run.fsm === 'waiting' || run.fsm === 'interest') {
+      if (lure && gx.swim === 'top' && inp.pressed('action') && run.bite.slot < 0) { // the popper pops: a spit and a ring
+        fx.ripple(c.x1, wy + 1, 1, 6, 0.6); G.gfx.surface.poke(c.x1, 0.2, 1); body.kick = 0.3;
+      }
       if (inp.held('action') && run.bite.slot < 0) { // with a fish on the bite, holding means hook, not reel
-        var b = run.boat, home = b.x + b.facing * UW.reach;
+        var b = run.boat, home = b.x + b.facing * UW.reach, far = Math.abs(home - c.x1) > 14;
         c.x1 += clamp(home - c.x1, -UW.reelIn * dt, UW.reelIn * dt);
         c.lx = c.x1;
-        c.ly -= UW.reelUp * dt;
+        if (lure && gx.swim === 'top') c.ly = far ? wy + 0.5 : wy;                     // skated in along the surface
+        else if (lure && gx.swim === 'dive' && far) c.ly = Math.min(c.ly + UW.reelUp * dt, wy + floorPx); // the lip digs it down
+        else c.ly -= UW.reelUp * dt;
         if (c.ly <= wy) {
           c.ly = wy;
           fx.splash(c.x1, wy, 0.15);
@@ -287,6 +295,7 @@ G.scene.underwater = (function () {
           return;
         }
       }
+      else if (lure && gx.swim === 'dive' && c.ly > wy + FLOAT) c.ly = Math.max(wy + FLOAT, c.ly - UW.reelUp * 0.4 * dt); // let go, the plug floats back up
       drift(c, loc, dt, c.ly - wy >= bottom);
       c.lx = c.x1;
       c.ly = Math.min(c.ly, wy + bottomAt(loc, c.x1));
@@ -302,7 +311,7 @@ G.scene.underwater = (function () {
   // 11.1: the current moves the lure (and where its line enters) by loc.drift, a pure
   // function of the cast's seed, its time in the water, its depth and (Phase 22, the lakes)
   // the grey hours' wind, at the fixed dt.
-  var LIFT = 1.8;
+  var LIFT = 1.8, FLOAT = 2; // Phase 43: px under the surface a floating plug rests at
   function wind() { return G.scene.sailing.light(G.state.save.clock || 0).grey; }
   function drift(c, loc, dt, onBottom) {
     if (!loc.drift) return;
@@ -854,6 +863,12 @@ G.scene.underwater = (function () {
         G.core.state.go(run, 'landing');
       } else if (res === F.SNAP || res === F.ESCAPE) {
         release(run);
+        // Phase 43: a snapped line takes the lure with it (a thrown hook does not; passive never loses one).
+        if (res === F.SNAP && !run.passive.on && G.sim.economy.loseLure(G.state.save, run.cast.bait, G.data)) {
+          var lb = G.sim.economy.baitById(run.cast.bait, G.data), left = G.state.save.baits[lb.id] || 0;
+          G.ui.hud.say('Lost the ' + lb.name + '. ' + (left ? left + ' left.' : 'None left: worms next.'));
+          G.core.save.autosave('lure');
+        }
         fx.splash(run.hook.x, loc.waterY, 0.3);
         if (G.core.debug) G.core.debug.log(res === F.SNAP ? 'the line snapped' : 'it slipped away');
         G.core.state.go(run, 'sailing');
@@ -975,7 +990,7 @@ G.scene.underwater = (function () {
     var moving = Math.sqrt(rx * rx + ry * ry);
     body.flutter = Math.min(1, (fsm === 'sinking' ? 0.8 : 0.2) + moving / 25 + Math.abs(body.flow) * 0.2);
     body.kick = Math.max(0, body.kick - dt);
-    if (body.kick <= 0 && (G.gfx.sprites.hash(Math.floor(body.t * 3), 17) & 7) === 0) body.kick = 0.25; // the cricket's kick
+    if (body.kick <= 0 && (run.cast.bait || run.gearFx.bait) === 'cricket' && (G.gfx.sprites.hash(Math.floor(body.t * 3), 17) & 7) === 0) body.kick = 0.25; // the cricket's kick (Phase 43: only the cricket; the popper's comes from a pop)
   }
 
   // The baits' shapes, as a test of a pixel at (u, v) in the lure's own frame (u along the
@@ -1010,8 +1025,55 @@ G.scene.underwater = (function () {
       return (Math.round(u * 1.7) + Math.round(v * 2.3)) % 3 === 0 ? 'blood' : 'paper';
     }
   };
-  var LURE_EDGE = { worm: 'flesh_dark', cricket: 'ink', minnow: 'stone_dark', unlabelled: 'paper_dark' };
-  var LS = 12, DIRS = 16, BAIT_IDS = ['worm', 'cricket', 'minnow', 'unlabelled'], lureCv = [];
+  // Phase 43: the lures. ph: the spinner's blade face on or edge on, the plug's flank flash,
+  // the grub's tail curled one way or the other, the popper's spit, the jig's skirt flared.
+  BAITS.spinner = function (u, v, ph) {
+    var bu = u - 1.8, e = (bu / 1.8) * (bu / 1.8) + (v / (ph ? 2 : 0.9)) * (v / (ph ? 2 : 0.9));
+    if (e < 1) return ph ? 'brass_hi' : 'leaf_gold';                                  // the blade, turning
+    if (u > -1.8 && u < 0.2 && Math.abs(v) < 0.9) return u > -0.4 ? 'rust_hi' : 'stone_hi'; // its body and bead
+    if (u <= -1.8 && u > -3.2 && Math.abs(v) < 0.6 + (-1.8 - u) * 0.6) return 'ink'; // the treble
+    return '';
+  };
+  BAITS.plug = function (u, v, ph) {
+    var e = (u / 3.4) * (u / 3.4) + (v / 1.9) * (v / 1.9);
+    if (u > 2.8 && u < 4.6 && v > 0.3 && v < 2.6 && u - 2.6 > v * 0.5) return 'stone_lit'; // the diving lip
+    if (e < 1) {
+      if (u > 1.6 && u < 2.6 && v > -1 && v < 0) return 'ink';
+      if (ph && Math.abs(u) < 1.2 && v > -0.5 && v < 0.6) return 'cream';            // the flank's flash as it wobbles
+      return v < -0.5 ? 'rust_hi' : (v < 0.6 ? 'leaf_gold' : 'cream');
+    }
+    if (u < -2.9 && u > -4.2 && Math.abs(v) < 0.4) return 'ink';                      // a treble behind
+    return '';
+  };
+  BAITS.grub = function (u, v, ph) {
+    var e = (u / 2.4) * (u / 2.4) + (v / 1.3) * (v / 1.3);
+    if (u > 1.8 && u < 3.4 && Math.abs(v) < 1.1) return 'stone_dark';                 // the jig head
+    if (e < 1) return v < 0 ? 'moss_lit' : 'moss_hi';
+    var tu = u + 3, tv = v - (ph ? 0.9 : -0.9) * Math.sin(Math.min(Math.PI, -u * 0.9)); // the curly tail
+    if (u < -1.8 && u > -4.6 && Math.abs(tv - (ph ? 0.6 : -0.6) * (u < -3.4 ? 1 : 0)) < 0.55 && tu < 1.2) return 'moss_hi';
+    return '';
+  };
+  BAITS.popper = function (u, v, ph) {
+    var e = (u / 2.8) * (u / 2.8) + (v / 1.8) * (v / 1.8);
+    if (e < 1) {
+      if (u > 2) return 'ink';                                                      // the cupped face
+      if (u > 0.9 && u < 1.6 && v > -0.8 && v < -0.1) return 'paper';                 // an eye
+      return v < 0 ? 'signal_amber' : 'cream';
+    }
+    if (ph && u > 2.6 && u < 4.4 && Math.abs(v) < (u - 2.4) * 0.9 && ((Math.round(u * 3 + v * 2) & 1) === 0)) return 'water_foam'; // the spit
+    if (u < -2.4 && u > -3.8 && Math.abs(v) < 0.5) return 'ink';
+    return '';
+  };
+  BAITS.jig = function (u, v, ph) {
+    var hu = u - 1.8;
+    if (hu * hu + v * v < 2.4) return u > 2.1 && v < -0.4 ? 'stone_lit' : 'stone_dark'; // the lead head
+    var flare = ph ? 1.9 : 1.1;
+    if (u < 0.9 && u > -3.6 && Math.abs(v) < 0.5 + (0.9 - u) / 4.5 * flare) return (Math.round(v * 2 + u) & 1) ? 'flame' : 'rust'; // the skirt
+    return '';
+  };
+  var LURE_EDGE = { worm: 'flesh_dark', cricket: 'ink', minnow: 'stone_dark', unlabelled: 'paper_dark',
+    spinner: 'rust', plug: 'rust', grub: 'moss', popper: 'rust', jig: 'ink' };
+  var LS = 12, DIRS = 16, BAIT_IDS = ['worm', 'cricket', 'minnow', 'unlabelled', 'spinner', 'plug', 'grub', 'popper', 'jig'], lureCv = [];
 
   // A bait's image facing heading slot k (of DIRS) in phase ph: LS view px square, baked once.
   function lureImg(bait, k, ph) {
@@ -1041,6 +1103,10 @@ G.scene.underwater = (function () {
     var a = body.a, fl = body.flutter, t = body.t, ph = 0;
     if (bait === 'minnow') { a += Math.sin(t * 12) * 0.3 * fl; ph = Math.sin(t * 5) > 0.85 ? 1 : 0; }
     else if (bait === 'cricket') ph = body.kick > 0 ? 1 : 0;
+    else if (bait === 'spinner') ph = Math.floor(t * (3 + 14 * fl)) & 1;                             // Phase 43: the blade turns faster as it moves
+    else if (bait === 'plug') { a += Math.sin(t * 16) * 0.22 * fl; ph = Math.sin(t * 16) > 0.5 ? 1 : 0; } // a tight wobble
+    else if (bait === 'popper') { a = body.a > Math.PI / 2 && body.a < 3 * Math.PI / 2 ? Math.PI : 0; ph = body.kick > 0 ? 1 : 0; } // it lies level on the surface
+    else if (bait === 'jig') ph = fl > 0.5 ? 1 : 0;
     else ph = Math.floor(t * (2 + 4 * fl)) & 1;
     var k = ((Math.round(a / (2 * Math.PI) * DIRS) % DIRS) + DIRS) % DIRS;
     ctx.drawImage(lureImg(bait, k, ph), Math.round(x * HI) / HI - LS / (2 * HI), Math.round(y * HI) / HI - LS / (2 * HI), LS / HI, LS / HI);

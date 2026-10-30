@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 4;
+  var VERSION = 5;
   var PREFIX = 'SS1';
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
@@ -37,6 +37,14 @@ G.core.save = (function () {
       var d = defaults();
       for (var k in d.flags) if (!(k in s.flags)) s.flags[k] = d.flags[k];
       return s;
+    },
+    // v4 -> v5 (Phase 43): rods became a rack. Every rod up the ladder to the one in hand
+    // was bought on the way, so all of them are owned.
+    4: function (s) {
+      var r = [];
+      for (var i = 0; i <= (s.gear.rod | 0); i++) r.push(i);
+      s.gear.rods = r;
+      return s;
     }
   };
 
@@ -45,8 +53,9 @@ G.core.save = (function () {
       version: VERSION,
       coins: 0,
       // Tier index per kind (data/gear.js), equipment owned, and the bait to put on.
-      gear: { rod: 0, reel: 0, line: 0, lantern: false, depthFinder: false, bait: 'worm' },
-      baits: {},             // bait id -> count left
+      // Phase 43: rods, the rod indices owned (rod is the one in hand); bait may be a lure id.
+      gear: { rod: 0, rods: [0], reel: 0, line: 0, lantern: false, depthFinder: false, bait: 'worm' },
+      baits: {},             // bait or lure id -> count left
       journal: {},           // species id -> {caught, bestLen, bestW, hints, seen, phantom}
       kept: [],              // {id, len, w}
       cabinLevel: 0,         // restoration stage (data/gear.js cabin)

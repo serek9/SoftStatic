@@ -269,7 +269,7 @@ G.audio.engine = (function () {
   }
 
   // How much a bait weighs in a splash (the worm is a soft plip, the minnow a fuller plop).
-  var BAIT_W = { worm: 0.5, cricket: 0.75, minnow: 1, unlabelled: 1.1 };
+  var BAIT_W = { worm: 0.5, cricket: 0.75, minnow: 1, unlabelled: 1.1, spinner: 0.7, plug: 0.9, grub: 0.6, popper: 0.85, jig: 0.8 };
 
   // Cues from the scenes for what the engine cannot see by reading state (rises, jumps, a lure
   // lifted out, a nibble, a fish thrashing at the surface). a: a size or strength 0..1.

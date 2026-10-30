@@ -117,8 +117,11 @@ G.ui.journal = (function () {
   function hhmm(h) { var m = Math.round(h * 60); return (m < 600 ? '0' : '') + Math.floor(m / 60) + ':' + (m % 60 < 10 ? '0' : '') + (m % 60); }
 
   function baitNames(sp) {
-    if (!sp.baitLikes.length) return 'anything';
-    return sp.baitLikes.map(function (id) { var b = G.sim.economy.baitById(id, G.data); return b ? (b.label === false ? 'the unlabelled jar' : b.name.toLowerCase()) : id; }).join(', ');
+    var name = function (id) { var b = G.sim.economy.baitById(id, G.data); return b ? (b.label === false ? 'the unlabelled jar' : b.name.toLowerCase()) : id; };
+    var s = sp.baitLikes.length ? sp.baitLikes.map(name).join(', ') : 'anything';
+    // Phase 43: the lures it is proven to take: those it has been caught on.
+    var j = G.state.save.journal[sp.id], on = j && j.took ? j.took.filter(function (id) { return G.sim.economy.isLure(id, G.data); }) : [];
+    return on.length ? s + '; caught on ' + on.map(name).join(', ') : s;
   }
 
   function hoursText(sp) {

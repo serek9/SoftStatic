@@ -14,12 +14,19 @@ G.ui.shop = (function () {
   var px = A.px, box = A.box, blob = A.blob, limb = A.limb, tone = A.tone, line = A.line, slab = A.slab;
 
   // Shelves (the panel's tabs). kind: a gear kind for economy.buy, or 'bait' with an id.
+  // Phase 43: the rack holds every rod (kind 'rod' with its index: buy it, or take one you own
+  // in hand), and a case holds the lures (sold like the baits).
   var SHELVES = [
-    [{ kind: 'rod', icon: 'rod' }, { kind: 'reel', icon: 'reel' }, { kind: 'line', icon: 'line' }],
+    [{ kind: 'rod', id: 0, icon: 'rod' }, { kind: 'rod', id: 5, icon: 'rod' }, { kind: 'rod', id: 1, icon: 'rod' }, { kind: 'rod', id: 2, icon: 'rod' },
+     { kind: 'rod', id: 3, icon: 'rod' }, { kind: 'rod', id: 4, icon: 'rod' }, { kind: 'reel', icon: 'reel' }, { kind: 'line', icon: 'line' }],
     [{ kind: 'lantern', icon: 'lantern' }, { kind: 'depthFinder', icon: 'finder' }],
     [{ kind: 'bait', id: 'worm', icon: 'worm' }, { kind: 'bait', id: 'cricket', icon: 'cricket' },
-     { kind: 'bait', id: 'minnow', icon: 'minnow' }, { kind: 'bait', id: 'unlabelled', icon: 'jar' }]
+     { kind: 'bait', id: 'minnow', icon: 'minnow' }, { kind: 'bait', id: 'unlabelled', icon: 'jar' }],
+    [{ kind: 'bait', id: 'spinner', icon: 'spinner' }, { kind: 'bait', id: 'plug', icon: 'plug' }, { kind: 'bait', id: 'grub', icon: 'grub' },
+     { kind: 'bait', id: 'popper', icon: 'popper' }, { kind: 'bait', id: 'jig', icon: 'jig' }]
   ];
+  var SWIM_SAYS = { mid: 'Spins in mid water as you reel.', dive: 'Floats, and dives when reeled.', bed: 'Sinks to the bottom and hops.',
+    top: 'Stays on top. Tap to make it pop.', lift: 'Sinks fast; jig it up and down.' };
   var TYPE = 48; // characters of speech typed a second
 
   // Ramps, dark to light.
@@ -119,6 +126,33 @@ G.ui.shop = (function () {
       blob(c, 13 * s, 10 * s, 3.5 * s, 1.2 * s, ['stone_hi', 'fog_light', 'cream'], { bias: 0.2 }); px(c, 'ink', (11 * s) | 0, (10 * s) | 0);
       line(c, 'fog_light', 16 * s, 10 * s, 18 * s, 9 * s); line(c, 'fog_light', 16 * s, 10 * s, 18 * s, 11 * s);
     },
+    // Phase 43: the lures in the case.
+    spinner: function (c, s) {
+      line(c, 'stone_hi', 6 * s, 16 * s, 26 * s, 16 * s);
+      blob(c, 9 * s, 16 * s, 4.5 * s, 2.6 * s, BRASS, { bias: 0.15 });                // the blade
+      blob(c, 17 * s, 16 * s, 3 * s, 1.6 * s, RUST, { bias: 0.1 });
+      box(c, 'ink', 23 * s, 13 * s, 1 * s, 6 * s); line(c, 'ink', 23 * s, 13 * s, 26 * s, 11 * s); line(c, 'ink', 23 * s, 19 * s, 26 * s, 21 * s);
+    },
+    plug: function (c, s) {
+      blob(c, 15 * s, 16 * s, 9 * s, 4 * s, ['rust_dark', 'rust_hi', 'leaf_gold', 'cream'], { bias: 0.2 });
+      px(c, 'ink', (21 * s) | 0, (15 * s) | 0);
+      limb(c, 24 * s, 18 * s, 29 * s, 22 * s, 1.2 * s, ['stone', 'stone_hi', 'stone_lit'], 0.1); // the lip
+      line(c, 'ink', 9 * s, 21 * s, 9 * s, 25 * s); line(c, 'ink', 18 * s, 21 * s, 18 * s, 25 * s);
+    },
+    grub: function (c, s) {
+      box(c, 'stone_dark', 22 * s, 13 * s, 5 * s, 5 * s); box(c, 'stone_hi', 23 * s, 13 * s, 2 * s, 1 * s);
+      limb(c, 21 * s, 15 * s, 11 * s, 16 * s, 2.4 * s, ['moss_dark', 'moss', 'moss_hi', 'moss_lit'], 0.1);
+      limb(c, 11 * s, 16 * s, 6 * s, 21 * s, 1.6 * s, ['moss', 'moss_hi', 'moss_lit'], 0.1); limb(c, 6 * s, 21 * s, 9 * s, 25 * s, 1.2 * s, ['moss', 'moss_hi'], 0.1);
+    },
+    popper: function (c, s) {
+      blob(c, 15 * s, 16 * s, 8 * s, 4.5 * s, ['rust', 'signal_amber', 'cream'], { bias: 0.15 });
+      box(c, 'ink', 22 * s, 12 * s, 2 * s, 8 * s); px(c, 'ink', (19 * s) | 0, (14 * s) | 0);
+      line(c, 'ink', 6 * s, 16 * s, 3 * s, 20 * s);
+    },
+    jig: function (c, s) {
+      blob(c, 23 * s, 15 * s, 3.5 * s, 3.5 * s, STONE, { bias: 0.2 });
+      for (var k = 0; k < 6; k++) limb(c, 20 * s, 15 * s, 6 * s, (9 + k * 2.6) * s, 0.8 * s, k & 1 ? RUST : ['rust_dark', 'flame', 'brass_hi'], 0.1);
+    },
     jar: function (c, s) {
       for (var y = 9 * s; y < 29 * s; y++) for (var x = 6 * s; x < 26 * s; x++) {
         var nx = (x - 16 * s) / (10 * s), edge = Math.abs(nx) > 0.86 || y > 28 * s - 2;
@@ -179,7 +213,8 @@ G.ui.shop = (function () {
   // Phase 38: the shelves he can face, and their items ([shelf, item] in SHELVES); what they
   // show: the gear he has, and the minnows and crickets left after what he bought this visit
   // (the shop's stock is endless in the sim; the tank and the crate are full again next visit).
-  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]] };
+  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]],
+    lures: [[3, 0], [3, 1], [3, 2], [3, 3], [3, 4]] };
   var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
   var stock = { rod: 0, lantern: false, finder: false, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
   // Phase 39: the hour and the light for the room (the lake's: Fogbound's drizzle and fog),
@@ -208,19 +243,28 @@ G.ui.shop = (function () {
 
   function stockStep() {
     var g = G.state.save.gear;
-    stock.rod = g.rod; stock.lantern = !!g.lantern; stock.finder = !!g.depthFinder;
+    stock.rods = g.rods; stock.lantern = !!g.lantern; stock.finder = !!g.depthFinder;
     stock.minnows = Math.max(1, 7 - 2 * packs.minnow); stock.crickets = Math.max(1, 6 - 2 * packs.cricket);
   }
 
   function item() { return SHELVES[row][col]; }
 
   function pct(r) { return Math.round((r - 1) * 100); }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  var ACTION = ['slow', 'moderate', 'moderate fast', 'fast', 'extra fast'];
 
   // Fills txt for the selected item: what it is, what it costs, what it does, and its state.
   function describe() {
     var it = item(), save = G.state.save, g = G.data.gear, desc = '', next, cur, name = '', status = '';
     txt.price = '';
-    if (it.kind === 'rod' || it.kind === 'reel' || it.kind === 'line') {
+    if (it.kind === 'rod') { // Phase 43: one rod of the rack
+      var rd = g.rods[it.id], inHand = g.rods[save.gear.rod], own = E.ownsRod(save, it.id);
+      name = rd.name;
+      desc = cap(rd.power) + ', ' + ACTION[rd.action] + ' action. Holds fish up to ' + rd.maxMass + ' kg' +
+        (rd.smallBoost > 1 ? '; small fish come to it.' : (rd.smallHook < 0.9 ? '; small mouths tear free of it.' : '.'));
+      if (!own) txt.price = rd.cost + 'c';
+      status = save.gear.rod === it.id ? 'In your hands.' : (own ? 'Yours. Space to take it.' : 'In hand: ' + inHand.name + '.');
+    } else if (it.kind === 'reel' || it.kind === 'line') {
       var tiers = g[E.TIERED[it.kind]];
       cur = tiers[save.gear[it.kind]]; next = E.nextItem(save, it.kind, G.data);
       if (!next) { name = cur.name; status = 'In use. Nothing finer on the shelf.'; }
@@ -239,7 +283,10 @@ G.ui.shop = (function () {
       var b = E.baitById(it.id, G.data), have = save.baits[b.id] || 0, on = E.baitInUse(save, G.data).id === b.id;
       name = b.label === false ? '(no label)' : b.name;
       if (b.unlimited) desc = 'Free, and they never run out. Most fish take them.';
-      else {
+      else if (b.swim) { // Phase 43: a lure
+        txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
+        desc = SWIM_SAYS[b.swim] + ' Not every fish wants it. Lost if the line snaps.';
+      } else {
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
         if (b.label === false) desc = 'No label. The jar is warm.';
         else desc = 'Fish turn up ' + pct(b.attract) + '% sooner' + (b.rareBoost > 1 ? ', and rare ones are ' + pct(b.rareBoost) + '% likelier.' : '.');
@@ -256,7 +303,11 @@ G.ui.shop = (function () {
   function label(it) {
     var save = G.state.save, g = G.data.gear;
     lab.mark = '';
-    if (it.kind === 'rod' || it.kind === 'reel' || it.kind === 'line') {
+    if (it.kind === 'rod') {
+      var rd = g.rods[it.id], own = E.ownsRod(save, it.id);
+      lab.name = rd.name; lab.price = own ? 'OWNED' : rd.cost + 'c';
+      if (save.gear.rod === it.id) lab.mark = 'ON';
+    } else if (it.kind === 'reel' || it.kind === 'line') {
       var next = E.nextItem(save, it.kind, G.data);
       if (next) { lab.name = next.name; lab.price = next.cost + 'c'; }
       else { lab.name = g[E.TIERED[it.kind]][save.gear[it.kind]].name; lab.price = 'BEST'; }
@@ -281,6 +332,9 @@ G.ui.shop = (function () {
       if (b.unlimited || (save.gear.bait !== b.id && save.baits[b.id] > 0)) { save.gear.bait = b.id; describe(); say('On the hook next cast.'); return; }
       r = E.buyBait(save, b.id, b.pack, G.data);
       if (r === E.OK) { save.gear.bait = b.id; if (packs[b.id] !== undefined) packs[b.id]++; }
+    } else if (it.kind === 'rod') { // Phase 43: buy it, or take it in hand if it is yours
+      if (E.ownsRod(save, it.id)) { E.useRod(save, it.id); describe(); G.core.save.autosave('rod'); say('In your hands now.'); return; }
+      r = E.buyRod(save, it.id, G.data);
     } else r = E.buy(save, it.kind, G.data);
     describe();
     if (r === E.OK) { G.core.save.autosave('purchase'); say('Thank you kindly.', 'moss_dark'); }
@@ -447,8 +501,10 @@ G.ui.shop = (function () {
       F.bold(ctx, txt.coins, COINS.x + 24, COINS.y + 8, 'wood_deep');
       // The list.
       frame(ctx, LIST.x, LIST.y, LIST.w, LIST.h);
-      for (i = 0; i < list.length; i++) {
-        var it = SHELVES[list[i][0]][list[i][1]], y = LIST.y + 4 + i * LIST.rowH, l = label(it);
+      var rows = Math.floor((LIST.h - 6) / LIST.rowH), top = Math.max(0, Math.min(sel - rows + 2, list.length - rows)); // Phase 43: the list scrolls
+      if (top < 0) top = 0;
+      for (i = top; i < list.length && i < top + rows; i++) {
+        var it = SHELVES[list[i][0]][list[i][1]], y = LIST.y + 4 + (i - top) * LIST.rowH, l = label(it);
         if (i === sel) { ctx.fillStyle = P.paper; ctx.fillRect(LIST.x + 2, y - 1, LIST.w - 4, LIST.rowH); arrow(ctx, LIST.x + 6, y + 11, true); }
         ctx.drawImage(icon(it.icon, 1), LIST.x + 14, y - 2);
         F.drawText(ctx, l.name, LIST.x + 50, y + 9, 'wood_deep');

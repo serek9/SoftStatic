@@ -41,6 +41,9 @@ G.sim.fight = (function () {
     st.T = 0; st.D = st.D0 = k.d0; st.S = 1; st.slips = 0; st.escT = 0; st.result = NONE; st.slipped = false; st.t = 0;
     st.strength = fish.strength; st.speed = fish.speed; st.fatigue = fish.fatigue; st.mass = fish.mass;
     st.lineStrength = gear.lineStrength; st.reelSpeed = gear.reelSpeed;
+    // Phase 43: a fish much smaller than the rod is made for is hooked lightly (a stiff rod
+    // tears a small mouth): its hold starts at the rod's smallHook.
+    if (gear.smallHook !== undefined && fish.mass < data.gear.rodSmall.frac * gear.maxMass) st.H *= gear.smallHook;
     st.mode = 'pull';
     st.modeT = rng.range(k.pull0, k.pull1) * (0.5 + st.S);
     st.shakeT = rng.range(k.shakeGap0, k.shakeGap1) / st.speed;

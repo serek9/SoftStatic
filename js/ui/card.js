@@ -21,7 +21,8 @@ G.ui.card = (function () {
     return {
       spIdx: spIdx, id: sp.id, name: sp.name, rarity: sp.rarity, len: h.len, w: h.w, q: h.q,
       price: G.sim.economy.price(sp, h.q, G.data), isNew: !j || !j.caught, isRecord: !!j && j.caught > 0 && h.w > j.bestW,
-      desc: sp.desc, hintRefs: sp.hintRefs, windowCatch: win
+      desc: sp.desc, hintRefs: sp.hintRefs, windowCatch: win,
+      bait: G.state.run && G.state.run.cast ? G.state.run.cast.bait : '' // Phase 43: what it was caught on (the journal's "Caught on")
     };
   }
 
