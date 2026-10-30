@@ -64,6 +64,148 @@ G.scene.underwater = (function () {
     return prof;
   }
 
+  // ---- Phase 48: the bed's things and the new weeds, from the water's table (life.WATERS) -----
+  // Their own seeded streams (seed × 31 + 203 and 204), so the older layout is unchanged. All in
+  // the layer's HI pixels; top[X] is the bed's top row.
+  function bedThings(ctx, loc, set, top, WH, HH) {
+    var T = G.scene.life.table(loc.id), u = loc.underwater, A = G.gfx.paint, r = new G.core.rng.Rng(loc.seed * 31 + 203), i, k, X, y;
+    var BARK = ['wood_deep', 'wood_dark', 'wood', 'wood_mid'];
+    function topAt(X) { return top[clamp(Math.round(X), 0, WH - 1)]; }
+    // A shape cut by the bed: only the part above the bed's top is painted (half buried).
+    function buried(cx, cy, rx, ry, fn) {
+      A.area(ctx, Math.round(cx - rx), Math.round(cy - ry), Math.round(rx * 2) + 1, Math.round(ry * 2) + 1, function (x, y) {
+        if (y > topAt(x) + 1) return '';
+        var nx = (x - cx) / rx, ny = (y - cy) / ry;
+        return nx * nx + ny * ny > 1 ? '' : fn(nx, ny, x, y);
+      });
+    }
+    // Algae on the boulders: a fuzzy coat along their tops in the water's weed keys.
+    var rk = set.rocks || [];
+    for (i = 0; i < rk.length; i++) {
+      if (r.next() >= T.algae) continue;
+      var R = rk[i], x0 = Math.round((R.x - R.rw * 0.7) * HI), x1 = Math.round((R.x + R.rw * 0.4) * HI);
+      for (X = x0; X <= x1; X++) {
+        var uu = clamp((X / HI - R.x) / R.rw, -0.95, 0.95), ty = Math.round((R.cy - R.rh * Math.sqrt(1 - uu * uu)) * HI), hh = 1 + (A.hash2(X, i) < 0.5 ? 1 : 0);
+        A.box(ctx, u.weedDark, X, ty, 1, hh);
+        if (A.hash2(X, i + 7) < 0.35) A.box(ctx, u.weed, X, ty - 1 - (A.hash2(X, i + 9) < 0.4 ? 1 : 0), 1, 2); // tufts
+      }
+    }
+    // Freshwater mussels, half buried, their lit ridge up.
+    for (i = 0; i < T.mussel; i++) {
+      X = r.int(10, loc.width - 10) * HI;
+      var rx = r.range(3.5, 5), lean = r.range(-0.3, 0.3);
+      buried(X, topAt(X) + 1, rx, 3, function (nx, ny) { return ny < -0.55 ? 'stone' : (nx + lean < -0.2 ? 'stone_dark' : 'ink'); });
+    }
+    // Caddis-fly cases on the snags (the creek): little tubes of grit and twig stuck to the bark.
+    if (T.caddis) for (i = 0; i < set.snagAt.length; i++) {
+      var sg = set.snagAt[i];
+      for (k = 0; k < 5; k++) {
+        var h = r.int(6, Math.max(8, (sg.foot - sg.tip) * 0.6) | 0), yy = sg.foot - h, cx = Math.round(sg.X + sg.lean * Math.sin(h * 0.025) * 12) + (k & 1 ? 6 : -2);
+        A.box(ctx, 'reed_dark', cx, yy, 2, 5);
+        A.px(ctx, 'reed', cx, yy + 1); A.px(ctx, 'reed_hi', cx + 1, yy + 3); A.px(ctx, 'stone', cx, yy + 4);
+      }
+    }
+    // Old roots reaching out of the bed.
+    for (i = 0; i < T.roots; i++) {
+      X = r.int(20, loc.width - 20) * HI;
+      for (k = 0; k < 3; k++) {
+        var px = X + r.int(-6, 6), py = topAt(px) + 1, dir = r.next() < 0.5 ? -1 : 1;
+        for (var sgm = 0; sgm < 4; sgm++) {
+          var qx = px + dir * r.int(3, 8), qy = py - r.int(2, 7);
+          A.line(ctx, 'wood_deep', px, py + 1, qx, qy + 1);
+          A.line(ctx, sgm < 2 ? 'wood_dark' : 'wood', px, py, qx, qy);
+          px = qx; py = qy; if (r.next() < 0.4) dir = -dir;
+        }
+      }
+    }
+    // A drowned tree lying on the bed, its branches reaching up.
+    for (i = 0; i < T.tree; i++) {
+      X = r.int(Math.round(loc.width * 0.3), Math.round(loc.width * 0.7)) * HI;
+      var len = r.int(50, 80) * HI, dirT = r.next() < 0.5 ? -1 : 1, xa = X, xb = X + dirT * len;
+      var ya = topAt(xa) - 3, yb = topAt(xb) - 8;
+      A.limb(ctx, xa, ya, xb, yb, 4, BARK, 0);
+      buried(xa, ya, 9, 7, function (nx, ny) { return ny < -0.5 ? 'wood_mid' : (nx < 0 ? 'wood' : 'wood_dark'); }); // the root plate
+      for (k = 1; k <= 4; k++) {
+        var f = k / 5, bx0 = Math.round(xa + (xb - xa) * f), by0 = Math.round(ya + (yb - ya) * f) - 3, bl2 = r.int(18, 46), bx1 = bx0 + dirT * r.int(4, 16), by1 = by0 - bl2;
+        A.line(ctx, 'wood_deep', bx0 + 1, by0, bx1 + 1, by1);
+        A.line(ctx, 'wood_dark', bx0, by0, bx1, by1);
+        A.line(ctx, 'wood', bx1, by1, bx1 + dirT * r.int(2, 7), by1 - r.int(3, 9)); // a twig
+      }
+    }
+    // Litter, one of each in the table, spread along the water.
+    var Lt = T.litter, snagI = 0;
+    for (i = 0; i < Lt.length; i++) {
+      X = Math.round(((i + 0.5) / Lt.length * loc.width + r.range(-60, 60))) * HI;
+      X = clamp(X, 20 * HI, (loc.width - 20) * HI);
+      y = topAt(X);
+      if (Lt[i] === 'bottle') { // on its side, half sunk: glass, its lit edge, the neck
+        var bd = r.next() < 0.5 ? -1 : 1, bx = X - 6;
+        buried(X, y + 1, 7, 3, function (nx, ny) { return ny < -0.6 ? 'teal_lit' : (ny < 0 ? 'teal' : 'teal_dark'); });
+        A.box(ctx, 'teal_dark', bd > 0 ? X + 7 : bx - 4, y - 1, 4, 2); A.px(ctx, 'teal_hi', bd > 0 ? X + 8 : bx - 3, y - 1);
+      } else if (Lt[i] === 'tyre') { // a tyre half in the silt
+        buried(X, y + 3, 11, 8, function (nx, ny, x) { var d = nx * nx + ny * ny; return d < 0.3 ? u.silt : (d < 0.42 ? 'stone_dark' : ((x & 3) === 0 ? 'stone_dark' : 'ink')); });
+      } else if (Lt[i] === 'lure') { // a lost lure caught on a snag (or on the bed), its line trailing up
+        var lx2 = X, ly2 = y - 2;
+        if (set.snagAt.length) { var sa = set.snagAt[snagI++ % set.snagAt.length], hh2 = Math.round((sa.foot - sa.tip) * 0.35); lx2 = Math.round(sa.X + sa.lean * Math.sin(hh2 * 0.025) * 12) + 7; ly2 = sa.foot - hh2; }
+        A.line(ctx, 'fog_mid', lx2 + 1, ly2, lx2 + 9, ly2 - 22);
+        A.box(ctx, 'rust', lx2 - 3, ly2, 5, 3); A.box(ctx, 'rust_hi', lx2 - 3, ly2, 4, 1); A.px(ctx, 'ink', lx2 - 2, ly2 + 1);
+        A.px(ctx, 'stone_hi', lx2 - 1, ly2 + 3); A.px(ctx, 'stone_hi', lx2, ly2 + 4); // the hook
+      }
+    }
+  }
+
+  // The new weeds: ribbon weed (long twisting blades in clumps), a fern-like weed (a stem with
+  // paired leaflets) and lily stems from the bed to pads at the surface, near the shores.
+  function plantList(loc, topAt, WH) {
+    var T = G.scene.life.table(loc.id), r = new G.core.rng.Rng(loc.seed * 31 + 204), out = [], i, k, w = loc.width;
+    var nr = Math.round(w * T.ribbon), nf = Math.round(w * T.fern);
+    for (i = 0; i < nr; i++) {
+      var X = r.int(4, w - 5) * HI, nb = r.int(2, 4);
+      for (k = 0; k < nb; k++) { var xb = X + r.int(-4, 4); out.push({ kind: 0, x: xb, base: topAt(xb) + 1, h: r.int(16, 46) * HI, ph: r.range(0, 6.28), dark: r.next() < 0.4 }); }
+    }
+    for (i = 0; i < nf; i++) { var xf = r.int(4, w - 5) * HI; out.push({ kind: 1, x: xf, base: topAt(xf) + 1, h: r.int(8, 16) * HI, ph: r.range(0, 6.28) }); }
+    for (i = 0; i < T.lily; i++) {
+      var xl = (i % 2 ? w - r.int(30, 170) : r.int(30, 170)) * HI;
+      out.push({ kind: 2, x: xl, base: topAt(xl) + 1, h: topAt(xl) + 1 - 2, ph: r.range(0, 6.28), pad: r.int(5, 8) * HI });
+    }
+    return out;
+  }
+  function paintPlants(ctx, u, plants, lean) {
+    var A = G.gfx.paint, lit = S.shift(u.weed, 1);
+    for (var i = 0; i < plants.length; i++) {
+      var p = plants[i], y, q, dx;
+      if (p.kind === 0) { // a blade one pixel wide, wider where it twists to face us
+        var k0 = p.dark ? u.weedDark : u.weed, k1 = p.dark ? u.weed : lit;
+        for (y = 0; y < p.h; y++) {
+          q = y / p.h; dx = Math.round(lean * 7 * Math.pow(q, 1.3) + Math.sin(y * 0.09 + p.ph) * 2.5 * q);
+          var tw = Math.sin(y * 0.16 + p.ph * 2) > 0.85;
+          A.box(ctx, tw ? k1 : k0, p.x + dx, p.base - 1 - y, tw ? 2 : 1, 1);
+        }
+      } else if (p.kind === 1) { // a stem with leaflets in pairs, shorter toward the tip
+        for (y = 0; y < p.h; y++) {
+          q = y / p.h; dx = Math.round(lean * 3 * q * q + Math.sin(y * 0.2 + p.ph) * 0.8 * q);
+          var yy = p.base - 1 - y;
+          A.px(ctx, u.weedDark, p.x + dx, yy);
+          if (y > 2 && y % 3 === 0) {
+            var ll = Math.max(1, Math.round(5 * (1 - q)) + 1);
+            A.line(ctx, u.weed, p.x + dx - 1, yy, p.x + dx - ll, yy - (ll >> 1));
+            A.line(ctx, u.weed, p.x + dx + 1, yy, p.x + dx + ll, yy - (ll >> 1));
+            A.px(ctx, lit, p.x + dx + ll, yy - (ll >> 1));
+          }
+        }
+      } else { // a lily's stem to the surface and its pad lying on it
+        for (y = 0; y < p.h; y++) {
+          q = y / p.h; dx = Math.round(lean * 3 * Math.pow(q, 3) + Math.sin(y * 0.03 + p.ph) * 2 * q);
+          A.px(ctx, u.weedDark, p.x + dx, p.base - 1 - y);
+        }
+        var cx = p.x + Math.round(lean * 3 + Math.sin(p.h * 0.03 + p.ph) * 2);
+        A.box(ctx, u.weedDark, cx - (p.pad >> 1), 1, p.pad, 2);
+        A.box(ctx, u.weed, cx - (p.pad >> 1) + 1, 1, p.pad - 3, 1);
+        A.px(ctx, u.weedDark, cx + 2, 1); // the pad's notch
+      }
+    }
+  }
+
   // Bakes (once per location) the gradient strip, bottom, three weed frames, the far layer and
   // a light shaft. Phase 19: like the sailing scene (8.3 #89) everything is baked at HI times
   // the world's resolution and drawn at 1/HI size, under the pixel-art rules of 8.3 #84: flat
@@ -121,10 +263,12 @@ G.scene.underwater = (function () {
         // Boulders, outlined and shaded in flat clusters, lit from the top left; some carry moss.
         var RK = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' }, rim = S.shift(RK.dark, -1);
         var ramp = [RK.dark, RK.mid, RK.lit], i, n;
+        set.rocks = []; set.snagAt = []; // Phase 48: where the boulders and snags stand (the snails, the caddis)
         for (i = 0; i < w / 18; i++) {
           var bxw = rng.int(4, w - 12) * HI, rw = rng.int(3, 8) * HI, rh = rng.int(2, 5) * HI, base = 1e9;
           for (var k = -rw; k <= rw; k += 2) base = Math.min(base, topAt(bxw + k) + 2);
           var bcy = Math.round(base - rh * 0.3);
+          set.rocks.push({ x: bxw / HI, cy: bcy / HI, rw: rw / HI, rh: rh / HI });
           A.blob(ctx, bxw, bcy, rw + 1, rh + 1, [rim]);
           A.blob(ctx, bxw, bcy, rw, rh, ramp, { rim: 0.3 });
           A.line(ctx, rim, bxw + rng.int(-rw >> 1, 0), bcy - rng.int(0, rh >> 1), bxw + rng.int(1, rw >> 1), bcy + rng.int(1, rh >> 1));
@@ -146,6 +290,7 @@ G.scene.underwater = (function () {
         var snags = u.snags || [], BARK = ['wood_deep', 'wood_dark', 'wood', 'wood_mid'];
         for (n = 0; n < snags.length; n++) {
           var sn = snags[n], sx = sn.x * HI, foot = topAt(sx) + 2, lean = rng.next() < 0.5 ? -1 : 1, tip = sn.top * HI, len = foot - tip;
+          set.snagAt.push({ X: sx, foot: foot, tip: tip, lean: lean });
           for (var y = foot; y >= tip; y--) {
             var h = foot - y, cx = Math.round(sx + lean * Math.sin(h * 0.025) * 12), tw = Math.max(3, Math.round(7 - 4 * h / Math.max(1, len)));
             A.box(ctx, BARK[0], cx - 1, y, tw + 2, 1);
@@ -161,6 +306,7 @@ G.scene.underwater = (function () {
             }
           }
         }
+        bedThings(ctx, loc, set, top, WH, HH);
         A.reset();
       });
     });
@@ -169,6 +315,9 @@ G.scene.underwater = (function () {
     // pixels wide, lit on one side, with blades that alternate up it.
     var strands = [], n = Math.round(w * u.weedDensity);
     for (var s = 0; s < n; s++) strands.push({ x: rng.int(2, w - 3) * HI + rng.int(0, 1), h: rng.int(6, 22) * HI, dark: rng.next() < 0.5, ph: rng.range(0, 6.28) });
+    set.strands = [];
+    for (s = 0; s < strands.length; s++) set.strands.push({ x: strands[s].x / HI, base: topAt(strands[s].x) / HI, h: strands[s].h / HI });
+    var plants = plantList(loc, topAt, WH); // Phase 48: ribbon weed, fern-like weed, lily stems
     set.weeds = [];
     for (var f = 0; f < 3; f++) {
       set.weeds.push(B.cached(key + 'weeds' + f, (function (lean) {
@@ -187,6 +336,7 @@ G.scene.underwater = (function () {
                 }
               }
             }
+            paintPlants(ctx, u, plants, lean);
             A.reset();
           });
         };
@@ -350,6 +500,7 @@ G.scene.underwater = (function () {
       for (var c = 0; c < CN; c++) { cx[c] = G.vrng.range(0, VIEW_W + 40); cy[c] = G.vrng.range(0.05, 0.9); cl[c] = G.vrng.range(4, 11); }
       motesReady = true;
     }
+    G.scene.life.step(run, dt, loc); // Phase 48: the life under water (it goes on while sailing)
     if (uw.alpha > 0) {
       var f0 = flow(loc, 0), f1 = flow(loc, loc.maxDepth);
       for (var j = 0; j < MN; j++) { mp[j] += dt * 0.8; my[j] += dt * 1.5; mx[j] += (Math.sin(mp[j]) * 2 + f0 + (f1 - f0) * Math.min(1, (my[j] % set.H) / loc.maxDepth)) * dt; }
@@ -722,7 +873,9 @@ G.scene.underwater = (function () {
     ctx.globalAlpha = alpha;
     drawLayer(ctx, set.bottom, camPx, wyS, H);
     drawCaustics(ctx, loc, camPx, wyS, alpha, t);
+    G.scene.life.drawBed(ctx, loc, camPx, wyS, alpha); // Phase 48: crayfish, snails, the eel, silt
     drawLayer(ctx, set.weeds[weedFrame(loc, t)], camPx, wyS, H);
+    G.scene.life.drawWater(ctx, loc, camPx, wyS, alpha); // Phase 48: fry, tadpoles, the darting perch, the turtle
     drawHeavy(ctx, loc, camPx, camPy, alpha);
     var tf = performance.now();
     drawFish(ctx, loc, camPx, camPy, t);
