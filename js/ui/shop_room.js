@@ -189,63 +189,132 @@ G.ui.shopRoom = (function () {
   }
 
   // ---- Sprites ------------------------------------------------------------------------------
-  // The fisher from above: the red cap, the green jacket, dark trousers; four facings, a
-  // standing frame and two walking frames (the legs and arms swing). 32×32, feet at the bottom.
-  var COAT = ['ink', 'coat_dark', 'coat', 'coat_hi'], SKIN = ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi'];
-  function paintFisher(c, dir, fr) {
-    var sw = fr === 1 ? 1 : (fr === 2 ? -1 : 0), side = dir === 'side';
+  // The fisher from above: the jacket, the hat, the trousers; four facings, a standing frame
+  // and two walking frames (the legs and arms swing). 32×32, feet at the bottom. Phase 47: in
+  // the look's keys (data/looks.js), the hat in its shape, a beard and a check shirt if it has them.
+  function paintFisher(c, dir, fr, L) {
+    var sw = fr === 1 ? 1 : (fr === 2 ? -1 : 0), side = dir === 'side', T0 = L.trousers, K = L.coat, H = L.hatKeys, SK = L.skin;
+    var COAT = ['ink', K[0], K[1], K[2]];
     // Legs and boots.
-    if (side) { box(c, 'stone_dark', 13 + sw * 2, 24, 3, 6); box(c, 'stone_dark', 17 - sw * 2, 24, 3, 6); box(c, 'ink', 13 + sw * 2, 29, 4, 2); box(c, 'ink', 17 - sw * 2, 29, 4, 2); }
-    else { box(c, 'stone_dark', 12, 24 - Math.max(0, sw), 3, 6); box(c, 'stone_dark', 17, 24 - Math.max(0, -sw), 3, 6); box(c, 'ink', 12, 29 - Math.max(0, sw), 3, 2); box(c, 'ink', 17, 29 - Math.max(0, -sw), 3, 2); }
+    if (side) { box(c, T0, 13 + sw * 2, 24, 3, 6); box(c, T0, 17 - sw * 2, 24, 3, 6); box(c, 'ink', 13 + sw * 2, 29, 4, 2); box(c, 'ink', 17 - sw * 2, 29, 4, 2); }
+    else { box(c, T0, 12, 24 - Math.max(0, sw), 3, 6); box(c, T0, 17, 24 - Math.max(0, -sw), 3, 6); box(c, 'ink', 12, 29 - Math.max(0, sw), 3, 2); box(c, 'ink', 17, 29 - Math.max(0, -sw), 3, 2); }
     // The jacket and arms.
     A.blob(c, 16, 19, side ? 5.5 : 7, 6.5, COAT, { bias: 0.05 });
-    if (side) { A.limb(c, 16, 15, 16 + sw * 3, 23, 1.6, COAT, 0.1); A.blob(c, 16 + sw * 3, 23.5, 1.3, 1.3, SKIN); }
-    else { box(c, 'coat_dark', 8, 16 + sw, 3, 8); box(c, 'coat_dark', 21, 16 - sw, 3, 8); A.blob(c, 9.5, 24.5 + sw, 1.4, 1.3, SKIN); A.blob(c, 22.5, 24.5 - sw, 1.4, 1.3, SKIN); }
-    if (dir === 'down') box(c, 'coat_hi', 12, 14, 8, 1);
-    // The head and the cap.
-    A.blob(c, 16, 10, 5, 5, SKIN, { bias: 0.1 });
-    if (dir === 'down') {
-      A.blob(c, 16, 6.5, 5.5, 3.5, ['rust_dark', 'cap', 'rust_hi'], { bias: 0.1 });
-      box(c, 'rust_dark', 10, 8, 12, 2);                                                  // the brim over his eyes
-      px(c, 'ink', 14, 11); px(c, 'ink', 18, 11); box(c, 'skin_shadow', 14, 14, 4, 1);
-    } else if (dir === 'up') {
-      A.blob(c, 16, 8.5, 5.5, 5, ['rust_dark', 'cap', 'rust_hi'], { bias: 0.1 });
-      box(c, 'stone_dark', 12, 13, 8, 2);                                                 // hair under the cap
-    } else {
-      A.blob(c, 15, 7, 5, 4, ['rust_dark', 'cap', 'rust_hi'], { bias: 0.1 });
-      box(c, 'rust_dark', 17, 9, 6, 2);                                                   // the brim, forward
-      px(c, 'ink', 19, 11); box(c, 'stone_dark', 11, 9, 2, 4); px(c, 'skin_shadow', 20, 13);
+    if (L.check) for (var y = 13; y < 26; y++) for (var x = 9; x < 24; x++) {
+      if (y !== 16 && y !== 20 && y !== 24 && x !== 13 && x !== 19) continue;
+      var nx = (x - 16) / (side ? 5.5 : 7), ny = (y - 19) / 6.5;
+      if (nx * nx + ny * ny < 0.75) px(c, L.check, x, y);
     }
+    if (side) { A.limb(c, 16, 15, 16 + sw * 3, 23, 1.6, COAT, 0.1); A.blob(c, 16 + sw * 3, 23.5, 1.3, 1.3, SK); }
+    else { box(c, K[0], 8, 16 + sw, 3, 8); box(c, K[0], 21, 16 - sw, 3, 8); A.blob(c, 9.5, 24.5 + sw, 1.4, 1.3, SK); A.blob(c, 22.5, 24.5 - sw, 1.4, 1.3, SK); }
+    if (dir === 'down') box(c, K[2], 12, 14, 8, 1);
+    // The head, a beard, the hat.
+    A.blob(c, 16, 10, 5, 5, SK, { bias: 0.1 });
+    if (L.beard && dir === 'down') A.blob(c, 16, 13.5, 3.5, 2.2, L.beard, { bias: 0.1 });
+    if (L.beard && side) A.blob(c, 19, 13, 2.5, 2, L.beard, { bias: 0.1 });
+    TOP_HATS[L.hat](c, dir, H, L);
   }
+  // Phase 47: each hat from above, facing down (the face below it), up (the back of the head)
+  // or to the side (the face to the right); the eyes and hair as the face shows them.
+  function eyes(c, dir, L) {
+    if (dir === 'down') { px(c, 'ink', 14, 11); px(c, 'ink', 18, 11); if (!L.beard) box(c, L.skin[1], 14, 14, 4, 1); }
+    else if (dir === 'up') box(c, L.hair, 12, 13, 8, 2);                                 // hair under the hat
+    else { px(c, 'ink', 19, 11); box(c, L.hair, 11, 9, 2, 4); if (!L.beard) px(c, L.skin[1], 20, 13); }
+  }
+  var TOP_HATS = {
+    cap: function (c, dir, H, L) {
+      if (dir === 'down') {
+        A.blob(c, 16, 6.5, 5.5, 3.5, H, { bias: 0.1 });
+        box(c, H[0], 10, 8, 12, 2);                                                       // the brim over his eyes
+      } else if (dir === 'up') A.blob(c, 16, 8.5, 5.5, 5, H, { bias: 0.1 });
+      else {
+        A.blob(c, 15, 7, 5, 4, H, { bias: 0.1 });
+        box(c, H[0], 17, 9, 6, 2);                                                        // the brim, forward
+      }
+      eyes(c, dir, L);
+    },
+    knit: function (c, dir, H, L) {
+      if (dir === 'down') { A.blob(c, 16, 7, 5.5, 4, H, { bias: 0.1 }); box(c, H[0], 10, 9, 12, 2); }
+      else if (dir === 'up') A.blob(c, 16, 8.5, 5.5, 5, H, { bias: 0.1 });
+      else { A.blob(c, 15, 7, 5, 4, H, { bias: 0.1 }); box(c, H[0], 10, 9, 11, 2); }
+      A.blob(c, dir === 'side' ? 14 : 16, dir === 'up' ? 6 : 3.5, 1.6, 1.4, H, { bias: 0.2 }); // the bobble
+      eyes(c, dir, L);
+    },
+    bucket: function (c, dir, H, L) {
+      if (dir === 'side') { box(c, H[0], 9, 9, 15, 2); A.blob(c, 15, 6.5, 4.5, 3.5, H, { bias: 0.1 }); }
+      else { A.blob(c, 16, dir === 'up' ? 9 : 8, 7.5, dir === 'up' ? 5 : 3.2, H, { bias: 0 }); A.blob(c, 16, dir === 'up' ? 8 : 6, 4.5, 3, H, { bias: 0.15 }); }
+      eyes(c, dir, L);
+    },
+    lamp: function (c, dir, H, L) {
+      if (dir === 'down') { A.blob(c, 16, 7, 5.5, 4, H, { bias: 0.1 }); box(c, H[0], 10, 9, 12, 2); box(c, 'ink', 15, 8, 3, 2); px(c, 'lamp_glow', 16, 9); }
+      else if (dir === 'up') { A.blob(c, 16, 8.5, 5.5, 5, H, { bias: 0.1 }); box(c, 'ink', 11, 10, 10, 1); }       // the strap round the back
+      else { A.blob(c, 15, 7, 5, 4, H, { bias: 0.1 }); box(c, H[0], 10, 9, 11, 2); box(c, 'ink', 19, 7, 2, 3); px(c, 'lamp_glow', 20, 8); }
+      eyes(c, dir, L);
+    }
+  };
 
-  // The dog from above, a yellow lab nearly a tile long: four facings, standing, a walking
-  // frame and sitting.
-  var DOGK = ['dog_dark', 'dog', 'dog_hi'];
-  function paintDog(c, dir, fr) {
-    var sit = fr === 3, sw = fr === 1 ? 1 : 0;
+  // The dog from above, nearly a tile long: four facings, standing, a walking frame and
+  // sitting. Phase 47: the breed's coat, ears, tail and bulk (data/looks.js).
+  function paintDog(c, dir, fr, B) {
+    var sit = fr === 3, sw = fr === 1 ? 1 : 0, DOGK = B.coat, D0 = B.coat[0], D1 = B.paleLegs ? B.muzzle[1] : B.coat[1], E = B.ear[1], M = B.muzzle[2], k = B.bulk;
     if (dir === 'side') {
       if (!sit) {
-        box(c, 'dog_dark', 6 + sw * 2, 22, 3, 8); box(c, 'dog_dark', 19 - sw * 2, 22, 3, 8);   // the far legs
-        A.blob(c, 13, 19, 10, 5.5, DOGK, { bias: 0.1 });
-        box(c, 'dog', 8 - sw, 23, 3, 7); box(c, 'dog', 17 + sw, 23, 3, 7);                     // the near legs
-        box(c, 'dog_dark', 1, 16 - sw, 4, 3);                                                   // the tail
-        A.blob(c, 25, 14, 5, 4.5, DOGK, { bias: 0.15 }); box(c, 'dog_hi', 27, 16, 4, 3); px(c, 'ink', 31, 16); px(c, 'ink', 26, 12);
-        box(c, 'dog_dark', 22, 12, 3, 6);                                                       // the ear
+        box(c, D0, 6 + sw * 2, 22, 3, 8); box(c, D0, 19 - sw * 2, 22, 3, 8);   // the far legs
+        A.blob(c, 13, 19, 10 * k, 5.5 * k, DOGK, { bias: 0.1 });
+        box(c, D1, 8 - sw, 23, 3, 7); box(c, D1, 17 + sw, 23, 3, 7);                     // the near legs
+        sideTail(c, B, 1, 16 - sw);                                                     // the tail
+        A.blob(c, 25, 14, 5, 4.5, DOGK, { bias: 0.15 }); box(c, M, 27, 16, 4, 3); px(c, 'ink', 31, 16); px(c, 'ink', 26, 12);
+        if (B.curly) topCurls(c, B, 13, 19, 8, 4);
+        if (B.face) box(c, B.chest, 25, 9, 3, 2);                                       // the brow's blaze or mask
+        sideEar(c, B, 22, 12);                                                         // the ear
       } else {
-        A.blob(c, 13, 22, 7, 6.5, DOGK, { bias: 0.1 }); box(c, 'dog', 17, 23, 3, 7); box(c, 'dog_dark', 6, 27, 6, 3);
-        A.blob(c, 20, 12, 5, 4.5, DOGK, { bias: 0.15 }); box(c, 'dog_hi', 22, 14, 4, 3); px(c, 'ink', 26, 14); px(c, 'ink', 21, 10);
-        box(c, 'dog_dark', 17, 10, 3, 6);
+        A.blob(c, 13, 22, 7 * k, 6.5 * k, DOGK, { bias: 0.1 }); box(c, D1, 17, 23, 3, 7); sitTail(c, B);
+        A.blob(c, 20, 12, 5, 4.5, DOGK, { bias: 0.15 }); box(c, M, 22, 14, 4, 3); px(c, 'ink', 26, 14); px(c, 'ink', 21, 10);
+        sideEar(c, B, 17, 10);
       }
     } else {
       var down = dir === 'down';
-      if (!sit) { box(c, 'dog_dark', 9, 11 + sw * 2, 3, 6); box(c, 'dog_dark', 20, 11 - sw * 2, 3, 6); box(c, 'dog_dark', 9, 23 - sw * 2, 3, 6); box(c, 'dog_dark', 20, 23 + sw * 2, 3, 6); }
-      A.blob(c, 16, sit ? 21 : 18, 6.5, sit ? 7 : 10, DOGK, { bias: 0.1 });
+      if (!sit) { box(c, D0, 9, 11 + sw * 2, 3, 6); box(c, D0, 20, 11 - sw * 2, 3, 6); box(c, D0, 9, 23 - sw * 2, 3, 6); box(c, D0, 20, 23 + sw * 2, 3, 6); }
+      A.blob(c, 16, sit ? 21 : 18, 6.5 * k, (sit ? 7 : 10) * k, DOGK, { bias: 0.1 });
+      if (B.curly) topCurls(c, B, 16, sit ? 21 : 18, 4, sit ? 5 : 7);
       var hy = down ? (sit ? 15 : 27) : (sit ? 13 : 7);
       A.blob(c, 16, hy, 5, 4.5, DOGK, { bias: 0.15 });
-      box(c, 'dog_dark', 10, hy - 2, 3, 5); box(c, 'dog_dark', 19, hy - 2, 3, 5);                // the ears
+      if (down && B.face === 'blaze') { box(c, B.chest, 15, hy - 4, 2, 4); box(c, B.muzzle[1], 14, hy + 1, 4, 3); }
+      if (down && B.face === 'mask') { box(c, B.chest, 13, hy + 1, 6, 3); px(c, B.chest, 13, hy - 2); px(c, B.chest, 18, hy - 2); }
+      if (B.ears === 'prick') { box(c, E, 11, hy - 5, 2, 4); box(c, E, 19, hy - 5, 2, 4); } // the ears
+      else if (B.ears === 'heavy') { box(c, E, 9, hy - 2, 4, 6); box(c, E, 19, hy - 2, 4, 6); }
+      else if (B.ears === 'pom') { A.blob(c, 10.5, hy + 1, 2, 3, B.ear, { bias: 0.15 }); A.blob(c, 21.5, hy + 1, 2, 3, B.ear, { bias: 0.15 }); A.blob(c, 16, hy - 3, 2.6, 1.8, DOGK, { bias: 0.2 }); }
+      else { box(c, E, 10, hy - 2, 3, 5); box(c, E, 19, hy - 2, 3, 5); }
       if (down) { px(c, 'ink', 14, hy); px(c, 'ink', 18, hy); box(c, 'ink', 15, hy + 3, 2, 1); }
-      else if (!sit) box(c, 'dog_dark', 15, 28, 2, 4);                                            // the tail
+      else if (!sit) backTail(c, B);                                                  // the tail
     }
+  }
+  // A curled coat: little rings of the coat's light and dark keys over the body.
+  function topCurls(c, B, cx, cy, rx, ry) {
+    for (var y = -ry; y <= ry; y += 3) for (var x = -rx + ((y / 3) & 1) * 2; x <= rx; x += 4) px(c, B.coat[0], cx + x, cy + y);
+  }
+  function sideEar(c, B, x, y) {
+    var E = B.ear[1];
+    if (B.ears === 'prick') box(c, E, x + 1, y - 3, 2, 4);
+    else if (B.ears === 'heavy') box(c, E, x - 1, y, 4, 7);
+    else if (B.ears === 'pom') A.blob(c, x + 1.5, y + 3, 2.2, 3.2, B.ear, { bias: 0.15 });
+    else box(c, E, x, y, 3, 6);
+  }
+  function sideTail(c, B, x, y) {
+    if (B.tail === 'curl') A.blob(c, x + 4, y - 2, 2.6, 2.2, B.coat, { bias: 0.2 });
+    else if (B.tail === 'low') box(c, B.coat[0], x, y + 3, 4, 3);
+    else if (B.tail === 'pom') { box(c, B.coat[0], x + 2, y + 1, 2, 1); A.blob(c, x + 1, y + 1, 2, 2, B.coat, { bias: 0.15 }); }
+    else box(c, B.coat[0], x, y, 4, 3);
+  }
+  function sitTail(c, B) {
+    if (B.tail === 'pom') A.blob(c, 7, 28, 2, 2, B.coat, { bias: 0.15 });
+    else if (B.tail === 'curl') A.blob(c, 8, 20, 2.6, 2.2, B.coat, { bias: 0.2 });
+    else box(c, B.coat[0], 6, 27, 6, 3);
+  }
+  function backTail(c, B) {
+    if (B.tail === 'curl') A.blob(c, 16, 26, 2.6, 2.2, B.coat, { bias: 0.25 });
+    else if (B.tail === 'pom') { box(c, B.coat[0], 15, 28, 2, 2); A.blob(c, 16, 30, 2, 1.6, B.coat, { bias: 0.15 }); }
+    else box(c, B.coat[0], 15, 28, 2, B.tail === 'low' ? 3 : 4);
   }
 
   // Rusty from above (Phase 37), old, worn down to the game's mood: a pale canvas jacket, a
@@ -282,12 +351,21 @@ G.ui.shopRoom = (function () {
     }
   }
 
+  // lk (Phase 47): the look's id or record for the fisher or the dog; save.look's without it.
   var art = {};
-  function sprite(kind, dir, fr) {
-    var flip = dir === 'left', d = dir === 'left' || dir === 'right' ? 'side' : dir, key = kind + d + fr + (flip ? '<' : '');
+  function sprite(kind, dir, fr, lk) {
+    var L = kind === 'rusty' ? null : (typeof lk === 'object' && lk ? lk : G.data.lookOf(kind === 'dog' ? G.data.looks.dogs : G.data.looks.fishers,
+      lk || (G.state.save && G.state.save.look ? G.state.save.look[kind] : '')));
+    var flip = dir === 'left', d = dir === 'left' || dir === 'right' ? 'side' : dir, key = kind + (L ? L.id : '') + d + fr + (flip ? '<' : '');
     if (art[key]) return art[key];
-    if (flip) return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr), 'x'));
-    return (art[key] = G.gfx.bake.layer(32, 32, function (c) { A.reset(); (kind === 'dog' ? paintDog : (kind === 'rusty' ? paintRusty : paintFisher))(c, d, fr); A.reset(); }));
+    if (flip) return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, L), 'x'));
+    return (art[key] = G.gfx.bake.layer(32, 32, function (c) { A.reset(); (kind === 'dog' ? paintDog : (kind === 'rusty' ? paintRusty : paintFisher))(c, d, fr, L); A.reset(); }));
+  }
+  // Phase 47: paints a look's fisher or dog in every facing and frame. Returns the ms it took.
+  function prebake(kind, lk) {
+    var t0 = typeof performance !== 'undefined' ? performance.now() : 0, DS = ['down', 'up', 'right', 'left'];
+    for (var i = 0; i < 4; i++) for (var f = 0; f < 4; f++) sprite(kind, DS[i], f, lk);
+    return typeof performance !== 'undefined' ? performance.now() - t0 : 0;
   }
 
   // ---- The walk ---------------------------------------------------------------------------
@@ -496,6 +574,6 @@ G.ui.shopRoom = (function () {
   }
 
   return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,
-    create: create, step: step, facing: facing, isBlocked: isBlocked, draw: draw, bake: bake, sprite: sprite,
+    create: create, step: step, facing: facing, isBlocked: isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: prebake,
     bakeMs: function () { return bakeMs; }, blocked: blockedList, shown: function () { return shown; } };
 })();

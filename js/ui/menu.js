@@ -32,11 +32,12 @@ G.ui.menu = (function () {
 
   // ---- Overlay manager -----------------------------------------------------------------
 
-  function open(name) {
-    var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, tape: G.ui.tape }[name] || null;
+  // arg: passed to the overlay's open() (Phase 47: the pause list's row; the picker's caller).
+  function open(name, arg) {
+    var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, tape: G.ui.tape, look: G.ui.look }[name] || null;
     if (!o) return false;
     cur = o; curName = name;
-    o.open();
+    o.open(arg);
     return true;
   }
 
@@ -61,10 +62,10 @@ G.ui.menu = (function () {
 
   // ---- Pause menu ------------------------------------------------------------------------
 
-  // TODO(P47.3): 'Fisher & dog' goes between Dog barks and Export save.
-  var ITEMS = ['Resume', 'Volume', 'Sound', 'Dog barks', 'Export save', 'Import save'];
+  // Phase 47: 'Fisher & dog' opens the picker (G.ui.look), which comes back here on close.
+  var ITEMS = ['Resume', 'Volume', 'Sound', 'Dog barks', 'Fisher & dog', 'Export save', 'Import save'];
   // Phase 46: the panel's bounds (at the right edge), where the values and the message sit.
-  var PRECT = G.ui.panel.place(176, 136, 'right', [0, 0, 176, 136]), VAL_X = 110, MSG_Y = 94;
+  var PRECT = G.ui.panel.place(176, 140, 'right', [0, 0, 176, 140]), VAL_X = 110, MSG_Y = 103;
   var sel = 0, msg = '', msgLines = [], msgKey = 'fog_light', dirty = false, lastExport = '';
 
   // Volume as tenths so the shown bar and the stored value always agree.
@@ -118,7 +119,7 @@ G.ui.menu = (function () {
   }
 
   var pause = {
-    open: function () { sel = 0; say(''); dirty = false; },
+    open: function (at) { sel = Math.max(0, ITEMS.indexOf(at)); say(''); dirty = false; },
     update: function () {
       var inp = G.core.input, st = G.state.save.settings;
       if (inp.pressed('pause') || inp.pressed('back')) { pause.close(); return false; }
@@ -132,6 +133,7 @@ G.ui.menu = (function () {
         case 'Resume': pause.close(); return false;
         case 'Sound': st.mute = !st.mute; dirty = true; break;
         case 'Dog barks': st.dogBark = !st.dogBark; dirty = true; break; // Phase 42
+        case 'Fisher & dog': pause.close(); open('look', 'pause'); return true; // Phase 47: the picker is the overlay now
         case 'Export save': exportSave(); break;
         case 'Import save': askImport(); break;
       }
@@ -156,6 +158,7 @@ G.ui.menu = (function () {
           }
         } else if (ITEMS[i] === 'Sound') F.drawText(ctx, st.mute ? 'off' : 'on', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Dog barks') F.drawText(ctx, st.dogBark === false ? 'off' : 'on', X + VAL_X, y, key);
+        else if (ITEMS[i] === 'Fisher & dog') F.drawText(ctx, '>', X + W - U.PAD - 6, y, key);
       }
       for (i = 0; i < msgLines.length && i < 2; i++) F.drawText(ctx, msgLines[i], U.left(X), Y + MSG_Y + i * U.ROW, msgKey);
       x = U.left(X);

@@ -395,7 +395,7 @@ G.ui.shop = (function () {
     var steps0 = walk.steps;
     if (open) openStep(dt); else roomStep(dt);
     voiceIn.on = save.settings.dogBark !== false;                                     // Phase 42: the dog in the shop
-    if (G.state.run.dog && G.scene.dog.voice(G.state.run.dog, dt, voiceIn, G.vrng)) G.audio.engine.cue('bark', G.state.run.boat ? G.state.run.boat.x : 0, 1);
+    if (G.state.run.dog && G.scene.dog.voice(G.state.run.dog, dt, voiceIn, G.vrng)) G.audio.engine.cue('bark', G.state.run.boat ? G.state.run.boat.x : 0, G.scene.dog.barkPitch());
     rustyStep();
     stockStep();
     envStep(dt);

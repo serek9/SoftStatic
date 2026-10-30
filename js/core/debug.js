@@ -355,7 +355,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
-      pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop', 'panel'); // small: Phase 44; panel: Phase 46
+      pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop', 'panel', 'fishers', 'dogs', 'looks top'); // small: Phase 44; panel: Phase 46; looks: Phase 47
       page = 0; t = 0;
     }
 
@@ -507,6 +507,46 @@ G.core.debug = (function () {
           px0 += pw0 + 24;
         }
         F.drawText(ctx, 'the largest is the limit: ' + U.MAX_W + 'x' + U.MAX_H + ' with the tab', 8, 344, 'fog_light');
+      } else if (name === 'fishers') {
+        // Phase 47: every fisher's look in every pose (the hands where each pose puts them, the
+        // head and the item as the acts have them), facing right and left, at 1×.
+        var FI = G.scene.fisher, LKS = G.data.looks.fishers, PN = Object.keys(FI.POSES);
+        var HEADS = { mouth: 2, lureLook: 1, baitA: 1, baitB: 1, tug: 1 }, ITEMS0 = { cup: 'cup', mouth: 'can' };
+        for (var pn = 0; pn < PN.length; pn++) F.drawText(ctx, PN[pn].slice(0, 7), 8 + pn * 40, 18, 'fog_mid');
+        for (var lf = 0; lf < LKS.length; lf++) for (var fc = 0; fc < 2; fc++) {
+          var rowY = 30 + (lf * 2 + fc) * 36;
+          if (!fc) F.drawText(ctx, LKS[lf].name, 572, rowY + 4, 'fog_light');
+          ctx.setTransform(2, 0, 0, 2, 0, 0);
+          for (pn = 0; pn < PN.length; pn++) {
+            var pp = FI.POSES[PN[pn]], fs0 = { nx: pp.n[0], ny: pp.n[1], fx: pp.f[0], fy: pp.f[1], head: HEADS[PN[pn]] || 0, item: ITEMS0[PN[pn]] || '', cord: -1 };
+            FI.draw(ctx, fs0, (8 + pn * 40) / 2 + (fc ? 12 : 8), rowY / 2 + 17, fc ? -1 : 1, 0, 0, t, 0, LKS[lf]);
+          }
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+      } else if (name === 'dogs') {
+        // Phase 47: every breed in every pose and frame at 2×, and the wind on its ears.
+        var DG = G.scene.dog, DLK = G.data.looks.dogs, cl = 0;
+        for (var db = 0; db < DLK.length; db++) {
+          F.drawText(ctx, DLK[db].name + '  bark x' + DLK[db].bark, 8, 20 + db * 84, 'fog_light');
+          cl = 0;
+          for (var dp = 0; dp < DG.POSES.length; dp++) for (var dfr = 0; dfr < (DG.FRAMES[DG.POSES[dp]] || 1); dfr++) {
+            var dpose = DG.POSES[dp], dd = { pose: dpose, t: dfr / (dpose === 'pet' ? 7 : (dpose === 'sleep' ? 0.7 : 5)) + 0.001 };
+            ctx.setTransform(4, 0, 0, 4, 0, 0);
+            DG.draw(ctx, dd, (8 + cl * 52) / 4, (32 + db * 84) / 4, false, dpose === 'idle' && dfr === 0 ? 0 : (dpose === 'alert' ? 0.9 : 0), DLK[db]);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            if (!db) F.drawText(ctx, dpose.slice(0, 8) + (DG.FRAMES[dpose] ? dfr : ''), 8 + cl * 52, 344, 'fog_mid');
+            cl++;
+          }
+        }
+        F.drawText(ctx, 'alert: with wind', 8, 332, 'fog_mid');
+      } else if (name === 'looks top') {
+        // Phase 47: the shop room's sprites for every look: each facing, standing and walking (the dog sitting too).
+        var SRl = G.ui.shopRoom, DS2 = ['down', 'up', 'right', 'left'], KL = [['fisher', G.data.looks.fishers, [0, 1, 2]], ['dog', G.data.looks.dogs, [0, 1, 3]]];
+        for (var kk = 0; kk < 2; kk++) for (var li2 = 0; li2 < 4; li2++) {
+          var yy0 = 20 + (kk * 4 + li2) * 42, rec = KL[kk][1][li2];
+          F.drawText(ctx, rec.name, 8, yy0 + 12, 'fog_light');
+          for (var d2 = 0; d2 < 4; d2++) for (var f2 = 0; f2 < 3; f2++) ctx.drawImage(SRl.sprite(KL[kk][0], DS2[d2], KL[kk][2][f2], rec), 100 + (d2 * 3 + f2) * 36, yy0);
+        }
       } else if (name === 'baits') {
         // Phase 22: each bait's body in every heading (both flutter phases), drawn ×3 on water.
         var UWm = G.scene.underwater, ids = ['worm', 'cricket', 'minnow', 'unlabelled'];

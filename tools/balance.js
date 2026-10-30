@@ -156,6 +156,9 @@ function validate(G, opts) {
   for (const id in d.locations) lureIds.forEach(l => {
     if (!d.fish.some(f => f.locations.includes(id) && f.lures[l] && f.mass <= g.rods[0].maxMass && !f.windows.length)) err('lure ' + l + ': nothing in ' + id + ' takes it on the cane rod');
   });
+  // Phase 47: the looks (four fishers, four dogs): their shapes and every key in the palette.
+  if (d.looks) d.validateLooks(d.looks, PAL).forEach(e => err('look ' + e));
+  else err('looks: data/looks.js is not loaded');
   if (!(g.lantern.nightDepth > g.nightDepth)) err('lantern: must show deeper fish than without it');
   if (!(g.depthFinder.bands > 0)) err('depth finder: needs depth bands');
   ['pull0', 'pull1', 'tired0', 'tired1', 'pullRise', 'easeFall', 'run', 'tiredRise', 'release', 'recover', 'slipT', 'slipD', 'escape', 'd0',
@@ -462,18 +465,28 @@ const OLD_SAVES = [
     flags: { windowCatch: { owl_333: true }, lines: {}, shopVisits: 2, heavy: {}, anomalies: { lit_window: 2 }, dogStare: { fog: true }, lateAt: 30 }, tapes: [], settings: { volume: 0.8, mute: false }, rng: 5 } },
   { from: 'Phase 12 (159b20d), v4 with tapes and a phantom', save: { version: 4, coins: 6100, gear: { rod: 4, reel: 4, line: 4, lantern: true, depthFinder: true, bait: 'unlabelled' }, baits: { unlabelled: 2 }, journal: { owl_eel: { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: 0, phantom: true } },
     kept: [], cabinLevel: 4, unlocks: { fog: true, creek: true, pines: true, red: true }, loc: 'red', unease: { red: 0.3 }, clock: 9, lastSeen: 1700000000000,
-    flags: { windowCatch: { owl_247: true }, lines: {}, shopVisits: 9, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [{ loc: 'fog', kind: 'away', entries: [], caught: 3, lost: 0, coins: 20, secs: 600 }], settings: { volume: 1, mute: false }, rng: 11 } }
+    flags: { windowCatch: { owl_247: true }, lines: {}, shopVisits: 9, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [{ loc: 'fog', kind: 'away', entries: [], caught: 3, lost: 0, coins: 20, secs: 600 }], settings: { volume: 1, mute: false }, rng: 11 } },
+  // Phase 47: a v5 save from before the looks (Phase 46, 148a0b9), one with a look chosen, and one whose look was hand-edited.
+  { from: 'Phase 46 (148a0b9), v5 with a rack and lures', save: { version: 5, coins: 800, gear: { rod: 5, rods: [0, 1, 5], reel: 1, line: 1, lantern: false, depthFinder: false, bait: 'spinner' }, baits: { spinner: 2, grub: 4 }, journal: {},
+    kept: [], cabinLevel: 1, unlocks: { fog: true }, loc: 'fog', unease: { fog: 0.1 }, clock: 20, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 3, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: false }, rng: 3 } },
+  { from: 'Phase 47, v5 with a look', save: { version: 5, coins: 50, gear: { rod: 0, rods: [0], reel: 0, line: 0, lantern: false, depthFinder: false, bait: 'worm' }, baits: {}, journal: {},
+    kept: [], cabinLevel: 0, unlocks: { fog: true }, loc: 'fog', unease: {}, clock: 19, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true }, look: { fisher: 'headlamp', dog: 'husky' }, rng: 4 }, look: { fisher: 'headlamp', dog: 'husky' } },
+  { from: 'Phase 47, v5 with a hand-edited look', save: { version: 5, coins: 50, gear: { rod: 0, rods: [0], reel: 0, line: 0, lantern: false, depthFinder: false, bait: 'worm' }, baits: {}, journal: {},
+    kept: [], cabinLevel: 0, unlocks: { fog: true }, loc: 'fog', unease: {}, clock: 19, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true }, look: { fisher: 7 }, rng: 4 }, look: { fisher: 'red_cap', dog: 'golden' } }
 ];
 
 function savesCheck() {
   const G = load(), SV = G.core.save, d = SV.defaults(), E = G.sim.economy;
   let failed = 0;
-  // Every key today's defaults have, one level into the objects (gear, flags, settings).
+  // Every key today's defaults have, one level into the objects (gear, flags, settings, look).
   function missing(s) {
     const out = [];
     for (const k in d) {
       if (!(k in s)) { out.push(k); continue; }
-      if (d[k] && typeof d[k] === 'object' && !Array.isArray(d[k]) && ['gear', 'flags', 'settings'].includes(k)) for (const j in d[k]) if (!(j in s[k])) out.push(k + '.' + j);
+      if (d[k] && typeof d[k] === 'object' && !Array.isArray(d[k]) && ['gear', 'flags', 'settings', 'look'].includes(k)) for (const j in d[k]) if (!(j in s[k])) out.push(k + '.' + j);
     }
     return out;
   }
@@ -494,6 +507,8 @@ function savesCheck() {
         G.sim.passive.plan(ps, new G.core.rng.Rng(1), G.data);
         for (const id in s.journal) if (!G.data.fish.some(f => f.id === id)) probs.push('journal species ' + id + ' no longer exists');
         if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
+        const want = o.look || { fisher: 'red_cap', dog: 'golden' }; // Phase 47: kept when chosen, the default when absent or broken
+        if (s.look.fisher !== want.fisher || s.look.dog !== want.dog || G.data.lookOf(G.data.looks.fishers, s.look.fisher).id !== s.look.fisher || G.data.lookOf(G.data.looks.dogs, s.look.dog).id !== s.look.dog) probs.push('look ' + JSON.stringify(s.look));
       } catch (e) { probs.push('throws: ' + e.message); }
     }
     if (probs.length) failed++;
