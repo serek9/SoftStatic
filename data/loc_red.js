@@ -23,7 +23,7 @@ G.data.locations.red = {
   // for open water; the reflection barely moves.
   swell: { amp: 0.15, mirror: 0.15, waves: [[140, 2, 0.7], [60, -1, 0.3]] },
   // Phase 22: almost no flow, and it turns round every few seconds, upstream of nothing.
-  current: { lake: true, speed: 0.12, wind: 0, ramp: 6, period: 23, slack: 0.2, bottom: 0.5 },
+  current: { lake: true, turns: true, speed: 0.12, wind: 0, ramp: 6, period: 23, slack: 0.2, bottom: 0.5 },
   drift: function (seed, t, depth, onBottom, wind) { return G.data.lakeDrift(this, seed, t, depth, onBottom, wind); },
   scenery: 'red',
 

@@ -1,6 +1,6 @@
 # SoftStatic: Handoff
 
-How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-29, after Phase 25, the last of the realism phases ([PLAN_REALISM.md](PLAN_REALISM.md)), merged to `origin/main` by pull request.
+How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-29, after Phase 26 (revisiting three choices of the realism phases) ([PLAN_REALISM.md](PLAN_REALISM.md)), merged to `origin/main` by pull request.
 
 ## State in one paragraph
 
@@ -36,6 +36,7 @@ Phases 1 to 12 of [PLAN.md](PLAN.md) are built, checked and committed, one commi
 | 23 A fight you can lose | `Phase 23: A fight you can lose` | The hook hold H: head shakes and jumps work the hook loose on a slack line (V4 change, R2); `jumps` on eight species; the auto-player keeps tension; `--fight`; `--pacing` over 20 seeds; `incomeMult` 0.63; new replay hash |
 | 24 The boat under way | `Phase 24: The boat under way` | Pitch and heave springs drawn as a pixel-crisp shear; the boat's own wake rocks it after a stop; the outboard (throttle, rpm, pull-start, cut-out after 8 s), churn, bow wave, exhaust, the dog's ears; a synthesised two-stroke, hull slaps and creaks |
 | 25 The sounds of fishing | `Phase 25: The sounds of fishing` | A synthesised kit (splashes from impacts, bubbles and droplets; each reel's clicks; Karplus-Strong line twangs; ticks, knocks, pops; a reverb per water); the cast, reel, drag, bite and fight sounds; a water bus muffled under water; distance; `cue()`; a level meter |
+| 26 Revisiting three choices | `Phase 26: Revisiting three choices` | The boat's wake simulated as a wave layer that catches it up after a stop; the boat waits for its motor on a pull-start; every lake cast drifts (the Red Room's current still turns) |
 
 ## Architecture
 
@@ -53,7 +54,7 @@ js/ui/               hud.js card.js menu.js journal.js shop.js map.js cabin.js t
 tools/balance.js     --validate | --replay <seed> | --pacing | --passive | --saves | --fight
 ```
 
-- **Realism phases (20–25, [PLAN_REALISM.md](PLAN_REALISM.md)):** `G.gfx.surface` is a height field along the water in view pixels (swell from `loc.swell`, ripples from `poke(x, s, width)`); the waterline, the mirror's row shifts, the caustics and everything that floats read it (`sailing.floatY(x)`). `G.audio.engine` (Phase 25) builds a sound kit at unlock and has a water bus (muffled under water, with a reverb per water) and `meter()`. `G.gfx.rope` is the line: `sailing.ropeStep` sets its anchors and rest length by state every update, and `drawRope` draws it. `underwater.flow(loc, depth)` is the current now, from the same `loc.drift` as the lure; the rope, the weeds, motes, bubbles and streaks use it, and `underwater.bodyStep`/`drawLure` give the lure its heading and bait sprite.
+- **Realism phases (20–25, [PLAN_REALISM.md](PLAN_REALISM.md)):** `G.gfx.surface` is a height field along the water in view pixels (swell from `loc.swell`, ripples from `poke(x, s, width)`, the boat's wake from `wake(...)`); the waterline, the mirror's row shifts, the caustics and everything that floats read it (`sailing.floatY(x)`). `G.audio.engine` (Phase 25) builds a sound kit at unlock and has a water bus (muffled under water, with a reverb per water) and `meter()`. `G.gfx.rope` is the line: `sailing.ropeStep` sets its anchors and rest length by state every update, and `drawRope` draws it. `underwater.flow(loc, depth)` is the current now, from the same `loc.drift` as the lure; the rope, the weeds, motes, bubbles and streaks use it, and `underwater.bodyStep`/`drawLure` give the lure its heading and bait sprite.
 
 - **The view (640×360):** `G.core.view` in `core/loop.js`. A scene or overlay with `native: true` (shop, cabin, journal, map, pause, tape) draws in the view's pixels; the sailing scene still works in world pixels (the sim's 320×180 units) under a ×2 transform, but bakes every image at `HI` = 2 and draws it at half size, and draws live things in half pixels, so it is native too. The HUD and the catch card switch the view to native for themselves. `underwater.js` works the same way since Phase 19, and its fish are `fishgen.swimmer` canvases. Text at 640×360 uses `G.gfx.sprites.fine` (`drawText`, `bold`, `measure`, `wrap`); painted art uses `G.gfx.paint` (`area`, `tone`, `blob`, `limb`, `line`, `slab`, `box`).
 
@@ -76,21 +77,21 @@ tools/balance.js     --validate | --replay <seed> | --pacing | --passive | --sav
 
 ## Pending work
 
-**Every phase in PLAN.md §4 is done** (Milestone C), and so is the improvement audit. So are Phases 15–19, which took the whole game to 640×360, and the realism Phases 20–25 ([PLAN_REALISM.md](PLAN_REALISM.md)). No next phase is scheduled. There are no `TODO(Px.y)` markers in the code. Known issues are PLAN.md §8.4 (#24: the journal's first opening costs one ~90 ms frame; #25: three unused old sprites; #26: the reflection pass measures 2.1–2.4 ms in headless Chromium against a 2 ms budget, to re-measure on the reference laptop).
+**Every phase in PLAN.md §4 is done** (Milestone C), and so is the improvement audit. So are Phases 15–19, which took the whole game to 640×360, the realism Phases 20–25 and Phase 26, which revisited three of their choices ([PLAN_REALISM.md](PLAN_REALISM.md)). No next phase is scheduled. There are no `TODO(Px.y)` markers in the code. Known issues are PLAN.md §8.4 (#24: the journal's first opening costs one ~90 ms frame; #25: three unused old sprites; #26: the reflection pass measures 2.1–2.4 ms in headless Chromium against a 2 ms budget, to re-measure on the reference laptop).
 
 **Checks outside the repo:** the Phase 15–21 screenshot and check scripts (Playwright, in the session scratchpad), the per-phase Node scripts (Phases 1, 6, 7, 8) and the Phase 9–12 browser checks (a small headless-Brave DevTools driver in Node, plus Node checks of the shop lines, anomaly scheduler, spot value, late hints and the creek's drift; Phase 12's TAB-in-every-state, tape and two-tab checks) lived in temporary folders and are not in git. The checks that matter long-term are in `tools/balance.js`; the results of the rest are recorded in PLAN.md §8.5.
 
 ## Decisions and departures from the plan
 
-The full, numbered list is PLAN.md §8.3 (132 entries). The ones most likely to surprise:
+The full, numbered list is PLAN.md §8.3 (135 entries). The ones most likely to surprise:
 
 - **640×360 instead of 320×180** (user's decision, 2026-10-29): the sim still uses 320×180 world pixels; only drawing changed, so the replay hash and balance did not move.
 - **Pixel-art rules for new art** (§8.3 #84): no `ctx.scale` of art (except the sailing scene's half-size drawing of 2× bakes), no dithering, no random speckle, 3–6 flat keys per material, light that steps with planks or logs.
 - **Realism phases (20–25)** were asked for by the user and planned in [PLAN_REALISM.md](PLAN_REALISM.md), with five approved spec deviations (R1–R5): new files `surface.js` and `rope.js`, a fight that can be lost on a slack line, a simulated line instead of a vertical dotted one, a current on every water, and an optional `jumps` field on fish.
 - **The rope never moves the lure:** the lure's path is the sim's, and the rope is pinned to where the lure is drawn, so the replay hash did not change. Reeling takes up the slack fast instead of delaying the lure.
-- **Every water has a current now** (the lakes a slow wind drift, the Red Room one that turns round every 23 s). The live game's lure drifts; the balance models do not, so the baselines did not move. A lure that drifts into a spot gains its boost.
+- **Every water has a current now** (the lakes a slow wind drift, one way per cast since Phase 26; the Red Room one that turns round every 23 s). The live game's lure drifts; the balance models do not, so the baselines did not move. A lure that drifts into a spot gains its boost.
 - **Fish can get away on a slack line** (Phase 23, a change to V4 approved by the user): head shakes and jumps work the hook loose when tension is under 0.12. A careful player lands about 97%, a careless one about 70%; a loss is quiet, never a fail screen. This moved the replay hash and the pacing; `--pacing` now uses 20 seeds because 5 were too noisy, and passive's `incomeMult` is 0.63.
-- **The boat pitches by shearing, not rotating** (Phase 24), so the pixel art stays crisp; its own wake catching it after a stop is modelled directly, because the surface ripples were too small at the hull. The boat's speed rules did not change, so it moves for the 0.4 s the motor takes to catch on a pull-start.
+- **The boat pitches by shearing, not rotating** (Phase 24), so the pixel art stays crisp. Its own wake is a wave layer in the surface whose waves travel at the boat's top speed, so they roll under it when it brakes (Phase 26; at first it was scripted). It moves only once its motor runs.
 - **Every fishing sound is synthesised** (Phase 25; no sound files, §0.2): the kit is computed into buffers at the first key press (about 70–85 ms). Scenes tell the engine about one-off events with `G.audio.engine.cue(...)`; everything else it still reads from state.
 - **Rusty** is an original shopkeeper in the spirit of the reference, not a copy; the shop's lines are still `data/dialogue.js`.
 

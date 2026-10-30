@@ -119,24 +119,19 @@ G.scene.boat = (function () {
     start: 0.4,                // s of pull-start before the motor runs
     rest: 8,                   // s stopped before it cuts out
     squat: 0.006,              // px the hull dips per px/s² of braking
-    wakeAfter: 1.3,            // s after the boat drops from speed until its own wake reaches it
-    wakeLift: 3, wakeTip: 8    // the wake's kick at full speed: heave px/s up, pitch °/s bow down
+    liftHit: 0.6               // px/s: the water lifting the hull faster than this slaps it (Phase 26)
   };
   var D2R = Math.PI / 180;
 
   function create(x) {
     return { x: x, vx: 0, t: 0, facing: 1, stopped: true,
-      pitch: 0, pv: 0, wave: 0, show: 0, heave: 0, hv: 0, ax: 0, prevVx: 0, lean: 0, peak: 0, wakeT: -1, wakeA: 0, wakeHit: false,
+      pitch: 0, pv: 0, wave: 0, show: 0, heave: 0, hv: 0, ax: 0, prevVx: 0, lean: 0, wakeA: 0, wakeHit: false,
       throttle: 0, rpm: 0, motor: false, startT: -1, restT: 0, puff: 0, starts: 0 };
   }
 
-  // Phase 24: pitch, heave, throttle and the outboard, after step(). hBow and hStern are the
-  // surface's heights (world px, up positive) under the bow and the stern.
-  function motion(b, move, dt, hBow, hStern) {
-    var a = (b.vx - b.prevVx) / dt;
-    b.prevVx = b.vx;
-    b.ax += (a * b.facing - b.ax) * Math.min(1, 8 * dt);
-    // The outboard: a pull-start on the first move, idling, cut out after a long rest.
+  // Phase 24 (Phase 26: before step(), so the boat waits for the motor): the outboard. A
+  // pull-start on the first move, idling, cut out after a long rest; the throttle and the rpm.
+  function outboard(b, move, dt) {
     if (move !== 0) {
       b.restT = 0;
       if (!b.motor && b.startT < 0) { b.startT = 0; b.starts++; }
@@ -147,6 +142,14 @@ G.scene.boat = (function () {
     var rt = b.motor ? M.idle + (M.full - M.idle) * b.throttle : (b.startT >= 0 ? 600 * b.startT / M.start : 0);
     b.rpm += (rt - b.rpm) * Math.min(1, (rt > b.rpm ? 6 : 3) * dt);
     if (b.puff > 0) b.puff -= dt;
+  }
+
+  // Phase 24: pitch and heave, after step(). hBow and hStern are the surface's heights (world
+  // px, up positive) under the bow and the stern.
+  function motion(b, move, dt, hBow, hStern) {
+    var a = (b.vx - b.prevVx) / dt;
+    b.prevVx = b.vx;
+    b.ax += (a * b.facing - b.ax) * Math.min(1, 8 * dt);
     // Pitch: bow up under acceleration and at speed, down on a stop, rocking back to level.
     var pt = M.accelPitch * b.ax + M.speedPitch * Math.min(1, Math.abs(b.vx) / P.maxV) * b.throttle;
     b.pv += (-M.pitchK * (b.pitch - pt) - M.pitchC * b.pv) * dt;
@@ -155,22 +158,14 @@ G.scene.boat = (function () {
     var w = M.waveTip * Math.atan2(hBow - hStern, 2 * M.halfLen) / D2R;
     b.wave += (w - b.wave) * Math.min(1, 6 * dt);
     b.show = b.pitch + b.wave;
-    // The boat's own wake: the waves it pushed out behind travel slower than it sails, so when
-    // it drops from speed they catch it up wakeAfter s later, lifting the stern first. (The
-    // ripples on the surface are too small and too damped to do this by themselves at the hull.)
-    var sp = Math.abs(b.vx) / P.maxV;
-    b.wakeHit = false;
-    if (sp > b.peak) b.peak = sp;
-    if (b.peak > 0.6 && sp < 0.3 && b.wakeT < 0) { b.wakeT = M.wakeAfter; b.wakeA = b.peak; b.peak = 0; }
-    if (b.wakeT >= 0) {
-      b.wakeT -= dt;
-      if (b.wakeT < 0) { b.hv += M.wakeLift * b.wakeA; b.pv -= M.wakeTip * b.wakeA; b.wakeHit = true; }
-    }
-    if (sp < 0.05) b.peak = Math.min(b.peak, sp);
-    // Heave: riding the surface under the hull, and squatting as it brakes.
-    var squat = b.ax < 0 ? M.squat * b.ax : 0;
+    // Heave: riding the surface under the hull (its own wake included, Phase 26: the surface's
+    // wake layer catches it up after a stop), and squatting as it brakes. wakeHit marks the
+    // water lifting the hull hard, for the slap.
+    var squat = b.ax < 0 ? M.squat * b.ax : 0, hv0 = b.hv;
     b.hv += (-M.heaveK * (b.heave - (hBow + hStern) / 2 - squat) - M.heaveC * b.hv) * dt;
     b.heave += b.hv * dt;
+    b.wakeHit = b.hv > M.liftHit && hv0 <= M.liftHit;
+    if (b.wakeHit) b.wakeA = Math.min(1, b.hv / 3);
     b.lean = Math.max(-1, Math.min(1, -b.ax * 0.012));   // the fisher leans back on throttle
   }
 
@@ -180,12 +175,15 @@ G.scene.boat = (function () {
   function shear(b, dx) { return Math.round(-Math.tan(b.show * D2R) * dx * HI) / HI; }
 
   // move is the input axis (-1, 0, 1). worldW clamps the boat inside the location.
+  // Phase 26: only a running motor pushes the boat; while the cord is pulled a held direction
+  // turns it, and it drifts as when nothing is held.
   function step(b, move, dt, worldW) {
     b.t += dt;
-    if (move !== 0) {
+    if (move !== 0 && b.motor) {
       b.vx += move * (b.vx * move < 0 ? P.reverse : P.accel) * dt;
       b.facing = move;
     } else {
+      if (move !== 0) b.facing = move;
       var drift = P.driftV * Math.sin(b.t * P.driftRate);
       b.vx += (drift - b.vx) * Math.min(1, P.drag * dt);
     }
@@ -297,5 +295,5 @@ G.scene.boat = (function () {
   // World x of the bow.
   function bow(b) { return b.x + b.facing * 17; }
 
-  return { P: P, M: M, ROD: ROD, create: create, step: step, motion: motion, shear: shear, draw: draw, bob: bob, stern: stern, bow: bow, rodTip: rodTip };
+  return { P: P, M: M, ROD: ROD, create: create, step: step, outboard: outboard, motion: motion, shear: shear, draw: draw, bob: bob, stern: stern, bow: bow, rodTip: rodTip };
 })();
