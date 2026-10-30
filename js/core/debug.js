@@ -103,6 +103,9 @@ G.core.debug = (function () {
       }
       return true;
     },
+    // dbg.release(): the last fish let go from the card (Phase 51): its swing's time, whether
+    // it has left his hand, how long since it went in, where it is, and how many so far.
+    release: function () { return G.scene.sailing.release(); },
     // dbg.land() wins the current fight on the next step.
     // (tired, so an un-reeled step cannot push D back up before the win check)
     land: function () { var F = G.state.run.fight; if (!F.active) return false; F.D = 0; F.mode = 'tired'; F.modeT = 9; return true; },

@@ -144,7 +144,8 @@ G.sim.economy = (function () {
     return true;
   }
 
-  // A landed fish into the save. c: {id, len, w, price, hintRefs, windowCatch}; choice 'sell' or 'keep'.
+  // A landed fish into the save. c: {id, len, w, price, hintRefs, windowCatch}; choice 'sell',
+  // 'keep' or (Phase 51) 'release': let go, it still counts in the journal, and earns nothing.
   function recordCatch(save, c, choice) {
     var j = save.journal[c.id];
     if (!j) j = save.journal[c.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: true, phantom: false };
@@ -155,6 +156,7 @@ G.sim.economy = (function () {
     if (c.windowCatch) save.flags.windowCatch[c.windowCatch] = true;
     if (c.bait) { if (!j.took) j.took = []; if (j.took.indexOf(c.bait) < 0) j.took.push(c.bait); } // Phase 43: what it was caught on
     if (choice === 'sell') save.coins += c.price;
+    else if (choice === 'release') j.released = (j.released || 0) + 1;
     else save.kept.push({ id: c.id, len: c.len, w: c.w });
   }
 

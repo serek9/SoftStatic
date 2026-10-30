@@ -167,7 +167,7 @@ G.ui.journal = (function () {
     selIsNew = !j.read;
     j.read = true;
     page.name = sp.name; page.got = true;
-    page.count = 'Caught ' + j.caught + (j.caught === 1 ? ' time' : ' times');
+    page.count = 'Caught ' + j.caught + (j.caught === 1 ? ' time' : ' times') + (j.released ? ', ' + j.released + ' let go' : ''); // Phase 51
     var bw = j.bestW < 0.1 ? Math.round(j.bestW * 1000) + ' g' : j.bestW.toFixed(2) + ' kg'; // Phase 44: small fish in grams
     page.best = j.bestLen.toFixed(1) + ' cm  |  ' + bw;
     add(sp.name, 'ink', true); add(sp.rarity, 'wood', false); add(page.count, 'ink', true); add('Best ' + j.bestLen.toFixed(1) + ' cm, ' + bw, 'ink', true);

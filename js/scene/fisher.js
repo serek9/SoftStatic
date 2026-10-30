@@ -64,6 +64,7 @@ G.scene.fisher = (function () {
     clips:  { n: [-3.2, -5.1], f: [1.2, -4.4] },
     tiller: { n: [-4.3, -6], f: [1.2, -4.4] }
   };
+  var TOSS = { hold: [3.2, -4.6], back: [-1.2, -6.6], out: [7.4, -10.6] }; // Phase 51: the far hand letting a fish go, local
   var COOLER = [-5, -4], CAN = [-2.2, -4.2]; // the cooler (its middle, on the floor behind him) and the can's place, local
 
   // Acts: steps of {d: s, pose, rod: 'hand' | 'holder', head: 0 ahead, 1 down, 2 back, item, angle}.
@@ -174,7 +175,7 @@ G.scene.fisher = (function () {
       line: null, reel: 0, bail: false, held: false, tug: false, cue: '',
       can: false, sips: 0, beerRest: 0,
       act: '', step: 0, t: 0, idleT: 0, wait: 0, ret: false, fast: false, acts: 0,
-      helm: 0, helmT: 0, cord: -1, steer: 0, stows: 0 };
+      helm: 0, helmT: 0, cord: -1, steer: 0, stows: 0, toss: -1 };
   }
 
   function spring(x, v, target, w, dt) {
@@ -324,6 +325,14 @@ G.scene.fisher = (function () {
     if (fs.cord >= 0) {
       var cp = fs.cord < 0.35 ? CORD.reach : CORD.pull;
       ftx = cp[0]; fty = cp[1]; fw = K.fast;
+    }
+    // Phase 51: letting a fish go (sailing.js sets toss, s into the swing, -1 otherwise): the
+    // far hand holds it low by the gunwale, swings it back past his hip, then out and up over
+    // the water, where it lets go, and comes back to his knee.
+    if (fs.toss >= 0) {
+      var tp = fs.toss < 0.12 ? TOSS.hold : (fs.toss < 0.42 ? TOSS.back : (fs.toss < 0.58 ? TOSS.out : POSES.knees.f));
+      ftx = tp[0]; fty = tp[1]; fw = fs.toss >= 0.42 && fs.toss < 0.58 ? K.fast * 1.4 : K.ease;
+      if (fs.act) abort(fs);
     }
     fs.nvx = spring(fs.nx, fs.nvx, ntx, w, dt); fs.nx += dt * fs.nvx;
     fs.nvy = spring(fs.ny, fs.nvy, nty, w, dt); fs.ny += dt * fs.nvy;

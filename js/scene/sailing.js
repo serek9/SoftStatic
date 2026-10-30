@@ -1397,6 +1397,67 @@ G.scene.sailing = (function () {
     return pv.on && pv.pl && pv.ps.plan.result !== G.sim.passive.EMPTY && pv.t >= pv.ps.plan.wait;
   }
 
+  // ---- Letting a fish go (Phase 51) ---------------------------------------------
+  // RELEASE on the catch card: the fish is back in his far hand by the gunwale; he swings it
+  // back, then out over the water, and lets go (fisher.toss drives the arm). It flies in an
+  // arc, turning, and goes in with a splash, a ring and a dent in the surface; then its shape
+  // slips away under the surface and fades. Presentation only: the catch is in the journal
+  // already and nothing is drawn from G.rng. A cast or the helm cuts the swing short: the
+  // fish leaves his hand at once.
+  var REL = { hold: 0.42, out: 0.16, back: 0.4, vx: 58, vy: -62, g: 240, swim: 1.6, dive: 9 };
+  var rel = { t: -1, sp: -1, len: 0, w: 0, x: 0, y: 0, vx: 0, vy: 0, flown: false, inT: -1, ix: 0, face: 1, n: 0 };
+  function releaseStart(run, sp, len, w) {
+    rel.t = 0; rel.sp = sp; rel.len = len; rel.w = w; rel.flown = false; rel.inT = -1; rel.face = run.boat.facing; rel.n++;
+    run.fisher.toss = 0;
+  }
+  function releaseStep(run, dt) {
+    var fs = run.fisher;
+    if (rel.t < 0) { fs.toss = -1; return; }
+    var b = run.boat, f = b.facing;
+    rel.t += dt;
+    var swinging = run.fsm === 'sailing' && !fs.helm && rel.t < REL.hold + REL.out + REL.back;
+    fs.toss = swinging ? rel.t : -1;
+    if (!rel.flown) {
+      rel.x = b.x + f * fs.fx - f * b.lean; rel.y = loc.waterY + boat.bob(b) + fs.fy + boat.shear(b, -1) + 1.5;
+      if (rel.t >= REL.hold + REL.out * 0.6 || !swinging) {
+        rel.flown = true; rel.face = f;
+        rel.vx = f * (swinging ? REL.vx : 18); rel.vy = swinging ? REL.vy : -10;
+      }
+    } else if (rel.inT < 0) {
+      rel.vy += REL.g * dt; rel.x += rel.vx * dt; rel.y += rel.vy * dt;
+      if (rel.vy > 0 && rel.y >= floatY(rel.x)) {
+        var k = Math.min(1, 0.3 + rel.w * 0.15);
+        rel.inT = 0; rel.ix = rel.x; rel.y = loc.waterY;
+        fx.splash(rel.x, loc.waterY, 0.25 + 0.4 * k);
+        fx.ripple(rel.x, loc.waterY + 1, 2, 10 + 8 * k, 1);
+        G.gfx.surface.poke(rel.x, 0.3 + 0.4 * k, 2 + 2 * k);
+        G.audio.engine.cue('jump', rel.x, 1);
+        if (G.core.debug) G.core.debug.log('released ' + G.data.fish[rel.sp].id);
+      }
+    } else {
+      rel.inT += dt;
+      if (rel.inT >= REL.swim) rel.t = -1;
+    }
+  }
+  // The fish in his hand or in the air: its portrait, sized by its length, nose down while
+  // held (the fall's own lean shown by a half-pixel step as it turns in the air).
+  function drawRelease(c, run) {
+    if (rel.t < 0) return;
+    var FG = G.gfx.fishgen, size = Math.max(8, Math.min(34, Math.round(rel.len * 0.55)));
+    if (rel.inT < 0) {
+      var right = rel.flown ? (rel.vx >= 0) : rel.face > 0, pic = right ? FG.portrait(rel.sp, size, size >> 1, false) : FG.portraitFlipped(rel.sp, size, size >> 1);
+      var w = pic.width / HI, h = pic.height / HI;
+      c.drawImage(pic, Math.round((rel.x - camPx - w / 2) * HI) / HI, Math.round((rel.y - camPy - h / 2) * HI) / HI, w, h);
+      return;
+    }
+    // Under the surface: it slips away, down and out, fading (a swimmer frame at its beat).
+    var u = rel.inT / REL.swim, cv = FG.swimmer(rel.sp, FG.BEAT[Math.floor(rel.inT * 8) & 3], false, rel.face < 0);
+    var x = rel.ix + rel.face * 34 * u, y = loc.waterY + 3 + REL.dive * u;
+    c.globalAlpha = 0.55 * (1 - u) * Math.min(1, rel.inT * 6);
+    c.drawImage(cv, Math.round((x - camPx - cv.width / (2 * HI)) * HI) / HI, Math.round((y - camPy - cv.midY / HI) * HI) / HI, cv.width / HI, cv.height / HI);
+    c.globalAlpha = 1;
+  }
+
   // ---- The fisher (Phase 33) ---------------------------------------------------
   // The idle director's context: between casts (stopped, no line, not passive, no anomaly) or
   // waiting for a bite with nothing interested; any key held or pressed ends an act. The keys
@@ -1505,12 +1566,17 @@ G.scene.sailing = (function () {
       G.gfx.surface.poke(rx, 0.12, 1); // the same drop dents the waterline (Phase 20)
     }
     passiveStep(run, dt);
+    releaseStep(run, dt);
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
     if (run.fsm === 'card') {
       G.ui.card.tick(dt);
       var choice = pv.on ? (run.fsmT >= PASSIVE.card ? 'sell' : null) : G.ui.card.update(dt); // passive sells
-      if (choice) { G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing'); }
+      if (choice) {
+        var got = G.ui.card.info();
+        G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing');
+        if (choice === 'release') releaseStart(run, got.spIdx, got.len, got.w); // Phase 51: he lets it go
+      }
     }
     var move = run.fsm === 'sailing' && !pv.on && !toggled && !setupOn ? (inp.move() || sailMove(dt)) : 0;
     run.move = move;
@@ -1764,6 +1830,7 @@ G.scene.sailing = (function () {
       drawWaterline(ctx, wy - camPy, cols, wl, 0, Math.max(0, hx - 36), Math.min(640, hx + 36), 0.55);
     }
     drawLift(ctx, run);
+    drawRelease(ctx, run);
     drawMist(ctx);
     drawRain(ctx);
     G.scene.underwater.drawHooked(ctx, loc, camPx, camPy, run.boat.t);
@@ -1782,6 +1849,8 @@ G.scene.sailing = (function () {
     skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
     rodPose: function () { return rodPose(G.state.run, [0, 0, 0]); }, // debug: [angle, load, pull] now
     lift: function () { return plift.t; },
+    // dbg.release(): the last release's state (Phase 51).
+    release: function () { return { t: +rel.t.toFixed(3), sp: rel.sp, flown: rel.flown, inT: +rel.inT.toFixed(3), x: +rel.x.toFixed(1), y: +rel.y.toFixed(1), n: rel.n }; },
     floatY: function (x) { return floatY(x); },
     lureAt: function () { var r = G.state.run, o = [0, 0]; return r.passive.on && r.passive.pl ? floatPos(r, o) : lurePos(r, o); }, // debug: where the rope's far end is held // Phase 20: the surface's height at world x, as floats sit on it
     rain: function () { return loc ? rainK() : 0; },
