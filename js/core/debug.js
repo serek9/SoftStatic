@@ -268,6 +268,11 @@ G.core.debug = (function () {
     // dbg.lureBody() returns the lure's heading (degrees: 0 right, 90 down, 180 left), its
     // flutter 0..1, its velocity (px/s) and the current at it (Phase 22).
     lureBody: function () { return G.scene.underwater.body(); },
+    // dbg.fishBody(i) returns a swimmer's body (Phase 27): school slot i (0..7) or 'hook'.
+    // face, turn (0 none, else 0..1 through it), beatHz, phase 0..1, glide, pitch (slope,
+    // head down positive when swimming its way), frame (fishgen.FR), speed and vy (px/s),
+    // len (world px); null when the slot is empty.
+    fishBody: function (i) { return G.scene.underwater.fishBody(i === undefined ? 0 : i); },
     // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
     poke: function (x, s) {
       var b = G.state.run.boat;
@@ -280,8 +285,8 @@ G.core.debug = (function () {
 
   // `?gallery`: pages of everything the gfx layer can draw. A/D or arrows change page.
   // Phase 19: native 640×360. The fish pages show the swimmers as the underwater view draws
-  // them (rest, tail flick, shimmer, flipped, silhouette): every species, then every part on
-  // every base, one base per page.
+  // them (the beat, the turn, shimmer, flipped, silhouette): every species, then every part on
+  // every base, one base per page. Phase 27: the 'swim' page lays every base's frames side by side.
   var gallery = (function () {
     var pages = [], page = 0, t = 0, emitT = 0;
     var SAMPLE = 'The quick brown fox jumps over the lazy dog.';
@@ -294,7 +299,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
-      pages.push('sprites', 'baits', 'fx');
+      pages.push('swim', 'sprites', 'baits', 'fx');
       page = 0; t = 0;
     }
 
@@ -319,8 +324,8 @@ G.core.debug = (function () {
     // One swimmer cell: the frames in turn, the same flipped, and the silhouette. sp is a
     // species index, or a part on the base `base` ('' for the bare base).
     function art(sp, base, fr, sil, flip) { return base ? G.gfx.fishgen.partSwimmer(base, sp, fr, sil, flip) : G.gfx.fishgen.swimmer(sp, fr, sil, flip); }
-    function swimCell(ctx, sp, base, n, label, x0, y0, cw, ch) {
-      var F = G.gfx.sprites.fine, fr = Math.floor(t * 3) % n, a = art(sp, base, fr, false, false), b = art(sp, base, fr, false, true), c = art(sp, base, fr, true, false);
+    function swimCell(ctx, sp, base, frs, label, x0, y0, cw, ch) {
+      var F = G.gfx.sprites.fine, fr = frs[Math.floor(t * 3) % frs.length], a = art(sp, base, fr, false, false), b = art(sp, base, fr, false, true), c = art(sp, base, fr, true, false);
       ctx.fillStyle = G.gfx.sprites.PALETTE.water_dark;
       ctx.fillRect(x0, y0, cw - 4, ch - 4);
       var yy = y0 + 4 + Math.max(0, (ch - 20 - a.height) >> 1);
@@ -362,13 +367,13 @@ G.core.debug = (function () {
         var start = +arg, fish = G.data.fish;
         for (var s = start; s < Math.min(fish.length, start + SPECIES_PER); s++) {
           var cell = s - start;
-          swimCell(ctx, s, '', FG.frameCount(fish[s].look),
+          swimCell(ctx, s, '', FG.swimFrames(fish[s].look),
             fish[s].id + ' w' + fish[s].look.wrongness + ' ' + fish[s].look.base, 8 + (cell % 4) * 158, 20 + Math.floor(cell / 4) * 66, 158, 66);
         }
       } else if (name.indexOf('parts:') === 0) {
         var list = [''].concat(FG.PARTS);
         for (var q = 0; q < list.length; q++) {
-          swimCell(ctx, list[q], arg, list[q] === 'static' ? 3 : 2, list[q] || 'bare', 8 + (q % 4) * 158, 20 + Math.floor(q / 4) * 84, 158, 84);
+          swimCell(ctx, list[q], arg, FG.swimFrames({ wrongness: 0, parts: [list[q]] }), list[q] || 'bare', 8 + (q % 4) * 158, 20 + Math.floor(q / 4) * 84, 158, 84);
         }
       } else if (name === 'sprites') {
         // Whatever is still a small sprite (drawn at 1×, its own size).
@@ -378,6 +383,18 @@ G.core.debug = (function () {
           S.draw(ctx, names[m], x0, y0, Math.floor(t * 3), false);
           S.draw(ctx, names[m], x0 + d.w + 4, y0, Math.floor(t * 3), true);
           F.drawText(ctx, names[m] + ' ' + d.w + 'x' + d.h + ' x' + d.n, x0, y0 + 22, 'fog_light');
+        }
+      } else if (name === 'swim') {
+        // Phase 27: each base's swimming frames in a row: rest, tail away, tail near, the two
+        // turn frames, then the beat and a full turn playing.
+        var FRN = ['rest', 'away', 'near', 'turn1', 'turn2'], FRS = [0, 1, 3, 4, 5];
+        for (var bb = 0; bb < FG.BASE_NAMES.length; bb++) {
+          var y1 = 20 + bb * 40, base = FG.BASE_NAMES[bb];
+          F.drawText(ctx, base, 8, y1 + 14, 'fog_light');
+          for (var fi = 0; fi < 5; fi++) ctx.drawImage(FG.partSwimmer(base, '', FRS[fi], false, false), 64 + fi * 64, y1);
+          var cyc = Math.floor(t * 4) % 8, TURN = [4, 5, 5, 4]; // the beat four times, then a turn
+          ctx.drawImage(cyc < 4 ? FG.partSwimmer(base, '', FG.BEAT[cyc], false, false) : FG.partSwimmer(base, '', TURN[cyc - 4], false, cyc >= 6), 400, y1);
+          if (bb === 0) for (fi = 0; fi < 5; fi++) F.drawText(ctx, FRN[fi], 64 + fi * 64, 344, 'fog_mid');
         }
       } else if (name === 'baits') {
         // Phase 22: each bait's body in every heading (both flutter phases), drawn ×3 on water.

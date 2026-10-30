@@ -273,6 +273,11 @@ G.gfx.fishgen = (function () {
   }
 
   function frameCount(look) { return (look.wrongness >= 3 || look.parts.indexOf('static') >= 0) ? 3 : 2; }
+  // Phase 27: the swimmers' frames (paintLook): the beat runs REST, AWAY, REST, NEAR; a turn
+  // runs TURN1, TURN2, then the same flipped. GLITCH only for looks with frameCount 3.
+  var FR = { REST: 0, AWAY: 1, GLITCH: 2, NEAR: 3, TURN1: 4, TURN2: 5 }, BEAT = [0, 1, 0, 3];
+  var SWIM_FRAMES = [0, 1, 3, 4, 5], SWIM_FRAMES_G = [0, 1, 2, 3, 4, 5];
+  function swimFrames(look) { return frameCount(look) > 2 ? SWIM_FRAMES_G : SWIM_FRAMES; }
 
   // Returns the frames (arrays of row strings) for a look, cropped to a shared bounding box.
   function generate(look) {
@@ -364,10 +369,14 @@ G.gfx.fishgen = (function () {
     return portraits[key] || (portraits[key] = paintLook(G.data.fish[i].look, maxW, maxH, sil, 0, false));
   }
 
-  // Paints a look (a species' or a bare base's). frame 0 rest, 1 the tail flicked down, 2 the
-  // glitch shimmer (two bands slip sideways, static breaks out in short dashes). swim leaves
-  // room under the tail so every frame of a swimmer has the same size. The canvas carries
-  // where the mouth is (mouthX, mouthY) and the body's middle row (midY), in its pixels.
+  // Paints a look (a species' or a bare base's). frame (FR): 0 rest, 1 the tail swept away
+  // from the viewer, 2 the glitch shimmer (two bands slip sideways, static breaks out in short
+  // dashes), 3 the tail swept toward the viewer, 4 and 5 the fish turning (seen at an angle,
+  // narrowed across to 0.6 and 0.3 of its length, painted so, never scaled). Phase 27: seen
+  // from the side a beating tail foreshortens; it does not drop. swim leaves room under the
+  // tail so every frame of a swimmer has the same size. The canvas carries where the mouth is
+  // (mouthX, mouthY) and the body's middle row (midY), in its pixels.
+  var TAIL_C = [1, 0.55, 1, 0.75, 1, 1], TAIL_S = [1, 0.92, 1, 1.12, 1, 1], SQUASH = [1, 1, 1, 1, 0.6, 0.3];
   function paintLook(look, maxW, maxH, sil, frame, swim) {
     var SH = SHAPES[look.base], pal = PALETTES[look.palette], parts = look.parts, rng = new G.core.rng.Rng(look.seed * 7 + 3);
     var has = function (p) { return parts.indexOf(p) >= 0; };
@@ -386,9 +395,11 @@ G.gfx.fishgen = (function () {
     var W = Math.max(4, Math.ceil((right - left) * Lp) + 2), H = Math.max(4, Math.ceil((bot - top) * Lp) + 2);
     var g = new Array(W * H);
     for (k = 0; k < g.length; k++) g[k] = '';
-    function wx(px) { return (px + 0.5 - 1) / Lp + left; }
+    // Across, the fish is narrowed about the canvas's middle while it turns (27.2).
+    var sq = SQUASH[frame] || 1, Xc = (left + right) / 2;
+    function wx(px) { return Xc + ((px + 0.5 - 1) / Lp + left - Xc) / sq; }
     function wy(py) { return (py + 0.5 - 1) / Lp + top; }
-    function PX(v) { return Math.round((v - left) * Lp + 1 - 0.5); }
+    function PX(v) { return Math.round(((v - Xc) * sq + Xc - left) * Lp + 1 - 0.5); }
     function PY(v) { return Math.round((v - top) * Lp + 1 - 0.5); }
     function put(px, py, key) { if (px >= 0 && py >= 0 && px < W && py < H) g[py * W + px] = key; }
     function get(px, py) { return px >= 0 && py >= 0 && px < W && py < H ? g[py * W + px] : ''; }
@@ -399,8 +410,10 @@ G.gfx.fishgen = (function () {
     if (has('mannequin')) Lb = 'bone';
     var dark = S.shift(Dk, -1), finDark = S.shift(Fn, -1), finLit = S.shift(Fn, 1);
     var MX = 0, MY = 0;
-    // Frame 1: how far the tail has dropped, in body lengths, at tt (0 root .. 1 tip).
-    function bend(tt) { return frame === 1 ? T.spread * 0.5 * Math.pow(tt, 1.6) : 0; }
+    // The tail's foreshortening and apparent size in this frame (27.1), and its keys: swept
+    // away, its far side is in shadow.
+    var tc = TAIL_C[frame] || 1, ts = TAIL_S[frame] || 1, away = frame === 1;
+    var tailFill = away ? finDark : Fn, tailRay = away ? S.shift(finDark, -1) : finDark, tailRim = away ? Fn : finLit;
 
     // The body as a function, for every layer to ask "is this on the fish, and how far down?"
     function bodyAt(X, Y) {
@@ -415,12 +428,13 @@ G.gfx.fishgen = (function () {
       for (py = 0; py < H; py++) for (px = 0; px < W; px++) {
         var X = wx(px), Y = wy(py) - dy, key = '';
         if (headOnly && X < 0.66) continue;
-        if (X < 0.02 && X >= -T.len) {
-          var tt = Math.max(0, -X / T.len), root = profile(SH.body, 2, 0), half = root + (T.spread - root) * Math.pow(tt, 0.8), ay = Math.abs(Y - bend(tt) - (profile(SH.body, 1, 0) + root) / 2);
+        var Xt = X < 0 ? X / tc : X; // along the tail, undoing its foreshortening
+        if (X < 0.02 && Xt >= -T.len) {
+          var tt = Math.max(0, -Xt / T.len), root = profile(SH.body, 2, 0), half = root + (T.spread * ts - root) * Math.pow(tt, 0.8), ay = Math.abs(Y - (profile(SH.body, 1, 0) + root) / 2);
           var inTail = ay <= half;
-          if (T.round) inTail = ((X + T.len * 0.45) * (X + T.len * 0.45)) / (T.len * T.len * 0.3) + (ay * ay) / (T.spread * T.spread) <= 1 || (tt < 0.5 && ay <= half);
+          if (T.round) inTail = ((Xt + T.len * 0.45) * (Xt + T.len * 0.45)) / (T.len * T.len * 0.3) + (ay * ay) / (T.spread * ts * T.spread * ts) <= 1 || (tt < 0.5 && ay <= half);
           else if (T.fork && tt > 1 - T.fork * (1 - ay / Math.max(0.001, half))) inTail = false;
-          if (inTail) key = ((Math.round(ay * Lp) % 3 === 0) && tt > 0.15) ? finDark : (ay > half - 1.5 / Lp ? finLit : Fn);
+          if (inTail) key = ((Math.round(ay * Lp) % 3 === 0) && tt > 0.15) ? tailRay : (ay > half - 1.5 / Lp ? tailRim : tailFill);
         }
         for (k = 0; k < SH.fins.length && !key; k++) {
           f = SH.fins[k];
@@ -532,7 +546,7 @@ G.gfx.fishgen = (function () {
       for (y = 0; y < sh; y++) { var sw = Math.round(1 + y * 0.6); for (x = -sw; x <= sw; x++) if (!(y > sh * 0.6 && Math.abs(x) < sw * 0.4)) put(stx + x, sty - 1 - y, Math.abs(x) % 3 === 0 ? finDark : Fn); }
     }
     if (has('tail_face')) {
-      var tfx = PX(-T.len * 0.55), tfy = PY((profile(SH.body, 1, 0) + profile(SH.body, 2, 0)) / 2 + bend(0.55)), tr = Math.max(1, T.spread * Lp * 0.14);
+      var tfx = PX(-T.len * 0.55 * tc), tfy = PY((profile(SH.body, 1, 0) + profile(SH.body, 2, 0)) / 2), tr = Math.max(1, T.spread * Lp * 0.14);
       disc(tfx - tr * 1.6, tfy - tr * 1.6, tr, 'bone'); disc(tfx + tr * 1.6, tfy - tr * 1.6, tr, 'bone');
       put(Math.round(tfx - tr * 1.6), Math.round(tfy - tr * 1.6), 'ink'); put(Math.round(tfx + tr * 1.6), Math.round(tfy - tr * 1.6), 'ink');
       seg(tfx - tr * 1.5, tfy + tr * 1.8, tfx + tr * 1.5, tfy + tr * 1.8, 'flesh_dark');
@@ -616,8 +630,8 @@ G.gfx.fishgen = (function () {
 
   // ---- Swimmers (Phase 19) ------------------------------------------------------------------
   // The underwater fish: a look painted at swimming size in the view's pixels (about twice
-  // the old sprites), in its frames (rest, tail flick, and the shimmer for wrongness 3 or
-  // static), facing right or flipped, in colour or as a silhouette. Baked on first use.
+  // the old sprites), in its frames (FR: the beat, the turn, and the shimmer for wrongness 3
+  // or static), facing right or flipped, in colour or as a silhouette. Baked on first use.
   // SWIM: the box per base, in view pixels.
   var SWIM = { perch: [34, 30], pike: [50, 30], carp: [38, 34], trout: [40, 30], eel: [58, 26], catfish: [44, 34], gar: [54, 26], koi: [38, 34] };
   var swimmers = {};
@@ -628,9 +642,20 @@ G.gfx.fishgen = (function () {
       var src = swimArt(id, look, scale, frame, sil, false);
       cv = G.gfx.bake.flipped(src, 'x');
       cv.mouthX = src.width - 1 - src.mouthX; cv.mouthY = src.mouthY; cv.midY = src.midY;
+    } else if (sil) {
+      // Phase 27: the silhouette is the colour frame's shape filled flat (the same pixels
+      // paintLook would give it), so the bake paints each frame once.
+      var col = swimArt(id, look, scale, frame, false, false);
+      cv = G.gfx.bake.layer(col.width, col.height, function (c) {
+        c.drawImage(col, 0, 0);
+        c.globalCompositeOperation = 'source-in';
+        c.fillStyle = S.PALETTE[SIL_KEY];
+        c.fillRect(0, 0, col.width, col.height);
+      });
+      cv.mouthX = col.mouthX; cv.mouthY = col.mouthY; cv.midY = col.midY;
     } else {
       var box = SWIM[look.base];
-      cv = paintLook(look, box[0] * scale, box[1] * scale, sil, frame, true);
+      cv = paintLook(look, box[0] * scale, box[1] * scale, false, frame, true);
     }
     return (swimmers[key] = cv);
   }
@@ -655,7 +680,7 @@ G.gfx.fishgen = (function () {
   }
 
   return {
-    portrait: portrait, portraitFlipped: portraitFlipped, frameCount: frameCount,
+    portrait: portrait, portraitFlipped: portraitFlipped, frameCount: frameCount, FR: FR, BEAT: BEAT, swimFrames: swimFrames,
     swimmer: swimmer, baseSwimmer: baseSwimmer, partSwimmer: partSwimmer, SWIM: SWIM,
     BASE_NAMES: BASE_NAMES, PARTS: PARTS, PALETTES: PALETTES,
     generate: generate
