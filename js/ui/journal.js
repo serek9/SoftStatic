@@ -168,8 +168,9 @@ G.ui.journal = (function () {
     j.read = true;
     page.name = sp.name; page.got = true;
     page.count = 'Caught ' + j.caught + (j.caught === 1 ? ' time' : ' times');
-    page.best = j.bestLen.toFixed(1) + ' cm  |  ' + j.bestW.toFixed(2) + ' kg';
-    add(sp.name, 'ink', true); add(sp.rarity, 'wood', false); add(page.count, 'ink', true); add('Best ' + j.bestLen.toFixed(1) + ' cm, ' + j.bestW.toFixed(2) + ' kg', 'ink', true);
+    var bw = j.bestW < 0.1 ? Math.round(j.bestW * 1000) + ' g' : j.bestW.toFixed(2) + ' kg'; // Phase 44: small fish in grams
+    page.best = j.bestLen.toFixed(1) + ' cm  |  ' + bw;
+    add(sp.name, 'ink', true); add(sp.rarity, 'wood', false); add(page.count, 'ink', true); add('Best ' + j.bestLen.toFixed(1) + ' cm, ' + bw, 'ink', true);
     para(sp.desc, 'rust'); first = false;
     for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
     if (j.caught >= 2 && j.hints.indexOf('bait') < 0) note('bait');

@@ -39,6 +39,7 @@ const ROSTER = { common: 4, uncommon: 3, rare: 1, legendary: 1 }; // per locatio
 
 function stripCode(src) { return src.replace(/'(?:[^'\\\n]|\\.)*'/g, "''").replace(/\/\/.*$/gm, ''); }
 
+let sizeInfo = '';
 function validate(G, opts) {
   const errors = [], warnings = [], d = G.data;
   const err = m => errors.push(m), warn = m => warnings.push(m);
@@ -86,11 +87,32 @@ function validate(G, opts) {
 
   // Roster counts per location.
   for (const id in d.locations) {
-    const here = d.fish.filter(f => f.locations.includes(id)), have = {};
+    const here = d.fish.filter(f => f.locations.includes(id) && !d.isSmall(f)), have = {}; // Phase 44: small fish apart
     here.forEach(f => { have[f.rarity] = (have[f.rarity] || 0) + 1; });
     const short = Object.keys(ROSTER).filter(r => (have[r] || 0) !== ROSTER[r]).map(r => r + ' ' + (have[r] || 0) + '/' + ROSTER[r]);
     if (short.length) (opts.strict ? err : warn)('roster ' + id + ': ' + short.join(', ') + ' (target 9 species, TODO P14)');
   }
+  // Phase 44: two or three small fish in each water, 3-10 cm and 5-60 g.
+  for (const id in d.locations) {
+    const n = d.fish.filter(f => f.locations.includes(id) && d.isSmall(f)).length;
+    if (n < 2 || n > 3) err('small fish ' + id + ': ' + n + ' (want 2-3)');
+  }
+  d.fish.filter(d.isSmall).forEach(f => {
+    if (f.lengthCm[0] < 3 || f.weightKg[0] < 0.005 || f.weightKg[1] > 0.06) err('fish ' + f.id + ': a small fish is 3-10 cm and 5-60 g');
+  });
+  // Phase 44: the size curve. 10,000 draws a species through economy.sizeQ: the median length
+  // under the range's midpoint and the top 5% in the range's top tenth.
+  const E = G.sim.economy, rq = new G.core.rng.Rng(4401), qs = new Float64Array(10000);
+  let medMax = 0, p95Min = 1;
+  d.fish.forEach(f => {
+    for (let i = 0; i < qs.length; i++) qs[i] = E.sizeQ(rq.next(), d);
+    qs.sort();
+    const med = qs[qs.length >> 1], p95 = qs[Math.floor(qs.length * 0.95)]; // length is linear in q
+    medMax = Math.max(medMax, med); p95Min = Math.min(p95Min, p95);
+    if (!(med < 0.5)) err('fish ' + f.id + ': size curve median ' + med.toFixed(3) + ' of its range (want under 0.5)');
+    if (!(p95 >= 0.9)) err('fish ' + f.id + ': size curve top 5% from ' + p95.toFixed(3) + ' of its range (want 0.9+)');
+  });
+  sizeInfo = 'size curve (' + d.fish.length + ' species x 10,000): median at most ' + medMax.toFixed(3) + ' of the range, top 5% from ' + p95Min.toFixed(3);
   validateLocations(G, err);
 
   // Gear: 5 tiers each, tier 0 free, every tier dearer and better (V8: every item has an effect).
@@ -293,8 +315,8 @@ function session(G, seed, opts) {
         if (bite.slot >= 0 && school.fish[bite.slot].uid !== st.hookUid) { st.hookUid = school.fish[bite.slot].uid; st.willHook = rng.next() < P.hookRate; }
         bIn.reel = bite.slot >= 0 && st.willHook && bite.t >= P.hookDelay;
         if (S.bite.step(bite, bIn, DT, rng, data, school) === S.bite.HOOK) {
-          const f = school.fish[bite.slot], sp = data.fish[f.sp], q = rng.next();
-          st.cur = { sp: f.sp, id: sp.id, q, len: sp.lengthCm[0] + (sp.lengthCm[1] - sp.lengthCm[0]) * q, w: sp.weightKg[0] + (sp.weightKg[1] - sp.weightKg[0]) * Math.pow(q, 1.3),
+          const f = school.fish[bite.slot], sp = data.fish[f.sp], q = S.economy.sizeQ(rng.next(), data), sz = S.economy.size(sp, q, {});
+          st.cur = { sp: f.sp, id: sp.id, q, len: sz.len, w: sz.w,
             price: S.economy.price(sp, q, data), hintRefs: sp.hintRefs, windowCatch: Object.keys(latched)[0] || null };
           S.fight.start(fight, f.sp, sp, fx, rng, data, S.bite.hold(bite.t, false, data)); // Phase 23: the hold from the hook-set time
           f.active = false; S.fish_ai.scatter(school); S.bite.reset(bite);
@@ -630,6 +652,14 @@ function rodCheck() {
   let mis6 = 0, mis1 = 0; for (let t = 0; t < TIERS; t++) { mis6 = Math.max(mis6, Math.abs(at(t, 0.6).mis)); mis1 = Math.max(mis1, Math.abs(at(t, 1).mis)); }
   add('a tight line: the tip within 18° of it at load 0.6, 8° at load 1', mis6 <= 18 && mis1 <= 8, mis6.toFixed(1) + '°, ' + mis1.toFixed(1) + '°');
 
+  // Phase 44: a 0.05 kg fish at a fight's load (0.6) bends the Ultralight Wand's tip 3x+ as far
+  // as The Long Rod's (each rod's action and maxMass from data/gear.js).
+  const gearSrc = vm.createContext({}); vm.runInContext(fs.readFileSync(path.join(ROOT, 'data/gear.js'), 'utf8'), gearSrc);
+  const rods = gearSrc.G.data.gear.rods, wand = rods.find(r => r.ladder === false && r.smallBoost > 1), longRod = rods.filter(r => r.ladder !== false).pop();
+  const tipOff = r => { fresh(); settle(58, 0.6 * R.fishLoad(0.05, r.maxMass), 50, r.action); return Math.hypot(R.jx[N] - Math.cos(58 * D2R) * L, R.jy[N] - Math.sin(58 * D2R) * L); };
+  const wOff = tipOff(wand), lOff = tipOff(longRod);
+  add('a 0.05 kg fish bends the ' + wand.name + ' 3x+ as far as ' + longRod.name, wOff >= 3 * lOff, wOff.toFixed(2) + ' px vs ' + lOff.toFixed(2) + ' px (' + (wOff / lOff).toFixed(1) + 'x)');
+
   // Springing: one smooth curve while it moves (an S only near straight), an overshoot, settled.
   let sMoving = 0, frames = 0;
   const watch = (n, a, load, deg, t) => { for (let i = 0; i < n; i++) { step(a, load, deg, t); frames++; if (sShape() && Math.abs(R.st.bendDeg) > 6) sMoving++; } };
@@ -707,6 +737,7 @@ if (require.main === module) {
   if (args.includes('--validate')) {
     const r = validate(load(), { strict: args.includes('--strict') });
     r.warnings.forEach(w => console.log('warn  ' + w));
+    if (sizeInfo) console.log('info  ' + sizeInfo);
     r.errors.forEach(e => console.log('ERROR ' + e));
     console.log(r.errors.length ? r.errors.length + ' error(s)' : 'validate: OK (' + r.warnings.length + ' warning(s))');
     if (r.errors.length) code = 1;

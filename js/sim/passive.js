@@ -65,9 +65,8 @@ G.sim.passive = (function () {
     }
     pl.result = r === F.WIN ? CAUGHT : LOST;
     if (pl.result === CAUGHT) {
-      var q = rng.next();
-      pl.len = Math.round((sp.lengthCm[0] + (sp.lengthCm[1] - sp.lengthCm[0]) * q) * 10) / 10;
-      pl.w = Math.round((sp.weightKg[0] + (sp.weightKg[1] - sp.weightKg[0]) * Math.pow(q, 1.3)) * 100) / 100;
+      var q = E.sizeQ(rng.next(), data);
+      E.size(sp, q, pl);
       pl.price = E.price(sp, q, data);
       pl.coins = Math.round(pl.price * data.gear.passive.incomeMult);
       for (k in ps.latched) { pl.win = k; break; }
