@@ -1308,6 +1308,7 @@ G.scene.sailing = (function () {
     var surf = G.gfx.surface; // Phase 24: pitch, heave and the outboard, on the surface under the hull
     boat.motion(b, move, dt, surf.at(boat.bow(b)) / HI, surf.at(boat.stern(b)) / HI);
     if (b.wakeHit) fx.ripple(b.x, loc.waterY + 2, 8, 22, 1.6); // the water lifts the hull: a ring
+    G.scene.underwater.swimStep(run, dt); // Phase 27: the swimmers' beat, turns and pitch (the mouth reads them)
     ropeStep(run, dt); // Phase 21: after everything that moves the rod tip, the lure or the fish
     G.scene.underwater.bodyStep(run, dt, loc); // Phase 22: the lure's heading and flutter
     fx.setFlow(G.scene.underwater.flow(loc, 8)); // bubbles drift with the water
