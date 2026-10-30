@@ -39,7 +39,7 @@ const ROSTER = { common: 4, uncommon: 3, rare: 1, legendary: 1 }; // per locatio
 
 function stripCode(src) { return src.replace(/'(?:[^'\\\n]|\\.)*'/g, "''").replace(/\/\/.*$/gm, ''); }
 
-let sizeInfo = '';
+let sizeInfo = '', lineInfo = '';
 function validate(G, opts) {
   const errors = [], warnings = [], d = G.data;
   const err = m => errors.push(m), warn = m => warnings.push(m);
@@ -164,6 +164,20 @@ function validate(G, opts) {
   ['pull0', 'pull1', 'tired0', 'tired1', 'pullRise', 'easeFall', 'run', 'tiredRise', 'release', 'recover', 'slipT', 'slipD', 'escape', 'd0',
     'holdLate', 'slackT', 'holdLoss', 'jumpLoss', 'shakeLen0', 'shakeLen1', 'shakeGap0', 'shakeGap1', 'shakeRise', 'jumpRate', 'jumpLen', 'jumpHigh', 'jumpSpike']
     .forEach(k => { if (!(typeof g.fight[k] === 'number' && g.fight[k] > 0)) err('fight constant ' + k); });
+
+  // Phase 53: line types. Monofilament is the line the game was tuned with (all ones, free);
+  // at least one line is unseen, or line-shy fish could never be caught.
+  const LT = g.lineTypes || [], mono = LT[0];
+  if (!mono || mono.id !== 'mono' || mono.cost !== 0 || mono.strength !== 1 || mono.rise !== 1 || mono.shake !== 1 || mono.hold !== 0 || !mono.seen) err('lineTypes: the first must be free monofilament with every factor 1');
+  LT.forEach(t => {
+    ['strength', 'rise', 'shake', 'feel', 'sinkG', 'belly', 'alpha'].forEach(k => { if (!(typeof t[k] === 'number' && t[k] > 0)) err('lineType ' + t.id + ': ' + k); });
+    if (!(t.hold >= 0 && t.hold < 0.3) || !PAL[t.key]) err('lineType ' + t.id + ': hold or key');
+  });
+  if (!LT.some(t => !t.seen)) err('lineTypes: no line hides from line-shy fish');
+  d.fish.forEach(f => { if (f.lineShy !== undefined && f.lineShy !== true) err('fish ' + f.id + ': lineShy must be true or absent'); });
+  const shy = d.fish.filter(f => f.lineShy).map(f => f.id);
+  if (shy.includes((d.locations.red.need || {}).fish)) err('lineShy: the Red Room key fish must not be line-shy');
+  lineInfo = 'line-shy species (' + shy.length + '): ' + shy.join(', ');
 
   // Phase 52: passive income is gone; nothing may bring it back (V7, D5 retired).
   if (g.passive) err('gear.passive: passive mode was removed in Phase 52');
@@ -324,6 +338,7 @@ function session(G, seed, opts) {
     c.hour = save.clock; c.unease = S.unease.get(save, st.loc); c.bait = lure.bait; c.rodMaxMass = fx.maxMass;
     c.attract = fx.attract; c.rareBoost = fx.rareBoost; c.depthM = lure.y * 0.25;
     c.lure = lure.lure = fx.lure; c.smallBoost = fx.smallBoost; c.smallMass = fx.smallMass; // Phase 43
+    c.lineSeen = fx.lineSeen && !(opts && opts.unseen); // Phase 53
     st.t += DT;
     switch (st.phase) {
       case 'cast':
@@ -394,7 +409,9 @@ function session(G, seed, opts) {
 // Each hook (the live baits and the lures) fished for an hour at each water with the rod of
 // that stage (Fogbound the fibreglass, the creek the graphite, the Pines the lacquered, the
 // Red Room the long rod), 4 seeds: catches and coins an hour, net of what the hook cost.
-// Target: every lure earns 50-200% of what worms earn at every water.
+// Target: every lure earns 50-200% of what worms earn at every water. Phase 53: the line is
+// left out of it (unseen: line-shy fish bite as on fluorocarbon, the fight is monofilament's),
+// so the lures are compared as they were before the line types.
 
 function tackleCheck() {
   const G = load(), d = G.data, hooks = ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)), waters = { fog: 1, creek: 2, pines: 3, red: 4 };
@@ -407,7 +424,7 @@ function tackleCheck() {
     for (const w in waters) {
       let coins = 0, catches = 0;
       for (let sd = 1; sd <= 4; sd++) {
-        const s = session(G, sd * 97, { stay: true, shop: false, loc: w, rod: waters[w], bait: hk });
+        const s = session(G, sd * 97, { stay: true, shop: false, loc: w, rod: waters[w], bait: hk, unseen: true }); // Phase 53: the line out of the picture
         const c0 = s.save.coins; s.run(3600);
         coins += s.save.coins - c0 - s.st.spent; catches += s.st.catches;
       }
@@ -506,7 +523,11 @@ const OLD_SAVES = [
     flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true }, look: { fisher: 'headlamp', dog: 'husky' }, rng: 4 }, look: { fisher: 'headlamp', dog: 'husky' } },
   { from: 'Phase 47, v5 with a hand-edited look', save: { version: 5, coins: 50, gear: { rod: 0, rods: [0], reel: 0, line: 0, lantern: false, depthFinder: false, bait: 'worm' }, baits: {}, journal: {},
     kept: [], cabinLevel: 0, unlocks: { fog: true }, loc: 'fog', unease: {}, clock: 19, lastSeen: 0,
-    flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true }, look: { fisher: 7 }, rng: 4 }, look: { fisher: 'red_cap', dog: 'golden' } }
+    flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true }, look: { fisher: 7 }, rng: 4 }, look: { fisher: 'red_cap', dog: 'golden' } },
+  // Phase 53: a v6 save with braid on the reel and fluorocarbon owned, and a released fish.
+  { from: 'Phase 53, v6 with line types', save: { version: 6, coins: 300, gear: { rod: 1, rods: [0, 1], reel: 1, line: 2, lineType: 'braid', lineTypes: ['mono', 'fluoro', 'braid'], lantern: false, depthFinder: false, bait: 'worm' }, baits: {},
+    journal: { mist_carp: { caught: 1, bestLen: 50, bestW: 1.9, hints: ['line'], seen: true, phantom: false, released: 1 } }, kept: [], cabinLevel: 0, unlocks: { fog: true }, loc: 'fog', unease: {}, clock: 12, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 1, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 6 }, lineType: 'braid' }
 ];
 
 function savesCheck() {
@@ -533,6 +554,7 @@ function savesCheck() {
         const fx = E.effects(s, G.data, {});
         if (!(fx.maxMass > 0 && fx.castMax > 0)) probs.push('gear effects');
         if (!Array.isArray(s.gear.rods) || !s.gear.rods.includes(s.gear.rod)) probs.push('the rod in hand is not owned');
+        if (s.gear.lineType !== (o.lineType || 'mono') || !E.ownsLineType(s, s.gear.lineType) || fx.lineType !== s.gear.lineType) probs.push('line type ' + s.gear.lineType); // Phase 53
         for (const id in G.data.locations) E.canUnlock(s, id, G.data);
         for (const id in s.journal) if (!G.data.fish.some(f => f.id === id)) probs.push('journal species ' + id + ' no longer exists');
         if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
@@ -616,6 +638,34 @@ function fightCheck() {
     ['tapping lands 70% or less', rate('tapping', 'win') <= 0.7, (100 * rate('tapping', 'win')).toFixed(1) + '%'],
     ['never reeling loses every fish in 5-10 s', all.never.win === 0 && all.never.lossT / all.never.tot >= 5 && all.never.lossT / all.never.tot <= 10, (all.never.lossT / all.never.tot).toFixed(1) + ' s, ' + all.never.win + ' landed']
   ];
+  // Phase 53: the line types on the middle tier: braid (no stretch) sets the hook firmer and
+  // its strength keeps tension down, but its slack head shakes throw more hooks; fluorocarbon
+  // is a little less forgiving than monofilament. Checks: every type lands 60%+ at skill 0.5
+  // and 88%+ at 0.85; braid throws more hooks than mono at skill 0.5 and snaps fewer.
+  const lt = {};
+  console.log('\nline     player      landed  snapped  thrown  run out   (tier 2)');
+  for (const t of g.lineTypes) {
+    const gear = { lineStrength: g.lines[2].strength * t.strength, reelSpeed: g.reels[2].speed, maxMass: g.rods[2].maxMass, smallHook: g.rods[2].smallHook, lineRise: t.rise, lineShake: t.shake, lineHold: t.hold };
+    const fish = d.fish.filter(f => f.mass <= g.rods[2].maxMass);
+    lt[t.id] = {};
+    for (const sk of [0.5, 0.85]) {
+      const rng = new G.core.rng.Rng(777), n = { win: 0, snap: 0, thrown: 0, run: 0 };
+      for (const f of fish) for (let i = 0; i < N; i++) {
+        const st = F.create();
+        F.start(st, d.fish.indexOf(f), f, gear, rng, d, hold);
+        let r = F.NONE, steps = 0;
+        while (r === F.NONE && steps < 60 * 600) { r = F.step(st, { reel: F.autoPlayer(st, sk, rng) === 1 }, DT, rng, d); steps++; }
+        if (r === F.WIN) n.win++; else if (r === F.SNAP) n.snap++; else if (st.thrown) n.thrown++; else n.run++;
+      }
+      const tot = fish.length * N, pc = k => (100 * n[k] / tot).toFixed(1).padStart(6) + '%';
+      lt[t.id][sk] = { win: n.win / tot, snap: n.snap / tot, thrown: n.thrown / tot };
+      console.log(t.id.padEnd(9) + ('skill ' + sk).padEnd(11) + pc('win') + ' ' + pc('snap') + ' ' + pc('thrown') + ' ' + pc('run'));
+    }
+  }
+  const lw = k => Math.min.apply(null, g.lineTypes.map(t => lt[t.id][k].win));
+  checks.push(['every line type lands 60%+ at skill 0.5 and 88%+ at 0.85', lw(0.5) >= 0.6 && lw(0.85) >= 0.88, (100 * lw(0.5)).toFixed(1) + '%, ' + (100 * lw(0.85)).toFixed(1) + '%']);
+  checks.push(['braid throws more hooks and snaps fewer lines than mono (skill 0.5)', lt.braid[0.5].thrown > lt.mono[0.5].thrown && lt.braid[0.5].snap <= lt.mono[0.5].snap,
+    'thrown ' + (100 * lt.braid[0.5].thrown).toFixed(1) + '% vs ' + (100 * lt.mono[0.5].thrown).toFixed(1) + '%, snapped ' + (100 * lt.braid[0.5].snap).toFixed(1) + '% vs ' + (100 * lt.mono[0.5].snap).toFixed(1) + '%']);
   let ok = true;
   for (const [what, pass, got] of checks) { console.log((pass ? 'PASS ' : 'FAIL ') + what + ': ' + got); ok = ok && pass; }
   return ok ? 0 : 1;
@@ -767,6 +817,7 @@ if (require.main === module) {
     const r = validate(load(), { strict: args.includes('--strict') });
     r.warnings.forEach(w => console.log('warn  ' + w));
     if (sizeInfo) console.log('info  ' + sizeInfo);
+    if (lineInfo) console.log('info  ' + lineInfo);
     r.errors.forEach(e => console.log('ERROR ' + e));
     console.log(r.errors.length ? r.errors.length + ' error(s)' : 'validate: OK (' + r.warnings.length + ' warning(s))');
     if (r.errors.length) code = 1;

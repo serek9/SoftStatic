@@ -38,6 +38,9 @@ G.gfx.rope = (function () {
     st.ax = st.bx = px; st.ay = st.by = py;
   }
 
+  // Phase 53: how fast the line sinks under water (px/s²): the line type's (data/gear.js).
+  function setSink(g) { K.waterG = g; }
+
   function off() { st.mode = OFF; st.rest = 0; st.taut = 0; st.sagMax = 0; st.span = 0; }
 
   // The rod tip and (pinned) the far end, in world px.
@@ -129,7 +132,7 @@ G.gfx.rope = (function () {
 
   return {
     N: N, K: K, st: st, x: x, y: y, wet: wet, OFF: OFF, PINNED: PINNED, LOOSE: LOOSE,
-    reset: reset, off: off, anchors: anchors, loosen: loosen, step: step, twitch: twitch, setRest: setRest
+    reset: reset, off: off, anchors: anchors, loosen: loosen, step: step, twitch: twitch, setRest: setRest, setSink: setSink
   };
 })();
 

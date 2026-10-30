@@ -107,6 +107,7 @@ G.sim.fish_ai = (function () {
       ctx: {
         species: data.fish, rarity: data.rarity, windows: data.windows, loc: '', depthM: null, hour: 0,
         unease: 0, bait: '', latched: {}, rodMaxMass: 0, weights: null, tooHeavyNear: false,
+        lineSeen: true, // Phase 53: a line-shy species (fish.lineShy) sees this line and will not bite
         attract: 1, rareBoost: 1, legendBoost: 1, // gear and cast spot: attract shortens the wait between arrivals
         maxDepthPx: 0, floorAt: null, // floorAt(x) -> bottom depth in px; null uses maxDepthPx
         flowAt: null // Phase 28: flowAt(x, depth px) -> px/s of current; null is still water
@@ -115,7 +116,7 @@ G.sim.fish_ai = (function () {
     for (var i = 0; i < MAX; i++) {
       s.fish.push({ active: false, uid: 0, sp: -1, x: 0, y: 0, vx: 0, vy: 0, home: 0, dir: 1,
         state: 'wander', t: 0, turnT: 0, circles: 0, ang: 0, swept: 0, nibbles: 0, nibbleN: 0, nibbleT: 0, nibbleLen: 0, missed: 0,
-        yaw: 0, pitch: 0, spd: 0, back: 0, face: 1, gl: 0, glT: 0, bursts: 0, flow: 0 }); // Phase 28
+        yaw: 0, pitch: 0, spd: 0, back: 0, face: 1, gl: 0, glT: 0, bursts: 0, flow: 0, shied: 0 }); // Phase 28; shied: Phase 53
     }
     return s;
   }
@@ -142,7 +143,7 @@ G.sim.fish_ai = (function () {
       f.x = x; f.y = y; f.vx = 0; f.vy = 0; f.dir = dir;
       f.yaw = dir >= 0 ? 0 : Math.PI; f.pitch = 0; f.spd = 0; f.back = 0; f.face = dir >= 0 ? 1 : -1; f.gl = 0; f.glT = 0; f.bursts = 0; f.flow = 0;
       f.home = clampDepth(school, f, rng.range(h.depthMin, h.depthMax) * 4);
-      f.turnT = rng.range(2, 6); f.circles = 0; f.ang = 0; f.swept = 0; f.nibbles = 0; f.nibbleN = 0; f.nibbleT = 0; f.missed = 0;
+      f.turnT = rng.range(2, 6); f.circles = 0; f.ang = 0; f.swept = 0; f.nibbles = 0; f.nibbleN = 0; f.nibbleT = 0; f.missed = 0; f.shied = 0;
       setState(f, 'wander');
       return f;
     }
@@ -279,7 +280,9 @@ G.sim.fish_ai = (function () {
         swim(f, sp, -Math.sin(la) * R * w * f.dir + (tx - f.x) * M.circleK, Math.cos(la) * R * 0.5 * w * f.dir + (ty - f.y) * M.circleK, speed * 0.8, false, dt);
         if (f.swept >= 6.2832) {
           f.swept = 0;
-          if (--f.circles <= 0) {
+          if (--f.circles <= 0 && sp.lineShy && school.ctx.lineSeen) {
+            setState(f, 'leave'); f.shied = 1;           // Phase 53: close enough to see the line: it turns away
+          } else if (f.circles <= 0) {
             setState(f, 'nibble');
             f.nibbleN = rng.int(2, 4); f.nibbles = 0; f.nibbleT = f.nibbleLen = rng.range(0.25, 0.6);
             f.dir = f.x < lure.x ? 1 : -1;

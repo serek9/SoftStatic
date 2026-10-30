@@ -103,6 +103,18 @@ G.core.debug = (function () {
       }
       return true;
     },
+    // dbg.line(id) spools on line type id ('mono', 'fluoro', 'braid'), owning it if needed
+    // (Phase 53); dbg.line() reads the line and what it does.
+    line: function (id) {
+      var save = G.state.save, E = G.sim.economy;
+      if (id !== undefined) {
+        if (E.lineTypeById(id, G.data).id !== id) return 'line types: ' + G.data.gear.lineTypes.map(function (t) { return t.id; }).join(', ');
+        if (!E.ownsLineType(save, id)) save.gear.lineTypes.push(id);
+        E.useLineType(save, id); G.core.save.autosave('line');
+      }
+      var fx = E.effects(save, G.data, {});
+      return { type: fx.lineType, owned: save.gear.lineTypes.slice(), strength: fx.lineStrength, rise: fx.lineRise, shake: fx.lineShake, hold: fx.lineHold, seen: fx.lineSeen, feel: fx.lineFeel, sinkG: G.gfx.rope.K.waterG };
+    },
     // dbg.release(): the last fish let go from the card (Phase 51): its swing's time, whether
     // it has left his hand, how long since it went in, where it is, and how many so far.
     release: function () { return G.scene.sailing.release(); },

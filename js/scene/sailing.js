@@ -406,6 +406,7 @@ G.scene.sailing = (function () {
     ctx.unease = G.sim.unease.get(save, loc.id);
     ctx.bait = li.bait; ctx.lure = li.lure;
     ctx.smallBoost = gx.smallBoost; ctx.smallMass = gx.smallMass; // Phase 43: the ultralight rod
+    ctx.lineSeen = gx.lineSeen;                                    // Phase 53: line-shy fish see it
     ctx.latched = c.latched;
     ctx.rodMaxMass = rodMaxOverride || gx.maxMass;
     // 8.4 #5: after a rod change the too-heavy flag is worked out again at once (it used to
@@ -588,6 +589,7 @@ G.scene.sailing = (function () {
           u = (run.bite.t * 2.6) % 1;
           out[1] = 0.1 + Math.min(0.15, run.bite.t * 0.2) + 0.3 * (u < 0.08 ? u / 0.08 : Math.exp(-(u - 0.08) * 7));
         }
+        out[1] *= run.gearFx.lineFeel || 1; // Phase 53: a line without stretch (braid) carries every touch to the tip
     }
     if (run.fisher && run.fisher.angle !== null) out[0] = run.fisher.angle; // Phase 33: in the holder, or raised in an act
     return out;
@@ -760,7 +762,7 @@ G.scene.sailing = (function () {
       else {
         // Waiting, the angler takes in the slack the sink left until a light belly remains;
         // a lure that drifts away draws line out.
-        var belly = span * ROPE.belly + 1.5;
+        var belly = span * lineType().belly + 1.5; // Phase 53: braid lies straighter, mono keeps a belly
         r = r > belly ? r - (r - belly) * Math.min(1, ROPE.takeUp * dt) : Math.max(r, span * 1.01);
       }
       nibT -= dt;
@@ -817,10 +819,10 @@ G.scene.sailing = (function () {
       end = lurePos(run, lurePt);
       end[0] -= camPx; end[1] -= camPy;
     }
-    var F = run.fight, key = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : F.T) : 'fog_light';
+    var LT = lineType(), F = run.fight, key = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : F.T) : LT.key; // Phase 53: the line's own colour
     var vib = fsm === 'fighting' && F.mode === 'pull' ? (0.4 + 0.9 * F.T) * Math.sin(b.t * 47) : 0; // the taut line hums
     var hum = run.heavy.hum > 0 ? Math.round(Math.sin(b.t * 90)) : 0;
-    drawRope(ctx, end, key, fight ? 0.85 : 0.6, vib, hum);
+    drawRope(ctx, end, key, fight ? Math.max(LT.alpha, 0.5) + 0.25 : LT.alpha, vib, hum);
     if (fight) return;
     var lx, ly;
     if (end) { lx = end[0]; ly = end[1]; }
@@ -1286,6 +1288,29 @@ G.scene.sailing = (function () {
     c.globalAlpha = 1;
   }
 
+  // ---- The line (Phase 53) ------------------------------------------------------
+  // The line type on the reel (data/gear.js lineTypes) for how it is drawn and how it hangs:
+  // its colour and alpha (fluorocarbon barely shows, braid is green and plain), how fast it
+  // sinks under water (rope.setSink) and the belly a waiting line keeps. A line-shy fish that
+  // turns away (fish_ai sets f.shied) is said once a cast on the HUD and writes the journal's
+  // 'line' hint for its species, caught or not.
+  function lineType() { return G.sim.economy.lineTypeById(G.state.save.gear.lineType, G.data); }
+  var shyCast = -1;
+  function lineStep(run) {
+    rope.setSink(lineType().sinkG);
+    var fish = run.school.fish;
+    for (var i = 0; i < fish.length; i++) {
+      var f = fish[i];
+      if (!f.active || f.shied !== 1) continue;
+      f.shied = 2;
+      var sp = G.data.fish[f.sp], j = G.state.save.journal[sp.id];
+      if (!j) j = G.state.save.journal[sp.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: true, phantom: false };
+      if (j.hints.indexOf('line') < 0) { j.hints.push('line'); G.core.save.autosave('hint'); }
+      if (shyCast !== run.cast.n) { shyCast = run.cast.n; G.ui.hud.say('It saw the line and turned away.'); }
+      if (G.core.debug) G.core.debug.log(sp.id + ' saw the line');
+    }
+  }
+
   // ---- Letting a fish go (Phase 51) ---------------------------------------------
   // RELEASE on the catch card: the fish is back in his far hand by the gunwale; he swings it
   // back, then out over the water, and lets go (fisher.toss drives the arm). It flies in an
@@ -1451,6 +1476,7 @@ G.scene.sailing = (function () {
       G.gfx.surface.poke(rx, 0.12, 1); // the same drop dents the waterline (Phase 20)
     }
     releaseStep(run, dt);
+    lineStep(run);
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
     if (run.fsm === 'card') {
@@ -1572,8 +1598,9 @@ G.scene.sailing = (function () {
     gearLook.fisher = run.fisher; // Phase 33: P2-2's thermos is one of his idle acts now
     // Phase 31: the line along the rod in the same colour as the line out (drawCast).
     var fight = fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing';
-    gearLook.lineKey = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : run.fight.T) : 'fog_light';
-    gearLook.lineA = fight ? 0.85 : 0.6;
+    var LT = lineType();
+    gearLook.lineKey = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : run.fight.T) : LT.key;
+    gearLook.lineA = fight ? Math.max(LT.alpha, 0.5) + 0.25 : LT.alpha;
     boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, fisher !== false, drawDog, gearLook);
   }
 

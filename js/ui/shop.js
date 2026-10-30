@@ -18,7 +18,8 @@ G.ui.shop = (function () {
   // in hand), and a case holds the lures (sold like the baits).
   var SHELVES = [
     [{ kind: 'rod', id: 0, icon: 'rod' }, { kind: 'rod', id: 5, icon: 'rod' }, { kind: 'rod', id: 1, icon: 'rod' }, { kind: 'rod', id: 2, icon: 'rod' },
-     { kind: 'rod', id: 3, icon: 'rod' }, { kind: 'rod', id: 4, icon: 'rod' }, { kind: 'reel', icon: 'reel' }, { kind: 'line', icon: 'line' }],
+     { kind: 'rod', id: 3, icon: 'rod' }, { kind: 'rod', id: 4, icon: 'rod' }, { kind: 'reel', icon: 'reel' }, { kind: 'line', icon: 'line' },
+     { kind: 'lineType', id: 'mono', icon: 'line' }, { kind: 'lineType', id: 'fluoro', icon: 'line' }, { kind: 'lineType', id: 'braid', icon: 'line' }], // Phase 53: the spools
     [{ kind: 'lantern', icon: 'lantern' }, { kind: 'depthFinder', icon: 'finder' }],
     [{ kind: 'bait', id: 'worm', icon: 'worm' }, { kind: 'bait', id: 'cricket', icon: 'cricket' },
      { kind: 'bait', id: 'minnow', icon: 'minnow' }, { kind: 'bait', id: 'unlabelled', icon: 'jar' }],
@@ -27,6 +28,12 @@ G.ui.shop = (function () {
   ];
   var SWIM_SAYS = { mid: 'Spins in mid water as you reel.', dive: 'Floats, and dives when reeled.', bed: 'Sinks to the bottom and hops.',
     top: 'Stays on top. Tap to make it pop.', lift: 'Sinks fast; jig it up and down.' };
+  // Phase 53: what Rusty says of each kind of line.
+  var LINE_SAYS = {
+    mono: 'Stretches, so it forgives a lunge. Fish can see it.',
+    fluoro: 'Near invisible under water, and it sinks. Shy fish will not see it. Stiffer: less forgiving.',
+    braid: 'No stretch: you feel every touch and the hook sets hard. Strong, but a head shake throws hooks. Fish see it.'
+  };
   var TYPE = 48; // characters of speech typed a second
 
   // Ramps, dark to light.
@@ -217,7 +224,7 @@ G.ui.shop = (function () {
   // Phase 38: the shelves he can face, and their items ([shelf, item] in SHELVES); what they
   // show: the gear he has, and the minnows and crickets left after what he bought this visit
   // (the shop's stock is endless in the sim; the tank and the crate are full again next visit).
-  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]],
+  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]],
     lures: [[3, 0], [3, 1], [3, 2], [3, 3], [3, 4]] };
   var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
   var stock = { rod: 0, lantern: false, finder: false, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
@@ -268,6 +275,12 @@ G.ui.shop = (function () {
         (rd.smallBoost > 1 ? '; small fish come to it.' : (rd.smallHook < 0.9 ? '; small mouths tear free of it.' : '.'));
       if (!own) txt.price = rd.cost + 'c';
       status = save.gear.rod === it.id ? 'In your hands.' : (own ? 'Yours. Space to take it.' : 'In hand: ' + inHand.name + '.');
+    } else if (it.kind === 'lineType') { // Phase 53: a spool of a line type
+      var lt = E.lineTypeById(it.id, G.data), ownL = E.ownsLineType(save, it.id);
+      name = lt.name;
+      desc = LINE_SAYS[lt.id];
+      if (!ownL) txt.price = lt.cost + 'c';
+      status = save.gear.lineType === it.id ? 'On your reel.' : (ownL ? 'Yours. Space to spool it on.' : 'On your reel: ' + E.lineTypeById(save.gear.lineType, G.data).name + '.');
     } else if (it.kind === 'reel' || it.kind === 'line') {
       var tiers = g[E.TIERED[it.kind]];
       cur = tiers[save.gear[it.kind]]; next = E.nextItem(save, it.kind, G.data);
@@ -276,7 +289,7 @@ G.ui.shop = (function () {
         name = next.name; txt.price = next.cost + 'c';
         if (it.kind === 'rod') desc = 'Casts ' + pct(next.castMax / cur.castMax) + '% farther and holds fish up to ' + next.maxMass + ' kg (yours: ' + cur.maxMass + ' kg).';
         if (it.kind === 'reel') desc = 'Reels a tired fish in ' + pct(next.speed / cur.speed) + '% faster.';
-        if (it.kind === 'line') desc = 'Tension builds ' + Math.round((1 - cur.strength / next.strength) * 100) + '% slower while a fish pulls.';
+        if (it.kind === 'line') desc = 'A stronger test, any kind of line. Tension builds ' + Math.round((1 - cur.strength / next.strength) * 100) + '% slower while a fish pulls.';
         status = 'In use: ' + cur.name + '.';
       }
     } else if (it.kind === 'lantern' || it.kind === 'depthFinder') {
@@ -311,6 +324,10 @@ G.ui.shop = (function () {
       var rd = g.rods[it.id], own = E.ownsRod(save, it.id);
       lab.name = rd.name; lab.price = own ? 'OWNED' : rd.cost + 'c';
       if (save.gear.rod === it.id) lab.mark = 'ON';
+    } else if (it.kind === 'lineType') {
+      var lt = E.lineTypeById(it.id, G.data), ownL = E.ownsLineType(save, it.id);
+      lab.name = lt.name; lab.price = ownL ? 'OWNED' : lt.cost + 'c';
+      if (save.gear.lineType === it.id) lab.mark = 'ON';
     } else if (it.kind === 'reel' || it.kind === 'line') {
       var next = E.nextItem(save, it.kind, G.data);
       if (next) { lab.name = next.name; lab.price = next.cost + 'c'; }
@@ -339,6 +356,9 @@ G.ui.shop = (function () {
     } else if (it.kind === 'rod') { // Phase 43: buy it, or take it in hand if it is yours
       if (E.ownsRod(save, it.id)) { E.useRod(save, it.id); describe(); G.core.save.autosave('rod'); say('In your hands now.'); return; }
       r = E.buyRod(save, it.id, G.data);
+    } else if (it.kind === 'lineType') { // Phase 53: buy the spool, or spool on one you own
+      if (E.ownsLineType(save, it.id)) { E.useLineType(save, it.id); describe(); G.core.save.autosave('line'); say('Spooled on.'); return; }
+      r = E.buyLineType(save, it.id, G.data);
     } else r = E.buy(save, it.kind, G.data);
     describe();
     if (r === E.OK) { G.core.save.autosave('purchase'); say('Thank you kindly.', 'moss_lit'); }

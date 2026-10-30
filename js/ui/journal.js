@@ -96,6 +96,7 @@ G.ui.journal = (function () {
       var b = G.sim.economy.baitById(p[1], G.data);
       if (b) return 'Comes to ' + (b.label === false ? 'the jar with no label' : b.name.toLowerCase()) + '.';
     }
+    if (ref === 'line') return 'Shy of the line: it saw mine and turned away. Only fluorocarbon fools it.'; // Phase 53
     if (ref === 'depth:deep') return 'Keeps to the deepest water here.';
     if (ref === 'depth:shallow') return 'Stays near the surface.';
     if (p[0] === 'spot') { var sp0 = spotById(sp, p[1]); if (sp0 && sp0.where) return 'Lives ' + sp0.where + '.'; }
