@@ -11,7 +11,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.ui = G.ui || {};
 G.ui.shop = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu, E = G.sim.economy, A = G.gfx.paint;
-  var px = A.px, box = A.box, blob = A.blob, limb = A.limb, tone = A.tone, line = A.line, slab = A.slab, hash = A.hash2, D = A.dither;
+  var px = A.px, box = A.box, blob = A.blob, limb = A.limb, tone = A.tone, line = A.line, slab = A.slab;
 
   // Shelves (the panel's tabs). kind: a gear kind for economy.buy, or 'bait' with an id.
   var SHELVES = [
@@ -473,6 +473,24 @@ G.ui.shop = (function () {
     // dbg.shop(): where he stands and faces, the dog, what he faces, what is open over the room.
     info: function () { return walk ? { c: walk.c, r: walk.r, face: walk.face, moving: walk.moving, steps: walk.steps, dog: [walk.dog.c, walk.dog.r, walk.dog.sit], faced: faced, open: open, page: page, pages: pages.length, choice: CHOICES[choice], items: list.length, sel: sel, from: from, rusty: [rusty.face, rusty.fr], shown: R.shown(), strange: odd.kind, oddSeen: odd.seen, env: env, bakeMs: +R.bakeMs().toFixed(1), room: [R.OX, R.OY, R.COLS * R.T, R.ROWS * R.T], blocked: R.blocked().length } : null; },
     walk: function () { return walk; },
+    // dbg.shopWalk(path) (Phase 40): walks him by U, D, L and R, a tile each, through the walk's
+    // own rules (turning, collisions); returns where he ended and how many steps were blocked.
+    walkPath: function (path) {
+      var DIR = { U: 'up', D: 'down', L: 'left', R: 'right' }, blocked = 0;
+      for (var i = 0; i < path.length; i++) {
+        var d = DIR[path[i].toUpperCase()];
+        if (!d) continue;
+        var n0 = walk.steps;
+        for (var k = 0; k < 90; k++) {                                              // held until the step starts, then let go
+          R.step(walk, 1 / 60, walk.steps > n0 ? '' : d, '');
+          if (walk.steps > n0 && !walk.moving) break;
+        }
+        if (walk.steps === n0) blocked++;
+      }
+      R.step(walk, 1 / 60, '', '');
+      faced = R.facing(walk);
+      return { c: walk.c, r: walk.r, face: walk.face, faced: faced, blocked: blocked };
+    },
     icon: icon
   };
 })();

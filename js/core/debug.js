@@ -294,6 +294,8 @@ G.core.debug = (function () {
     // dbg.shop() returns the bait shop's walk (Phase 36): the tile (c, r), facing, moving, steps,
     // the dog (c, r, sitting), the mode ('room' or 'panel') and what he faces.
     shop: function () { return G.ui.shop.info(); },
+    // dbg.shopWalk('RRRUU') walks him through the shop a tile per letter (U, D, L, R), by the walk's rules.
+    shopWalk: function (path) { return G.core.state.sceneName() === 'shop' ? G.ui.shop.walkPath(path || '') : 'not in the shop'; },
     // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
     // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
     dangle: function () { return G.scene.sailing.dangle(); },
@@ -330,7 +332,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
-      pages.push('swim', 'sprites', 'baits', 'fx');
+      pages.push('swim', 'sprites', 'baits', 'fx', 'shop');
       page = 0; t = 0;
     }
 
@@ -427,6 +429,20 @@ G.core.debug = (function () {
           ctx.drawImage(cyc < 4 ? FG.partSwimmer(base, '', FG.BEAT[cyc], false, false) : FG.partSwimmer(base, '', TURN[cyc - 4], false, cyc >= 6), 528, y1);
           if (bb === 0) for (fi = 0; fi < 7; fi++) F.drawText(ctx, FRN[fi], 64 + fi * 64, 344, 'fog_mid');
         }
+      } else if (name === 'shop') {
+        // Phase 40: the bait shop's room as baked, and its sprites: the fisher and the dog in
+        // each facing and frame, Rusty's frames (down, side, his back).
+        var SR = G.ui.shopRoom, DS = ['down', 'up', 'right', 'left'];
+        ctx.drawImage(SR.bake(), 8, 40);
+        F.drawText(ctx, 'room (baked)', 8, 26, 'fog_mid');
+        F.drawText(ctx, 'fisher', 404, 26, 'fog_mid'); F.drawText(ctx, 'dog', 516, 26, 'fog_mid');
+        for (var di = 0; di < 4; di++) for (var fr2 = 0; fr2 < 3; fr2++) {
+          ctx.drawImage(SR.sprite('fisher', DS[di], fr2), 404 + fr2 * 34, 40 + di * 34);
+          ctx.drawImage(SR.sprite('dog', DS[di], [0, 1, 3][fr2]), 516 + fr2 * 34, 40 + di * 34);
+        }
+        F.drawText(ctx, 'rusty', 404, 186, 'fog_mid');
+        for (fr2 = 0; fr2 < 4; fr2++) { ctx.drawImage(SR.sprite('rusty', 'down', fr2), 404 + fr2 * 34, 200); ctx.drawImage(SR.sprite('rusty', 'right', fr2), 404 + fr2 * 34, 236); }
+        ctx.drawImage(SR.sprite('rusty', 'up', 0), 540, 200);
       } else if (name === 'baits') {
         // Phase 22: each bait's body in every heading (both flutter phases), drawn ×3 on water.
         var UWm = G.scene.underwater, ids = ['worm', 'cricket', 'minnow', 'unlabelled'];

@@ -1,7 +1,7 @@
 # SoftStatic: The Bait Shop as a Room, Phases 36–40
 
 **Date:** 2026-10-30. **Repo state:** Phases 1–35 done (PLAN.md §8.1).
-**Status:** Asked for by the user on 2026-10-30: "make a plan to improve the bait shop changing the whole look and keeping the same vibe/look like when fishing in the lake, it could look smaller the area like when you enter a building in retro pokemon.. plan it and do all the phases. when finish a phase update handoff and commit". All five phases are to be built in turn. Phases 36–39 are done (PLAN.md 8.3 #188–205; 40.3's removal of the old painted room and panel was done in 37).
+**Status:** Asked for by the user on 2026-10-30: "make a plan to improve the bait shop changing the whole look and keeping the same vibe/look like when fishing in the lake, it could look smaller the area like when you enter a building in retro pokemon.. plan it and do all the phases. when finish a phase update handoff and commit". All five phases are to be built in turn. All five are done (PLAN.md 8.3 #188–208; 40.3's removal of the old painted room and panel was done in 37).
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like PLAN_ROD.md, this file adds phases after the approved spec and does not edit §0–§7 or Appendix V.
 
 ---
