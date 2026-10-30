@@ -661,6 +661,7 @@ G.scene.sailing = (function () {
       if (run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85 && nibT <= 0) {
         nibT = 0.25 + 0.3 * G.vrng.next();
         rope.twitch(6, (G.vrng.next() - 0.5) * 1.2, 0.8);                             // a nibble twitches the end
+        G.audio.engine.cue('nibble');                                                    // and ticks up the rod (Phase 25)
       }
     } else if (fsm === 'hooked' || fsm === 'landing') { r = span * 0.98; pull = 0.3; }
     else if (fsm === 'fighting') {
@@ -1207,6 +1208,7 @@ G.scene.sailing = (function () {
       fx.ripple(f.x, loc.waterY + 1, 1, 6, 1.0);
       G.gfx.surface.poke(f.x, 0.3, 1.5);
       if (G.vrng.next() < 0.5) fx.emit('splash', f.x, loc.waterY - 1, 1);
+      G.audio.engine.cue('rise', f.x); // Phase 25: a slurp
       return;
     }
   }

@@ -275,6 +275,7 @@ G.scene.underwater = (function () {
         if (c.ly <= wy) {
           c.ly = wy;
           fx.splash(c.x1, wy, 0.15);
+          G.audio.engine.cue('liftout', c.x1); // Phase 25: out of the water, dripping
           G.core.state.go(run, 'sailing');
           return;
         }
@@ -549,7 +550,7 @@ G.scene.underwater = (function () {
       if (F.mode === 'pull') {
         h.thrash += dt * 14; tx += Math.sin(h.thrash) * 3; ty += Math.cos(h.thrash * 1.3) * 2;
         // Phase 20: a fish pulling near the surface (above 4 m) churns it, harder the shallower.
-        if (h.y < SHALLOW) { h.churn += dt * 5; if (h.churn >= 1) { h.churn -= 1; G.gfx.surface.poke(h.x, 0.4 * (1 - h.y / SHALLOW), 2); } }
+        if (h.y < SHALLOW) { h.churn += dt * 5; if (h.churn >= 1) { h.churn -= 1; G.gfx.surface.poke(h.x, 0.4 * (1 - h.y / SHALLOW), 2); if (G.vrng.next() < 0.2 * F.speed) G.audio.engine.cue('thrash', h.x, 1 - h.y / SHALLOW); } } // splashes: more often for a fast fish
       }
       // Phase 23: a jump lifts it clear of the water in an arc and drops it back.
       var jl = G.data.gear.fight.jumpLen;
@@ -561,6 +562,7 @@ G.scene.underwater = (function () {
       if (air !== h.air) { // out of the water, or back in: a splash and a dent in the surface
         h.air = air;
         fx.splash(h.x, loc.waterY, air ? 0.5 : 0.8);
+        G.audio.engine.cue('jump', h.x, air ? 0 : 1); // Phase 25: out, and the bigger splash back in
       }
       var away = h.x >= b.x ? 1 : -1;
       h.face = F.mode === 'pull' ? away : -away;
