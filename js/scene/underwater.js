@@ -813,6 +813,7 @@ G.scene.underwater = (function () {
         h.air = air;
         fx.splash(h.x, loc.waterY, air ? 0.5 : 0.8);
         G.audio.engine.cue('jump', h.x, air ? 0 : 1); // Phase 25: out, and the bigger splash back in
+        if (air && Math.abs(h.x - b.x) < DOG_NEAR) G.scene.dog.request(run.dog, 'jump'); // Phase 42
       }
       var away = h.x >= b.x ? 1 : -1;
       h.face = F.mode === 'pull' ? away : -away;
@@ -827,6 +828,8 @@ G.scene.underwater = (function () {
     var h = run.hook, f = G.sim.fish_ai.spawn(run.school, h.sp, h.x, h.y, h.face, G.rng, G.data);
     if (f) { f.state = 'leave'; f.t = 0; f.missed = 1; }
   }
+
+  var DOG_NEAR = 60, DOG_BIG = 2; // Phase 42: px from the boat a jump makes the dog bark; kg (or any rarer fish) a landing does
 
   function catchStep(run, dt, loc) {
     var inp = G.core.input, fsm = run.fsm, F = G.sim.fight;
@@ -860,6 +863,7 @@ G.scene.underwater = (function () {
       if (run.hook.lift >= 1) {
         fx.splash(run.hook.x, loc.waterY, 0.4);
         G.ui.card.open(G.ui.card.build(run.hook.sp, run.hook, G.state.save, run.cast.latched));
+        if (run.hook.sp.rarity !== 'common' || run.hook.w >= DOG_BIG) G.scene.dog.request(run.dog, 'catch'); // Phase 42: a big one
         G.core.state.go(run, 'card');
         return;
       }

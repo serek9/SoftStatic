@@ -322,10 +322,12 @@ G.ui.shop = (function () {
     line_ = pickLine(save, G.data.dialogue, save.clock);
     describe();
     say('');
+    if (G.state.run.dog) G.scene.dog.request(G.state.run.dog, 'bell'); // Phase 42: the door's bell
   }
 
   function exit() {}
 
+  var voiceIn = { on: true, block: false };
   function update(dt) {
     var save = G.state.save;
     t += dt;
@@ -334,6 +336,8 @@ G.ui.shop = (function () {
     G.sim.unease.step(save, uneaseIn, dt, G.rng, G.data);
     var steps0 = walk.steps;
     if (open) openStep(dt); else roomStep(dt);
+    voiceIn.on = save.settings.dogBark !== false;                                     // Phase 42: the dog in the shop
+    if (G.state.run.dog && G.scene.dog.voice(G.state.run.dog, dt, voiceIn, G.vrng)) G.audio.engine.cue('bark', G.state.run.boat ? G.state.run.boat.x : 0, 1);
     rustyStep();
     stockStep();
     envStep(dt);

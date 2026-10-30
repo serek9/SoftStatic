@@ -134,6 +134,14 @@ G.core.debug = (function () {
     },
     // dbg.pet() pets the dog (as S or the down arrow does while stopped); false if it is not ready.
     pet: function () { return G.scene.dog.pet(G.state.run.dog); },
+    // dbg.bark(why) asks the dog for a bout (Phase 42: 'jump', 'catch', 'bell', 'bird', 'cue'; with
+    // no argument the next idle bout comes in 1 s); returns its voice: bouts, woofs said, s since
+    // the last bout, s to the next idle one, the last reason, and the setting.
+    bark: function (why) {
+      var d = G.state.run.dog;
+      if (why) G.scene.dog.request(d, why); else d.voiceT = 1;
+      return { bouts: d.bouts, said: d.said, since: +d.since.toFixed(1), next: +d.voiceT.toFixed(1), last: d.last, want: d.want, on: G.state.save.settings.dogBark !== false };
+    },
     // dbg.unease(v) sets the current location's unease (0..1); dbg.unease() reads it.
     unease: function (v) {
       var loc = G.state.run.loc;

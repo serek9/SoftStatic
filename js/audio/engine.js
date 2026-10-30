@@ -186,6 +186,19 @@ G.audio.engine = (function () {
     for (i = 0; i < N; i++) q[i] = R() * 2 - 1;
     for (i = 0; i < d.length; i++) { var cur = q[idx]; q[idx] = 0.5 * (cur + q[(idx + 1) % N]) * rho; d[i] = cur; idx = (idx + 1) % N; }
   }
+  function reson(f, bw, sr) { var r = Math.exp(-Math.PI * bw / sr); return [1 - r, 2 * r * Math.cos(2 * Math.PI * f / sr), r * r]; }
+  function barkSynth(d, sr, jit, R) {
+    var c1 = reson(550 * jit, 160, sr), c2 = reson(1400 * jit, 260, sr), y1 = 0, y2 = 0, z1 = 0, z2 = 0, ph = 0, hx = 0, hy = 0;
+    for (var i = 0; i < d.length; i++) {
+      var t = i / sr, f0 = 330 * jit * (1 - 0.35 * Math.min(1, t / 0.12));
+      ph += f0 / sr; if (ph >= 1) ph -= 1;
+      var env = Math.min(1, t / 0.006) * (t < 0.05 ? 1 : Math.exp(-(t - 0.05) / 0.045));
+      var src = (ph < 0.12 ? 1 - ph / 0.12 : 0) * env, br = (R() * 2 - 1) * env * Math.exp(-t / 0.03) * 0.6;
+      var a = c1[0] * src + c1[1] * y1 - c1[2] * y2; y2 = y1; y1 = a;
+      var b = c2[0] * (src + br) + c2[1] * z1 - c2[2] * z2; z2 = z1; z1 = b;
+      var o = a + 0.7 * b; hy = o - hx + 0.995 * hy; hx = o; d[i] = hy; // the pulses' DC taken out
+    }
+  }
   function irSynth(d, sr, decay, damp, R) {
     var lp = 0, a = 1 - Math.exp(-2 * Math.PI * damp / sr);
     for (var i = 0; i < d.length; i++) { var t = i / sr; lp += ((R() * 2 - 1) - lp) * a; d[i] = lp * Math.exp(-t * 6.9 / decay) * (t < 0.012 ? 0 : 1); }
@@ -218,6 +231,11 @@ G.audio.engine = (function () {
       var prev = 0;
       for (var j = 0; j < d.length; j++) { var t = j / sr, n = R() * 2 - 1; d[j] = (n - prev) * 0.5 * Math.exp(-t * 9) * (1 - Math.exp(-t * 300)); prev = n; }
     });
+    // Phase 42: the dog's woof. A pulse train whose pitch falls (330 Hz to about 215 over its
+    // first 0.12 s) through two formants (a chest at 550 Hz and a mouth at 1400), a puff of
+    // breath through the mouth formant at its start, a 6 ms rise and a quick fall. Three takes.
+    k.bark = [];
+    for (v = 0; v < 3; v++) k.bark.push(mkBuf(0.24, function (d, sr) { barkSynth(d, sr, 0.94 + 0.12 * R(), R); }));
     kitMs = performance.now() - t0;
     return k;
   }
@@ -274,6 +292,8 @@ G.audio.engine = (function () {
       case 'crack': playBuf(pick(KIT.tick), 0.016, panAt(run.boat.x), 2.4); playBuf(KIT.hiss, 0.01, panAt(run.boat.x), 1, null, 0.02); note('crack'); break;
       case 'candown': playBuf(pick(KIT.knock), 0.012, panAt(run.boat.x), 2.6); note('candown'); break;
       // Phase 41: the rod's butt laid in the gunwale's clips, or lifted out of them.
+      // Phase 42: a woof; a: the dog's pitch (1 for the golden dog). Over the water: its reverb, muffled below.
+      case 'bark': playBuf(pick(KIT.bark), 0.05, panAt(run.boat.x), (a || 1) * (0.96 + 0.08 * G.vrng.next()), bus.water); note('bark'); break;
       case 'clip': playBuf(pick(KIT.knock), 0.01, panAt(run.boat.x), 1.9 + 0.2 * G.vrng.next()); note('clip'); break;
       // Phase 39: the bait shop: a footstep on the boards; the third board from the door hums.
       case 'step': playBuf(pick(KIT.knock), 0.007, 0, 1.5 + 0.2 * G.vrng.next()); note('step'); break;

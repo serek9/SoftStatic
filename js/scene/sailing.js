@@ -1391,6 +1391,7 @@ G.scene.sailing = (function () {
   // waiting for a bite with nothing interested; any key held or pressed ends an act. The keys
   // still do what they always do on this step: the director only reads them.
   var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still'];
+  var voiceIn = { on: true, block: false }; // Phase 42
   var fisherIn = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
   function fisherStep(run, dt) {
     var inp = G.core.input, any = false;
@@ -1483,6 +1484,10 @@ G.scene.sailing = (function () {
     var cue = dog.cues(run.dog, save, loc, b.x, G.data);
     if (cue && G.core.debug) G.core.debug.log('the dog ' + (run.dog.pose === 'stare' ? 'stares at' : 'barks toward') + ' ' + cue);
     dog.step(run.dog, dt, run.dogIn);
+    // Phase 42: the dog's voice; quiet while a fish bites or is hooked.
+    voiceIn.on = save.settings.dogBark !== false;
+    voiceIn.block = run.bite.slot >= 0 || run.fsm === 'hooked';
+    if (dog.voice(run.dog, dt, voiceIn, G.vrng)) G.audio.engine.cue('bark', b.x, 1);
     G.ui.hud.update(dt, run);
     camStep(run, dt);
     G.scene.underwater.viewStep(run, dt, loc);
