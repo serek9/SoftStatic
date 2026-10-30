@@ -1443,8 +1443,9 @@ G.scene.sailing = (function () {
   }
   function tackleAfter() {
     var c = G.ui.setup.changes();
-    if (c.rod || c.hook) tackleAct = c.rod && c.hook ? 'swaptie' : (c.rod ? 'swap' : 'tie');
+    queueTackle(c.rod, c.hook);
   }
+  function queueTackle(rod, hook) { if (rod || hook) tackleAct = rod && hook ? 'swaptie' : (rod ? 'swap' : 'tie'); } // also dbg.tackle(rod, hook) (Phase 50.1)
   function tackleStep(run, any) {
     if (!tackleAct) return;
     var fs = run.fisher;
@@ -1774,7 +1775,7 @@ G.scene.sailing = (function () {
   }
 
   return {
-    HI: HI, owl: owl, dogTap: dogTap, tackleAct: function () { return tackleAct; },
+    HI: HI, owl: owl, dogTap: dogTap, tackleAct: function () { return tackleAct; }, queueTackle: queueTackle,
     load: load, tp: tp, enter: enter, exit: exit, setPassive: setPassive, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit

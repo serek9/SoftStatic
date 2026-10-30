@@ -359,6 +359,15 @@ G.scene.life = (function () {
   function img(ctx, d, f, flip, x, y) { // centre x, bottom y (world, screen-offset)
     ctx.drawImage(flip ? d.fl[f] : d.cv[f], Math.round((x - d.w / (2 * HI)) * HI) / HI, Math.round((y - d.h / HI) * HI) / HI, d.w / HI, d.h / HI);
   }
+  // The eel from its points (head first), and its eye. Phase 50.1: the gallery draws one too.
+  function drawEel(ctx, X, Y, dir, camPx, wyS) {
+    for (var i = EELN - 1; i >= 0; i--) {
+      var w = i < 2 ? 1.5 : (i > EELN - 4 ? 1 : 1.5), xs = Math.round((X[i] - camPx) * HI) / HI, ys = Math.round((wyS + Y[i] - w / 2) * HI) / HI;
+      ctx.fillStyle = P.wood_deep; ctx.fillRect(xs, ys, 2, w);
+      ctx.fillStyle = P.wood_dark; ctx.fillRect(xs, ys, 2, 0.5);
+    }
+    ctx.fillStyle = P.ink; ctx.fillRect(Math.round((X[0] - camPx + dir * 1.5) * HI) / HI, Math.round((wyS + Y[0] - 0.5) * HI) / HI, 0.5, 0.5);
+  }
   // On the bed, before the weeds: crayfish, snails, the eel, the silt.
   function drawBed(ctx, loc, camPx, wyS, alpha) {
     if (locId !== loc.id) return;
@@ -367,14 +376,7 @@ G.scene.life = (function () {
     for (i = 0; i < cn; i++) if (cxs[i] > x0 && cxs[i] < x1) img(ctx, d, cmode[i] === 1 ? 0 : (Math.floor(cph[i] * 2) & 1), cdir[i] < 0, cxs[i] - camPx, wyS + cys[i]);
     d = snailArt();
     for (i = 0; i < nn; i++) if (nx[i] > x0 && nx[i] < x1) img(ctx, d, nhide[i] > 0 ? 1 : 0, ndir[i] < 0, nx[i] - camPx, wyS + ny[i] + 0.5);
-    if (eel.on) {
-      for (i = EELN - 1; i >= 0; i--) {
-        var w = i < 2 ? 1.5 : (i > EELN - 4 ? 1 : 1.5), xs = Math.round((ex[i] - camPx) * HI) / HI, ys = Math.round((wyS + ey[i] - w / 2) * HI) / HI;
-        ctx.fillStyle = P.wood_deep; ctx.fillRect(xs, ys, 2, w);
-        ctx.fillStyle = P.wood_dark; ctx.fillRect(xs, ys, 2, 0.5);
-      }
-      ctx.fillStyle = P.ink; ctx.fillRect(Math.round((ex[0] - camPx + eel.dir * 1.5) * HI) / HI, Math.round((wyS + ey[0] - 0.5) * HI) / HI, 0.5, 0.5);
-    }
+    if (eel.on) drawEel(ctx, ex, ey, eel.dir, camPx, wyS);
     ctx.fillStyle = P[siltKey];
     for (i = 0; i < sn; i++) {
       ctx.globalAlpha = alpha * 0.55 * Math.min(1, sl[i] / sm[i] * 1.6);
@@ -988,7 +990,7 @@ G.scene.life = (function () {
       var ga_ = ab.mirror ? 1 - ab.ghost : 1, frame = dr.mode === 1 ? 1 : (dr.mode === 0 || dr.mode === 3 ? (Math.floor(dr.ph * 3) & 1 ? 2 : 0) : 0);
       if (ga_ > 0.01) { c.globalAlpha = dr.a * ga_; img(c, deerArt(), frame, dr.dir < 0, dr.x - ox, wyS - (Ly.height || 4) + 1.5); c.globalAlpha = 1; }
     }
-    if (A.beaver && A.beaver.layer === id && bv.on) drawBeaver(c, bv.x - ox, wyS);
+    if (A.beaver && A.beaver.layer === id && bv.on) drawBeaver(c, bv.x - ox, wyS, bv);
     if (A.fox && A.fox.layer === id && fo.on && fo.a > 0) {
       c.globalAlpha = fo.a;
       img(c, foxArt(), fo.mode === 1 ? 2 : (Math.floor(fo.ph * 6) & 1), fo.dir < 0, fo.x - ox, wyS - (ab.loc.waterY - Ly.base) - 0.5);
@@ -1008,17 +1010,18 @@ G.scene.life = (function () {
     if (Ly.kind === 'landmarks') drawNear(c, ox, wyS);
   }
 
-  function drawBeaver(c, X, wyS) {
+  function drawBeaver(c, X, wyS, B) {
+    B = B || bv;
     if (X < -20 || X > 340) return;
     var y = wyS - 1;
-    if (bv.mode === 0) {
+    if (B.mode === 0) {
       c.globalAlpha = 0.5; c.fillStyle = P.water_foam;
-      for (var s = 1; s <= 12; s++) { var bx = X - bv.dir * (2 + s), off = s * 0.28; c.fillRect(sp(c, bx), sp(c, y + 1 - off * 0.2), 0.5, 0.5); c.fillRect(sp(c, bx), sp(c, y + 1 + off * 0.45), 0.5, 0.5); }
+      for (var s = 1; s <= 12; s++) { var bx = X - B.dir * (2 + s), off = s * 0.28; c.fillRect(sp(c, bx), sp(c, y + 1 - off * 0.2), 0.5, 0.5); c.fillRect(sp(c, bx), sp(c, y + 1 + off * 0.45), 0.5, 0.5); }
       c.globalAlpha = 1;
-      px1(c, 'umber_dark', X - 2, y - 0.5, 4, 1.5); px1(c, 'umber', X - 1.5 + bv.dir * 0.5, y - 1, 3, 0.5);
-      px1(c, 'ink', X + bv.dir * 1.5, y - 0.5, 0.5, 0.5);
-    } else if (bv.t < 0.35) {
-      px1(c, 'umber_dark', X - bv.dir * 1.5, y - 2 + bv.t * 4, 1.5, 2); // the tail goes up and over
+      px1(c, 'umber_dark', X - 2, y - 0.5, 4, 1.5); px1(c, 'umber', X - 1.5 + B.dir * 0.5, y - 1, 3, 0.5);
+      px1(c, 'ink', X + B.dir * 1.5, y - 0.5, 0.5, 0.5);
+    } else if (B.t < 0.35) {
+      px1(c, 'umber_dark', X - B.dir * 1.5, y - 2 + B.t * 4, 1.5, 2); // the tail goes up and over
       c.globalAlpha = 0.6; px1(c, 'water_foam', X - 3, y + 0.5, 6, 0.5); c.globalAlpha = 1;
     }
   }
@@ -1048,22 +1051,33 @@ G.scene.life = (function () {
       for (i = 0; i < dfn; i++) {
         var X = dfx[i] - camPx, Y = wyS - dfy[i], fl = (Math.floor(G.state.run.boat.t * 30 + i) & 1);
         if (X < -2 || X > 322) continue;
-        c.globalAlpha = dfa; px1(c, 'teal_hi', X - 1, Y, 2, 0.5);
-        c.globalAlpha = dfa * 0.5; px1(c, 'paper', X - 0.5, Y - (fl ? 0.5 : 0), 1, 0.5);
+        dragonfly(c, X, Y, fl, dfa);
       }
       c.globalAlpha = 1;
     }
   }
 
+  // A dragonfly (its wings flicker with fl) at alpha a, and a pond skater on the surface at y.
+  function dragonfly(c, X, Y, fl, a) {
+    c.globalAlpha = a; px1(c, 'teal_hi', X - 1, Y, 2, 0.5);
+    c.globalAlpha = a * 0.5; px1(c, 'paper', X - 0.5, Y - (fl ? 0.5 : 0), 1, 0.5);
+  }
+  function strider(c, RX, ry) {
+    px1(c, 'ink', RX - 0.5, ry, 1, 0.5);
+    c.fillStyle = P.stone_dark;
+    c.fillRect(sp(c, RX - 1.5), sp(c, ry + 0.5), 0.5, 0.5); c.fillRect(sp(c, RX + 1), sp(c, ry + 0.5), 0.5, 0.5);
+    c.fillRect(sp(c, RX - 1), sp(c, ry - 0.5), 0.5, 0.5); c.fillRect(sp(c, RX + 0.5), sp(c, ry - 0.5), 0.5, 0.5);
+  }
+
   // The heron: legs into the water, the body, and the neck as a curve from the shoulder to the
   // head (rest, stalk, strike), drawn above the water here and below it in drawUnder (under).
   var NECK = new Float32Array(2 * 64);
-  function heronNeck(camPx, wyS) {
-    var x = hr.x - camPx, d = hr.dir, k = hr.mode === 1 ? 0.35 : 0, rr = hr.reach, idle = hr.mode === 0 ? Math.sin(hr.ph * 0.7) * 0.4 : 0;
-    var sx = x + d * 3, sy = wyS - 13 - hr.lift;
-    var hx0 = x + d * (2.5 + k * 3 + idle), hy0 = wyS - 21.5 + k * 3 - hr.lift, cx0 = x - d * 0.5, cy0 = wyS - 17 - hr.lift;
+  function heronNeck(camPx, wyS, H) {
+    var x = H.x - camPx, d = H.dir, k = H.mode === 1 ? 0.35 : 0, rr = H.reach, idle = H.mode === 0 ? Math.sin(H.ph * 0.7) * 0.4 : 0;
+    var sx = x + d * 3, sy = wyS - 13 - H.lift;
+    var hx0 = x + d * (2.5 + k * 3 + idle), hy0 = wyS - 21.5 + k * 3 - H.lift, cx0 = x - d * 0.5, cy0 = wyS - 17 - H.lift;
     var hx = hx0 + (x + d * 9 - hx0) * rr, hy = hy0 + (wyS + 2.5 - hy0) * rr, cx = cx0 + (x + d * 9 - cx0) * rr, cy = cy0 + (wyS - 13 - cy0) * rr;
-    if (hr.mode === 3) { hx = x + d * 4; hy = wyS - 15 - hr.lift; cx = x + d * 1; cy = wyS - 17 - hr.lift; } // tucked in flight
+    if (H.mode === 3) { hx = x + d * 4; hy = wyS - 15 - H.lift; cx = x + d * 1; cy = wyS - 17 - H.lift; } // tucked in flight
     var len = Math.abs(hx - sx) + Math.abs(hy - sy), n = Math.min(63, Math.ceil(len * HI) + 1);
     for (var i = 0; i <= n; i++) {
       var u = i / n, a = (1 - u) * (1 - u), b2 = 2 * u * (1 - u), c2 = u * u;
@@ -1071,26 +1085,27 @@ G.scene.life = (function () {
     }
     return n;
   }
-  function drawHeron(c, camPx, wyS, under) {
-    var x = hr.x - camPx, d = hr.dir, i, n;
+  function drawHeron(c, camPx, wyS, under, H) {
+    H = H || hr;
+    var x = H.x - camPx, d = H.dir, i, n;
     if (x < -30 || x > 350) return;
-    c.globalAlpha = (under ? 0.8 : 1) * hr.a;
+    c.globalAlpha = (under ? 0.8 : 1) * H.a;
     // Legs: wading, stepping while it stalks; trailing behind in flight.
-    var st = hr.mode === 1 ? Math.sin(hr.ph * 6) * 1 : 0;
+    var st = H.mode === 1 ? Math.sin(H.ph * 6) * 1 : 0;
     for (var l = 0; l < 2; l++) {
       var lx = x + (l ? 1 : -1) * 0.75, fx = lx + (l ? st : -st);
       for (var yy = 0; yy < 12; yy += 0.5) {
         var Y = wyS - 9 + yy, X = lx + (fx - lx) * yy / 12;
-        if (hr.mode === 3) { X = x - d * (2 + yy * 0.8); Y = wyS - 10 - hr.lift + yy * 0.1; }
+        if (H.mode === 3) { X = x - d * (2 + yy * 0.8); Y = wyS - 10 - H.lift + yy * 0.1; }
         if (under ? Y < wyS : Y >= wyS) continue;
         px1(c, 'stone_dark', X, Y, 0.5, 0.5);
       }
     }
     if (!under) {
-      img(c, heronBodyArt(), 0, d < 0, x - d * 1, wyS - 8 - hr.lift);
-      if (hr.mode === 3) { var up = Math.floor(hr.ph * 4) & 1; px1(c, 'stone', x - 5, wyS - 14 - hr.lift + (up ? -3 : 1), 10, 1.5); } // a slow wingbeat
+      img(c, heronBodyArt(), 0, d < 0, x - d * 1, wyS - 8 - H.lift);
+      if (H.mode === 3) { var up = Math.floor(H.ph * 4) & 1; px1(c, 'stone', x - 5, wyS - 14 - H.lift + (up ? -3 : 1), 10, 1.5); } // a slow wingbeat
     }
-    n = heronNeck(camPx, wyS);
+    n = heronNeck(camPx, wyS, H);
     for (i = 0; i <= n; i++) {
       var NX = NECK[2 * i], NY = NECK[2 * i + 1];
       if (under ? NY < wyS : NY >= wyS) continue;
@@ -1099,7 +1114,7 @@ G.scene.life = (function () {
     // The head and the beak, pointing along the neck's end.
     var hx = NECK[2 * n], hy = NECK[2 * n + 1], tx = hx - NECK[2 * n - 2], ty = hy - NECK[2 * n - 1], tl = Math.sqrt(tx * tx + ty * ty) || 1;
     tx /= tl; ty /= tl;
-    if (hr.reach < 0.2 && hr.mode !== 3) { tx = d; ty = 0.15; }
+    if (H.reach < 0.2 && H.mode !== 3) { tx = d; ty = 0.15; }
     if (under ? hy >= wyS - 1 : hy < wyS) {
       px1(c, 'stone_hi', hx - 1, hy - 1, 2, 1.5);
       px1(c, 'ink', hx - d * 1.5, hy - 1, 1.5, 0.5);
@@ -1110,7 +1125,7 @@ G.scene.life = (function () {
       if (under ? by < wyS : by >= wyS) continue;
       px1(c, 'brass_hi', bx, by, 0.5, 0.5);
     }
-    if (hr.fish > 0 && !under && hy < wyS) px1(c, 'water_foam', hx + tx * 3, hy + ty * 3 - 0.5, 1, 0.5); // a fry in its beak
+    if (H.fish > 0 && !under && hy < wyS) px1(c, 'water_foam', hx + tx * 3, hy + ty * 3 - 0.5, 1, 0.5); // a fry in its beak
     c.globalAlpha = 1;
   }
 
@@ -1137,11 +1152,7 @@ G.scene.life = (function () {
       for (i = 0; i < rn; i++) {
         var RX = rx_[i] - camPx;
         if (RX < -2 || RX > 322) continue;
-        var ry = wyS - surf.at(rx_[i]) / HI - 0.5;
-        px1(c, 'ink', RX - 0.5, ry, 1, 0.5);
-        c.fillStyle = P.stone_dark;
-        c.fillRect(sp(c, RX - 1.5), sp(c, ry + 0.5), 0.5, 0.5); c.fillRect(sp(c, RX + 1), sp(c, ry + 0.5), 0.5, 0.5);
-        c.fillRect(sp(c, RX - 1), sp(c, ry - 0.5), 0.5, 0.5); c.fillRect(sp(c, RX + 0.5), sp(c, ry - 0.5), 0.5, 0.5);
+        strider(c, RX, wyS - surf.at(rx_[i]) / HI - 0.5);
       }
       c.globalAlpha = 1;
     }
@@ -1220,10 +1231,33 @@ G.scene.life = (function () {
   // dbg: every fry of every cloud (x, depth), for overlap and re-forming checks.
   function fry() { var o = []; for (var k = 0; k < fnum; k++) o.push([fx_[k], fy[k]]); return o; }
 
+  // ---- Phase 50.1: for the gallery ---------------------------------------------------------
+  // Every sprite baked (by name: {w, h, cv, fl}), and the drawn-in-code creatures posed from
+  // the gallery's own scratch records, never the live ones. World px, the ctx at the view's scale.
+  var ARTS = [crayArt, snailArt, turtleArt, tadArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt];
+  function sprites() { for (var i = 0; i < ARTS.length; i++) ARTS[i](); return spr; }
+  var gH = { x: 0, dir: 1, mode: 0, reach: 0, ph: 0, lift: 0, a: 1, fish: 0 }, gB = { dir: 1, mode: 0, t: 0 };
+  var gEx = new Float32Array(EELN), gEy = new Float32Array(EELN);
+  var gallery = {
+    // mode: 0 stand, 1 stalk, 2 strike (reach 0..1), 3 fly; under: the part below the surface.
+    heron: function (c, x, wyS, mode, reach, ph, under) {
+      gH.x = x; gH.mode = mode; gH.reach = reach; gH.ph = ph; gH.lift = mode === 3 ? 6 : 0; gH.fish = mode === 2 && reach > 0.9 ? 1 : 0;
+      drawHeron(c, 0, wyS, !!under, gH);
+    },
+    beaver: function (c, x, wyS, mode, t) { gB.mode = mode; gB.t = t; drawBeaver(c, x, wyS, gB); },
+    eel: function (c, x, y, dir, ph) {
+      for (var i = 0; i < EELN; i++) { gEx[i] = x - dir * i * L.eelLen / EELN; gEy[i] = y + Math.sin(ph - i * 0.55) * (0.4 + i * 0.12); }
+      drawEel(c, gEx, gEy, dir, 0, 0);
+    },
+    dragonfly: function (c, x, y, fl) { dragonfly(c, x, y, fl, 1); c.globalAlpha = 1; },
+    strider: strider
+  };
+
   return { table: table, L: L, LA: LA, step: step, drawBed: drawBed, drawWater: drawWater, spawn: function (k) { return spawn(k) || spawnAbove(k); }, state: state, fry: fry, stats: stats, onSplash: onSplash,
     // Phase 49: the life above the water.
     drawFar: drawFar, afterLayer: afterLayer, drawSurface: drawSurface, above: aboveState, showing: showing, hrs: hrs,
-    mirror: function (on) { ab.mirror = on; } };
+    mirror: function (on) { ab.mirror = on; },
+    sprites: sprites, gallery: gallery }; // Phase 50.1
 })();
 
 if (G.core.debug) G.core.debug.addLine(function () {

@@ -452,5 +452,5 @@ G.gfx.paint = (function () {
   // Forget the cached pen colour (a painter that also sets ctx.fillStyle itself calls this).
   function reset() { penCtx = null; penKey = ''; }
 
-  return { reset: reset, area: area, pen: pen, px: px, box: box, hash2: hash2, tone: tone, blob: blob, limb: limb, line: line, slab: slab, dither: dither, mountains: mountains, forest: forest, shore: shore, pine: pine, round: round, birch: birch, spruce: spruce, dead: dead, poplar: poplar, TREES: TREES, SHORE_THINGS: SHORE_THINGS, cloudMask: cloudMask, paintMask: paintMask };
+  return { reset: reset, area: area, pen: pen, px: px, box: box, hash2: hash2, tone: tone, blob: blob, limb: limb, line: line, slab: slab, dither: dither, mountains: mountains, forest: forest, shore: shore, pine: pine, round: round, birch: birch, spruce: spruce, dead: dead, poplar: poplar, TREES: TREES, SHORE_THINGS: SHORE_THINGS, trunk: trunk, cattails: cattails, pad: pad, cloudMask: cloudMask, paintMask: paintMask };
 })();

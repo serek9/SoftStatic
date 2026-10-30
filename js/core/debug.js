@@ -136,8 +136,27 @@ G.core.debug = (function () {
     // dbg.pet() pets the dog (as S or the down arrow does while stopped); false if it is not ready.
     pet: function () { return G.scene.dog.pet(G.state.run.dog); },
     // dbg.useRod(i) takes an owned rod in hand (Phase 43); dbg.tackle() lists the rack and the hook.
+    // Phase 50.1: dbg.tackle(rod, hook) also puts an owned rod (index or id) in hand and a hook
+    // you have (bait or lure id) on, as the setup panel would (null or undefined leaves one as
+    // it is), saves, and lets the fisher play the act for it; refused gear is named in `refused`.
     useRod: function (i) { var r = G.sim.economy.useRod(G.state.save, +i); return r === G.sim.economy.OK ? G.data.gear.rods[+i].name : 'not owned'; },
-    tackle: function () { var s = G.state.save, fx = G.state.run.gearFx; return { rods: s.gear.rods.slice(), rod: s.gear.rod, bait: s.gear.bait, lure: fx.lure, swim: fx.swim, counts: JSON.parse(JSON.stringify(s.baits)), smallHook: fx.smallHook, smallBoost: fx.smallBoost }; },
+    tackle: function (rod, hook) {
+      var s = G.state.save, E = G.sim.economy, refused = [], g = s.gear, rod0 = g.rod, hook0 = g.bait;
+      if (rod !== undefined && rod !== null) {
+        var ri = typeof rod === 'string' ? G.data.gear.rods.map(function (r) { return r.id; }).indexOf(rod) : +rod;
+        if (E.useRod(s, ri) !== E.OK) refused.push('rod ' + rod);
+      }
+      if (hook !== undefined && hook !== null) {
+        var b = E.baitById(hook, G.data);
+        if (!b || !(b.unlimited || s.baits[b.id] > 0)) refused.push('hook ' + hook); else g.bait = b.id;
+      }
+      if (g.rod !== rod0 || g.bait !== hook0) { E.effects(s, G.data, G.state.run.gearFx); G.scene.sailing.queueTackle(g.rod !== rod0, g.bait !== hook0); G.core.save.autosave('setup'); }
+      var o = dbg.tackleNow();
+      if (refused.length) o.refused = refused;
+      return o;
+    },
+    // dbg.tackleNow(): the rack and the hook, without changing anything.
+    tackleNow: function () { var s = G.state.save, fx = G.state.run.gearFx; return { rods: s.gear.rods.slice(), rod: s.gear.rod, bait: s.gear.bait, lure: fx.lure, swim: fx.swim, counts: JSON.parse(JSON.stringify(s.baits)), smallHook: fx.smallHook, smallBoost: fx.smallBoost }; },
     // dbg.bark(why) asks the dog for a bout (Phase 42: 'jump', 'catch', 'bell', 'bird', 'cue'; with
     // no argument the next idle bout comes in 1 s); returns its voice: bouts, woofs said, s since
     // the last bout, s to the next idle one, the last reason, and the setting.
@@ -145,6 +164,20 @@ G.core.debug = (function () {
       var d = G.state.run.dog;
       if (why) G.scene.dog.request(d, why); else d.voiceT = 1;
       return { bouts: d.bouts, said: d.said, since: +d.since.toFixed(1), next: +d.voiceT.toFixed(1), last: d.last, want: d.want, on: G.state.save.settings.dogBark !== false };
+    },
+    // dbg.look(f, d) sets the fisher's and the dog's looks by id (Phase 50.1; null leaves one
+    // as it is), bakes them and saves; returns save.look and the ids it refused. dbg.look() lists the ids.
+    look: function (f, d) {
+      var LK = G.data.looks, ids = function (l) { return l.map(function (r) { return r.id; }); };
+      var now = function () { return { fisher: G.ui.look.info().fisher, dog: G.ui.look.info().dog }; };
+      if (f === undefined && d === undefined) return { look: now(), fishers: ids(LK.fishers), dogs: ids(LK.dogs) };
+      var refused = [], changed = false, r;
+      if (f !== undefined && f !== null) { r = G.ui.look.set('fisher', f); if (r < 0) refused.push('fisher ' + f); else if (r > 0) changed = true; }
+      if (d !== undefined && d !== null) { r = G.ui.look.set('dog', d); if (r < 0) refused.push('dog ' + d); else if (r > 0) changed = true; }
+      if (changed) G.core.save.autosave('look');
+      var o = { look: now() };
+      if (refused.length) o.refused = refused;
+      return o;
     },
     // dbg.unease(v) sets the current location's unease (0..1); dbg.unease() reads it.
     unease: function (v) {
@@ -373,6 +406,7 @@ G.core.debug = (function () {
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
       pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop', 'panel', 'fishers', 'dogs', 'looks top'); // small: Phase 44; panel: Phase 46; looks: Phase 47
+      pages.push('tackle', 'setup', 'life under', 'bed', 'life above', 'shore'); // Phase 50.1
       page = 0; t = 0;
     }
 
@@ -381,6 +415,8 @@ G.core.debug = (function () {
       if (inp.pressed('right')) page = (page + 1) % pages.length;
       if (inp.pressed('left')) page = (page + pages.length - 1) % pages.length;
       t += dt;
+      // Phase 50.1: the setup page shows the real panel, opened over the page and shut off it.
+      if ((pages[page] === 'setup') !== G.ui.setup.isOpen()) { if (G.ui.setup.isOpen()) G.ui.setup.close(); else G.ui.setup.open(); }
       if (pages[page] === 'fx') {
         emitT -= dt;
         if (emitT <= 0) {
@@ -407,6 +443,48 @@ G.core.debug = (function () {
       if (9 + a.width * 2 + c.width < cw - 4) ctx.drawImage(c, x0 + 9 + a.width * 2, yy);
       else if (yy + a.height + c.height < y0 + ch - 18) ctx.drawImage(c, x0 + 3, yy + a.height);
       F.drawText(ctx, label, x0 + 3, y0 + ch - 16, 'fog_light');
+    }
+
+    // Phase 50.1: the shore page, baked once: each of the shore's things on a strip of bank
+    // and water, every kind of tree in each forest's keys, and the Red Room's floor things.
+    function shoreBake() {
+      return G.gfx.bake.layer(640, 340, function (c) {
+        var A = G.gfx.paint, P = G.gfx.sprites.PALETTE, F = G.gfx.sprites.fine, R = new G.core.rng.Rng(50), i, x;
+        var L0 = { height: 6 }, wy = 104;
+        A.reset();
+        c.fillStyle = P.dusk_violet; c.fillRect(0, 0, 640, wy);
+        c.fillStyle = P.water_mid; c.fillRect(0, wy, 640, 22);
+        A.box(c, 'rock_dark', 0, wy - 6, 640, 6);
+        var TH = [['posts', 20, { n: 4 }], ['moored', 120, {}], ['lodge', 200, {}], ['duckbox', 270, {}]];
+        for (i = 0; i < TH.length; i++) { var f = TH[i][2]; f.kind = TH[i][0]; f.x = TH[i][1]; A.SHORE_THINGS[f.kind](c, f, wy, L0, R); }
+        A.trunk(c, 340, wy, L0, R); A.cattails(c, 420, wy, R); A.cattails(c, 440, wy, R);
+        for (i = 0; i < 4; i++) A.pad(c, 490 + i * 16, wy + 3, R);
+        var LB = ['posts', 'moored', 'lodge', 'duckbox', 'trunk', 'cattails', 'pads'], LX = [20, 106, 186, 262, 330, 418, 500];
+        A.reset();
+        for (i = 0; i < LB.length; i++) F.drawText(c, LB[i], LX[i], wy + 26, 'fog_light');
+        // The trees: every kind in the first forest layer's keys of each water that has one.
+        var ty = 236, col = 0, ids = ['fog', 'creek', 'pines'];
+        c.fillStyle = P.night_deep; c.fillRect(0, 140, 640, 110);
+        for (var li = 0; li < ids.length; li++) {
+          var lays = G.data.locations[ids[li]].layers, fl = null;
+          for (var q = 0; q < lays.length && !fl; q++) if (lays[q].kind === 'forest') fl = lays[q];
+          if (!fl) continue;
+          for (var kind in A.TREES) {
+            var keys = fl.keys[kind] || fl.keys[{ spruce: 'pine', dead: 'pine', poplar: 'round' }[kind]] || fl.keys.pine || fl.keys.round;
+            x = 14 + col * 35; A.TREES[kind](c, x, ty, 70, keys, R); A.reset();
+            F.drawText(c, kind.slice(0, 5), x - 10, ty + 2, 'fog_mid');
+            col++;
+          }
+        }
+        // The Red Room's floor: a potted fern, a chair, a side table and lamp, a door frame.
+        var red = G.data.locations.red, zz = null;
+        for (q = 0; q < red.layers.length; q++) if (red.layers[q].kind === 'zigzag') zz = red.layers[q];
+        var fy = 320;
+        A.area(c, 0, fy, 640, 20, function (xx, yy) { var r2 = yy - fy, sh = Math.abs((r2 % 12) - 6); return (((xx + sh) / 6) | 0) & 1 ? (zz ? zz.color : 'ink') : (zz ? zz.alt : 'bone'); });
+        var RT = G.scene.scenery.ROOM_THINGS, RX = 40;
+        for (var rk in RT) { RT[rk](c, RX, fy); F.drawText(c, rk, RX - 10, fy - 56, 'fog_light'); RX += 70; }
+        A.reset();
+      });
     }
 
     function draw(ctx) {
@@ -584,6 +662,97 @@ G.core.debug = (function () {
           F.drawText(ctx, lids[li], 8, 24 + li * 68, 'bone');
           for (var lk = 0; lk < 8; lk++) for (var lp = 0; lp < 2; lp++) ctx.drawImage(UWl.lureImg(lids[li], lk * 2, lp), 60 + (lk * 2 + lp) * 36, 30 + li * 68, 33, 33);
         }
+      } else if (name === 'tackle') {
+        // Phase 50.1: the rack (each rod's blank straight in its own keys at 2×, with its numbers
+        // and the panel's bars) and every hook (its body at rest and moving, ×3, who takes it).
+        var RODS = G.data.gear.rods, AC = ['slow', 'moderate', 'mod-fast', 'fast', 'x-fast'], RLEN = G.gfx.rod.K.len * 2;
+        F.bold(ctx, 'RODS', 8, 20, 'bone');
+        for (var ri = 0; ri < RODS.length; ri++) {
+          var rd = RODS[ri], ry1 = 34 + ri * 22, rx1 = 16;
+          for (var rs = -9; rs < RLEN; rs++) { // cork, seat, blank (thick on its lower half), the guides
+            var k1 = rs < -8 ? 'ink' : (rs < 2 ? 'wood_lit' : (rs < 5 ? 'stone_hi' : rd.look[0])), k2 = rs < -8 ? 'ink' : (rs < 2 ? 'wood_mid' : (rs < 5 ? 'stone_dark' : rd.look[1]));
+            ctx.fillStyle = P[k1]; ctx.fillRect(rx1 + (rs + 9) * 2, ry1, 2, 2);
+            if (rs < RLEN / 2) { ctx.fillStyle = P[k2]; ctx.fillRect(rx1 + (rs + 9) * 2, ry1 + 2, 2, 2); }
+          }
+          for (var gi = 0; gi < 5; gi++) { var gs = [0.22, 0.42, 0.6, 0.75, 0.88][gi] * RLEN; ctx.fillStyle = P.ink; ctx.fillRect(rx1 + (gs + 9) * 2, ry1, 2, 2); ctx.fillStyle = P.stone_lit; ctx.fillRect(rx1 + (gs + 9) * 2, ry1 + 4 + (gi < 1 ? 2 : 0), 2, 2); }
+          F.drawText(ctx, rd.name, 140, ry1 - 3, 'fog_light');
+          for (var bi2 = 0; bi2 < 6; bi2++) { ctx.fillStyle = P[bi2 <= ['ultralight', 'light', 'medium light', 'medium', 'medium heavy', 'heavy'].indexOf(rd.power) ? 'teal_lit' : 'fog_dark']; ctx.fillRect(232 + bi2 * 3, ry1 - 2, 2, 2); }
+          for (bi2 = 0; bi2 < 5; bi2++) { ctx.fillStyle = P[bi2 <= rd.action ? 'signal_amber' : 'fog_dark']; ctx.fillRect(232 + bi2 * 3, ry1 + 2, 2, 2); }
+          F.drawText(ctx, rd.power + ' / ' + AC[rd.action] + '  ' + rd.maxMass + 'kg  cast ' + rd.castMax + '  small x' + rd.smallHook + (rd.smallBoost > 1 ? ' +' + rd.smallBoost : '') + '  ' + rd.cost + 'c', 256, ry1 - 3, 'fog_mid');
+        }
+        var HK = G.data.gear.baits.concat(G.data.gear.lures), UWt = G.scene.underwater;
+        F.bold(ctx, 'HOOKS', 8, 168, 'bone');
+        ctx.fillStyle = P.water_mid; ctx.fillRect(0, 180, 640, 180);
+        ctx.imageSmoothingEnabled = false;
+        for (var hi = 0; hi < HK.length; hi++) {
+          var hb = HK[hi], hx1 = 8 + (hi % 3) * 210, hy1 = 184 + Math.floor(hi / 3) * 58, takers = 0;
+          for (var fi2 = 0; fi2 < G.data.fish.length; fi2++) { var ff = G.data.fish[fi2]; if (hb.swim ? ff.lures && ff.lures[hb.id] : ff.baitLikes.indexOf(hb.id) >= 0) takers++; }
+          ctx.drawImage(UWt.lureImg(hb.id, 0, 0), hx1, hy1, 33, 33);
+          ctx.drawImage(UWt.lureImg(hb.id, 0, 1), hx1 + 34, hy1, 33, 33);
+          F.drawText(ctx, hb.label === false ? '(no label)' : hb.name, hx1 + 72, hy1 + 2, 'bone');
+          F.drawText(ctx, (hb.swim ? 'lure, ' + hb.swim : (hb.unlimited ? 'bait, endless' : 'bait')) + '  ' + hb.cost + 'c' + (hb.pack ? ' x' + hb.pack : ''), hx1 + 72, hy1 + 14, 'fog_light');
+          F.drawText(ctx, takers + ' species take it', hx1 + 72, hy1 + 26, 'fog_light');
+        }
+      } else if (name === 'setup') {
+        // Phase 50.1: the setup panel itself (G.ui.setup, from this save) over sky and water.
+        ctx.fillStyle = P.dusk_violet; ctx.fillRect(0, 18, 640, 170);
+        ctx.fillStyle = P.water_mid; ctx.fillRect(0, 188, 640, 172);
+        G.ui.setup.draw(ctx);
+        var Rr = G.ui.setup.rect();
+        F.drawText(ctx, 'the TACKLE panel from this save at [' + Rr.join(', ') + ']: the rods owned, every hook you have', 8, 344, 'fog_light');
+      } else if (name === 'life under' || name === 'life above') {
+        // Phase 50.1: Phases 48-49's sprites (every frame at 1x, then 4x, then flipped) and the
+        // creatures drawn in code, posed from the gallery's own records (the live ones untouched).
+        var LF = G.scene.life, SP = LF.sprites(), under = name === 'life under';
+        var NAMES = under ? ['cray', 'snail', 'turtle', 'tad'] : ['duck', 'duckling', 'duckUnder', 'kingfisher', 'loon', 'frog', 'deer', 'fox', 'gull', 'heron'];
+        var Z = under ? 4 : 3, cy0 = 20, cx0 = 8, rowH = 0;
+        ctx.imageSmoothingEnabled = false;
+        for (var ni = 0; ni < NAMES.length; ni++) {
+          var sd = SP[NAMES[ni]], lab = NAMES[ni] + ' ' + sd.w + 'x' + sd.h + ' x' + sd.cv.length, cont = sd.cv.length * (sd.w + 1) + 4 + sd.cv.length * (sd.w * Z + 4) + sd.w * Z, cw2 = Math.max(F.measure(lab) + 12, cont + 16);
+          if (cx0 + cw2 > 632) { cx0 = 8; cy0 += rowH; rowH = 0; }
+          F.drawText(ctx, lab, cx0, cy0, 'fog_light');
+          var ix = cx0, iy = cy0 + 12;
+          ctx.fillStyle = P.water_dark; ctx.fillRect(cx0 - 2, iy - 2, cont + 4, sd.h * Z + 4);
+          for (var sf = 0; sf < sd.cv.length; sf++) ctx.drawImage(sd.cv[sf], ix + sf * (sd.w + 1), iy);
+          ix += sd.cv.length * (sd.w + 1) + 4;
+          for (sf = 0; sf < sd.cv.length; sf++) { ctx.drawImage(sd.cv[sf], ix, iy, sd.w * Z, sd.h * Z); ix += sd.w * Z + 4; }
+          ctx.drawImage(sd.fl[Math.floor(t * 3) % sd.cv.length], ix, iy, sd.w * Z, sd.h * Z);
+          cx0 += cw2; rowH = Math.max(rowH, sd.h * Z + 22);
+        }
+        var by0 = cy0 + rowH + 4, G2 = LF.gallery, SKY = under ? 0 : 96; // the heron stands 22 world px tall
+        ctx.fillStyle = P.dusk_violet; ctx.fillRect(0, by0, 640, SKY);
+        ctx.fillStyle = P.water_dark; ctx.fillRect(0, by0 + SKY, 640, 360 - by0 - SKY);
+        ctx.setTransform(4, 0, 0, 4, 0, 0); // world px at 2x the game's scale
+        var wy4 = (by0 + (under ? 10 : SKY)) / 4;
+        if (under) {
+          G2.eel(ctx, 30, wy4 + 6, 1, t * 4);
+          G2.eel(ctx, 80, wy4 + 6, -1, t * 4 + 1);
+          ctx.fillStyle = P.water_foam; for (var fq = 0; fq < 12; fq++) ctx.fillRect(110 + (fq % 4) * 2.5, wy4 + 2 + (fq >> 2) * 1.5, 1.5, 0.5); // a fry cloud
+          ctx.fillStyle = P.ink; for (fq = 0; fq < 12; fq++) ctx.fillRect(111 + (fq % 4) * 2.5, wy4 + 2 + (fq >> 2) * 1.5, 0.5, 0.5);
+          var cvP = G.gfx.fishgen.baseSwimmer('perch', 1, G.gfx.fishgen.BEAT[Math.floor(t * 4) & 3], true, false);
+          ctx.globalAlpha = 0.85; ctx.drawImage(cvP, 130, wy4 + 1, cvP.width / 2, cvP.height / 2); ctx.globalAlpha = 1;
+        } else {
+          var HP = [[0, 0], [1, 0], [2, 0.5], [2, 1], [3, 0]];
+          for (var hp = 0; hp < HP.length; hp++) { G2.heron(ctx, 14 + hp * 18, wy4, HP[hp][0], HP[hp][1], t, false); G2.heron(ctx, 14 + hp * 18, wy4, HP[hp][0], HP[hp][1], t, true); }
+          G2.beaver(ctx, 112, wy4, 0, 0); G2.beaver(ctx, 124, wy4, 1, 0.1);
+          G2.dragonfly(ctx, 136, wy4 - 6, Math.floor(t * 30) & 1); G2.strider(ctx, 146, wy4 - 0.5);
+          ctx.fillStyle = P.lamp_glow; ctx.globalAlpha = 0.3; ctx.fillRect(152, wy4 - 9, 7.5, 6); ctx.globalAlpha = 1; ctx.fillRect(155, wy4 - 7, 1.5, 1); // the moored boat's lantern
+        }
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        F.drawText(ctx, under ? 'eel (both ways), a fry cloud, the darting perch: 2x the game' : 'heron: stand, stalk, strike 0.5 and 1, fly; beaver, dragonfly, strider, lantern: 2x the game', 8, 344, 'fog_mid');
+      } else if (name === 'bed') {
+        // Phase 50.1: each water's bed things and new weeds on a short strip of bed, 2x the game.
+        var LIDS = ['fog', 'creek', 'pines', 'red'];
+        ctx.imageSmoothingEnabled = false;
+        for (var bl = 0; bl < LIDS.length; bl++) {
+          var lc = G.data.locations[LIDS[bl]], T0 = G.scene.life.table(LIDS[bl]), yb = 20 + bl * 82;
+          ctx.drawImage(G.scene.underwater.galleryBed(LIDS[bl]), 0, yb);
+          F.drawText(ctx, lc.name + ': mussels ' + T0.mussel + (T0.caddis ? ', caddis' : '') + ', roots ' + T0.roots + ', tree ' + T0.tree + ', litter ' + (T0.litter.join(' ') || '-') + ', ribbon ' + T0.ribbon + ', fern ' + T0.fern + ', lilies ' + T0.lily + ', algae ' + T0.algae, 8, yb + 82 - 12, 'fog_light');
+        }
+      } else if (name === 'shore') {
+        // Phase 50.1: the shore's things, the trees and the Red Room's floor, painted as the
+        // layers paint them (baked once here, layer px = the game's view px).
+        ctx.drawImage(G.gfx.bake.cached('gallery:shore', shoreBake), 0, 18);
       } else if (name === 'fx') {
         // The particles are drawn in world pixels, as the sailing scene draws them.
         ctx.setTransform(2, 0, 0, 2, 0, 0);
@@ -599,7 +768,7 @@ G.core.debug = (function () {
       }
     }
 
-    return { native: true, enter: enter, exit: function () { G.gfx.fx.clear(); }, update: update, draw: draw };
+    return { native: true, enter: enter, exit: function () { G.gfx.fx.clear(); }, update: update, draw: draw, page: function () { return pages[page]; } }; // page: Phase 50.1's checks
   })();
 
   return { on: on, addLine: addLine, log: log, error: error, dbg: dbg, gallery: gallery };

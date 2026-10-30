@@ -206,6 +206,34 @@ G.scene.underwater = (function () {
     }
   }
 
+  // Phase 50.1: the gallery's strip of a water's bed things and new weeds (its own table and
+  // keys) on a short flat bed 320 world px wide and 40 deep, with two boulders (for the algae
+  // and a snail's place) and one snag (the caddis cases and the lost lure). Baked once per water.
+  function galleryBed(id) {
+    var loc = G.data.locations[id], u = loc.underwater, WH = 320 * HI, HH = 40 * HI;
+    return B.cached('gallery:bed:' + id, function () {
+      return B.layer(WH, HH, function (ctx) {
+        var A = G.gfx.paint, top = new Int16Array(WH), X, fake = { id: id, seed: loc.seed, width: 320, underwater: u };
+        for (X = 0; X < WH; X++) top[X] = HH - 14 + Math.round(2 * Math.sin(X * 0.02));
+        A.reset();
+        ctx.fillStyle = S.PALETTE.water_dark; ctx.fillRect(0, 0, WH, HH);
+        A.area(ctx, 0, 0, WH, HH, function (x, y) { var d = y - top[x]; return d < 0 ? '' : (d < 2 ? 'wood_mid' : (d < 5 ? (u.sand || 'wood') : u.silt)); });
+        var RK = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' }, set = { rocks: [], snagAt: [] };
+        for (var i = 0; i < 2; i++) {
+          var rx = (60 + i * 170) * HI, rw = 7 * HI, rh = 4 * HI, cy = top[rx] + 2 - Math.round(rh * 0.3);
+          A.blob(ctx, rx, cy, rw, rh, [RK.dark, RK.mid, RK.lit], { rim: 0.3 });
+          set.rocks.push({ x: rx / HI, cy: cy / HI, rw: rw / HI, rh: rh / HI });
+        }
+        var sx = 280 * HI, foot = top[sx] + 2;
+        A.box(ctx, 'wood_dark', sx, 6, 6, foot - 6); A.box(ctx, 'wood_mid', sx, 6, 1, foot - 6);
+        set.snagAt.push({ X: sx, foot: foot, tip: 6, lean: 0 });
+        bedThings(ctx, fake, set, top, WH, HH);
+        paintPlants(ctx, u, plantList(fake, function (x) { return top[clamp(Math.round(x), 0, WH - 1)]; }, WH), 0);
+        A.reset();
+      });
+    });
+  }
+
   // Bakes (once per location) the gradient strip, bottom, three weed frames, the far layer and
   // a light shaft. Phase 19: like the sailing scene (8.3 #89) everything is baked at HI times
   // the world's resolution and drawn at 1/HI size, under the pixel-art rules of 8.3 #84: flat
@@ -1285,7 +1313,7 @@ G.scene.underwater = (function () {
         glide: bd.glide, pitch: +bd.pitch.toFixed(3), pitchRaw: bd.pitch + bd.jerk, frame: a.fr, mode: ['swim', 'shake', 'roll'][bd.mode], speed: +bd.spd.toFixed(2), vy: +bd.vy.toFixed(2), len: +bd.len.toFixed(1) };
     }, drawLure: drawLure, lureImg: lureImg, BAITS: BAITS, DIRS: DIRS,
     body: function () { return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3) }; },
-    UW: UW, UNDER: UNDER, stats: stats, prepare: prepare, bottomAt: bottomAt, deepestX: deepestX,
+    UW: UW, UNDER: UNDER, stats: stats, prepare: prepare, galleryBed: galleryBed, bottomAt: bottomAt, deepestX: deepestX,
     lureStep: lureStep, viewStep: viewStep, draw: draw, setLure: setLure,
     createCatch: createCatch, catchStep: catchStep, resetHeavy: resetHeavy, drawHooked: drawHooked, mouth: mouth
   };
