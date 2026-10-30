@@ -323,7 +323,8 @@ G.scene.boat = (function () {
   function draw(ctx, b, sx, wy, withFisher, drawDog, gear) {
     var flip = b.facing < 0, y = wy + bob(b), f = b.facing, P = S.PALETTE;
     if (withFisher) {
-      // Phase 33: the posable fisher (js/scene/fisher.js) and what he holds.
+      // Phase 33: the posable fisher (js/scene/fisher.js) and what he holds; Phase 35: the cooler behind him.
+      G.scene.fisher.drawCooler(ctx, sx, y, f, shear(b, -5));
       if (gear && gear.fisher) G.scene.fisher.draw(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -1), b.t);
     }
     if (drawDog) drawDog(ctx, flip ? sx - 16 : sx + 4, y - 14 + shear(b, 10), flip, Math.abs(b.vx) / P_SPEED);
@@ -351,7 +352,11 @@ G.scene.boat = (function () {
     ctx.drawImage(mcv, 0, 0, mcv.width, 16, mx, my, mcv.width / HI, 8);
     ctx.drawImage(mcv, 0, 16, mcv.width, mcv.height - 16, mx - f * tilt, my + 8, mcv.width / HI, (mcv.height - 16) / HI);
     putSheared(ctx, b, img('hull', flip), sx - 17, y - 6, sx);
-    if (withFisher) { G.scene.fisher.drawHolder(ctx, sx, y, f, b.lean, shear(b, -1)); drawReel(ctx, b, sx, wy); }
+    if (withFisher) {
+      G.scene.fisher.drawHolder(ctx, sx, y, f, b.lean, shear(b, -1));
+      if (gear && gear.fisher) G.scene.fisher.drawCan(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -2)); // Phase 35: a can on the gunwale
+      drawReel(ctx, b, sx, wy);
+    }
     if (gear && gear.finder && (Math.floor(b.t * 1.25) & 1)) {
       ctx.fillStyle = P.neon_teal; ctx.fillRect(sx - f * 10, y - 3.5, 1, 1 / HI);
     }

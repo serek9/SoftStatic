@@ -36,19 +36,25 @@ G.scene.fisher = (function () {
     lureLook: { n: [3.0, -9.2], f: [2.6, -9.0] },
     baitA:  { n: [3.2, -9.3], f: [2.2, -9.6] },
     baitB:  { n: [3.0, -9.0], f: [3.0, -8.6] },
-    tug:    { n: [4.8, -7.8], f: [2.6, -9.0] }    // pulled down and out a little, so the line bends the tip
+    tug:    { n: [4.8, -7.8], f: [2.6, -9.0] },   // pulled down and out a little, so the line bends the tip
+    // Phase 35: into the cooler behind him; to the can's place on the gunwale by his hip.
+    cooler: { n: [-4.2, -5.4], f: [1.2, -4.4] },
+    canSpot: { n: [-2.2, -5.0], f: [1.2, -4.4] }
   };
+  var COOLER = [-5, -4], CAN = [-2.2, -4.2]; // the cooler (its middle, on the floor behind him) and the can's place, local
 
   // Acts: steps of {d: s, pose, rod: 'hand' | 'holder', head: 0 ahead, 1 down, 2 back, item, angle}.
   // The near hand carries the rod to the holder before it lets go, and comes back for it.
   // Phase 34: line (px of line the lure hangs on), reel (the handle's turns a second), bail
   // (open: the line runs out), held (the lure in the near hand), tug (he tugs the knot: the
   // line pulls the tip), cue (a sound at the step's start). An act may set its holder angle.
+  // Phase 35: gun (true: the can is set on the gunwale; false: taken from it), sip (a drink
+  // counted), bin (the empty goes back in the cooler). modes: the director's modes it plays in.
   var PLACE = [{ d: 0.5, pose: 'holder', rod: 'hand', angle: HOLDER_ANGLE }, { d: 0.35, pose: 'knees', rod: 'holder' }];
   var TAKE = [{ d: 0.45, pose: 'holder', rod: 'holder' }, { d: 0.4, pose: 'rod', rod: 'hand' }];
   var ACTS = {
     // P2-2's thermos, between casts.
-    thermos: { mode: 'casts', steps: PLACE.concat([
+    thermos: { modes: ['casts', 'wait'], steps: PLACE.concat([
       { d: 0.5, pose: 'cup', rod: 'holder', item: 'cup' },
       { d: 1.8, pose: 'mouth', rod: 'holder', item: 'cup', head: 2 },
       { d: 1.2, pose: 'cup', rod: 'holder', item: 'cup' },
@@ -56,11 +62,11 @@ G.scene.fisher = (function () {
       { d: 0.6, pose: 'knees', rod: 'holder' }
     ], TAKE) },
     // Waiting for a bite: the rod in the holder, his hands on his knees.
-    rest: { mode: 'wait', steps: PLACE.concat([{ d: 7, pose: 'knees', rod: 'holder' }], TAKE) },
+    rest: { modes: ['wait'], steps: PLACE.concat([{ d: 7, pose: 'knees', rod: 'holder' }], TAKE) },
     // Phase 34: preparing the lure. The rod stands upright in the holder; line runs out until
     // the lure hangs before his face; he takes it, looks it over, works fresh bait onto the hook,
     // tugs the knot, lets it swing, takes the rod back and reels the lure up under the tip.
-    lure: { mode: 'casts', holder: 96, steps: [
+    lure: { modes: ['casts'], holder: 96, steps: [
       { d: 0.5, pose: 'holder', rod: 'hand', angle: 96 },
       { d: 0.3, pose: 'knees', rod: 'holder' },
       { d: 1.3, pose: 'knees', rod: 'holder', line: 16.4, bail: true },
@@ -76,9 +82,38 @@ G.scene.fisher = (function () {
       { d: 0.45, pose: 'holder', rod: 'holder' },
       { d: 0.4, pose: 'rod', rod: 'hand' },
       { d: 1.6, pose: 'rod', rod: 'hand', line: 3, reel: 2.2 }
-    ] }
+    ] },
+    // Phase 35: a beer at dusk and at night, one can at a time. He takes it from the cooler,
+    // cracks it, drinks and sets it on the gunwale by his hip; later sips come from it; after
+    // three the empty goes back in the cooler, and a while passes before the next.
+    beer: { modes: ['casts', 'wait'], steps: PLACE.concat([
+      { d: 0.6, pose: 'cooler', rod: 'holder' },
+      { d: 0.5, pose: 'cup', rod: 'holder', item: 'can' },
+      { d: 0.5, pose: 'cup', rod: 'holder', item: 'can', cue: 'crack' },
+      { d: 1.6, pose: 'mouth', rod: 'holder', item: 'can', head: 2, sip: true },
+      { d: 0.6, pose: 'cup', rod: 'holder', item: 'can' },
+      { d: 0.5, pose: 'canSpot', rod: 'holder', item: 'can' },
+      { d: 0.4, pose: 'knees', rod: 'holder', gun: true, cue: 'candown' },
+      { d: 2.5, pose: 'knees', rod: 'holder' }
+    ], TAKE) },
+    sip: { modes: ['casts', 'wait'], steps: PLACE.concat([
+      { d: 0.5, pose: 'canSpot', rod: 'holder' },
+      { d: 0.4, pose: 'cup', rod: 'holder', item: 'can', gun: false },
+      { d: 1.5, pose: 'mouth', rod: 'holder', item: 'can', head: 2, sip: true },
+      { d: 0.5, pose: 'cup', rod: 'holder', item: 'can' },
+      { d: 0.5, pose: 'canSpot', rod: 'holder', item: 'can' },
+      { d: 0.4, pose: 'knees', rod: 'holder', gun: true, cue: 'candown' },
+      { d: 2, pose: 'knees', rod: 'holder' }
+    ], TAKE) },
+    empty: { modes: ['casts', 'wait'], steps: PLACE.concat([
+      { d: 0.5, pose: 'canSpot', rod: 'holder' },
+      { d: 0.4, pose: 'cup', rod: 'holder', item: 'can', gun: false },
+      { d: 1.3, pose: 'mouth', rod: 'holder', item: 'can', head: 2, sip: true },
+      { d: 0.6, pose: 'cooler', rod: 'holder', item: 'can' },
+      { d: 0.4, pose: 'knees', rod: 'holder', bin: true }
+    ], TAKE) }
   };
-  var BY_MODE = { casts: ['thermos', 'lure'], wait: ['rest'] };
+  var BEER_SIPS = 3, BEER_REST = 90; // drinks from one can; s before the next can
   var WAIT = { casts: [6, 6], wait: [8, 7] }; // s of nothing happening before an act: least, plus up to
 
   var cur = null; // the fisher state the boat draws (one fisher)
@@ -88,6 +123,7 @@ G.scene.fisher = (function () {
     return cur = { nx: p.n[0], ny: p.n[1], nvx: 0, nvy: 0, fx: p.f[0], fy: p.f[1], fvx: 0, fvy: 0,
       pose: 'rod', head: 0, item: '', rodAt: 'hand', angle: null, holderA: HOLDER_ANGLE,
       line: null, reel: 0, bail: false, held: false, tug: false, cue: '',
+      can: false, sips: 0, beerRest: 0,
       act: '', step: 0, t: 0, idleT: 0, wait: 0, ret: false, fast: false, acts: 0 };
   }
 
@@ -101,32 +137,54 @@ G.scene.fisher = (function () {
     fs.angle = st.rod === 'holder' ? fs.holderA : (st.angle === undefined ? null : st.angle);
     fs.line = st.line === undefined ? null : st.line; fs.reel = st.reel || 0; fs.bail = !!st.bail;
     fs.held = !!st.held; fs.tug = !!st.tug; fs.cue = st.cue || '';
+    if (st.gun !== undefined) fs.can = st.gun;
+    if (st.sip) fs.sips++;
+    if (st.bin) { fs.sips = 0; fs.beerRest = BEER_REST; }
   }
   function clearStep(fs) { fs.line = null; fs.reel = 0; fs.bail = false; fs.held = false; fs.tug = false; fs.cue = ''; }
 
   function start(fs, name) {
     if (!ACTS[name]) return false;
     fs.act = name; fs.step = 0; fs.t = 0; fs.ret = false; fs.fast = false; fs.acts++; fs.idleT = 0;
+    if (name === 'beer') fs.sips = 0;
     fs.holderA = ACTS[name].holder || HOLDER_ANGLE;
     setStep(fs, ACTS[name].steps[0]);
     return true;
   }
 
-  // Ends the act at once: the item goes, the head comes up, the near hand fetches the rod from
-  // the holder if it is there, quickly, and takes it back to its place.
+  // Ends the act at once: the item goes (a can is set down on the gunwale), the head comes up,
+  // the near hand fetches the rod from the holder if it is there, quickly, and takes it back.
   function abort(fs) {
     if (!fs.act && !fs.ret) return;
+    if (fs.item === 'can') { fs.can = true; fs.cue = 'candown'; }
     fs.act = ''; fs.item = ''; fs.head = 0; fs.fast = true; fs.ret = true;
-    clearStep(fs);
+    var cue = fs.cue; clearStep(fs); fs.cue = cue;
     if (fs.rodAt === 'holder') { fs.pose = 'holder'; fs.angle = fs.holderA; }
     else { fs.pose = 'rod'; fs.angle = null; }
   }
 
-  // ctx: {mode: 'casts' | 'wait' | null (nothing to do but fish), input: a key held or pressed}.
+  // What he drinks (Phase 35): the thermos in the grey hours; at dusk and night a beer, a sip
+  // from the can on the gunwale, or the empty back in the cooler; the thermos while the last
+  // can is a while gone.
+  function drink(fs, night) {
+    if (!night) return 'thermos';
+    if (fs.can) return fs.sips >= BEER_SIPS ? 'empty' : 'sip';
+    return fs.beerRest > 0 ? 'thermos' : 'beer';
+  }
+
+  // The act for a mode: preparing the lure or a drink between casts; a rest or a drink while waiting.
+  function choose(fs, mode, night, rng) {
+    var d = drink(fs, night), other = mode === 'casts' ? 'lure' : 'rest';
+    return rng.next() < (fs.can && night ? 0.65 : 0.5) ? d : other;
+  }
+
+  // ctx: {mode: 'casts' | 'wait' | null (nothing to do but fish), input: a key held or pressed,
+  // night: dusk or night (Phase 35)}.
   function step(fs, dt, ctx, rng) {
+    if (fs.beerRest > 0) fs.beerRest -= dt;
     if (fs.act) {
       var a = ACTS[fs.act];
-      if (ctx.input || ctx.mode !== a.mode) abort(fs);
+      if (ctx.input || a.modes.indexOf(ctx.mode) < 0) abort(fs);
       else {
         fs.t += dt;
         while (fs.act && fs.t >= a.steps[fs.step].d) {
@@ -140,11 +198,7 @@ G.scene.fisher = (function () {
       if (ctx.mode && !ctx.input && !fs.ret) {
         if (fs.wait <= 0) fs.wait = WAIT[ctx.mode][0] + WAIT[ctx.mode][1] * rng.next();
         fs.idleT += dt;
-        if (fs.idleT >= fs.wait) {
-          var list = BY_MODE[ctx.mode];
-          start(fs, list[Math.min(list.length - 1, Math.floor(rng.next() * list.length))]);
-          fs.idleT = 0; fs.wait = 0;
-        }
+        if (fs.idleT >= fs.wait) { start(fs, choose(fs, ctx.mode, ctx.night, rng)); fs.idleT = 0; fs.wait = 0; }
       } else { fs.idleT = 0; fs.wait = 0; }
     }
     // The hands.
@@ -228,8 +282,36 @@ G.scene.fisher = (function () {
   }
   // Items held in the near hand, painted small: the thermos cup.
   // Each is drawn centred on the hand, standing on it.
-  var ITEMS = { cup: { w: 3, h: 4, paint: function (c) { A.slab(c, 0, 0, 3, 4, STONES); } } };
+  var ITEMS = {
+    cup: { w: 3, h: 4, paint: function (c) { A.slab(c, 0, 0, 3, 4, STONES); } },
+    can: { w: 2, h: 4, paint: paintCan }                                            // Phase 35
+  };
+  // A beer can, 2×4 view px: a lit rim, a rust body with a pale band.
+  function paintCan(c) {
+    A.box(c, 'stone_lit', 0, 0, 2, 1); A.box(c, 'rust_hi', 0, 1, 1, 3); A.box(c, 'rust', 1, 1, 1, 3); A.box(c, 'cream', 0, 2, 2, 1);
+  }
+  // The cooler, 12×9 view px: a pale lid with a handle, a teal body lit on its left; its foot is
+  // hidden by the hull.
+  function paintCooler(c) {
+    A.box(c, 'ink', 0, 1, 12, 8);
+    A.box(c, 'teal_hi', 1, 3, 10, 6); A.box(c, 'teal', 4, 3, 7, 6); A.box(c, 'teal_dark', 10, 3, 1, 6);
+    A.box(c, 'paper', 1, 1, 10, 2); A.box(c, 'paper_dark', 1, 2, 10, 1);
+    A.box(c, 'ink', 4, 0, 4, 1); A.px(c, 'stone', 4, 1); A.px(c, 'stone', 7, 1);
+  }
   function itemImg(name, flip) { var it = ITEMS[name]; return img('item' + name, flip, function () { return layer(it.w, it.h, it.paint); }); }
+  function coolerImg(flip) { return img('cooler', flip, function () { return layer(12, 9, paintCooler); }); }
+
+  // Phase 35: the cooler on the floor behind him, drawn before him and the hull (the gunwale
+  // hides its foot); the can on the gunwale, drawn after the hull.
+  function drawCooler(ctx, sx, y, f, dy) {
+    var cv = coolerImg(f < 0), x = sx + f * COOLER[0] - cv.width / HI / 2;
+    put(ctx, cv, Math.round(x * HI) / HI, Math.round((y + COOLER[1] - 3 + dy) * HI) / HI);
+  }
+  function drawCan(ctx, fs, sx, y, f, lean, dy) {
+    if (!fs.can) return;
+    var cv = itemImg('can', f < 0), x = sx + f * CAN[0] - f * lean - cv.width / HI / 2;
+    put(ctx, cv, Math.round(x * HI) / HI, Math.round((y + CAN[1] - cv.height / HI + dy) * HI) / HI);
+  }
 
   function put(ctx, cv, x, y) { ctx.drawImage(cv, x, y, cv.width / HI, cv.height / HI); }
 
@@ -271,9 +353,10 @@ G.scene.fisher = (function () {
   // dbg.fisher(): the pose, the hands (local px), where the rod is, the act and its time.
   function info(fs) {
     return { pose: fs.pose, hands: [+fs.nx.toFixed(2), +fs.ny.toFixed(2), +fs.fx.toFixed(2), +fs.fy.toFixed(2)], holder: fs.rodAt === 'holder',
-      act: fs.act, step: fs.step, actT: +fs.t.toFixed(2), idleT: +fs.idleT.toFixed(2), wait: +fs.wait.toFixed(2), returning: fs.ret, head: fs.head, item: fs.item, line: fs.line, held: fs.held, reel: fs.reel };
+      act: fs.act, step: fs.step, actT: +fs.t.toFixed(2), idleT: +fs.idleT.toFixed(2), wait: +fs.wait.toFixed(2), returning: fs.ret, head: fs.head, item: fs.item, line: fs.line, held: fs.held, reel: fs.reel,
+      can: fs.can, sips: fs.sips, beerRest: +Math.max(0, fs.beerRest).toFixed(1) };
   }
 
   return { K: K, POSES: POSES, ACTS: ACTS, HOLDER: HOLDER, HOLDER_ANGLE: HOLDER_ANGLE, create: create, step: step, start: start, abort: abort,
-    rodLocal: rodLocal, draw: draw, drawHolder: drawHolder, info: info, armCount: function () { var n = 0; for (var k in art) if (k[0] === 'a' && k[k.length - 1] !== '<') n++; return n; } };
+    rodLocal: rodLocal, draw: draw, drawHolder: drawHolder, drawCooler: drawCooler, drawCan: drawCan, drink: drink, choose: choose, info: info, armCount: function () { var n = 0; for (var k in art) if (k[0] === 'a' && k[k.length - 1] !== '<') n++; return n; } };
 })();

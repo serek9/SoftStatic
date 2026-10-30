@@ -284,8 +284,13 @@ G.core.debug = (function () {
     // dbg.rodLoad(x) forces the load on the rod's tip (0..1); dbg.rodLoad(null) gives it back to the scene.
     rodLoad: function (x) { G.gfx.rod.st.force = (x === null || x === undefined) ? null : +x; return G.gfx.rod.st.force; },
     // dbg.fisher() returns the fisher (Phase 33): pose, hands (near x, y, far x, y; local px),
-    // holder (the rod in it), act, step, actT, idleT and wait (the director's timer), returning.
-    fisher: function () { return G.scene.fisher.info(G.state.run.fisher); },
+    // holder (the rod in it), act, step, actT, idleT and wait (the director's timer), returning;
+    // Phase 35: can (on the gunwale), sips, beerRest, night and drink (what he would drink now).
+    fisher: function () {
+      var fs = G.state.run.fisher, o = G.scene.fisher.info(fs), night = G.scene.sailing.night();
+      o.night = night; o.drink = G.scene.fisher.drink(fs, night); // Phase 35: what he would drink now
+      return o;
+    },
     // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
     // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
     dangle: function () { return G.scene.sailing.dangle(); },

@@ -212,6 +212,12 @@ G.audio.engine = (function () {
     for (v = 0; v < 3; v++) k.tick.push(mkBuf(0.05, function (d, sr) { bodySynth(d, sr, [[1100, 0.008, 1], [2700, 0.005, 0.6]], 0, 0.95 + 0.1 * R(), R); }));
     for (v = 0; v < 3; v++) k.knock.push(mkBuf(0.2, function (d, sr) { bodySynth(d, sr, [[180, 0.035, 1], [620, 0.012, 0.5], [2100, 0.003, 0.3]], 0, 0.95 + 0.1 * R(), R); }));
     for (var w in IRS) k.ir[w] = mkBuf(IRS[w][0] * 1.1, function (d, sr) { irSynth(d, sr, IRS[w][0], IRS[w][1], R); });
+    // Phase 35: a can's hiss: noise with its lows taken out (the difference of two samples),
+    // in at once and fading over about a third of a second.
+    k.hiss = mkBuf(0.4, function (d, sr) {
+      var prev = 0;
+      for (var j = 0; j < d.length; j++) { var t = j / sr, n = R() * 2 - 1; d[j] = (n - prev) * 0.5 * Math.exp(-t * 9) * (1 - Math.exp(-t * 300)); prev = n; }
+    });
     kitMs = performance.now() - t0;
     return k;
   }
@@ -264,6 +270,9 @@ G.audio.engine = (function () {
       // Phase 34: preparing the lure: fresh bait worked onto the hook, and the hook set in it.
       case 'bait': playBuf(pick(KIT.tick), 0.012, panAt(run.boat.x), 1.4 + 0.2 * G.vrng.next()); note('bait'); break;
       case 'hooked': playBuf(pick(KIT.tick), 0.02, panAt(run.boat.x), 1.7); playBuf(pick(KIT.pop), 0.008, panAt(run.boat.x), 2.2, null, 0.05); note('hooked'); break;
+      // Phase 35: a can cracked open (a snap, then the hiss), and a can set down on the gunwale.
+      case 'crack': playBuf(pick(KIT.tick), 0.016, panAt(run.boat.x), 2.4); playBuf(KIT.hiss, 0.01, panAt(run.boat.x), 1, null, 0.02); note('crack'); break;
+      case 'candown': playBuf(pick(KIT.knock), 0.012, panAt(run.boat.x), 2.6); note('candown'); break;
     }
   }
 

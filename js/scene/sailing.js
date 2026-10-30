@@ -1383,13 +1383,14 @@ G.scene.sailing = (function () {
   // waiting for a bite with nothing interested; any key held or pressed ends an act. The keys
   // still do what they always do on this step: the director only reads them.
   var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still'];
-  var fisherIn = { mode: null, input: false };
+  var fisherIn = { mode: null, input: false, night: false };
   function fisherStep(run, dt) {
     var inp = G.core.input, any = false;
     for (var i = 0; i < KEYS_ANY.length; i++) if (inp.held(KEYS_ANY[i]) || inp.pressed(KEYS_ANY[i])) { any = true; break; }
     var quiet = !run.passive.on && !run.anom.on;
     fisherIn.mode = quiet && run.fsm === 'sailing' && run.boat.stopped ? 'casts' : (quiet && run.fsm === 'waiting' && run.bite.slot < 0 ? 'wait' : null);
     fisherIn.input = any;
+    fisherIn.night = greyF(hourNow()) < 0.5; // Phase 35: a beer at dusk and at night, the thermos in the grey hours
     G.scene.fisher.step(run.fisher, dt, fisherIn, G.vrng);
   }
 
@@ -1447,7 +1448,14 @@ G.scene.sailing = (function () {
     fisherStep(run, dt); // Phase 33: the idle director and the hands, before the rod reads them
     rodStep(run, dt); // Phase 31: the rod bends under the line before the rope reads its tip
     dangleStep(run, dt); // Phase 34: the lure hanging from the tip between casts
-    if (run.fisher.cue) { G.audio.engine.cue(run.fisher.cue); run.fisher.cue = ''; }
+    if (run.fisher.cue) {
+      var fs = run.fisher;
+      if (fs.cue === 'crack') { // Phase 35: a puff of foam from the can in his hand
+        var hx = b.x + b.facing * fs.nx - b.facing * b.lean, hy = loc.waterY + boat.bob(b) + fs.ny - 2;
+        fx.emit('splash', hx, hy, 3);
+      }
+      G.audio.engine.cue(fs.cue, b.x); fs.cue = '';
+    }
     ropeStep(run, dt); // Phase 21: after everything that moves the rod tip, the lure or the fish
     G.scene.underwater.bodyStep(run, dt, loc); // Phase 22: the lure's heading and flutter
     fx.setFlow(G.scene.underwater.flow(loc, 8)); // bubbles drift with the water
@@ -1699,6 +1707,7 @@ G.scene.sailing = (function () {
     moon: function () { return { x: moonPt[0], y: moonPt[1], a: moonPt[2] }; },
     waterLight: function () { return waterLight; },
     loc: function () { return loc; },
+    night: function () { return fisherIn.night; }, // Phase 35: what the idle director takes as dusk or night
     dangle: function () { return { on: dg.on, th: +dg.th.toFixed(3), om: +dg.om.toFixed(3), len: +dg.len.toFixed(2), off: [+dg.ox.toFixed(2), +dg.oy.toFixed(2)] }; }, // dbg.dangle (Phase 34)
     scenery: function () { return scen === NO_SCENERY ? null : scen; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },
