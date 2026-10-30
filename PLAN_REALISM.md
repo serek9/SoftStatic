@@ -1,7 +1,7 @@
 # SoftStatic: Realism Phases 20–25 (line, sound, boat, current, fight, water)
 
 **Date:** 2026-10-29. **Repo state:** Phases 1–19 done (PLAN.md §8.1), `main` at `4c37623`.
-**Status:** R1–R5 approved by the user on 2026-10-29. All six phases (20–25) are done (PLAN.md §8.1), each merged by pull request.
+**Status:** R1–R5 approved by the user on 2026-10-29. Phases 20–25 are done, each merged by pull request, and Phase 26 (below) revisited three of their choices (PLAN.md §8.1).
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like the improvement audit, this file adds phases after §4. It does not edit §0–§7 or Appendix V. Where a phase bends the approved spec, the **Spec deviations** table below names it, and the phase needs the user's approval before it starts.
 
 The user asked for six things:
@@ -152,6 +152,18 @@ Every fishing sound becomes a layered, physically inspired synthesis that follow
 | 25.6 | **Mix pass.** All new layers sit under the ambience at the levels set in audit batch 2. The master limiter stays on. Mute and volume reach every new bus. | js/audio/engine.js | Mute gives 0 on every bus. A 5-minute scripted session render never goes above −1 dBFS after the limiter and has no event louder than 6 dB above the ambience median (§0.14). |
 
 **Baselines:** all unchanged (presentation only).
+
+---
+
+## Phase 26: Revisiting three choices
+
+Asked for by the user on 2026-10-30, after Phases 20–25: three places where the first build took a shortcut. Presentation only; the baselines in PLAN.md §8.5 must not move.
+
+| ID | Task | Files | Done when |
+|---|---|---|---|
+| 26.1 | **The boat's wake, simulated.** Replace the scripted wake (8.3 #124) with a second, long-wave layer in the surface: wider, slower-damped waves that the stern and the bow push out in proportion to speed, travelling slower than the boat sails. The boat outruns them; when it stops they catch it up, and the heave and pitch, which already read the surface, rock it. No timer. | js/gfx/surface.js, js/scene/sailing.js, js/scene/boat.js | On flat water, a stop from full speed gives a heave bump from the wake 1–2 s after the braking dip, with no scripted kick in the code. The wake also shows on the waterline. The Phase 20 ripple checks still pass. |
+| 26.2 | **The motor before the boat.** While the cord is pulled (0.4 s), holding a direction turns the boat but does not push it; it moves once the motor runs. | js/scene/boat.js, js/scene/sailing.js | From rest with the motor off, the boat's speed stays under the stopped threshold until the motor runs, then accelerates as before. With the motor already running there is no delay. |
+| 26.3 | **Every lake cast drifts.** The lakes' wind drift no longer passes through zero: its direction is set per cast by the seed and only its strength sways. The Red Room keeps its current that turns round, on purpose. | data/loc_fog.js, data/loc_pines.js, data/loc_red.js | Over 200 seeds, every Fogbound and Pines cast at 6 m drifts 3–10 px in 30 s. Paths are still identical for the same seed. |
 
 ---
 

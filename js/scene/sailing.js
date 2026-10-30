@@ -1303,10 +1303,11 @@ G.scene.sailing = (function () {
       if (choice) { G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing'); }
     }
     var move = run.fsm === 'sailing' && !pv.on && !toggled ? inp.move() : 0;
+    boat.outboard(b, move, dt); // Phase 26: the motor first; only a running motor pushes the boat
     boat.step(b, move, dt, loc.width);
     var surf = G.gfx.surface; // Phase 24: pitch, heave and the outboard, on the surface under the hull
     boat.motion(b, move, dt, surf.at(boat.bow(b)) / HI, surf.at(boat.stern(b)) / HI);
-    if (b.wakeHit) { surf.poke(boat.stern(b), 0.6 * b.wakeA, 4); fx.ripple(b.x, loc.waterY + 2, 8, 22, 1.6); } // its wake arrives
+    if (b.wakeHit) fx.ripple(b.x, loc.waterY + 2, 8, 22, 1.6); // the water lifts the hull: a ring
     ropeStep(run, dt); // Phase 21: after everything that moves the rod tip, the lure or the fish
     G.scene.underwater.bodyStep(run, dt, loc); // Phase 22: the lure's heading and flutter
     fx.setFlow(G.scene.underwater.flow(loc, 8)); // bubbles drift with the water
@@ -1351,6 +1352,8 @@ G.scene.sailing = (function () {
       fx.ripple(b.x, wy + 2, 13, 24, 2.2);
       G.gfx.surface.poke(b.x - b.facing * 12, 0.06, 4); // the idle hull rocking
     }
+    // Phase 26: the moving boat makes its wake (the surface's wake layer), every step.
+    G.gfx.surface.wake(boat.stern(b), sp * sp, b.vx, dt);
     // The surface's swell roughens in drizzle and in the grey hours' wind.
     G.gfx.surface.step(dt, 1 + 0.6 * rainK() + 0.35 * greyF(hourNow()));
     fx.update(dt);

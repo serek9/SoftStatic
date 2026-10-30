@@ -19,7 +19,7 @@ G.data.locations.pines = {
   // Phase 20: the surface's swell (view px; see loc_fog.js): a medium chop.
   swell: { amp: 1.6, mirror: 0.9, waves: [[80, 11, 0.5], [37, -8, 0.3], [19, 6, 0.2]] },
   // Phase 22: a slow wind drift (G.data.lakeDrift in loc_fog.js).
-  current: { lake: true, speed: 0.45, wind: 0.3, ramp: 4, period: 200, slack: 0.75, bottom: 0.2 },
+  current: { lake: true, speed: 0.26, wind: 0.08, sway: 0.2, ramp: 4, period: 200, slack: 0.75, bottom: 0.2 },
   drift: function (seed, t, depth, onBottom, wind) { return G.data.lakeDrift(this, seed, t, depth, onBottom, wind); },
   scenery: 'pines',
 
