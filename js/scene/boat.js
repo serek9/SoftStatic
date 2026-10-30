@@ -332,9 +332,10 @@ G.scene.boat = (function () {
         }
         ctx.globalAlpha = 1;
       }
-      drawRod(ctx, b, sx, wy, gear ? gear.rod : 0, gear && gear.lineKey, gear ? gear.lineA : 0.6);
     }
     if (drawDog) drawDog(ctx, flip ? sx - 16 : sx + 4, y - 14 + shear(b, 10), flip, Math.abs(b.vx) / P_SPEED);
+    // The rod reaches out over the dog in the bow, so it is drawn after him: its bend shows whole.
+    if (withFisher) drawRod(ctx, b, sx, wy, gear ? gear.rod : 0, gear && gear.lineKey, gear ? gear.lineA : 0.6);
     if (gear && gear.lantern) {
       var px = sx - f * 13, ly0 = y;                          // a pole at the stern, its arm out back
       y += shear(b, -13);
