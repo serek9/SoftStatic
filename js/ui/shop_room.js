@@ -131,12 +131,8 @@ G.ui.shopRoom = (function () {
   function paintRack(c, x0, y0) {                                                    // a rod rack against the wall
     box(c, 'wood_deep', x0 + 2, y0 - 18, 60, 26); box(c, 'wood_dark', x0 + 3, y0 - 17, 58, 24);
     box(c, 'wood_mid', x0 + 2, y0 + 8, 60, 3); box(c, 'wood_dark', x0 + 2, y0 + 11, 60, 14); box(c, 'wood_deep', x0 + 2, y0 + 25, 60, 2);
-    var KEYS = ['stone_hi', 'wood_hi', 'rust_hi', 'moss_hi', 'bone'];
-    for (var i = 0; i < 5; i++) {                                                    // rods leaning in it (38.2 shows what is left)
-      var x = x0 + 8 + i * 11;
-      box(c, 'ink', x, y0 - 16, 2, 34); box(c, KEYS[i], x, y0 - 16, 1, 34);
-      box(c, 'wood_lit', x - 1, y0 + 12, 3, 6); px(c, 'stone_dark', x + 2, y0 + 8);
-    }
+    for (var i = 0; i < 4; i++) box(c, 'wood_deep', x0 + 10 + i * 13, y0 + 10, 4, 2);   // the slots the rods stand in (drawn live, 38.2)
+    box(c, 'stone_dark', x0 + 8, y0 - 15, 48, 2);                                    // the bar they lean on
   }
   function paintJarShelf(c, x0, y0) {                                                // a low shelf under the window
     box(c, 'wood_deep', x0 + 2, y0 + 6, 28, 20); box(c, 'wood_mid', x0 + 2, y0 + 6, 28, 3); box(c, 'wood_dark', x0 + 3, y0 + 9, 26, 15);
@@ -146,8 +142,7 @@ G.ui.shopRoom = (function () {
   function paintGearShelf(c, x0, y0) {                                               // a tall shelf between the windows
     box(c, 'wood_deep', x0 + 1, y0 - 22, 30, 48); box(c, 'wood_dark', x0 + 3, y0 - 20, 26, 44);
     for (var i = 0; i < 3; i++) box(c, 'wood_mid', x0 + 3, y0 - 8 + i * 12, 26, 2);
-    box(c, 'stone_dark', x0 + 8, y0 - 18, 8, 10); box(c, 'lamp_glow', x0 + 10, y0 - 16, 4, 5);                      // the lantern
-    box(c, 'ink', x0 + 18, y0 - 4, 9, 8); box(c, 'teal_dark', x0 + 19, y0 - 3, 7, 5); px(c, 'neon_teal', x0 + 21, y0 - 1); // the finder
+    // The lantern and the finder are drawn live (38.2: they leave the shelf when bought).
   }
   function paintCounter(c) {                                                         // an L: down by Rusty's left, then along
     var x0 = 8 * T, y0 = 2 * T;
@@ -161,7 +156,7 @@ G.ui.shopRoom = (function () {
   }
   function paintBox(c, x0, y0, kind) {                                               // the bait by the west wall
     if (kind === 'worms') { box(c, 'wood_deep', x0 + 4, y0 + 4, 24, 22); box(c, 'wood', x0 + 6, y0 + 6, 20, 16); box(c, 'rock_dark', x0 + 8, y0 + 8, 16, 12); box(c, 'flesh', x0 + 11, y0 + 11, 5, 1); box(c, 'flesh', x0 + 15, y0 + 15, 6, 1); }
-    if (kind === 'crickets') { box(c, 'wood_deep', x0 + 4, y0 + 4, 24, 22); box(c, 'reed', x0 + 6, y0 + 6, 20, 16); for (var i = 0; i < 4; i++) box(c, 'reed_dark', x0 + 7 + i * 5, y0 + 7, 1, 14); }
+    if (kind === 'crickets') { box(c, 'wood_deep', x0 + 4, y0 + 4, 24, 22); box(c, 'reed', x0 + 6, y0 + 6, 20, 16); } // its mesh and crickets are live
     if (kind === 'tank') { box(c, 'ink', x0 + 3, y0 + 2, 26, 26); box(c, 'water_dark', x0 + 5, y0 + 4, 22, 20); box(c, 'water_mid', x0 + 5, y0 + 4, 22, 3); box(c, 'stone_hi', x0 + 5, y0 + 24, 22, 2); }
   }
 
@@ -330,16 +325,53 @@ G.ui.shopRoom = (function () {
   function bake() {
     if (!room) {
       var t0 = typeof performance !== 'undefined' ? performance.now() : 0;
-      room = G.gfx.bake.cached('shop:room36b', function () { return G.gfx.bake.layer(W, H, paintRoom); });
+      room = G.gfx.bake.cached('shop:room38', function () { return G.gfx.bake.layer(W, H, paintRoom); });
       if (t0) bakeMs = performance.now() - t0;
     }
     return room;
   }
   function blockedList() { var o = []; for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) if (isBlocked(c, r)) o.push([c, r]); return o; }
 
+  // What the shelves hold (Phase 38): the rods not yet his on the rack (tiers above his own),
+  // the lantern and the finder unless bought, and the minnows and crickets left this visit.
+  var ROD_KEYS = ['stone_hi', 'wood_hi', 'rust_hi', 'moss_hi', 'bone'], shown = { rods: 0, lantern: false, finder: false, minnows: 0, crickets: 0 };
+  function drawStock(ctx, stock, t) {
+    var x0 = OX + T, y0 = OY + T, i, n = 0;
+    for (i = 1; i < ROD_KEYS.length; i++) {
+      if (i <= stock.rod) continue;
+      var x = x0 + 11 + (i - 1) * 13;
+      ctx.fillStyle = P.ink; ctx.fillRect(x, y0 - 16, 2, 28);
+      ctx.fillStyle = P[ROD_KEYS[i]]; ctx.fillRect(x, y0 - 16, 1, 28);
+      ctx.fillStyle = P.wood_lit; ctx.fillRect(x - 1, y0 + 4, 3, 6);
+      ctx.fillStyle = P.stone_dark; ctx.fillRect(x + 2, y0 + 1, 1, 2);
+      n++;
+    }
+    shown.rods = n;
+    var gx = OX + 6 * T, gy = OY + T;
+    shown.lantern = !stock.lantern; shown.finder = !stock.finder;
+    if (shown.lantern) { ctx.fillStyle = P.stone_dark; ctx.fillRect(gx + 8, gy - 18, 8, 10); ctx.fillStyle = P.lamp_glow; ctx.fillRect(gx + 10, gy - 16, 4, 5); }
+    if (shown.finder) { ctx.fillStyle = P.ink; ctx.fillRect(gx + 18, gy - 4, 9, 8); ctx.fillStyle = P.teal_dark; ctx.fillRect(gx + 19, gy - 3, 7, 5); ctx.fillStyle = P.neon_teal; ctx.fillRect(gx + 21, gy - 1, 1, 1); }
+    // Minnows in the tank, swimming to and fro; crickets in the crate, now and then a hop.
+    var tx = OX + T + 6, ty = OY + 5 * T + 8;
+    shown.minnows = stock.minnows;
+    ctx.fillStyle = P.water_hi;
+    for (i = 0; i < stock.minnows; i++) {
+      var ph = t * (0.35 + i * 0.07) + i * 1.7, u = (Math.sin(ph) + 1) / 2;
+      ctx.fillRect(tx + Math.round(u * 15), ty + (i * 5) % 14, 3, 1);
+    }
+    var cx = OX + T + 6, cy = OY + 4 * T + 6;
+    shown.crickets = stock.crickets;
+    for (i = 0; i < stock.crickets; i++) {
+      var hop = (t * 0.6 + i * 0.37) % 1 < 0.06 ? 1 : 0;
+      ctx.fillStyle = P.ink; ctx.fillRect(cx + 2 + (i * 7) % 16, cy + 3 + ((i * 5) % 11) - hop, 2, 1);
+    }
+    ctx.fillStyle = P.reed_dark;
+    for (i = 0; i < 4; i++) ctx.fillRect(cx + 1 + i * 5, cy + 1, 1, 14);                // the crate's slats over them
+  }
+
   // Draws the room, the glass, Rusty behind his counter, the dog and the fisher, the one
-  // further down the room in front. rusty: {face, fr} (Phase 37).
-  function draw(ctx, st, t, hour, rusty) {
+  // further down the room in front. rusty: {face, fr} (Phase 37); stock: what the shelves hold (38).
+  function draw(ctx, st, t, hour, rusty, stock) {
     ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
     ctx.drawImage(bake(), OX, OY);
     // The windows' glass (36: a still dusk; Phase 39 gives it the hour).
@@ -357,6 +389,7 @@ G.ui.shopRoom = (function () {
     var ha = h / 12 * 2 * Math.PI, ma = (hour % 1) * 2 * Math.PI;
     for (var i = 1; i <= 3; i++) ctx.fillRect(Math.round(cx + Math.sin(ma) * i), Math.round(cy - Math.cos(ma) * i), 1, 1);
     for (i = 1; i <= 2; i++) ctx.fillRect(Math.round(cx + Math.sin(ha) * i), Math.round(cy - Math.cos(ha) * i), 1, 1);
+    if (stock) drawStock(ctx, stock, t);
     if (rusty) ctx.drawImage(sprite('rusty', rusty.face, rusty.fr), OX + RUSTY[0] * T, OY + RUSTY[1] * T - 6);
     // The dog and the fisher, the one further down the room in front.
     var dg = st.dog, u = st.moving ? st.t : 1;
@@ -371,5 +404,5 @@ G.ui.shopRoom = (function () {
 
   return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,
     create: create, step: step, facing: facing, isBlocked: isBlocked, draw: draw, bake: bake, sprite: sprite,
-    bakeMs: function () { return bakeMs; }, blocked: blockedList };
+    bakeMs: function () { return bakeMs; }, blocked: blockedList, shown: function () { return shown; } };
 })();

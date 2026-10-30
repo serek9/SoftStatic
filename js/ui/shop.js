@@ -176,6 +176,17 @@ G.ui.shop = (function () {
   var CHOICES = ['BUY', 'TALK', 'LEAVE'];
   var BOX = { x: 24, y: 290, w: 592, h: 62 }, CH = { x: 488, y: 196, w: 128, h: 88 }, LIST = { x: 336, y: 14, w: 280, h: 270, rowH: 29 }, COINS = { x: 24, y: 14, w: 132, h: 26 };
   var rusty = { face: 'down', fr: 3 };
+  // Phase 38: the shelves he can face, and their items ([shelf, item] in SHELVES); what they
+  // show: the gear he has, and the minnows and crickets left after what he bought this visit
+  // (the shop's stock is endless in the sim; the tank and the crate are full again next visit).
+  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]] };
+  var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
+  var stock = { rod: 0, lantern: false, finder: false, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
+  function stockStep() {
+    var g = G.state.save.gear;
+    stock.rod = g.rod; stock.lantern = !!g.lantern; stock.finder = !!g.depthFinder;
+    stock.minnows = Math.max(1, 7 - 2 * packs.minnow); stock.crickets = Math.max(1, 6 - 2 * packs.cricket);
+  }
 
   function item() { return SHELVES[row][col]; }
 
@@ -245,7 +256,7 @@ G.ui.shop = (function () {
       var b = E.baitById(it.id, G.data);
       if (b.unlimited || (save.gear.bait !== b.id && save.baits[b.id] > 0)) { save.gear.bait = b.id; describe(); say('On the hook next cast.'); return; }
       r = E.buyBait(save, b.id, b.pack, G.data);
-      if (r === E.OK) save.gear.bait = b.id;
+      if (r === E.OK) { save.gear.bait = b.id; if (packs[b.id] !== undefined) packs[b.id]++; }
     } else r = E.buy(save, it.kind, G.data);
     describe();
     if (r === E.OK) { G.core.save.autosave('purchase'); say('Thank you kindly.', 'moss_dark'); }
@@ -268,9 +279,9 @@ G.ui.shop = (function () {
   function pageLen() { var n = 0, p = pages[page]; for (var i = 0; i < p.length; i++) n += p[i].length; return n; }
 
   // The item window over the room, for every shelf (Rusty's Buy) or one shelf (Phase 38).
-  function showItems(rows, src) {
+  function showItems(entries, src) {
     list.length = 0;
-    for (var r = 0; r < SHELVES.length; r++) if (rows.indexOf(r) >= 0) for (var c = 0; c < SHELVES[r].length; c++) list.push([r, c]);
+    for (var i = 0; i < entries.length; i++) list.push(entries[i]);
     sel = 0; from = src; open = 'items';
     row = list[0][0]; col = list[0][1]; describe(); say('');
   }
@@ -280,6 +291,7 @@ G.ui.shop = (function () {
     if (!coin) coin = G.gfx.bake.layer(8, 8, paintCoin);
     row = 0; col = 0; t = 0;
     walk = R.create(); faced = ''; open = ''; R.bake();
+    packs.minnow = 0; packs.cricket = 0;
     line_ = pickLine(save, G.data.dialogue, save.clock);
     describe();
     say('');
@@ -295,6 +307,7 @@ G.ui.shop = (function () {
     G.sim.unease.step(save, uneaseIn, dt, G.rng, G.data);
     if (open) openStep(dt); else roomStep(dt);
     rustyStep();
+    stockStep();
   }
 
   // Rusty reads his paper; every 11 s a sip from his cup; a blink every 4.3 s. Spoken to, he
@@ -324,7 +337,7 @@ G.ui.shop = (function () {
       var ud = M.axis('up', 'down');
       if (ud) choice = (choice + ud + CHOICES.length) % CHOICES.length;
       if (inp.pressed('action')) {
-        if (CHOICES[choice] === 'BUY') showItems([0, 1, 2], 'rusty');
+        if (CHOICES[choice] === 'BUY') showItems(ALL, 'rusty');
         else if (CHOICES[choice] === 'TALK') talk();
         else open = '';
       }
@@ -352,6 +365,7 @@ G.ui.shop = (function () {
     if (walk.exit) { G.core.state.change('sailing'); return; }
     faced = R.facing(walk);
     if (inp.pressed('action') && faced === 'rusty') { from = 'rusty'; talk(); }
+    else if (inp.pressed('action') && SHELF_ITEMS[faced]) showItems(SHELF_ITEMS[faced], faced); // Phase 38: a shelf's own items
   }
 
   // ---- Drawing --------------------------------------------------------------------------
@@ -372,7 +386,7 @@ G.ui.shop = (function () {
 
   function draw(ctx) {
     var save = G.state.save, i;
-    R.draw(ctx, walk, t, save.clock, rusty);
+    R.draw(ctx, walk, t, save.clock, rusty, stock);
     if (!open) return;
     if (open === 'box' || open === 'choice') {
       frame(ctx, BOX.x, BOX.y, BOX.w, BOX.h);
@@ -423,7 +437,7 @@ G.ui.shop = (function () {
     act: function () { act(); return txt.msg.join(' '); },
     text: function () { return txt; },
     // dbg.shop(): where he stands and faces, the dog, what he faces, what is open over the room.
-    info: function () { return walk ? { c: walk.c, r: walk.r, face: walk.face, moving: walk.moving, steps: walk.steps, dog: [walk.dog.c, walk.dog.r, walk.dog.sit], faced: faced, open: open, page: page, pages: pages.length, choice: CHOICES[choice], items: list.length, sel: sel, from: from, rusty: [rusty.face, rusty.fr], bakeMs: +R.bakeMs().toFixed(1), room: [R.OX, R.OY, R.COLS * R.T, R.ROWS * R.T], blocked: R.blocked().length } : null; },
+    info: function () { return walk ? { c: walk.c, r: walk.r, face: walk.face, moving: walk.moving, steps: walk.steps, dog: [walk.dog.c, walk.dog.r, walk.dog.sit], faced: faced, open: open, page: page, pages: pages.length, choice: CHOICES[choice], items: list.length, sel: sel, from: from, rusty: [rusty.face, rusty.fr], shown: R.shown(), bakeMs: +R.bakeMs().toFixed(1), room: [R.OX, R.OY, R.COLS * R.T, R.ROWS * R.T], blocked: R.blocked().length } : null; },
     walk: function () { return walk; },
     icon: icon
   };
