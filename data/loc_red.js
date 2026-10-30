@@ -30,13 +30,20 @@ G.data.locations.red = {
   layers: [
     { id: 'curtains', kind: 'curtain', parallax: 0.15, color: 'crimson', dark: 'blood', hi: 'dusk_rose', hem: 104, panel: [70, 150], gap: [18, 46] },
     { id: 'valance', kind: 'curtain', parallax: 0.4, color: 'blood', dark: 'rust_dark', hi: 'crimson', hem: 22, panel: [200, 320], gap: [0, 0] },
-    { id: 'floor', kind: 'zigzag', parallax: 0.6, color: 'ink', alt: 'bone', height: 6 },
+    // Phase 49: things standing on the floor at the water's edge (layer px).
+    { id: 'floor', kind: 'zigzag', parallax: 0.6, color: 'ink', alt: 'bone', height: 6,
+      features: [{ kind: 'pot', x: 90 }, { kind: 'chair', x: 250 }, { kind: 'table', x: 430 }, { kind: 'door', x: 560 }, { kind: 'pot', x: 700 }] },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
   landmarks: [],
   // Indoors: no stars, moon, clouds or dusk glow (presentation only).
   sky: { stars: false, moon: false, clouds: false, glow: false },
   grade: false, // the room's light does not follow the hour
+  // Life (see loc_fog.js): little lives here, and nothing above the water.
+  life: {
+    under: { cray: 2, snail: 2, fry: 2, tad: 0, turtle: false, eel: true, mussel: 0, caddis: false, litter: ['lure'], roots: 0, tree: 0, ribbon: 0.012, fern: 0.01, lily: 0, algae: 0.2 },
+    above: {}
+  },
 
   // The structures that move. Each one's spot goes wherever it stands.
   movers: [

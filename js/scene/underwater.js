@@ -64,7 +64,7 @@ G.scene.underwater = (function () {
     return prof;
   }
 
-  // ---- Phase 48: the bed's things and the new weeds, from the water's table (life.WATERS) -----
+  // ---- Phase 48: the bed's things and the new weeds, from the water's table (loc.life.under) -----
   // Their own seeded streams (seed × 31 + 203 and 204), so the older layout is unchanged. All in
   // the layer's HI pixels; top[X] is the bed's top row.
   function bedThings(ctx, loc, set, top, WH, HH) {
@@ -318,6 +318,8 @@ G.scene.underwater = (function () {
     set.strands = [];
     for (s = 0; s < strands.length; s++) set.strands.push({ x: strands[s].x / HI, base: topAt(strands[s].x) / HI, h: strands[s].h / HI });
     var plants = plantList(loc, topAt, WH); // Phase 48: ribbon weed, fern-like weed, lily stems
+    set.lilies = []; // Phase 49: where the pads lie on the surface (world x, width), for the frog and the pads seen from above
+    for (s = 0; s < plants.length; s++) if (plants[s].kind === 2) set.lilies.push({ x: (plants[s].x + Math.round(Math.sin(plants[s].h * 0.03 + plants[s].ph) * 2)) / HI, w: plants[s].pad / HI });
     set.weeds = [];
     for (var f = 0; f < 3; f++) {
       set.weeds.push(B.cached(key + 'weeds' + f, (function (lean) {

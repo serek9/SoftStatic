@@ -135,35 +135,85 @@ G.gfx.paint = (function () {
     round(ctx, x, gy - Math.round(h * 0.42), Math.round(h * 0.58), k, rng);
   }
 
-  var TREES = { pine: pine, round: round, birch: birch };
+  // Phase 49: three more silhouettes for the far woods. A spruce: a narrow spire of short
+  // drooping tiers. keys as pine.
+  function spruce(ctx, x, gy, h, k, rng) {
+    var hw = Math.max(2, Math.round(h * rng.range(0.1, 0.13))), top = gy - h, y;
+    pen(ctx, k.trunk || k.dark); ctx.fillRect(x, gy - 3, 1, 3);
+    for (y = top; y < gy - 2; y++) {
+      var r = (y - top) / (gy - 2 - top), half = Math.round(hw * r * (0.55 + 0.45 * (((y - top) % 4) / 3)));
+      pen(ctx, k.lit); ctx.fillRect(x - half, y, 1, 1);
+      if (half > 0) { pen(ctx, k.mid); ctx.fillRect(x - half + 1, y, half, 1); pen(ctx, k.dark); ctx.fillRect(x + 1, y, half, 1); }
+    }
+    px(ctx, k.mid, x, top - 1);
+  }
+  // A dead tree: a bare grey trunk, a broken top, and a few crooked limbs. keys as pine (the
+  // trunk key, lit along its left side by k.mid).
+  function dead(ctx, x, gy, h, k, rng) {
+    var top = gy - Math.round(h * 0.9), y, i;
+    pen(ctx, k.trunk || k.dark); ctx.fillRect(x, top, 2, gy - top);
+    pen(ctx, k.mid); ctx.fillRect(x, top + 2, 1, gy - top - 2);
+    for (i = 0; i < 4; i++) {
+      var by = top + rng.int(2, Math.round(h * 0.5)), len = rng.int(4, 10), dir = i % 2 ? 1 : -1;
+      for (var s = 0; s < len; s++) px(ctx, k.trunk || k.dark, x + (dir > 0 ? 2 : -1) + dir * s, by - Math.round(s * 0.7));
+      px(ctx, k.trunk || k.dark, x + (dir > 0 ? 2 : -1) + dir * (len - 1), by - Math.round(len * 0.7) - 1);
+    }
+    for (y = 0; y < 3; y++) px(ctx, k.trunk || k.dark, x + (y & 1), top - 1 - y);   // the broken top
+  }
+  // A poplar: a tall narrow column of foliage on a short trunk. keys as round.
+  function poplar(ctx, x, gy, h, k, rng) {
+    var hw = Math.max(3, Math.round(h * rng.range(0.13, 0.17))), top = gy - h, foot = gy - Math.round(h * 0.15), y;
+    pen(ctx, k.trunk); ctx.fillRect(x, foot - 1, 2, gy - foot + 1);
+    for (y = top; y < foot; y++) {
+      var u = (y - top) / (foot - top), half = Math.max(1, Math.round(hw * Math.sin(Math.min(1, u * 1.15) * Math.PI) * (0.85 + 0.15 * (((y >> 2) & 1)))));
+      var l = Math.max(1, Math.round(half * 0.6));
+      pen(ctx, k.lit); ctx.fillRect(x - half + 1, y, l, 1);
+      pen(ctx, k.mid); ctx.fillRect(x - half + 1 + l, y, Math.max(0, half - l + 1), 1);
+      pen(ctx, k.dark); ctx.fillRect(x + 2, y, half - 1, 1);
+    }
+  }
+
+  var TREES = { pine: pine, round: round, birch: birch, spruce: spruce, dead: dead, poplar: poplar };
+  var TREE_KEYS = { spruce: 'pine', dead: 'pine', poplar: 'round' }; // a kind without its own keys borrows these
 
   // L: {base (ground y), height, gap [lo, hi], mix {pine, round, birch}, keys {...} per kind,
   // back (optional: a first, smaller, darker row with keys back)}. A dense back row in the
   // dark key fills the gaps, then the trees themselves.
+  // Returns the kinds of tree it painted (Phase 49: sailing records them for dbg.shore()).
   function forest(ctx, L, w, wy, rng) {
+    var kinds = [];
     function row(base, height, gap, keys, kindOnly) {
       for (var x = rng.int(0, gap[0]); x < w + 10; x += rng.int(gap[0], gap[1])) {
         var h = Math.round(height * rng.range(0.6, 1.15)), roll = rng.next(), kind = 'pine', acc = 0;
         for (var m in L.mix) { acc += L.mix[m]; if (roll < acc) { kind = m; break; } }
         if (kindOnly) kind = kindOnly;
-        TREES[kind](ctx, x, base + rng.int(0, 3), h, keys[kind] || keys.pine, rng);
+        if (kinds.indexOf(kind) < 0) kinds.push(kind);
+        TREES[kind](ctx, x, base + rng.int(0, 3), h, keys[kind] || keys[TREE_KEYS[kind]] || keys.pine, rng);
       }
     }
     var dark = L.keys.pine ? L.keys.pine.dark : L.keys.round.dark;
     pen(ctx, dark); ctx.fillRect(0, L.base - 2, w, wy - L.base + 2);
     var backKeys = { pine: { dark: dark, mid: dark, lit: L.keys.pine ? L.keys.pine.mid : L.keys.round.mid, trunk: dark } };
     row(L.base - 3, L.height * 0.55, [3, 6], backKeys, 'pine');
+    kinds.length = 0; // the back row is a dark fill, not a kind of tree you see
     row(L.base, L.height, L.gap || [4, 12], L.keys);
+    return kinds;
   }
 
   // ---- Shore --------------------------------------------------------------------------------
   // L: {height, rock {dark, mid, lit}, reeds 0..1, reedH, rockEvery, ground}. Boulders sit on
   // the waterline, outlined and lit on the top left; reeds stand in clumps with cattails;
-  // tufts of grass along the top of the bank.
+  // tufts of grass along the top of the bank. Phase 49: L.features (each {kind, x} in layer
+  // px: 'posts' (an old dock's, n of them), 'moored' (a rowboat tied up, its lantern lit at
+  // night by life.js), 'lodge' (a beaver's), 'duckbox' (on a pole)) stand behind the rocks;
+  // L.trunks fallen trunks reach into the water, L.cattails more clumps, L.pads lily pads lie
+  // on the water. Returns the kinds of thing it painted.
   function shore(ctx, L, w, wy, rng) {
-    var x, i, r = L.rock || { dark: 'rock_dark', mid: 'rock', lit: 'rock_lit' }, t = 0;
+    var x, i, r = L.rock || { dark: 'rock_dark', mid: 'rock', lit: 'rock_lit' }, t = 0, kinds = ['rocks', 'reeds', 'grass'];
     pen(ctx, L.ground || 'rock_dark');
     for (x = 0; x < w; x++) { t = Math.max(-2, Math.min(2, t + rng.int(-1, 1))); ctx.fillRect(x, wy - L.height + t, 1, L.height - t); }
+    var f = L.features || [];
+    for (i = 0; i < f.length; i++) if (SHORE_THINGS[f[i].kind]) { SHORE_THINGS[f[i].kind](ctx, f[i], wy, L, rng); if (kinds.indexOf(f[i].kind) < 0) kinds.push(f[i].kind); }
     var n = Math.round(w / (L.rockEvery || 80));
     for (i = 0; i < n; i++) {
       var cx = rng.int(0, w - 1), rw = rng.int(6, 18), rh = rng.int(4, Math.max(5, Math.round(rw * 0.7)));
@@ -189,7 +239,94 @@ G.gfx.paint = (function () {
       var gx = rng.int(0, w - 1), gy = wy - L.height - rng.int(-1, 1);
       px(ctx, 'moss', gx, gy); px(ctx, 'moss_dark', gx + 1, gy + 1); if (i % 3 === 0) px(ctx, 'moss_hi', gx, gy - 1);
     }
+    // Phase 49: the scattered things, from the layer's own stream after everything above.
+    for (i = 0; i < (L.trunks || 0); i++) trunk(ctx, rng.int(20, w - 20), wy, L, rng);
+    for (i = 0; i < (L.cattails || 0); i++) cattails(ctx, rng.int(6, w - 6), wy, rng);
+    for (i = 0; i < (L.pads || 0); i++) pad(ctx, rng.int(4, w - 4), wy, rng);
+    if (L.trunks) kinds.push('trunks');
+    if (L.cattails) kinds.push('cattails');
+    if (L.pads) kinds.push('pads');
+    return kinds;
   }
+
+  // ---- The shore's things (Phase 49), in layer px; wy is the waterline ------------------
+  var WOODS = ['wood_deep', 'wood_dark', 'wood', 'wood_mid'];
+  // A fallen trunk: its root plate on the bank, the trunk sloping down into the water, a few
+  // broken limbs standing up from it.
+  function trunk(ctx, x, wy, L, rng) {
+    var dir = rng.next() < 0.5 ? -1 : 1, len = rng.int(26, 48), th = rng.int(3, 5), y0 = wy - L.height - th - 2, s;
+    for (s = 0; s <= len; s++) {
+      var X = x + dir * s, Y = Math.round(y0 + (wy - 1 - y0 + 1) * s / len);
+      box(ctx, 'wood_dark', X, Y, 1, th); px(ctx, 'wood_mid', X, Y); if (th > 3) px(ctx, 'wood', X, Y + 1);
+      if (s % 9 === 5) px(ctx, 'wood_deep', X, Y + 2);
+    }
+    for (s = 0; s < 3; s++) {
+      var bs = rng.int(6, len - 6), bx = x + dir * bs, by = Math.round(y0 + (wy - y0) * bs / len), bl = rng.int(4, 9);
+      line(ctx, 'wood_dark', bx, by, bx + dir * (bl >> 1), by - bl);
+    }
+    blob(ctx, x - dir * 2, y0 + 1, 3, th + 1, ['ink', 'wood_deep', 'wood_dark'], { rim: 0 });          // the root plate
+    for (s = 0; s < 4; s++) line(ctx, 'wood_deep', x - dir * 2, y0 + 1, x - dir * rng.int(3, 7), y0 + rng.int(-5, 6));
+  }
+  // A clump of cattails: tall blades and stalks with their brown heads.
+  function cattails(ctx, x, wy, rng) {
+    var n = rng.int(3, 6), k;
+    for (var s = 0; s < n; s++) {
+      var sx = x + rng.int(-4, 4), h = rng.int(16, 28), lean = rng.range(-0.15, 0.15);
+      for (k = 0; k < h; k++) px(ctx, s % 2 ? 'reed' : 'reed_dark', sx + Math.round(lean * k), wy - 2 - k);
+      var hx = sx + Math.round(lean * h);
+      box(ctx, 'wood_dark', hx - 1, wy - 2 - h - 6, 2, 6); px(ctx, 'wood', hx - 1, wy - 2 - h - 6); px(ctx, 'reed_dark', hx, wy - 2 - h - 8); px(ctx, 'reed_dark', hx, wy - 2 - h - 7);
+      if (s % 2 === 0) { var bl = rng.int(8, 16), bd = rng.next() < 0.5 ? -1 : 1; for (k = 0; k < bl; k++) px(ctx, 'reed_hi', sx + bd * Math.round(k * k / (bl * 2)), wy - 2 - k); } // a curving blade
+    }
+  }
+  // A lily pad lying on the water (now and then a flower), its notch toward us.
+  function pad(ctx, x, wy, rng) {
+    var hw = rng.int(4, 7);
+    box(ctx, 'moss_dark', x - hw, wy - 1, hw * 2, 2); box(ctx, 'moss', x - hw + 1, wy - 1, hw * 2 - 3, 1);
+    px(ctx, 'moss_dark', x + rng.int(-2, 2), wy - 1);
+    if (rng.next() < 0.3) { px(ctx, 'paper', x - 1, wy - 3); px(ctx, 'paper', x, wy - 2); px(ctx, 'dusk_rose', x, wy - 3); px(ctx, 'paper', x + 1, wy - 3); }
+  }
+  var SHORE_THINGS = {
+    // An old dock's posts standing in a row out of the water, weathered to different heights;
+    // a stringer still nailed across the first two.
+    posts: function (ctx, f, wy, L, rng) {
+      for (var i = 0; i < (f.n || 4); i++) {
+        var X = f.x + i * 10 + rng.int(-1, 1), h = Math.max(6, 22 - i * 3 + rng.int(-3, 3));
+        slab(ctx, X, wy - h, 3, h, WOODS);
+        px(ctx, 'wood_deep', X + 1, wy - h);
+      }
+      box(ctx, 'wood_dark', f.x, wy - 16, 13, 2); box(ctx, 'wood_mid', f.x, wy - 16, 13, 1);
+    },
+    // A rowboat tied up at the shore: the hull on the water, a seat, oars shipped, the painter
+    // to a stake, and a lantern on a short pole at the stern (life.js lights it at night).
+    moored: function (ctx, f, wy) {
+      var x0 = f.x - 14, i;
+      for (i = 0; i < 28; i++) {
+        var lift = i < 4 ? 4 - i : (i > 23 ? i - 23 : 0), y = wy - 6 + Math.round(lift * 0.5);
+        box(ctx, 'wood_dark', x0 + i, y, 1, wy - y); px(ctx, 'wood_mid', x0 + i, y); px(ctx, 'wood_deep', x0 + i, wy - 2);
+      }
+      box(ctx, 'wood', x0 + 12, wy - 8, 5, 2);                                  // the seat
+      line(ctx, 'wood_mid', x0 + 6, wy - 9, x0 + 22, wy - 7);                     // an oar
+      slab(ctx, x0 - 10, wy - 9, 2, 9, WOODS); line(ctx, 'stone', x0 - 8, wy - 8, x0 + 1, wy - 6); // the stake and painter
+      box(ctx, 'stone_dark', x0 + 25, wy - 18, 1, 12);                             // the lantern's pole
+      box(ctx, 'stone_dark', x0 + 23, wy - 22, 5, 4); box(ctx, 'ink', x0 + 24, wy - 21, 3, 2);
+    },
+    // A beaver's lodge: a low dome of sticks and mud at the water's edge.
+    lodge: function (ctx, f, wy, L, rng) {
+      blob(ctx, f.x, wy - 1, 18, 12, ['ink', 'wood_deep', 'wood_dark', 'wood'], { rim: 0.3, bias: -0.15 });
+      box(ctx, 'wood_deep', f.x - 19, wy - 2, 38, 2);
+      for (var i = 0; i < 26; i++) {
+        var a = rng.range(0.15, 2.99), rr = rng.range(4, 15), sx = Math.round(f.x + Math.cos(a) * rr), sy = Math.round(wy - 1 - Math.sin(a) * rr * 0.7), l = rng.int(3, 7), d = rng.next() < 0.5 ? -1 : 1;
+        line(ctx, i % 3 ? 'wood_mid' : 'wood_hi', sx, sy, sx + d * l, sy - rng.int(-1, 2));
+      }
+    },
+    // A nesting box for ducks on a pole standing in the water.
+    duckbox: function (ctx, f, wy) {
+      slab(ctx, f.x, wy - 26, 2, 26, WOODS);
+      slab(ctx, f.x - 4, wy - 35, 10, 9, WOODS);
+      box(ctx, 'wood_deep', f.x - 5, wy - 36, 12, 2); box(ctx, 'wood_mid', f.x - 5, wy - 36, 12, 1);
+      box(ctx, 'ink', f.x - 1, wy - 32, 3, 3);
+    }
+  };
 
   // ---- Clouds -------------------------------------------------------------------------------
   // A cloud field as a level mask (0 none, 1 shadow, 2 body, 3 lit) so the same shapes can be
@@ -315,5 +452,5 @@ G.gfx.paint = (function () {
   // Forget the cached pen colour (a painter that also sets ctx.fillStyle itself calls this).
   function reset() { penCtx = null; penKey = ''; }
 
-  return { reset: reset, area: area, pen: pen, px: px, box: box, hash2: hash2, tone: tone, blob: blob, limb: limb, line: line, slab: slab, dither: dither, mountains: mountains, forest: forest, shore: shore, pine: pine, round: round, birch: birch, cloudMask: cloudMask, paintMask: paintMask };
+  return { reset: reset, area: area, pen: pen, px: px, box: box, hash2: hash2, tone: tone, blob: blob, limb: limb, line: line, slab: slab, dither: dither, mountains: mountains, forest: forest, shore: shore, pine: pine, round: round, birch: birch, spruce: spruce, dead: dead, poplar: poplar, TREES: TREES, SHORE_THINGS: SHORE_THINGS, cloudMask: cloudMask, paintMask: paintMask };
 })();

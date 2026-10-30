@@ -206,12 +206,52 @@ function validateLocations(G, err) {
         if (!num(v) || Math.abs(v) > 40) err(p + 'drift gives ' + v + ' px/s at t ' + t);
       }
     }
+    validateLife(L, p, err);
     if (L.place) {
       const a = L.place(777, []), b = L.place(777, []);
       if (a.length !== L.movers.length || a.some((x, i) => x !== b[i])) err(p + 'place is not deterministic');
       if (a.some(x => !(x >= 0 && x < L.width))) err(p + 'place puts a structure outside the world');
       for (let i = 0; i < a.length; i++) for (let k = 0; k < i; k++) if (Math.abs(a[i] - a[k]) < L.moverGap) err(p + 'place puts two structures closer than moverGap');
     }
+  }
+}
+
+// Phase 49: a water's life table (loc.life): `under` with every field the bake and the scene
+// read; `above` with known creatures, hours as [from, to] pairs in 0..24, places inside the
+// world or the named layer, perches above the water. Shore layers' features are known kinds.
+const UNDER_KEYS = ['cray', 'snail', 'fry', 'tad', 'turtle', 'eel', 'mussel', 'caddis', 'litter', 'roots', 'tree', 'ribbon', 'fern', 'lily', 'algae'];
+const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls'];
+const SHORE_KINDS = { bank: ['posts', 'moored', 'lodge', 'duckbox'], zigzag: ['pot', 'chair', 'table', 'door'] };
+function validateLife(L, p, err) {
+  const life = L.life, num = v => typeof v === 'number' && isFinite(v);
+  (L.layers || []).forEach(l => {
+    const w = 320 + Math.ceil((L.width - 320) * l.parallax);
+    if (SHORE_KINDS[l.kind]) (l.features || []).forEach(f => { if (!SHORE_KINDS[l.kind].includes(f.kind) || !(f.x >= 0 && f.x < w)) err(p + 'layer ' + l.id + ': feature ' + f.kind + ' at ' + f.x + ' (kind or x)'); });
+    if (l.place !== undefined && (!num(l.place) || l.place <= 0)) err(p + 'layer ' + l.id + ': place must be a positive seed');
+  });
+  if (!life) { err(p + 'life (needs under and above)'); return; }
+  const u = life.under;
+  if (!u) err(p + 'life.under'); else UNDER_KEYS.forEach(k => { if (u[k] === undefined) err(p + 'life.under.' + k); });
+  const a = life.above;
+  if (!a) { err(p + 'life.above'); return; }
+  const hoursOk = hs => Array.isArray(hs) && hs.length && hs.every(h => Array.isArray(h) && h.length === 2 && h.every(v => num(v) && v >= 0 && v <= 24) && h[0] !== h[1]);
+  const layerOf = id => (L.layers || []).find(l => l.id === id);
+  for (const k in a) {
+    const c = a[k], q = p + 'life.above.' + k + ': ';
+    if (!ABOVE_KINDS.includes(k)) { err(q + 'unknown creature'); continue; }
+    if (!hoursOk(c.hours)) err(q + 'hours must be [[from, to], ...] in 0..24');
+    if (c.call && !hoursOk(c.call)) err(q + 'call hours');
+    const lay = c.layer ? layerOf(c.layer) : null;
+    if (c.layer && !lay) err(q + 'no layer ' + c.layer);
+    const pp = lay ? lay.parallax : (c.p || 1), w = 320 + Math.ceil((L.width - 320) * pp);
+    const inW = x => num(x) && x >= 0 && x <= w;
+    if (c.x) { const xs = Array.isArray(c.x[0]) ? c.x : [c.x]; xs.forEach(r => { if (!(inW(r[0]) && inW(r[1]) && r[0] < r[1])) err(q + 'x range ' + r); }); }
+    (c.perches || []).forEach(s => { if (!(inW(s.x) && num(s.y) && s.y > 0)) err(q + 'perch ' + JSON.stringify(s)); });
+    if (k === 'beaver' && !(lay && (lay.features || []).some(f => f.kind === 'lodge'))) err(q + 'its layer needs a lodge');
+    if (k === 'frog' && !(u && u.lily > 0)) err(q + 'needs lilies (life.under.lily)');
+    if (k === 'kingfisher' && !(c.perches || []).length) err(q + 'needs perches');
+    if (k === 'gulls' && !(c.n > 0 && c.perches && c.perches.length >= c.n)) err(q + 'n and perches');
+    if ((k === 'ducks' || k === 'loon') && !(c.p > 0 && c.p <= 1)) err(q + 'p (parallax)');
   }
 }
 
