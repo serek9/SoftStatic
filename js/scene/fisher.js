@@ -124,6 +124,32 @@ G.scene.fisher = (function () {
       { d: 0.4, pose: 'knees', rod: 'holder', bin: true }
     ], TAKE) }
   };
+  // Phase 45: after the setup panel (PLAN_TACKLE.md 2.5). swap: the chosen rod lies in the
+  // clips and he lifts it to his hands; tie: a short Phase 34 lure act, the rod upright in the
+  // holder while he ties the new lure on (or baits the hook) and reels it up; swaptie: both.
+  // modes: only between casts; a cast cuts them short like every act.
+  var SWAP = [
+    { d: 0.4, pose: 'clips', rod: 'clips', angle: STOW_ANGLE, line: 1 },
+    { d: 0.2, pose: 'clips', rod: 'hand', angle: STOW_ANGLE, line: 1, cue: 'clip' },
+    { d: 0.45, pose: 'rod', rod: 'hand' }
+  ];
+  var TIE = [
+    { d: 0.4, pose: 'holder', rod: 'hand', angle: 96 },
+    { d: 0.2, pose: 'knees', rod: 'holder' },
+    { d: 0.8, pose: 'knees', rod: 'holder', line: 16.4, bail: true },
+    { d: 0.4, pose: 'lureTake', rod: 'holder', line: 16.4 },
+    { d: 0.6, pose: 'lureLook', rod: 'holder', held: true, head: 1 },
+    { d: 0.25, pose: 'baitA', rod: 'holder', held: true, head: 1, cue: 'bait' },
+    { d: 0.25, pose: 'baitB', rod: 'holder', held: true, head: 1, cue: 'hooked' },
+    { d: 0.2, pose: 'tug', rod: 'holder', held: true, head: 1, tug: true },
+    { d: 0.3, pose: 'knees', rod: 'holder' },
+    { d: 0.35, pose: 'holder', rod: 'holder' },
+    { d: 0.35, pose: 'rod', rod: 'hand' },
+    { d: 1.0, pose: 'rod', rod: 'hand', line: 3, reel: 2.2 }
+  ];
+  ACTS.swap = { modes: ['casts'], steps: SWAP };
+  ACTS.tie = { modes: ['casts'], holder: 96, steps: TIE };
+  ACTS.swaptie = { modes: ['casts'], holder: 96, steps: SWAP.concat(TIE) };
   var BEER_SIPS = 3, BEER_REST = 90; // drinks from one can; s before the next can
   var WAIT = { casts: [6, 6], wait: [8, 7] }; // s of nothing happening before an act: least, plus up to
 
