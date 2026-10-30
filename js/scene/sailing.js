@@ -358,6 +358,8 @@ G.scene.sailing = (function () {
       boost: { attract: 1, rare: 1, legend: 1 } };
     run.school = G.sim.fish_ai.createSchool(G.data);
     run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
+    // Phase 28: the current carries the fish as it carries the lure (the same pure function).
+    run.school.ctx.flowAt = loc.drift ? function (x, depth) { return G.scene.underwater.flow(loc, depth); } : null;
     G.scene.underwater.bottomAt(loc, 0); // bakes the cross-section now
     run.lureIn = { active: false, x: 0, y: 0, bait: '' };
     run.uneaseIn = { loc: id, still: true, atShop: false };
