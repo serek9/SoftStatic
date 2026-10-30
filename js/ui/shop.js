@@ -7,6 +7,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // panel: a tab per shelf (gear tiers, equipment, bait), the selected item large with its
 // practical effect, and the shelf as a grid of pegs. Rusty says one line per visit
 // (data/dialogue.js). Time passes here and unease drains (V10.1). Esc or M goes back out.
+// Phase 36 (PLAN_SHOP.md): the shop is a room you walk into (js/ui/shop_room.js); the panel
+// above is what facing the counter opens until Phase 37 gives Rusty his text box.
 G.ui = G.ui || {};
 G.ui.shop = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu, E = G.sim.economy, A = G.gfx.paint;
@@ -528,6 +530,7 @@ G.ui.shop = (function () {
 
   // ---- Scene ----------------------------------------------------------------------------
   var room = null, row = 0, col = 0, t = 0, line_ = null, speech = [], speechH = 0, speechEnd = 0;
+  var R = G.ui.shopRoom, walk = null, mode = 'room', faced = ''; // Phase 36: walking the room, or the panel at the counter
   var txt = { name: [], price: '', desc: [], status: [], msg: [], msgKey: 'fog_light', coins: '', badge: [], inUse: [] }, lastCoins = -1;
   var uneaseIn = { loc: 'fog', still: true, atShop: true };
 
@@ -603,6 +606,7 @@ G.ui.shop = (function () {
     if (!room) room = G.gfx.bake.cached('shop:room640', function () { return G.gfx.bake.layer(640, 360, paintRoom); });
     if (!coin) coin = G.gfx.bake.layer(8, 8, paintCoin);
     row = 0; col = 0; t = 0;
+    walk = R.create(); mode = 'room'; faced = ''; R.bake();
     line_ = pickLine(save, G.data.dialogue, save.clock);
     speech.length = 0;
     var said = spoken(line_);
@@ -630,7 +634,8 @@ G.ui.shop = (function () {
     G.sim.clock.step(save, null, dt, G.rng, G.data);
     uneaseIn.loc = G.state.run.loc;
     G.sim.unease.step(save, uneaseIn, dt, G.rng, G.data);
-    if (inp.pressed('back') || inp.pressed('map')) { G.core.state.change('sailing'); return; }
+    if (mode === 'room') { roomStep(dt); return; }
+    if (inp.pressed('back') || inp.pressed('map')) { mode = 'room'; return; } // back to the room
     var ud = M.axis('up', 'down'), lr = M.axis('left', 'right');
     if (ud || lr) {
       if (ud) { row = (row + ud + SHELVES.length) % SHELVES.length; col = Math.min(col, SHELVES[row].length - 1); }
@@ -639,6 +644,24 @@ G.ui.shop = (function () {
       say('');
     }
     if (inp.pressed('action')) act();
+  }
+
+  // Phase 36: walking the room. The last direction pressed and still held leads; Space talks
+  // to what he faces (until Phase 37 the counter opens the panel); Esc, M or the door leave.
+  var DIRK = ['up', 'down', 'left', 'right'], held = [];
+  function roomStep(dt) {
+    var inp = G.core.input, dir = '', tapped = '', i;
+    if (inp.pressed('back') || inp.pressed('map')) { G.core.state.change('sailing'); return; }
+    for (i = 0; i < DIRK.length; i++) {
+      var k = DIRK[i], at = held.indexOf(k);
+      if (inp.pressed(k)) { if (at >= 0) held.splice(at, 1); held.push(k); tapped = k; }
+      else if (!inp.held(k) && at >= 0) held.splice(at, 1);
+    }
+    if (held.length) dir = held[held.length - 1];
+    R.step(walk, dt, dir, tapped === dir ? tapped : '');
+    if (walk.exit) { G.core.state.change('sailing'); return; }
+    faced = R.facing(walk);
+    if (inp.pressed('action') && faced === 'rusty') { mode = 'panel'; say(''); } // TODO(P37.2): Rusty's text box replaces the panel
   }
 
   // A bevelled tile: lit on the top and left, shaded on the bottom and right; amber when chosen.
@@ -655,6 +678,7 @@ G.ui.shop = (function () {
   }
 
   function draw(ctx) {
+    if (mode === 'room') { R.draw(ctx, walk, t, G.state.save.clock); return; }
     var save = G.state.save, i, x, img;
     ctx.drawImage(room, 0, 0);
 
@@ -756,7 +780,7 @@ G.ui.shop = (function () {
     F.drawText(ctx, FOOT1, PX + ((PW - FOOT1_W) >> 1), PY + PH - 26, 'fog_light');
     F.drawText(ctx, FOOT2, PX + ((PW - FOOT2_W) >> 1), PY + PH - 14, 'fog_light');
   }
-  var FOOT1 = 'W/S shelf   A/D item', FOOT2 = 'SPACE buy   ESC leave', FOOT1_W = F.measure(FOOT1), FOOT2_W = F.measure(FOOT2);
+  var FOOT1 = 'W/S shelf   A/D item', FOOT2 = 'SPACE buy   ESC back', FOOT1_W = F.measure(FOOT1), FOOT2_W = F.measure(FOOT2);
 
   return {
     native: true,
@@ -765,6 +789,9 @@ G.ui.shop = (function () {
     select: function (r, c) { row = r; col = c; describe(); return txt.name.join(' '); },
     act: function () { act(); return txt.msg.join(' '); },
     text: function () { return txt; },
+    // dbg.shop() (Phase 36): where he stands and faces, the dog, the mode, what he faces.
+    info: function () { return walk ? { c: walk.c, r: walk.r, face: walk.face, moving: walk.moving, steps: walk.steps, dog: [walk.dog.c, walk.dog.r, walk.dog.sit], mode: mode, faced: faced, bakeMs: +R.bakeMs().toFixed(1), room: [R.OX, R.OY, R.COLS * R.T, R.ROWS * R.T], blocked: R.blocked().length } : null; },
+    walk: function () { return walk; },
     icon: icon
   };
 })();

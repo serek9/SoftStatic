@@ -291,6 +291,9 @@ G.core.debug = (function () {
       o.night = night; o.drink = G.scene.fisher.drink(fs, night); // Phase 35: what he would drink now
       return o;
     },
+    // dbg.shop() returns the bait shop's walk (Phase 36): the tile (c, r), facing, moving, steps,
+    // the dog (c, r, sitting), the mode ('room' or 'panel') and what he faces.
+    shop: function () { return G.ui.shop.info(); },
     // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
     // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
     dangle: function () { return G.scene.sailing.dangle(); },
