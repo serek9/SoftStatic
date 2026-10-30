@@ -28,6 +28,25 @@ G.sim.fish_ai = (function () {
     scent: 3,                     // × awareness: how far a wandering fish senses the lure is there
     drift: 0.75                   // chance per turn that it heads toward the lure
   };
+  // Phase 28: how a fish swims. It has a heading (yaw: 0 swimming right, PI left, between them
+  // across the view; pitch: up or down, never steeper than asin 0.6) and a speed, and steers
+  // them toward the velocity its state wants, at the rates below. Speeds in px/s, rates per s.
+  var M = {
+    turn0: 2.4, turnK: 1,         // rad/s of yaw: turn0 + turnK × species speed (a reversal 0.7-0.9 s)
+    pitchMax: 0.6435,             // rad (asin 0.6): vertical speed at most 0.6 of the speed
+    pitchRate: 1.6,               // rad/s
+    accel: 1.5,                   // × its top speed per s
+    brake: 3,                     // 1/s, slowing toward a lower target
+    burstHi: 1.45,                // burst toward this × the target speed ...
+    burst0: 0.4, burst1: 1,       // ... for this long (s, by a hash of the fish and the burst) ...
+    glideDrag: 0.9,               // 1/s, then glide, slowing ...
+    glideLo: 0.55, glideMax: 2,   // ... until under glideLo × the target, or glideMax s
+    arrive: 20,                   // px: approaching, it slows inside this
+    circleK: 2.5,                 // 1/s: circling, how hard it closes on its place on the circle
+    lead: 0.35,                   // rad: circling, how far ahead on the circle it aims
+    dartIn: 2, dartOut: 7, dartK: 9, // nibbling: px from the lure in and back out, and how fast
+    holdK: 6                      // 1/s: biting, how it holds at the lure
+  };
   var INTERESTED = { notice: 1, approach: 1, inspect: 1, nibble: 1, bite: 1 };
   // How interested a fish in each state is, for the dog (V3.8): 0..1.
   var INTEREST = { notice: 0.4, approach: 0.5, inspect: 0.7, nibble: 0.85, bite: 1 };
@@ -87,12 +106,14 @@ G.sim.fish_ai = (function () {
         species: data.fish, rarity: data.rarity, windows: data.windows, loc: '', depthM: null, hour: 0,
         unease: 0, bait: '', latched: {}, rodMaxMass: 0, weights: null, tooHeavyNear: false,
         attract: 1, rareBoost: 1, legendBoost: 1, // gear and cast spot: attract shortens the wait between arrivals
-        maxDepthPx: 0, floorAt: null // floorAt(x) -> bottom depth in px; null uses maxDepthPx
+        maxDepthPx: 0, floorAt: null, // floorAt(x) -> bottom depth in px; null uses maxDepthPx
+        flowAt: null // Phase 28: flowAt(x, depth px) -> px/s of current; null is still water
       }
     };
     for (var i = 0; i < MAX; i++) {
       s.fish.push({ active: false, uid: 0, sp: -1, x: 0, y: 0, vx: 0, vy: 0, home: 0, dir: 1,
-        state: 'wander', t: 0, turnT: 0, circles: 0, ang: 0, swept: 0, nibbles: 0, nibbleN: 0, nibbleT: 0, missed: 0 });
+        state: 'wander', t: 0, turnT: 0, circles: 0, ang: 0, swept: 0, nibbles: 0, nibbleN: 0, nibbleT: 0, nibbleLen: 0, missed: 0,
+        yaw: 0, pitch: 0, spd: 0, back: 0, face: 1, gl: 0, glT: 0, bursts: 0, flow: 0 }); // Phase 28
     }
     return s;
   }
@@ -117,6 +138,7 @@ G.sim.fish_ai = (function () {
       var h = data.fish[sp].habitat;
       f.active = true; f.uid = ++school.uid; f.sp = sp;
       f.x = x; f.y = y; f.vx = 0; f.vy = 0; f.dir = dir;
+      f.yaw = dir >= 0 ? 0 : Math.PI; f.pitch = 0; f.spd = 0; f.back = 0; f.face = dir >= 0 ? 1 : -1; f.gl = 0; f.glT = 0; f.bursts = 0; f.flow = 0;
       f.home = clampDepth(school, f, rng.range(h.depthMin, h.depthMax) * 4);
       f.turnT = rng.range(2, 6); f.circles = 0; f.ang = 0; f.swept = 0; f.nibbles = 0; f.nibbleN = 0; f.nibbleT = 0; f.missed = 0;
       setState(f, 'wander');
@@ -129,11 +151,69 @@ G.sim.fish_ai = (function () {
 
   function ease(v, target, k, dt) { return v + (target - v) * Math.min(1, k * dt); }
 
-  // One fish, one fixed step. lure: {active, x, y (depth px), bait}.
+  // 0..1 from a fish and a counter, for burst lengths: no draw from the rng, so the bursts
+  // add nothing to the random stream.
+  function hfrac(uid, n) {
+    var h = Math.imul(uid ^ Math.imul(n + 1, 0x9e3779b1), 0x85ebca6b) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  // Steers a fish toward the ground velocity (gx, gy) its state wants, at most top px/s:
+  // the swim it needs is that minus the current; yaw turns toward its horizontal sign, pitch
+  // toward its slope, and speed toward its size, in bursts and glides when burst is set.
+  var PI = Math.PI;
+  function swim(f, sp, gx, gy, top, burst, dt) {
+    var dx = gx - f.flow, dy = gy, need = Math.sqrt(dx * dx + dy * dy), max = sp.speed * A.swimPx;
+    if (need > top) { dx *= top / need; dy *= top / need; need = top; }
+    // Yaw: right (0) or left (PI) by the swim's horizontal sign; nearly still, it keeps facing.
+    var yt = dx > 0.3 ? 0 : (dx < -0.3 ? PI : (f.yaw < PI / 2 ? 0 : PI)), turn = (M.turn0 + M.turnK * sp.speed) * dt;
+    f.yaw += yt > f.yaw ? Math.min(turn, yt - f.yaw) : -Math.min(turn, f.yaw - yt);
+    var pt = need > 0.05 ? Math.atan2(dy, Math.abs(dx)) : 0, pr = M.pitchRate * dt;
+    pt = pt > M.pitchMax ? M.pitchMax : (pt < -M.pitchMax ? -M.pitchMax : pt);
+    f.pitch += pt > f.pitch ? Math.min(pr, pt - f.pitch) : -Math.min(pr, f.pitch - pt);
+    // Speed: a burst toward burstHi × the need, then a glide; or straight toward the need.
+    if (burst && need > 0.5) {
+      f.glT += dt;
+      if (f.gl) {
+        f.spd *= 1 - M.glideDrag * dt;
+        if (f.spd < need * M.glideLo || f.glT > M.glideMax) { f.gl = 0; f.glT = 0; f.bursts++; }
+      } else {
+        var bt = need * M.burstHi;
+        if (f.spd < bt) f.spd = Math.min(bt, f.spd + M.accel * max * dt); else f.spd += (bt - f.spd) * Math.min(1, M.brake * dt);
+        if (f.glT > M.burst0 + (M.burst1 - M.burst0) * hfrac(f.uid, f.bursts)) { f.gl = 1; f.glT = 0; }
+      }
+    } else {
+      f.gl = 0; f.glT = 0;
+      if (f.spd < need) f.spd = Math.min(need, f.spd + M.accel * max * dt); else f.spd += (need - f.spd) * Math.min(1, M.brake * dt);
+    }
+    f.back *= 1 - Math.min(1, 4 * dt); // backing off the lure (hover) dies away
+    f.vx = (f.spd + f.back) * Math.cos(f.pitch) * Math.cos(f.yaw) + f.flow;
+    f.vy = f.spd * Math.sin(f.pitch);
+  }
+
+  // Hovering at the lure (nibbling, biting): it faces the lure (f.dir) and holds or darts to
+  // world x tx by fins, backing when it must, its velocity set straight.
+  function hover(f, sp, tx, ty, k, dt) {
+    var max = sp.speed * A.swimPx, yt = f.dir >= 0 ? 0 : PI, turn = (M.turn0 + M.turnK * sp.speed) * dt;
+    f.yaw += yt > f.yaw ? Math.min(turn, yt - f.yaw) : -Math.min(turn, f.yaw - yt);
+    f.pitch += (0 - f.pitch) * Math.min(1, 3 * dt);
+    var vx = (tx - f.x) * k, vy = (ty - f.y) * k;
+    vx = vx > max ? max : (vx < -max ? -max : vx);
+    vy = vy > max * 0.6 ? max * 0.6 : (vy < -max * 0.6 ? -max * 0.6 : vy);
+    f.vx = vx; f.vy = vy; f.gl = 0; f.glT = 0;
+    var fwd = vx * (f.dir >= 0 ? 1 : -1); // along its facing: forward is speed, backward is backing
+    f.spd = Math.sqrt((fwd > 0 ? fwd * fwd : 0) + vy * vy); f.back = fwd < 0 ? fwd : 0;
+  }
+
+  // One fish, one fixed step. lure: {active, x, y (depth px), bait}. Phase 28: the states set a
+  // velocity they want and the fish steers toward it (swim) or hovers (hover); the current,
+  // when the water has one, carries it.
   function stepFish(f, lure, dt, rng, data, school) {
     var sp = data.fish[f.sp], speed = sp.speed * A.swimPx;
     var dx = lure.x - f.x, dy = lure.y - f.y, dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
     f.t += dt;
+    f.flow = school.ctx.flowAt ? school.ctx.flowAt(f.x, f.y) : 0;
     if (!lure.active && f.state !== 'leave') setState(f, 'leave'); // reeled in: everyone drifts off
 
     switch (f.state) {
@@ -152,20 +232,24 @@ G.sim.fish_ai = (function () {
             f.home = clampDepth(school, f, f.home + rng.range(-6, 6));
           }
         }
-        f.vx = ease(f.vx, f.dir * speed * 0.35, 2, dt);
-        f.vy = (f.home - f.y) * 0.5;
+        // In a current a fish not drawn to the lure faces into it: it swims upstream, or slips
+        // back tail first, never faster over the bed than 0.8 of the current, so it never turns
+        // to swim with it. A fish heading for the lure swims after it, downstream or up.
+        var gw = speed * 0.35, fa = Math.abs(f.flow), drawn = lure.active && Math.abs(dx) < sp.awareness * A.scent && f.dir * dx > 0;
+        if (fa > 0.5 && !drawn && f.dir * f.flow > 0 && gw > fa * 0.8) gw = fa * 0.8;
+        swim(f, sp, f.dir * gw, (f.home - f.y) * 0.5, speed, true, dt);
         if (lure.active && dist < sp.awareness && baitOk(sp, lure.bait)) setState(f, 'notice');
         break;
 
-      case 'notice': // a pause, turning toward the lure
-        f.vx = ease(f.vx, 0, 3, dt); f.vy = ease(f.vy, 0, 3, dt);
+      case 'notice': // a pause: it stops (holding its place in a current) and turns toward the lure
         f.dir = dx >= 0 ? 1 : -1;
+        swim(f, sp, f.dir * 0.31, 0, speed, false, dt); // just enough to swing round toward it
         if (f.t >= A.noticePause) setState(f, 'approach');
         break;
 
-      case 'approach':
-        f.vx = ease(f.vx, dx / dist * speed * 0.6, 3, dt);
-        f.vy = ease(f.vy, dy / dist * speed * 0.6, 3, dt);
+      case 'approach': // toward the lure in bursts, slowing as it arrives
+        var ar = dist < M.arrive ? Math.max(0.3, dist / M.arrive) : 1;
+        swim(f, sp, dx / dist * speed * 0.6 * ar, dy / dist * speed * 0.6 * ar, speed, true, dt);
         if (dist < A.inspectR + 2) {
           setState(f, 'inspect');
           f.circles = rng.int(1, 3);
@@ -175,45 +259,46 @@ G.sim.fish_ai = (function () {
         }
         break;
 
-      case 'inspect': // circle the lure circles times (a flattened circle)
+      case 'inspect': // circle the lure circles times (a flattened circle), steering after a point on it
         var w = speed * 0.4 / A.inspectR;
         f.ang += f.dir * w * dt;
         f.swept += w * dt;
-        var tx = lure.x + Math.cos(f.ang) * A.inspectR, ty = lure.y + Math.sin(f.ang) * A.inspectR * 0.5;
-        f.vx = (tx - f.x) * 6; f.vy = (ty - f.y) * 6;
+        var la = f.ang + f.dir * M.lead, R = A.inspectR;
+        var tx = lure.x + Math.cos(la) * R, ty = lure.y + Math.sin(la) * R * 0.5;
+        swim(f, sp, -Math.sin(la) * R * w * f.dir + (tx - f.x) * M.circleK, Math.cos(la) * R * 0.5 * w * f.dir + (ty - f.y) * M.circleK, speed * 0.8, false, dt);
         if (f.swept >= 6.2832) {
           f.swept = 0;
           if (--f.circles <= 0) {
             setState(f, 'nibble');
-            f.nibbleN = rng.int(2, 4); f.nibbles = 0; f.nibbleT = rng.range(0.25, 0.6);
+            f.nibbleN = rng.int(2, 4); f.nibbles = 0; f.nibbleT = f.nibbleLen = rng.range(0.25, 0.6);
             f.dir = f.x < lure.x ? 1 : -1;
           }
         }
         break;
 
-      case 'nibble': // nose at the lure; small tugs, then the caution roll
-        f.vx = (lure.x - f.dir * 5 - f.x) * 5; f.vy = (lure.y - f.y) * 5;
+      case 'nibble': // nose at the lure: short darts in and back, then the caution roll
         f.nibbleT -= dt;
+        hover(f, sp, lure.x - f.dir * (f.nibbleT > f.nibbleLen * 0.6 ? M.dartIn : M.dartOut), lure.y, M.dartK, dt);
         if (f.nibbleT <= 0) {
           f.nibbles++;
-          f.nibbleT = rng.range(0.25, 0.6);
+          f.nibbleT = f.nibbleLen = rng.range(0.25, 0.6);
           if (f.nibbles >= f.nibbleN) setState(f, rng.next() >= sp.caution ? 'bite' : 'leave');
         }
         break;
 
       case 'bite':
-        f.vx = (lure.x - f.dir * 5 - f.x) * 5; f.vy = (lure.y - f.y) * 5;
+        hover(f, sp, lure.x - f.dir * 4, lure.y, M.holdK, dt);
         if (f.t >= A.biteHold) setState(f, 'leave');
         break;
 
       case 'leave':
         var away = f.x >= lure.x ? 1 : -1;
         f.dir = away;
-        f.vx = ease(f.vx, away * speed * 1.5, 2, dt);
-        f.vy = ease(f.vy, (f.home - f.y) * 0.5, 2, dt);
+        swim(f, sp, away * speed * 1.5, (f.home - f.y) * 0.5, speed * 1.5, false, dt);
         if (Math.abs(f.x - lure.x) > A.despawn) f.active = false;
         break;
     }
+    f.face = f.yaw < PI / 2 ? 1 : -1;
     f.x += f.vx * dt;
     f.y = clampDepth(school, f, f.y + f.vy * dt);
   }
@@ -270,7 +355,7 @@ G.sim.fish_ai = (function () {
   function clear(school) { for (var i = 0; i < MAX; i++) school.fish[i].active = false; school.spawnT = 0; }
 
   return {
-    MAX: MAX, W: W, A: A,
+    MAX: MAX, W: W, A: A, M: M,
     weightOf: weightOf, speciesWeights: speciesWeights, pickSpecies: pickSpecies,
     createSchool: createSchool, spawn: spawn, stepFish: stepFish, stepSchool: stepSchool,
     count: count, interested: interested, interestLevel: interestLevel, scatter: scatter, clear: clear

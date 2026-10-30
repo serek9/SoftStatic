@@ -386,7 +386,9 @@ G.scene.underwater = (function () {
 
   // One body for one step. x, y: where the fish is now; hint: the facing the sim wants when it
   // is barely moving (or always, with useV false); hz: a beat rate to use instead (0: speed's).
-  function swimOne(bd, uid, sp, x, y, hint, useV, hz, dt) {
+  // Phase 28: sim, when not null, is the school fish itself: its swimming speed through the
+  // water (not over the bed, which the current adds to), its glide and its pitch.
+  function swimOne(bd, uid, sp, x, y, hint, useV, hz, dt, sim) {
     if (bd.uid !== uid) {
       bd.uid = uid; bd.sp = sp; bd.x = x; bd.y = y; bd.vx = bd.vy = bd.spd = bd.acc = 0;
       bd.face = bd.from = hint; bd.turnT = 0; bd.pitch = 0; bd.len = bodyLen(sp);
@@ -408,12 +410,14 @@ G.scene.underwater = (function () {
     }
     if (bd.turnT < 0) bd.turnT = 0;
     // The beat: speed over length; gliding, the tail finishes its stroke and rests.
-    bd.hz = hz || Math.min(SW.beatMax, SW.beat0 + SW.beatK * U / bd.len);
-    bd.glide = !hz && bd.acc < SW.glideA && U > 1;
+    var Us = sim ? sim.spd : U;
+    bd.hz = hz || Math.min(SW.beatMax, SW.beat0 + SW.beatK * Us / bd.len);
+    bd.glide = !hz && (sim ? sim.gl === 1 : bd.acc < SW.glideA && U > 1);
     var idx = Math.floor(bd.phase * 4) & 3;
     if (!bd.glide || idx === 1 || idx === 3) { bd.phase += bd.hz * dt; bd.phase -= Math.floor(bd.phase); }
     // Pitch: toward the direction of travel, level while barely moving or turning.
-    var tp = U > 1 && bd.turnT <= 0 ? clamp(bd.vy / U, -SW.pitchMax, SW.pitchMax) * Math.min(1, U / 3) : 0;
+    var tp = bd.turnT > 0 ? 0 : (sim ? clamp(Math.sin(sim.pitch), -SW.pitchMax, SW.pitchMax) * Math.min(1, sim.spd / 3) :
+      (U > 1 ? clamp(bd.vy / U, -SW.pitchMax, SW.pitchMax) * Math.min(1, U / 3) : 0));
     bd.pitch += (tp - bd.pitch) * Math.min(1, SW.pitchK * dt);
   }
 
@@ -424,14 +428,16 @@ G.scene.underwater = (function () {
     for (i = 0; i < school.fish.length && i < HOOKB; i++) {
       f = school.fish[i];
       if (!f.active) { bodies[i].uid = -1; continue; }
-      swimOne(bodies[i], f.uid, f.sp, f.x, f.y, f.dir, true, 0, dt);
+      // Phase 28: the sim has a heading now, so the body faces where the fish faces (a fish
+      // slipping back tail first in a current, or backing off the lure, keeps its facing).
+      swimOne(bodies[i], f.uid, f.sp, f.x, f.y, f.face, false, 0, dt, f);
     }
     var fsm = run.fsm, h = run.hook;
     if (fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') {
       // The hooked fish faces where the fight sends it (away pulling, home tired); its beat
       // follows the pull. Its thrash is in its position, so its facing ignores its speed.
       var pull = fsm !== 'landing' && run.fight.mode === 'pull';
-      swimOne(bodies[HOOKB], h.uid, h.sp, h.x, h.y, h.face, false, fsm === 'landing' ? 3 : (pull ? 4.5 : 1), dt);
+      swimOne(bodies[HOOKB], h.uid, h.sp, h.x, h.y, h.face, false, fsm === 'landing' ? 3 : (pull ? 4.5 : 1), dt, null);
     } else bodies[HOOKB].uid = -1;
   }
 
@@ -936,7 +942,8 @@ if (G.core.debug) G.core.debug.addLine(function () {
     if (!f.active) continue;
     n++;
     s += '  ' + G.data.fish[f.sp].id + ' ' + f.state + (f.state === 'inspect' ? '(' + f.circles + ')' : '') +
-      (f.state === 'nibble' ? '(' + f.nibbles + '/' + f.nibbleN + ')' : '') + ' ' + (f.y * 0.25).toFixed(1) + 'm';
+      (f.state === 'nibble' ? '(' + f.nibbles + '/' + f.nibbleN + ')' : '') + ' ' + (f.y * 0.25).toFixed(1) + 'm ' +
+      f.spd.toFixed(1) + (f.gl ? 'g' : '') + (f.face > 0 ? '>' : '<'); // Phase 28: speed, gliding, facing
   }
   return 'fish ' + n + '/' + G.sim.fish_ai.MAX + s;
 });
