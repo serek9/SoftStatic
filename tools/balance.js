@@ -570,6 +570,41 @@ function rodCheck() {
   }
   add('let go at full load: it swings past straight and settles within 5% in 0.25-1.0 s', relOk, relGot.join('  '));
 
+  // The cast (Phase 32): held back at 120° (the lure's weight on the tip), the stroke to 20° in
+  // 0.12 s eased as sailing.js eases it (it gathers speed and stops short), then up to 40° in
+  // 0.3 s, the lure gone from the tip. While it swings the tip trails the straight rod; the stop
+  // whips it forward past straight, and it springs back past the bend it comes to rest at (the
+  // line's pull and the rising hands keep that bend forward); one curve throughout.
+  let castOk = true, castGot = [];
+  for (let t = 0; t < TIERS; t++) {
+    fresh();
+    const ds = (a, l, deg, hang) => { const d = dirOf(deg); R.solve(a, l, d[0], d[1], 1, t, DT, true, hang); };
+    for (let i = 0; i < 60; i++) ds(120, 0.05, 90, true);
+    let trail = 0, whip = 0, castS = 0, phase = 0, low = 0, after = -1e9, rest = 0;
+    const straightTip = a => [Math.cos(a * D2R) * L, Math.sin(a * D2R) * L];
+    for (let i = 1; i <= 7; i++) {                                                 // the stroke, 0.12 s
+      const u = Math.min(1, i * DT / 0.12), a = 120 + (20 - 120) * u * u * (2 - u);
+      ds(a, 0.05, 90, true);
+      const st0 = straightTip(R.st.a / D2R);
+      if (R.st.bendDeg > 0) trail = Math.max(trail, Math.hypot(R.jx[N] - st0[0], R.jy[N] - st0[1]));
+      if (sShape() && Math.abs(R.st.bendDeg) > 6) castS++;
+    }
+    for (let i = 1; i <= 120; i++) {                                               // the stop, then up to wait
+      const u = Math.min(1, i * DT / 0.3), a = 20 + 20 * (1 - Math.cos(Math.PI * u)) / 2;
+      ds(a, 0.06, 30, false);
+      const b = R.st.bendDeg, st0 = straightTip(R.st.a / D2R), off = Math.hypot(R.jx[N] - st0[0], R.jy[N] - st0[1]);
+      if (phase === 0 && b < 0) phase = 1;
+      if (phase === 1) { if (b < 0) whip = Math.max(whip, off); if (b < low) low = b; else if (b > low + 1) phase = 2; }
+      if (phase === 2 && i <= 60) after = Math.max(after, b);
+      if (sShape() && Math.abs(b) > 6) castS++;
+      rest = b;
+    }
+    const rebound = after - rest;
+    castGot.push(t + ': trails ' + trail.toFixed(1) + ' px, whips ' + whip.toFixed(1) + ' px, rebounds ' + rebound.toFixed(0) + '°' + (castS ? ', ' + castS + ' S' : ''));
+    if (trail < 3 || whip < 2 || rebound < 2 || castS > 0) castOk = false;
+  }
+  add('the cast: the tip trails 3+ px on the stroke, whips 2+ px past and rebounds, one curve', castOk, castGot.join('  '));
+
   // Cost and NaN.
   let nan = false; for (let i = 0; i < 20000; i++) { R.solve(20 + (i * 37) % 80, ((i * 13) % 17) / 12, Math.sin(i * 0.3), Math.cos(i * 0.7), i % 2 ? 1 : -1, i % TIERS, DT); if (!isFinite(R.jx[N]) || !isFinite(R.jy[N])) nan = true; }
   const t0 = process.hrtime.bigint(); for (let i = 0; i < 5000; i++) R.solve(58, ((i * 13) % 17) / 12, 1, 1, 1, i % TIERS, DT);

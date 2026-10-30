@@ -531,9 +531,10 @@ G.scene.sailing = (function () {
   // Phase 31: the rod's pose for the current state, written into out: [0] the angle the hands
   // hold (degrees up from the facing), [1] the load on the tip (0..1 of the rod's rating) and
   // [2] where it pulls: ROD_LINE along the line, ROD_DOWN straight down (the lure hanging from
-  // the tip), ROD_BACK across the rod toward its back (a stand-in for the cast's load until
-  // Phase 32). G.gfx.rod bends the blank from these (rodStep).
-  var ROD_LINE = 0, ROD_DOWN = 1, ROD_BACK = 2;
+  // the tip). G.gfx.rod bends the blank from these (rodStep); Phase 32: the cast's load is the
+  // swing itself, the inertia of the blank and the lure, so its stroke is eased: it gathers
+  // speed and stops short, the stop firing the rod.
+  var ROD_LINE = 0, ROD_DOWN = 1;
   function rodPose(run, out) {
     var c = run.cast, back = CAST.restAngle + CAST.backAngle * Math.sqrt(c.charge), u;
     out[2] = ROD_LINE;
@@ -542,13 +543,12 @@ G.scene.sailing = (function () {
         out[0] = back; out[1] = 0.04 + 0.12 * Math.sqrt(c.charge); out[2] = ROD_DOWN;
         break;
       case 'casting':
-        out[2] = ROD_BACK;
-        if (c.t < CAST.flick) {
+        if (c.t < CAST.flick) { // the stroke: the lure still hangs at the tip
           u = c.t / CAST.flick;
-          out[0] = back + (CAST.flickAngle - back) * u; out[1] = 0.3 * u;
-        } else {
+          out[0] = back + (CAST.flickAngle - back) * u * u * (2 - u); out[1] = 0.05; out[2] = ROD_DOWN;
+        } else {                // the lure flies, the line peels off toward it; the rod comes up to wait
           u = Math.min(1, (c.t - CAST.flick) / 0.3);
-          out[0] = CAST.flickAngle + (CAST.waitAngle - CAST.flickAngle) * u; out[1] = 0.3 * (1 - u);
+          out[0] = CAST.flickAngle + (CAST.waitAngle - CAST.flickAngle) * (1 - Math.cos(Math.PI * u)) / 2; out[1] = 0.06;
         }
         break;
       case 'sailing':
@@ -571,7 +571,7 @@ G.scene.sailing = (function () {
           u = Math.min(1, run.hook.t / 0.3);
           out[0] += 10 * Math.sin(Math.PI * u); out[1] += 0.5 * (1 - u);
         }
-        if (F.shake > 0) { out[0] -= 3 * Math.abs(Math.sin(run.boat.t * 26)); out[1] += 0.15 * Math.abs(Math.sin(run.boat.t * 26)); } // Phase 23: a head shake knocks the tip
+        // Phase 23's head shakes knock the tip: impulses on the rod (ropeStep, 32.1).
         break;
       case 'landing':
         out[0] = 70; out[1] = 0.55; // the fish's weight hangs from the tip as it is lifted
@@ -594,6 +594,7 @@ G.scene.sailing = (function () {
   // how straight the line hangs, its sag against the line out (SAG_K px plus SAG_R of the span
   // for half the load), never under the line's weight.
   var ROD_K = 3, SAG_K = 1, SAG_R = 0.05, TICK = 0.12, tickT = 0;
+  var REEL_TURNS = 10, SHAKE_KICK = 5; // handle turns a second per unit of reel speed; a head shake's kick (rad/s at the tip)
   function rodStep(run, dt) {
     var b = run.boat, st = rope.st, dx = 0, dy = 1, load;
     tickT -= dt;
@@ -603,11 +604,18 @@ G.scene.sailing = (function () {
       dx = rope.x[ROD_K] - rope.x[0]; dy = rope.y[ROD_K] - rope.y[0];
       if (dx * dx + dy * dy < 0.25) { dx = 0; dy = 1; }
       if (load > 0.05) { var q = st.sagMax / (SAG_K + SAG_R * st.span); load = Math.max(0.02, load / (1 + q * q)); }
-    } else if (pose[2] === ROD_BACK) {
-      var a = (pose[0] + b.show) * Math.PI / 180;
-      dx = -b.facing * Math.sin(a); dy = -Math.cos(a);
     }
-    G.gfx.rod.solve(pose[0] + b.show, load, dx, dy, b.facing, G.state.save.gear.rod || 0, dt);
+    var fsm = run.fsm, R = G.gfx.rod;
+    R.solve(pose[0] + b.show, load, dx, dy, b.facing, G.state.save.gear.rod || 0, dt, fsm === 'charging' || fsm === 'casting',
+      fsm === 'charging' || (fsm === 'casting' && run.cast.t < CAST.flick) || pose[2] === ROD_DOWN);
+    // The reel (32.4): the handle turns while line comes in, faster on a faster reel and slower
+    // against tension; not while the drag gives line. The bail is open from the charge until
+    // the lure stops sinking (or reeling closes it).
+    var held = G.core.input.held('action'), turns = 0, F = run.fight;
+    if (fsm === 'fighting') { if (G.scene.underwater.fightReel() && !F.slipped) turns = REEL_TURNS * run.gearFx.reelSpeed * (1 - 0.5 * F.T); }
+    else if ((fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest') && held && run.bite.slot < 0) turns = REEL_TURNS * run.gearFx.reelSpeed;
+    else if (passiveFighting(run)) turns = 0.5 * REEL_TURNS * run.gearFx.reelSpeed;
+    R.reel(dt, turns, (fsm === 'charging' || fsm === 'casting' || fsm === 'sinking') && turns === 0);
   }
 
   // A line in the view's pixels between world points (dotted: every other pixel pair). The
@@ -685,7 +693,9 @@ G.scene.sailing = (function () {
     }
     var passive = fsm === 'sailing' && pv.on && pv.pl;
     if (fsm !== 'casting' && !G.scene.underwater.UNDER[fsm] && !passive) { rope.off(); return; }
-    if (st.mode === rope.OFF || (fsm === 'casting' && was !== 'casting')) rope.reset(tipW[0], tipW[1]);
+    // Until the lure flies it rides the tip, so the line is held there (Phase 32: the tip whips
+    // too fast for 48 links to follow, and they trailed in a loop longer than the line out).
+    if (st.mode === rope.OFF || (fsm === 'casting' && !run.cast.flying)) rope.reset(tipW[0], tipW[1]);
     if (passive) floatPos(run, lurePt); else lurePos(run, lurePt);
     rope.anchors(tipW[0], tipW[1], lurePt[0], lurePt[1]);
     var dx = lurePt[0] - tipW[0], dy = lurePt[1] - tipW[1], span = Math.sqrt(dx * dx + dy * dy), r = st.rest, k, pull = 0;
@@ -724,7 +734,11 @@ G.scene.sailing = (function () {
       if (taut) pull = 0.5 + 0.4 * F.T;
       // Phase 23: a head shake jerks the line near the fish.
       nibT -= dt;
-      if (F.shake > 0 && nibT <= 0) { nibT = 0.12; k = taut ? 0.3 : 1; rope.twitch(10, (G.vrng.next() - 0.5) * 3 * k, (G.vrng.next() - 0.5) * 2 * k); } // less on a taut line
+      if (F.shake > 0 && nibT <= 0) {
+        nibT = 0.12; k = taut ? 0.3 : 1;
+        rope.twitch(10, (G.vrng.next() - 0.5) * 3 * k, (G.vrng.next() - 0.5) * 2 * k); // less on a taut line
+        G.gfx.rod.kick(SHAKE_KICK * (0.6 + 0.4 * G.vrng.next()));                      // and it knocks the rod tip (32.1)
+      }
     }
     rope.setRest(r);
     rope.st.pull = pull;

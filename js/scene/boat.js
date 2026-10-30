@@ -294,15 +294,32 @@ G.scene.boat = (function () {
       ctx.fillStyle = P.stone_lit; dot(ctx, gvx[i / 2 + 1], gvy[i / 2 + 1]);
     }
     ctx.fillStyle = P.stone_lit; dot(ctx, gvx[n - 1], gvy[n - 1]);                       // the tip-top
-    // The reel: a stem down from the seat, the body, its handle.
+  }
+
+  // The reel: a stem down from the seat, the body, its bail and its handle (Phase 32). The
+  // handle turns in the plane we see, in 8 steps, the way the crank goes for the facing; the
+  // bail closed is a wire across the spool's face, open it is thrown back toward the blank.
+  // The rod is held over the side, so the reel is drawn after the hull's gunwale.
+  function drawReel(ctx, b, sx, wy) {
+    var R = G.gfx.rod, f = b.facing, P = S.PALETTE, i, vx, vy;
+    rodF = f;
+    rodBase(b, sx, wy, rp);
+    var bx = rp[0], by = rp[1];
     normAt(R, 1.7); R.at(1.7, rp);
     vx = Math.round((bx + f * rp[0]) * HI); vy = Math.round((by - rp[1]) * HI);
     ctx.fillStyle = P.stone_dark;
     dot(ctx, Math.round(vx + nx * 2), Math.round(vy + ny * 2));
-    var rx = Math.round(vx + nx * 4), ry = Math.round(vy + ny * 4);
+    var rx = Math.round(vx + nx * 4), ry = Math.round(vy + ny * 4), ca2 = f * Math.cos(R.st.a), sa2 = -Math.sin(R.st.a);
     ctx.fillRect((rx - 1) / HI, (ry - 1) / HI, 3 / HI, 3 / HI);
     ctx.fillStyle = P.stone_hi; dot(ctx, rx - f, ry - 1);
-    ctx.fillStyle = P.ink; dot(ctx, rx - 2 * f, ry); dot(ctx, rx, ry + 1);
+    ctx.fillStyle = P.stone_lit;
+    for (i = -1; i <= 1; i++) {
+      if (R.st.bail) dot(ctx, Math.round(rx - nx * 2 + ca2 * i), Math.round(ry - ny * 2 + sa2 * i));
+      else dot(ctx, Math.round(rx + ca2 * 2 + nx * i), Math.round(ry + sa2 * 2 + ny * i));
+    }
+    var ph = Math.floor(R.st.crank * 8) / 8 * 2 * Math.PI, hc = f * Math.cos(ph), hs = Math.sin(ph);
+    ctx.fillStyle = P.ink; dot(ctx, rx + Math.round(hc * 1.6), ry + Math.round(hs * 1.6));
+    ctx.fillStyle = P.bone; dot(ctx, rx + Math.round(hc * 2.6), ry + Math.round(hs * 2.6));
   }
 
   // sx is the boat centre on screen, wy the waterline. Passengers sit behind the hull's
@@ -358,6 +375,7 @@ G.scene.boat = (function () {
     ctx.drawImage(mcv, 0, 0, mcv.width, 16, mx, my, mcv.width / HI, 8);
     ctx.drawImage(mcv, 0, 16, mcv.width, mcv.height - 16, mx - f * tilt, my + 8, mcv.width / HI, (mcv.height - 16) / HI);
     putSheared(ctx, b, img('hull', flip), sx - 17, y - 6, sx);
+    if (withFisher) drawReel(ctx, b, sx, wy);
     if (gear && gear.finder && (Math.floor(b.t * 1.25) & 1)) {
       ctx.fillStyle = P.neon_teal; ctx.fillRect(sx - f * 10, y - 3.5, 1, 1 / HI);
     }

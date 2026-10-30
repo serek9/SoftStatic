@@ -1,7 +1,7 @@
 # SoftStatic: The Rod and the Fisher, Phases 31–35
 
 **Date:** 2026-10-30. **Repo state:** Phases 1–30 done (PLAN.md §8.1), `main` at `bef55c8`.
-**Status:** Asked for by the user on 2026-10-30 ("make a plan to improve the realism on the rod bend (like an actual fishing rod) and make animations of preparing the lure and opening a beer when nothing happens or he is waiting. start with the first phase"). Phase 31 is done (PLAN.md §8.1, 8.3 #153–157), and 31b fixed it after the user saw it bend both ways under tension (8.3 #158–164): a stable solver with inertia (32.1 done there), the line's stretch, the load only through a tight line, the waiting line's belly and the bite's tugs, and `node tools/balance.js --rod`. Phases 32–35 wait for the user; 32 still has 32.2–32.4.
+**Status:** Asked for by the user on 2026-10-30 ("make a plan to improve the realism on the rod bend (like an actual fishing rod) and make animations of preparing the lure and opening a beer when nothing happens or he is waiting. start with the first phase"). Phase 31 is done (PLAN.md §8.1, 8.3 #153–157), and 31b fixed it after the user saw it bend both ways under tension (8.3 #158–164): a stable solver with inertia (32.1 done there), the line's stretch, the load only through a tight line, the waiting line's belly and the bite's tugs, and `node tools/balance.js --rod`. Phase 32 is done (8.3 #165–171). Phases 33–35 wait for the user.
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like PLAN_REALISM.md and PLAN_FISHSWIM.md, this file adds phases after the approved spec and does not edit §0–§7 or Appendix V.
 
 The user asked for two things:
