@@ -275,7 +275,7 @@ G.gfx.fishgen = (function () {
   function frameCount(look) { return (look.wrongness >= 3 || look.parts.indexOf('static') >= 0) ? 3 : 2; }
   // Phase 27: the swimmers' frames (paintLook): the beat runs REST, AWAY, REST, NEAR; a turn
   // runs TURN1, TURN2, then the same flipped. GLITCH only for looks with frameCount 3.
-  var FR = { REST: 0, AWAY: 1, GLITCH: 2, NEAR: 3, TURN1: 4, TURN2: 5 }, BEAT = [0, 1, 0, 3];
+  var FR = { REST: 0, AWAY: 1, GLITCH: 2, NEAR: 3, TURN1: 4, TURN2: 5, ROLL: 6, SHAKE: 7 }, BEAT = [0, 1, 0, 3]; // ROLL, SHAKE: the hooked fish (Phase 29)
   var SWIM_FRAMES = [0, 1, 3, 4, 5], SWIM_FRAMES_G = [0, 1, 2, 3, 4, 5];
   function swimFrames(look) { return frameCount(look) > 2 ? SWIM_FRAMES_G : SWIM_FRAMES; }
 
@@ -376,7 +376,11 @@ G.gfx.fishgen = (function () {
   // from the side a beating tail foreshortens; it does not drop. swim leaves room under the
   // tail so every frame of a swimmer has the same size. The canvas carries where the mouth is
   // (mouthX, mouthY) and the body's middle row (midY), in its pixels.
-  var TAIL_C = [1, 0.55, 1, 0.75, 1, 1], TAIL_S = [1, 0.92, 1, 1.12, 1, 1], SQUASH = [1, 1, 1, 1, 0.6, 0.3];
+  // Phase 29: 6 the fish rolled onto its side (a tired fish: its belly turned to the viewer,
+  // a pale flash, the back fins foreshortened), 7 its head turned in a shake (the head, from
+  // the gill forward, foreshortened to 0.7).
+  var TAIL_C = [1, 0.55, 1, 0.75, 1, 1, 0.85, 1], TAIL_S = [1, 0.92, 1, 1.12, 1, 1, 1, 1], SQUASH = [1, 1, 1, 1, 0.6, 0.3, 1, 1];
+  var HEAD_X = 0.62, HEAD_SQ = [1, 1, 1, 1, 1, 1, 1, 0.7];
   function paintLook(look, maxW, maxH, sil, frame, swim) {
     var SH = SHAPES[look.base], pal = PALETTES[look.palette], parts = look.parts, rng = new G.core.rng.Rng(look.seed * 7 + 3);
     var has = function (p) { return parts.indexOf(p) >= 0; };
@@ -396,10 +400,13 @@ G.gfx.fishgen = (function () {
     var g = new Array(W * H);
     for (k = 0; k < g.length; k++) g[k] = '';
     // Across, the fish is narrowed about the canvas's middle while it turns (27.2).
-    var sq = SQUASH[frame] || 1, Xc = (left + right) / 2;
-    function wx(px) { return Xc + ((px + 0.5 - 1) / Lp + left - Xc) / sq; }
+    // Phase 29: in a shake only the head is narrowed, about the gill (HEAD_X).
+    var sq = SQUASH[frame] || 1, Xc = (left + right) / 2, hs = HEAD_SQ[frame] || 1;
+    function toDisp(X) { return X > HEAD_X ? HEAD_X + (X - HEAD_X) * hs : X; }
+    function fromDisp(X) { return X > HEAD_X ? HEAD_X + (X - HEAD_X) / hs : X; }
+    function wx(px) { return fromDisp(Xc + ((px + 0.5 - 1) / Lp + left - Xc) / sq); }
     function wy(py) { return (py + 0.5 - 1) / Lp + top; }
-    function PX(v) { return Math.round(((v - Xc) * sq + Xc - left) * Lp + 1 - 0.5); }
+    function PX(v) { return Math.round(((toDisp(v) - Xc) * sq + Xc - left) * Lp + 1 - 0.5); }
     function PY(v) { return Math.round((v - top) * Lp + 1 - 0.5); }
     function put(px, py, key) { if (px >= 0 && py >= 0 && px < W && py < H) g[py * W + px] = key; }
     function get(px, py) { return px >= 0 && py >= 0 && px < W && py < H ? g[py * W + px] : ''; }
@@ -412,7 +419,7 @@ G.gfx.fishgen = (function () {
     var MX = 0, MY = 0;
     // The tail's foreshortening and apparent size in this frame (27.1), and its keys: swept
     // away, its far side is in shadow.
-    var tc = TAIL_C[frame] || 1, ts = TAIL_S[frame] || 1, away = frame === 1;
+    var tc = TAIL_C[frame] || 1, ts = TAIL_S[frame] || 1, away = frame === 1, roll = frame === 6;
     var tailFill = away ? finDark : Fn, tailRay = away ? S.shift(finDark, -1) : finDark, tailRim = away ? Fn : finLit;
 
     // The body as a function, for every layer to ask "is this on the fish, and how far down?"
@@ -440,7 +447,7 @@ G.gfx.fishgen = (function () {
           f = SH.fins[k];
           if (f.k === 'pectoral' || X < f.a || X > f.b) continue;
           var u = (X - f.a) / (f.b - f.a), edgeT = profile(SH.body, 1, X), edgeB = profile(SH.body, 2, X);
-          var hgt = f.h * (f.k === 'adipose' ? Math.sin(u * Math.PI) : (f.k === 'dorsal' && !f.spiny ? Math.sin(Math.min(1, u * 1.3) * Math.PI * 0.85) : Math.pow(1 - Math.abs(u - 0.3) / 1.3, 1.5)));
+          var hgt = f.h * (roll ? (f.k === 'dorsal' || f.k === 'adipose' ? 0.55 : 1.3) : 1) * (f.k === 'adipose' ? Math.sin(u * Math.PI) : (f.k === 'dorsal' && !f.spiny ? Math.sin(Math.min(1, u * 1.3) * Math.PI * 0.85) : Math.pow(1 - Math.abs(u - 0.3) / 1.3, 1.5)));
           if (f.spiny) { var ph = (u * (f.b - f.a) * Lp / 4) % 1; hgt *= 0.75 + 0.25 * (ph < 0.25 ? 1 : 0); }
           var up = f.k === 'dorsal' || f.k === 'adipose';
           var inFin = up ? (Y < edgeT + 0.01 && Y > edgeT - hgt) : (Y > edgeB - 0.01 && Y < edgeB + hgt);
@@ -456,7 +463,8 @@ G.gfx.fishgen = (function () {
         var v = bodyAt(X2, Y2);
         if (v < 0) continue;
         var t0 = profile(SH.body, 1, X2), b0 = profile(SH.body, 2, X2), mid = (t0 + b0) / 2, edge = 1.5 / Lp / Math.max(0.001, b0 - t0);
-        var key2 = v < edge ? S.shift(Dk, 1) : (v < 0.36 ? Dk : (v < 0.7 ? B : (v < 1 - edge * 1.2 ? Lb : S.shift(Lb, -1))));
+        var key2 = roll ? (v < edge ? Dk : (v < 0.18 ? Dk : (v < 0.4 ? B : (v < 0.56 ? S.shift(Lb, 1) : (v < 1 - edge * 1.2 ? Lb : S.shift(Lb, -1)))))) // rolled: the belly and its flash
+          : (v < edge ? S.shift(Dk, 1) : (v < 0.36 ? Dk : (v < 0.7 ? B : (v < 1 - edge * 1.2 ? Lb : S.shift(Lb, -1)))));
         // Pattern.
         if (SH.pattern === 'bars' && v < 0.72) {
           for (var bI = 0; bI < 5; bI++) { var bc = 0.24 + bI * 0.12, bw = 0.035 * (1 - v * 0.9); if (Math.abs(X2 - bc - (v - 0.3) * 0.04) < bw) key2 = dark; }

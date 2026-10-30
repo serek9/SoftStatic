@@ -387,14 +387,14 @@ G.core.debug = (function () {
       } else if (name === 'swim') {
         // Phase 27: each base's swimming frames in a row: rest, tail away, tail near, the two
         // turn frames, then the beat and a full turn playing.
-        var FRN = ['rest', 'away', 'near', 'turn1', 'turn2'], FRS = [0, 1, 3, 4, 5];
+        var FRN = ['rest', 'away', 'near', 'turn1', 'turn2', 'roll', 'shake'], FRS = [0, 1, 3, 4, 5, 6, 7]; // roll, shake: Phase 29
         for (var bb = 0; bb < FG.BASE_NAMES.length; bb++) {
           var y1 = 20 + bb * 40, base = FG.BASE_NAMES[bb];
           F.drawText(ctx, base, 8, y1 + 14, 'fog_light');
-          for (var fi = 0; fi < 5; fi++) ctx.drawImage(FG.partSwimmer(base, '', FRS[fi], false, false), 64 + fi * 64, y1);
+          for (var fi = 0; fi < 7; fi++) ctx.drawImage(FG.partSwimmer(base, '', FRS[fi], false, false), 64 + fi * 64, y1);
           var cyc = Math.floor(t * 4) % 8, TURN = [4, 5, 5, 4]; // the beat four times, then a turn
-          ctx.drawImage(cyc < 4 ? FG.partSwimmer(base, '', FG.BEAT[cyc], false, false) : FG.partSwimmer(base, '', TURN[cyc - 4], false, cyc >= 6), 400, y1);
-          if (bb === 0) for (fi = 0; fi < 5; fi++) F.drawText(ctx, FRN[fi], 64 + fi * 64, 344, 'fog_mid');
+          ctx.drawImage(cyc < 4 ? FG.partSwimmer(base, '', FG.BEAT[cyc], false, false) : FG.partSwimmer(base, '', TURN[cyc - 4], false, cyc >= 6), 528, y1);
+          if (bb === 0) for (fi = 0; fi < 7; fi++) F.drawText(ctx, FRN[fi], 64 + fi * 64, 344, 'fog_mid');
         }
       } else if (name === 'baits') {
         // Phase 22: each bait's body in every heading (both flutter phases), drawn ×3 on water.
