@@ -208,7 +208,11 @@ G.ui.shop = (function () {
   // (Buy, Talk, Leave) or 'items' (the item window); the list it shows and the choice.
   var open = '', pages = [], page = 0, typed = 0, crimson = false, choice = 0, list = [], sel = 0, from = '';
   var CHOICES = ['BUY', 'TALK', 'LEAVE'];
-  var BOX = { x: 24, y: 290, w: 592, h: 62 }, CH = { x: 488, y: 196, w: 128, h: 88 }, LIST = { x: 336, y: 14, w: 280, h: 270, rowH: 29 }, COINS = { x: 24, y: 14, w: 132, h: 26 };
+  var BOX = { x: 24, y: 290, w: 592, h: 62 }, CH = { x: 488, y: 196, w: 128, h: 88 };
+  // Phase 46: the item window's two panels at the top right (the list, the chosen item), and
+  // the list's title for each shelf.
+  var LIST = { x: 392, y: 8, w: 240, h: 140, rowH: 16, rows: 6 }, ITEM = { x: 392, y: 154, w: 240, h: 98 };
+  var TITLES = { rusty: 'BUY', rack: 'THE RACK', gear: 'GEAR', worms: 'WORMS', crickets: 'CRICKETS', tank: 'THE TANK', jar: 'THE JAR', lures: 'LURES' };
   var rusty = { face: 'down', fr: 3 };
   // Phase 38: the shelves he can face, and their items ([shelf, item] in SHELVES); what they
   // show: the gear he has, and the minnows and crickets left after what he bought this visit
@@ -293,9 +297,9 @@ G.ui.shop = (function () {
       }
       status = (b.unlimited ? '' : 'You have ' + have + '. ') + (on ? 'On the hook.' : '');
     }
-    txt.name = F.wrap(name, BOX.w - 120);
-    txt.desc = F.wrap(desc, BOX.w - 24);
-    txt.status = F.wrap(status, BOX.w - 24);
+    txt.name = F.wrap(name, ITEM.w - 90);
+    txt.desc = F.wrap(desc, ITEM.w - 2 * G.ui.panel.PAD);
+    txt.status = F.wrap(status, ITEM.w - 2 * G.ui.panel.PAD);
   }
 
   // One row of the item window: the item's name, its price (or its state) and a mark.
@@ -323,7 +327,7 @@ G.ui.shop = (function () {
     return lab;
   }
 
-  function say(s, key) { txt.msg = s ? F.wrap(s, BOX.w - 24) : []; txt.msgKey = key || 'wood_deep'; }
+  function say(s, key) { txt.msg = s ? F.wrap(s, ITEM.w - 2 * G.ui.panel.PAD) : []; txt.msgKey = key || 'fog_light'; }
 
   function act() {
     var it = item(), save = G.state.save, r;
@@ -337,8 +341,8 @@ G.ui.shop = (function () {
       r = E.buyRod(save, it.id, G.data);
     } else r = E.buy(save, it.kind, G.data);
     describe();
-    if (r === E.OK) { G.core.save.autosave('purchase'); say('Thank you kindly.', 'moss_dark'); }
-    else if (r === E.POOR) say('Not enough coins.', 'rust');
+    if (r === E.OK) { G.core.save.autosave('purchase'); say('Thank you kindly.', 'moss_lit'); }
+    else if (r === E.POOR) say('Not enough coins.', 'rust_hi');
     else if (r === E.MAXED) say('Nothing finer on the shelf.');
   }
 
@@ -494,31 +498,36 @@ G.ui.shop = (function () {
       }
     }
     if (open === 'items') {
-      // The coins, top left.
-      frame(ctx, COINS.x, COINS.y, COINS.w, COINS.h);
+      // Phase 46: the item window in two small panels (G.ui.panel) at the top right, the room
+      // showing round them: the list (its shelf on the tab, the coins beside it), and the
+      // chosen item (its name and price, what it does, its state or the last word, the keys).
+      var U = G.ui.panel, x = LIST.x, y = LIST.y;
       if (save.coins !== lastCoins) { lastCoins = save.coins; txt.coins = '' + save.coins; }
-      ctx.drawImage(coin, COINS.x + 10, COINS.y + 9);
-      F.bold(ctx, txt.coins, COINS.x + 24, COINS.y + 8, 'wood_deep');
-      // The list.
-      frame(ctx, LIST.x, LIST.y, LIST.w, LIST.h);
-      var rows = Math.floor((LIST.h - 6) / LIST.rowH), top = Math.max(0, Math.min(sel - rows + 2, list.length - rows)); // Phase 43: the list scrolls
+      U.frame(ctx, x, y, LIST.w, LIST.h, TITLES[from] || 'BUY', '  ' + txt.coins, 'bone');      // room for the coin
+      ctx.drawImage(coin, U.asideX(x, LIST.w, '  ' + txt.coins), y + 4);
+      var rows = LIST.rows, top = Math.max(0, Math.min(sel - rows + 2, list.length - rows)); // Phase 43: the list scrolls
       if (top < 0) top = 0;
+      ctx.imageSmoothingEnabled = false;
       for (i = top; i < list.length && i < top + rows; i++) {
-        var it = SHELVES[list[i][0]][list[i][1]], y = LIST.y + 4 + (i - top) * LIST.rowH, l = label(it);
-        if (i === sel) { ctx.fillStyle = P.paper; ctx.fillRect(LIST.x + 2, y - 1, LIST.w - 4, LIST.rowH); arrow(ctx, LIST.x + 6, y + 11, true); }
-        ctx.drawImage(icon(it.icon, 1), LIST.x + 14, y - 2);
-        F.drawText(ctx, l.name, LIST.x + 50, y + 9, 'wood_deep');
+        var it = SHELVES[list[i][0]][list[i][1]], ry = U.top(y) + (i - top) * LIST.rowH, l = label(it), on = i === sel;
+        if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, LIST.w - 6, LIST.rowH); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 1, LIST.rowH); }
+        ctx.drawImage(icon(it.icon, 1), x + U.PAD + 2, ry, 14, 14);
+        F.drawText(ctx, l.name, x + U.PAD + 20, ry + 3, on ? 'signal_amber' : 'bone');
         var pw = F.measure(l.price);
-        F.drawText(ctx, l.price, LIST.x + LIST.w - 12 - pw, y + 9, l.price === 'OWNED' || l.price === 'BEST' ? 'stone' : 'rust');
-        if (l.mark) F.drawText(ctx, l.mark, LIST.x + LIST.w - 22 - pw - F.measure(l.mark), y + 9, l.mark === 'ON' ? 'moss_dark' : 'stone');
+        F.drawText(ctx, l.price, x + LIST.w - U.PAD - pw, ry + 3, l.price === 'OWNED' || l.price === 'BEST' ? 'fog_mid' : 'rust_hi');
+        if (l.mark) F.drawText(ctx, l.mark, x + LIST.w - U.PAD - 8 - pw - F.measure(l.mark), ry + 3, l.mark === 'ON' ? 'moss_lit' : 'fog_light');
       }
-      // The chosen item in the box: its name and price, what it does, and the last word.
-      frame(ctx, BOX.x, BOX.y, BOX.w, BOX.h);
-      F.bold(ctx, txt.name[0] || '', BOX.x + 14, BOX.y + 8, 'wood_deep');
-      if (txt.price) F.bold(ctx, txt.price, BOX.x + BOX.w - 14 - F.measureBold(txt.price), BOX.y + 8, 'rust');
-      lines(ctx, txt.desc, BOX.x + 14, BOX.y + 8 + F.LINE_H + 2, 2, 'wood_dark');
-      if (txt.msg.length) lines(ctx, txt.msg, BOX.x + 14, BOX.y + BOX.h - 16, 1, txt.msgKey);
-      else lines(ctx, txt.status, BOX.x + 14, BOX.y + BOX.h - 16, 1, 'stone');
+      if (top > 0) F.drawText(ctx, '^', x + (LIST.w >> 1) - 8, y + LIST.h - 12, 'fog_mid');           // more above, more below
+      if (top + rows < list.length) F.drawText(ctx, 'v', x + (LIST.w >> 1) + 4, y + LIST.h - 14, 'fog_mid');
+      x = ITEM.x; y = ITEM.y;
+      U.frame(ctx, x, y, ITEM.w, ITEM.h, txt.name[0] || '', txt.price, 'signal_amber');
+      lines(ctx, txt.desc, U.left(x), U.top(y), 4, 'fog_light');
+      if (txt.msg.length) lines(ctx, txt.msg, U.left(x), U.top(y) + 4 * U.ROW + 2, 1, txt.msgKey);
+      else lines(ctx, txt.status, U.left(x), U.top(y) + 4 * U.ROW + 2, 1, 'fog_mid');
+      var hx = U.left(x), hy = y + ITEM.h - U.PAD - U.KEY_H;
+      hx += U.hint(ctx, 'SPACE', 'choose', hx, hy);
+      hx += U.hint(ctx, 'W/S', 'move', hx, hy);
+      U.hint(ctx, 'ESC', 'back', hx, hy);
     }
   }
 

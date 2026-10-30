@@ -347,7 +347,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
-      pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop'); // small: Phase 44
+      pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop', 'panel'); // small: Phase 44; panel: Phase 46
       page = 0; t = 0;
     }
 
@@ -477,6 +477,28 @@ G.core.debug = (function () {
         F.drawText(ctx, 'rusty', 404, 186, 'fog_mid');
         for (fr2 = 0; fr2 < 4; fr2++) { ctx.drawImage(SR.sprite('rusty', 'down', fr2), 404 + fr2 * 34, 200); ctx.drawImage(SR.sprite('rusty', 'right', fr2), 404 + fr2 * 34, 236); }
         ctx.drawImage(SR.sprite('rusty', 'up', 0), 540, 200);
+      } else if (name === 'panel') {
+        // Phase 46: the small panel (G.ui.panel) at three sizes over a strip of sky and water,
+        // as it sits over the world: a row chosen, key caps, key hints, an aside.
+        var U = G.ui.panel, SZ = [[120, 60, 'SMALL', ''], [180, 100, 'MIDDLE', '12c'], [U.MAX_W, U.MAX_H, 'LARGEST', 'NEW!']], px0 = 8;
+        ctx.fillStyle = P.dusk_violet; ctx.fillRect(0, 18, 640, 170);
+        ctx.fillStyle = P.water_mid; ctx.fillRect(0, 188, 640, 172);
+        for (var pz = 0; pz < SZ.length; pz++) {
+          var pw0 = SZ[pz][0], ph0 = SZ[pz][1], py0 = 40;
+          U.frame(ctx, px0, py0, pw0, ph0, SZ[pz][2], SZ[pz][3], pz === 2 ? 'neon_red' : 'bone');
+          for (var pr = 0; pr * U.ROW + U.TAB + U.PAD + U.ROW <= ph0 - U.PAD - U.KEY_H - 4; pr++) {
+            var ry0 = U.top(py0) + pr * U.ROW;
+            if (pr === 1) U.row(ctx, px0 + 3, ry0, pw0 - 6);
+            F.drawText(ctx, 'Row ' + (pr + 1), U.left(px0) + 3, ry0, pr === 1 ? 'signal_amber' : 'fog_light');
+          }
+          var kx = U.left(px0), ky = py0 + ph0 - U.PAD - U.KEY_H;
+          kx += U.key(ctx, 'SELL', kx, ky, true) + 4;
+          kx += U.key(ctx, 'KEEP', kx, ky, false) + 4;
+          if (pz) U.hint(ctx, 'A/D', 'choose', kx, ky);
+          F.drawText(ctx, pw0 + 'x' + ph0, px0, py0 + ph0 + 6, 'bone');
+          px0 += pw0 + 24;
+        }
+        F.drawText(ctx, 'the largest is the limit: ' + U.MAX_W + 'x' + U.MAX_H + ' with the tab', 8, 344, 'fog_light');
       } else if (name === 'baits') {
         // Phase 22: each bait's body in every heading (both flutter phases), drawn ×3 on water.
         var UWm = G.scene.underwater, ids = ['worm', 'cricket', 'minnow', 'unlabelled'];

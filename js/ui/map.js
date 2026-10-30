@@ -98,7 +98,9 @@ G.ui.map = (function () {
   }
 
   var chart = null, sel = 0, phase = 'map', t = 0, dest = null, lastMs = 0, lastDest = '';
-  var info = { name: '', status: '', key: 'wood', hint: '' };
+  var info = { name: '', status: '', key: 'wood', hint: '', lines: [] }; // hint: what Space does here
+  // Phase 46: the place card, a small panel (G.ui.panel) at the bottom left, over the chart.
+  var CARD = G.ui.panel.place(240, 74, 'bl', [0, 0, 240, 74]);
 
   function stopName(s) {
     if (s.kind === 'shop') return 'Bait Shop';
@@ -124,17 +126,21 @@ G.ui.map = (function () {
   }
 
   function describe() {
+    describeStop();
+    info.lines = F.wrap(info.status, CARD[2] - 2 * G.ui.panel.PAD);
+  }
+  function describeStop() {
     var s = STOPS[sel], save = G.state.save, v = verdict(s), L = G.data.locations[s.id];
     info.name = stopName(s); info.key = 'wood'; info.hint = '';
-    if (s.kind === 'shop') { info.status = 'On the Fogbound shore. Coffee is on the house.'; info.hint = 'SPACE go in'; return; }
-    if (s.kind === 'cabin') { info.status = 'Yours. ' + G.data.gear.cabin[save.cabinLevel].name + '.'; info.hint = 'SPACE go in'; return; }
+    if (s.kind === 'shop') { info.status = 'On the Fogbound shore. Coffee is on the house.'; info.hint = 'go in'; return; }
+    if (s.kind === 'cabin') { info.status = 'Yours. ' + G.data.gear.cabin[save.cabinLevel].name + '.'; info.hint = 'go in'; return; }
     if (v === 'here') { info.status = 'You are here.'; return; }
-    if (v === 'travel') { info.status = 'Open water.'; info.hint = 'SPACE travel'; return; }
+    if (v === 'travel') { info.status = 'Open water.'; info.hint = 'travel'; return; }
     if (!stocked(s.id)) { info.status = 'The water is still settling. Nothing lives here yet.'; info.key = 'rust'; return; }
     var r = E.canUnlock(save, s.id, G.data);
     if (r === E.LOCKED) { info.status = (L.need && L.need.text) || 'It opens to someone who has fished while the owl calls.'; info.key = 'rust'; return; }
     info.status = 'Opens for ' + L.cost + 'c.';
-    if (r === E.OK) info.hint = 'SPACE pay and travel'; else info.key = 'rust';
+    if (r === E.OK) info.hint = 'pay and travel'; else info.key = 'rust';
   }
 
   var names = [], nameW = [];
@@ -207,17 +213,17 @@ G.ui.map = (function () {
         ctx.fillRect(s.x - 10, s.y + 9, 6, 2); ctx.fillRect(s.x + 5, s.y + 9, 6, 2);
       }
     }
-    var py = CY + CH - 46;
-    ctx.fillStyle = P.wood_mid; ctx.fillRect(CX + 8, py - 1, CW - 16, 40);
-    ctx.fillStyle = P.wood_deep; ctx.fillRect(CX + 9, py, CW - 18, 38);
-    F.bold(ctx, info.name, CX + 18, py + 7, 'bone');
-    if (info.hint) F.bold(ctx, info.hint, CX + CW - 18 - F.measureBold(info.hint), py + 7, 'signal_amber');
-    F.drawText(ctx, info.status, CX + 18, py + 22, info.key === 'rust' ? 'rust_hi' : 'fog_light');
+    var U = G.ui.panel, x = CARD[0], y = CARD[1];
+    U.frame(ctx, x, y, CARD[2], CARD[3], info.name);
+    for (i = 0; i < info.lines.length && i < 3; i++) F.drawText(ctx, info.lines[i], U.left(x), U.top(y) + i * U.ROW, info.key === 'rust' ? 'rust_hi' : 'fog_light');
+    var hx = U.left(x), hy = y + CARD[3] - U.PAD - U.KEY_H;
+    if (info.hint) hx += U.hint(ctx, 'SPACE', info.hint, hx, hy);
+    U.hint(ctx, 'M', 'close', hx, hy);
     if (phase === 'out') M.dim(ctx, t / FADE);
   }
 
   return {
-    native: true,
+    native: true, CARD: CARD,
     open: open, update: update, draw: draw, STOPS: STOPS, verdict: verdict, stocked: stocked,
     // dbg: travel to a stop id through the same path as the menu (fade included).
     travel: function (id) {
