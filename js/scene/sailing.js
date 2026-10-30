@@ -576,10 +576,11 @@ G.scene.sailing = (function () {
           u = Math.min(1, run.hook.t / 0.3);
           out[0] += 10 * Math.sin(Math.PI * u); out[1] += 0.5 * (1 - u);
         }
+        out[1] *= G.gfx.rod.fishLoad(run.hook.w, run.gearFx.maxMass); // Phase 44: a small fish on a stiff rod
         // Phase 23's head shakes knock the tip: impulses on the rod (ropeStep, 32.1).
         break;
       case 'landing':
-        out[0] = 70; out[1] = 0.55; // the fish's weight hangs from the tip as it is lifted
+        out[0] = 70; out[1] = 0.55 * G.gfx.rod.fishLoad(run.hook.w, run.gearFx.maxMass); // the fish's weight hangs from the tip as it is lifted
         break;
       default:
         out[0] = CAST.waitAngle; out[1] = 0.02 + 0.07 * Math.max(0, tickT) / TICK; // the line's own weight; a nibble ticks the tip
@@ -800,7 +801,7 @@ G.scene.sailing = (function () {
       if (F.shake > 0 && nibT <= 0) {
         nibT = 0.12; k = taut ? 0.3 : 1;
         rope.twitch(10, (G.vrng.next() - 0.5) * 3 * k, (G.vrng.next() - 0.5) * 2 * k); // less on a taut line
-        G.gfx.rod.kick(SHAKE_KICK * (0.6 + 0.4 * G.vrng.next()));                      // and it knocks the rod tip (32.1)
+        G.gfx.rod.kick(SHAKE_KICK * (0.6 + 0.4 * G.vrng.next()) * G.gfx.rod.fishLoad(run.hook.w, run.gearFx.maxMass)); // and it knocks the rod tip (32.1); a fry's barely (Phase 44)
       }
     }
     rope.setRest(r);

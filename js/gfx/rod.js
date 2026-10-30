@@ -32,8 +32,16 @@ G.gfx.rod = (function () {
     stretch: 0.09,                            // s: the line's stretch spreads a sudden pull (and a swing of the line) over this
     handsHz: 2.5,                             // how quickly the hands follow a new angle (critically damped)
     inertia: 0.9e-5,                          // the inertial bend per rad/s² of the hands, per unit of mass moment
-    lure: 3                                   // the lure's mass, in px of blank at the butt
+    lure: 3,                                  // the lure's mass, in px of blank at the butt
+    // Phase 44: a fish's load against the rod. A fish under ref × the rod's maxMass loads it by
+    // (mass / (ref × maxMass))^exp, never under min: a fry barely bends the long rod and
+    // bends the wand well. Heavier fish load it fully, as before.
+    small: { ref: 0.15, exp: 0.6, min: 0.08 }
   };
+  function fishLoad(kg, maxMass) {
+    var S = K.small, r = maxMass > 0 ? kg / (S.ref * maxMass) : 1;
+    return r >= 1 ? 1 : Math.max(S.min, Math.pow(r, S.exp));
+  }
   var SEG = K.len / N;
   var c = new Float32Array(N);                // compliance at joint i (the bend at the start of segment i), rad per px of moment
   var d = new Float32Array(N);                // the bend at each joint (rad); the rigid ones stay 0
@@ -192,7 +200,7 @@ G.gfx.rod = (function () {
   setTier(0);
   place(0, d, jx, jy);
 
-  return { N: N, RIGID: RIGID, SEG: SEG, K: K, st: st, jx: jx, jy: jy, d: d, v: v, q: q, solve: solve, reset: reset, kick: kick, reel: reel, at: at, tip: tip };
+  return { N: N, RIGID: RIGID, SEG: SEG, K: K, st: st, jx: jx, jy: jy, d: d, v: v, q: q, solve: solve, fishLoad: fishLoad, reset: reset, kick: kick, reel: reel, at: at, tip: tip };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {

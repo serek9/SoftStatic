@@ -29,7 +29,7 @@ G.ui.card = (function () {
   function open(info) {
     cur = info; sel = 0; t = 0; at = 0;
     txt.len = 'LEN ' + info.len.toFixed(1) + ' cm';
-    txt.wt = 'WT  ' + info.w.toFixed(2) + ' kg';
+    txt.wt = 'WT  ' + (info.w < 0.1 ? Math.round(info.w * 1000) + ' g' : info.w.toFixed(2) + ' kg'); // Phase 44: small fish in grams
     txt.sell = 'SELL ' + info.price;
     txt.price = info.price + 'c';
     txt.rarity = info.rarity;

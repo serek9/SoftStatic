@@ -771,9 +771,8 @@ G.scene.underwater = (function () {
     fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
     h.depth = f.y;
-    h.q = G.rng.next();
-    h.len = Math.round((sp.lengthCm[0] + (sp.lengthCm[1] - sp.lengthCm[0]) * h.q) * 10) / 10;
-    h.w = Math.round((sp.weightKg[0] + (sp.weightKg[1] - sp.weightKg[0]) * Math.pow(h.q, 1.3)) * 100) / 100;
+    h.q = G.sim.economy.sizeQ(G.rng.next(), G.data); // Phase 44: the size curve
+    G.sim.economy.size(sp, h.q, h);
     // gearFx: lineStrength, reelSpeed; Phase 23: the hook hold from how long the bite had waited
     G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data, G.sim.bite.hold(b.t, run.passive.on, G.data));
     f.active = false;

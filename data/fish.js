@@ -177,7 +177,7 @@ G.data.fish = [
     id: 'diner_perch', name: 'Diner Perch', rarity: 'common', locations: ['pines'],
     habitat: { depthMin: 1, depthMax: 8 }, speed: 1.4, strength: 0.6, fatigue: 0.12, mass: 0.4,
     lengthCm: [15, 28], weightKg: [0.2, 0.6], awareness: 46, caution: 0.35,
-    baitLikes: ['worm', 'cricket'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 23, lures: { spinner: 2, grub: 1 },
+    baitLikes: ['worm', 'cricket'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 23, lures: { spinner: 2, grub: 1, plug: 1 },
     desc: 'Smells of coffee, black and too strong. It bites while the diner is open: all night.', hintRefs: ['hour:night'],
     look: { base: 'perch', wrongness: 1, parts: ['coffee_drip'], palette: 'bronze', seed: 131 }
   },
@@ -185,7 +185,7 @@ G.data.fish = [
     id: 'keyback_bass', name: 'Keyback Bass', rarity: 'common', locations: ['pines'],
     habitat: { depthMin: 3, depthMax: 12 }, speed: 1.3, strength: 0.8, fatigue: 0.1, mass: 0.8,
     lengthCm: [24, 40], weightKg: [0.4, 1.2], awareness: 44, caution: 0.4,
-    baitLikes: ['worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 25, lures: { grub: 2, plug: 1, popper: 1, jig: 1 },
+    baitLikes: ['worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 25, lures: { grub: 2, plug: 2, popper: 1, jig: 1 },
     desc: 'Typewriter keys along its spine. They spell nothing, the same nothing every time. Worms.', hintRefs: ['bait:worm'],
     look: { base: 'perch', wrongness: 1, parts: ['vertebrae'], palette: 'ink', seed: 132 }
   },
@@ -320,8 +320,98 @@ G.data.fish = [
     baitLikes: ['unlabelled', 'minnow'], timeLikes: [], windows: ['owl_247'], uneaseMin: 0, price: 40, lures: {},
     desc: 'Two of it, joined at the side, dreaming the same dream. It wakes over the drain in the floor when the owl calls at 02:47.', hintRefs: ['spot:floor_drain', 'window:owl_247'],
     look: { base: 'koi', wrongness: 3, parts: ['fused_twins', 'human_eyes', 'static'], palette: 'koi', seed: 149 }
+  },
+
+  // ---- Phase 44: the small fish, 3-10 cm and 5-60 g, two or three to a water. Appended so
+  // the species above keep their indices. Cheap, quick to land, and mostly in the shallows,
+  // so a cast near the top finds them; the Ultralight Wand is their rod. Not counted in the
+  // V5 roster (G.data.isSmall); the swimmer draws them to scale with a plain painter.
+  {
+    id: 'dim_fry', name: 'Dim Fry', rarity: 'common', locations: ['fog'],
+    habitat: { depthMin: 0.5, depthMax: 3.5 }, speed: 1.8, strength: 0.2, fatigue: 0.3, mass: 0.01,
+    lengthCm: [3, 6], weightKg: [0.005, 0.02], awareness: 54, caution: 0.25,
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 4, lures: { spinner: 1, grub: 1 },
+    desc: 'A cloud of them just under the boat. Each one blinks out for a moment, like a bad channel.', hintRefs: ['depth:shallow'],
+    look: { base: 'perch', wrongness: 1, parts: ['static'], palette: 'pale', seed: 501 }
+  },
+  {
+    id: 'reed_stickleback', name: 'Reed Stickleback', rarity: 'common', locations: ['fog'],
+    habitat: { depthMin: 1, depthMax: 4 }, speed: 1.6, strength: 0.25, fatigue: 0.28, mass: 0.015,
+    lengthCm: [4, 8], weightKg: [0.008, 0.03], awareness: 50, caution: 0.3,
+    baitLikes: ['worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 5, lures: { grub: 1 },
+    desc: 'Spines along its back, and one more than it should have. A worm, and nothing else.', hintRefs: ['bait:worm'],
+    look: { base: 'trout', wrongness: 1, parts: ['vertebrae'], palette: 'olive', seed: 502 }
+  },
+  {
+    id: 'wick_minnow', name: 'Wick Minnow', rarity: 'common', locations: ['fog'],
+    habitat: { depthMin: 1, depthMax: 4.5 }, speed: 1.9, strength: 0.25, fatigue: 0.26, mass: 0.025,
+    lengthCm: [5, 9], weightKg: [0.01, 0.05], awareness: 56, caution: 0.3,
+    baitLikes: ['cricket', 'worm'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 6, lures: { popper: 1, spinner: 1 },
+    desc: 'It comes up after dark toward any light at all, even a match.', hintRefs: ['hour:night'],
+    look: { base: 'trout', wrongness: 1, parts: ['human_eyes'], palette: 'pale', seed: 503 }
+  },
+  {
+    id: 'gravel_darter', name: 'Gravel Darter', rarity: 'common', locations: ['creek'],
+    habitat: { depthMin: 1, depthMax: 4 }, speed: 2.0, strength: 0.25, fatigue: 0.28, mass: 0.015,
+    lengthCm: [4, 8], weightKg: [0.006, 0.03], awareness: 48, caution: 0.3,
+    baitLikes: ['worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 5, lures: { grub: 2, jig: 1 },
+    desc: 'It lies flat on the stones of the shallow run and hops from one to the next. A worm, nothing else.', hintRefs: ['bait:worm'],
+    look: { base: 'perch', wrongness: 1, parts: ['wood_grain'], palette: 'bronze', seed: 504 }
+  },
+  {
+    id: 'penny_dace', name: 'Penny Dace', rarity: 'common', locations: ['creek'],
+    habitat: { depthMin: 0.5, depthMax: 3.5 }, speed: 1.9, strength: 0.3, fatigue: 0.25, mass: 0.03,
+    lengthCm: [5, 10], weightKg: [0.01, 0.06], awareness: 52, caution: 0.3,
+    baitLikes: ['cricket', 'worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 6, lures: { spinner: 1, popper: 1 },
+    desc: 'Flat and bright as a coin. They hold in the shallow run where the water is quick.', hintRefs: ['depth:shallow'],
+    look: { base: 'trout', wrongness: 1, parts: ['mannequin'], palette: 'silver', seed: 505 }
+  },
+  {
+    id: 'napkin_bluegill', name: 'Napkin Bluegill', rarity: 'common', locations: ['pines'],
+    habitat: { depthMin: 1, depthMax: 4.5 }, speed: 1.6, strength: 0.3, fatigue: 0.25, mass: 0.035,
+    lengthCm: [5, 10], weightKg: [0.015, 0.06], awareness: 50, caution: 0.3,
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 6, lures: { grub: 1, popper: 1, spinner: 1 },
+    desc: 'Small enough to fold into a napkin. It took whatever I offered it.', hintRefs: [],
+    look: { base: 'carp', wrongness: 1, parts: ['zipper'], palette: 'olive', seed: 506 }
+  },
+  {
+    id: 'jukebox_shiner', name: 'Jukebox Shiner', rarity: 'common', locations: ['pines'],
+    habitat: { depthMin: 0.5, depthMax: 4 }, speed: 1.9, strength: 0.2, fatigue: 0.3, mass: 0.012,
+    lengthCm: [4, 8], weightKg: [0.006, 0.025], awareness: 54, caution: 0.25,
+    baitLikes: ['cricket'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 6, lures: { popper: 1 },
+    desc: 'They rise under the pier lights after dark, all turning at once, in time with something.', hintRefs: ['hour:night'],
+    look: { base: 'perch', wrongness: 1, parts: ['static'], palette: 'pale', seed: 507 }
+  },
+  {
+    id: 'sugar_minnow', name: 'Sugar Minnow', rarity: 'common', locations: ['pines'],
+    habitat: { depthMin: 1, depthMax: 4 }, speed: 1.7, strength: 0.2, fatigue: 0.3, mass: 0.008,
+    lengthCm: [3, 6], weightKg: [0.005, 0.015], awareness: 50, caution: 0.3,
+    baitLikes: ['worm'], timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], windows: [], uneaseMin: 0, price: 5, lures: { grub: 1 },
+    desc: 'Grains of something sweet in its scales, like a diner counter. Only in the grey hours.', hintRefs: ['hour:grey'],
+    look: { base: 'trout', wrongness: 1, parts: ['coffee_drip'], palette: 'silver', seed: 508 }
+  },
+  {
+    id: 'curtain_fry', name: 'Curtain Fry', rarity: 'common', locations: ['red'],
+    habitat: { depthMin: 0.5, depthMax: 4 }, speed: 1.8, strength: 0.2, fatigue: 0.3, mass: 0.01,
+    lengthCm: [3, 7], weightKg: [0.005, 0.02], awareness: 52, caution: 0.25,
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 5, lures: { grub: 1, spinner: 1 },
+    desc: 'Red as the curtains. They gather in the shallows where the floor meets the water.', hintRefs: ['depth:shallow'],
+    look: { base: 'perch', wrongness: 1, parts: ['static'], palette: 'koi', seed: 509 }
+  },
+  // The small strange one: only once the room has gone strange.
+  {
+    id: 'thimble', name: 'The Thimble', rarity: 'uncommon', locations: ['red'],
+    habitat: { depthMin: 2, depthMax: 5 }, speed: 1.5, strength: 0.25, fatigue: 0.25, mass: 0.008,
+    lengthCm: [3, 5], weightKg: [0.005, 0.012], awareness: 46, caution: 0.4,
+    baitLikes: ['cricket', 'unlabelled'], timeLikes: [], windows: [], uneaseMin: 0.3, price: 6, lures: { jig: 1 },
+    desc: 'Small enough to sit on a fingertip. It looked up at me the way a person does. It only came once the room had gone strange.', hintRefs: ['unease'],
+    look: { base: 'perch', wrongness: 2, parts: ['human_eyes', 'human_mouth'], palette: 'ink', seed: 510 }
   }
 ];
+
+// Phase 44: a small fish is one whose longest is SMALL_CM or less. Not counted in the V5 roster.
+G.data.SMALL_CM = 10;
+G.data.isSmall = function (f) { return f.lengthCm[1] <= G.data.SMALL_CM; };
 
 // Schema check (V5). Returns a list of problems; empty means valid.
 // ref: {locations, windows, bases, parts} to check cross-references against.

@@ -80,7 +80,9 @@ G.data.gear = {
   },
 
   // Prices (V8): base × rarityMult × sizeFactor, sizeFactor from sizeMin to sizeMax.
-  economy: { rarityMult: { common: 1, uncommon: 2.5, rare: 8, legendary: 40 }, sizeMin: 0.7, sizeMax: 1.5 },
+  // sizeCurve (Phase 44): the size quantile is u^sizeCurve, so most fish are on the small side;
+  // sizeMin went 0.7 -> 0.85 with it, keeping the mean sizeFactor at 1.1.
+  economy: { rarityMult: { common: 1, uncommon: 2.5, rare: 8, legendary: 40 }, sizeMin: 0.85, sizeMax: 1.5, sizeCurve: 1.6 },
 
   // Cabin restoration (V9), one stage after another; cabinLevel is the index reached.
   // plaques: how many kept fish can be mounted at that stage.

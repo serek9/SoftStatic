@@ -661,6 +661,8 @@ G.gfx.fishgen = (function () {
         c.fillRect(0, 0, col.width, col.height);
       });
       cv.mouthX = col.mouthX; cv.mouthY = col.mouthY; cv.midY = col.midY;
+    } else if (look.tiny) {
+      cv = paintTiny(look, look.tiny, frame);
     } else {
       var box = SWIM[look.base];
       cv = paintLook(look, box[0] * scale, box[1] * scale, false, frame, true);
@@ -672,7 +674,62 @@ G.gfx.fishgen = (function () {
   function slot(fr, sil, flip) { return fr * 4 + (sil ? 2 : 0) + (flip ? 1 : 0); }
   function swimmer(i, frame, sil, flip) {
     var t = swimTab[i] || (swimTab[i] = []), k = slot(frame, sil, flip);
-    return t[k] || (t[k] = swimArt(i, G.data.fish[i].look, 1, frame, sil, flip));
+    if (t[k]) return t[k];
+    return (t[k] = swimArt(i, small(i) || G.data.fish[i].look, 1, frame, sil, flip));
+  }
+  // Phase 44: a small fish (G.data.isSmall) swims at its size, SMALL_PX view px a cm of its
+  // mean length with the tail (a 3-6 cm fry is 7 px long), from paintTiny: its parts need room
+  // it does not have (the portrait keeps them).
+  var SMALL_PX = 1.5, smallOf = [];
+  function small(i) {
+    if (smallOf[i] !== undefined) return smallOf[i];
+    var sp = G.data.fish[i], L = sp.look;
+    if (!G.data.isSmall || !G.data.isSmall(sp)) return (smallOf[i] = null);
+    var px = Math.max(6, Math.round((sp.lengthCm[0] + sp.lengthCm[1]) / 2 * SMALL_PX));
+    return (smallOf[i] = { base: L.base, wrongness: 0, parts: [], palette: L.palette, seed: L.seed, glitch: frameCount(L) > 2, tiny: px });
+  }
+
+  // Phase 44: the plain painter for a fish a few view pixels long, in the frames paintLook
+  // gives (FR): a spindle body (back, flank and belly rows; deeper for perch, carp, koi and
+  // catfish), a dark eye near the snout, a forked tail that flicks up and down with the beat,
+  // narrowed through a turn, the belly flashing in a roll, the head nodding in a shake; the
+  // shimmer (GLITCH, for a strange one) blanks a column. No outline: at this size it would be
+  // all outline. len: view px from the tail's tip to the snout.
+  var DEEP = { perch: 1, carp: 1, koi: 1, catfish: 1 };
+  function paintTiny(look, len, frame) {
+    var pal = PALETTES[look.palette], T = Math.max(2, Math.round(len * 0.24)), Lb = len - T;
+    var Hb = Math.max(3, Math.round(Lb * (DEEP[look.base] ? 0.42 : 0.3))), sq = SQUASH[frame] || 1;
+    var Lx = Math.max(2, Math.round(Lb * sq)), Tx = Math.max(1, Math.round(T * sq));
+    var W = len + 2, H = Hb + 4, mid = (H - 1) / 2, x0 = 1 + Math.round((len - Lx - Tx) / 2) + Tx;
+    var g = new Array(W * H), x, y, u, hh, key;
+    for (x = 0; x < g.length; x++) g[x] = '';
+    function put(px, py, k) { if (px >= 0 && py >= 0 && px < W && py < H) g[py * W + px] = k; }
+    var roll = frame === FR.ROLL, nod = frame === FR.SHAKE ? -1 : 0;
+    for (x = 0; x < Lx; x++) {
+      u = (x + 0.5) / Lx; // 0 at the tail's root, 1 at the snout
+      hh = Hb / 2 * Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.45) / 0.55, 2))); // fullest behind the head
+      var top = Math.round(mid - hh + 0.2), bot = Math.round(mid + hh - 0.2), dy = u > HEAD_X ? nod : 0;
+      if (bot < top) bot = top;
+      for (y = top; y <= bot; y++) {
+        key = y === top ? (roll ? pal.l : pal.d) : (y === bot && bot > top ? pal.l : (roll ? pal.l : pal.b));
+        put(x0 + x, y + dy, key);
+      }
+    }
+    if (Lx >= 4) put(x0 + Lx - 2, Math.round(mid - Hb * 0.15) + nod, 'ink');                        // the eye
+    if (DEEP[look.base] && Lx >= 5 && !roll) put(x0 + Math.round(Lx * 0.45), Math.round(mid - Hb / 2) - 1, pal.f); // the dorsal
+    var flick = frame === FR.AWAY ? -1 : (frame === FR.NEAR ? 1 : 0);
+    for (x = 1; x <= Tx; x++) {                                                                   // the tail, forking
+      var spread = Math.round((x / Tx) * Math.max(1, Hb / 2 - 0.5)), cy = Math.round(mid) + (x === Tx ? flick : 0);
+      put(x0 - x, cy - spread, pal.f); put(x0 - x, cy + spread, pal.f);
+      if (spread === 0 || x === 1) put(x0 - x, cy, pal.f);
+    }
+    if (frame === FR.GLITCH && look.glitch) for (y = 0; y < H; y++) if (g[y * W + x0 + (Lx >> 1)]) put(x0 + (Lx >> 1), y, 'fog_light');
+    var cv = G.gfx.bake.layer(W, H, function (c) {
+      G.gfx.paint.reset();
+      G.gfx.paint.area(c, 0, 0, W, H, function (xx, yy) { return g[yy * W + xx]; });
+    });
+    cv.mouthX = x0 + Lx - 1; cv.mouthY = Math.round(mid); cv.midY = Math.round(mid);
+    return cv;
   }
   // A bare base (no parts, wrongness 0) for the far silhouettes and the heavy shadow.
   var BARE = {};
@@ -689,7 +746,7 @@ G.gfx.fishgen = (function () {
 
   return {
     portrait: portrait, portraitFlipped: portraitFlipped, frameCount: frameCount, FR: FR, BEAT: BEAT, swimFrames: swimFrames,
-    swimmer: swimmer, baseSwimmer: baseSwimmer, partSwimmer: partSwimmer, SWIM: SWIM,
+    swimmer: swimmer, small: small, baseSwimmer: baseSwimmer, partSwimmer: partSwimmer, SWIM: SWIM,
     BASE_NAMES: BASE_NAMES, PARTS: PARTS, PALETTES: PALETTES,
     generate: generate
   };

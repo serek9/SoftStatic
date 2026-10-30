@@ -347,7 +347,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
-      pages.push('swim', 'sprites', 'baits', 'lures', 'fx', 'shop');
+      pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop'); // small: Phase 44
       page = 0; t = 0;
     }
 
@@ -417,6 +417,25 @@ G.core.debug = (function () {
           var cell = s - start;
           swimCell(ctx, s, '', FG.swimFrames(fish[s].look),
             fish[s].id + ' w' + fish[s].look.wrongness + ' ' + fish[s].look.base, 8 + (cell % 4) * 158, 20 + Math.floor(cell / 4) * 66, 158, 66);
+        }
+      } else if (name === 'small') {
+        // Phase 44: the small fish as they swim (1x, then 4x), the beat and a turn playing, the
+        // silhouette and the hooked frames (roll, shake), and the portrait with its parts.
+        var sm = 0, SF = [0, 1, 0, 3, 0, 1, 0, 3, 4, 5], SEQ = SF[Math.floor(t * 4) % SF.length];
+        ctx.imageSmoothingEnabled = false;
+        for (var si = 0; si < G.data.fish.length; si++) {
+          if (!G.data.isSmall(G.data.fish[si])) continue;
+          var col = sm % 2, row = sm >> 1, sx = 8 + col * 316, sy = 20 + row * 66, sw = FG.swimmer(si, SEQ, false, false);
+          ctx.fillStyle = P.water_dark; ctx.fillRect(sx, sy, 312, 62);
+          ctx.drawImage(sw, sx + 4, sy + 6);
+          ctx.drawImage(FG.swimmer(si, SEQ, true, true), sx + 4, sy + 22);
+          ctx.drawImage(sw, sx + 22, sy + 4, sw.width * 4, sw.height * 4);
+          ctx.drawImage(FG.swimmer(si, FG.FR.ROLL, false, false), sx + 80, sy + 4, sw.width * 4, sw.height * 4);
+          ctx.drawImage(FG.swimmer(si, FG.FR.SHAKE, false, true), sx + 138, sy + 4, sw.width * 4, sw.height * 4);
+          ctx.drawImage(FG.portrait(si, 100, 40, false), sx + 204, sy + 4);
+          var f = G.data.fish[si];
+          F.drawText(ctx, f.id + ' ' + f.lengthCm[0] + '-' + f.lengthCm[1] + ' cm ' + sw.width + 'px', sx + 4, sy + 46, 'fog_light');
+          sm++;
         }
       } else if (name.indexOf('parts:') === 0) {
         var list = [''].concat(FG.PARTS);

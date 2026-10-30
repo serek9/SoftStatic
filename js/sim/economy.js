@@ -18,6 +18,18 @@ G.sim.economy = (function () {
     return e.sizeMin + (e.sizeMax - e.sizeMin) * q;
   }
 
+  // Phase 44: a fish's size quantile from a uniform draw u (one rng.next()), skewed so small
+  // individuals are common and big ones rare: q = u^sizeCurve.
+  function sizeQ(u, data) { return Math.pow(u, data.gear.economy.sizeCurve); }
+  // Length (cm, to 0.1) and weight (kg, to 0.01, or to the gram under 0.1 kg) at quantile q,
+  // into out.len and out.w.
+  function size(sp, q, out) {
+    var w = sp.weightKg[0] + (sp.weightKg[1] - sp.weightKg[0]) * Math.pow(q, 1.3);
+    out.len = Math.round((sp.lengthCm[0] + (sp.lengthCm[1] - sp.lengthCm[0]) * q) * 10) / 10;
+    out.w = w < 0.1 ? Math.round(w * 1000) / 1000 : Math.round(w * 100) / 100;
+    return out;
+  }
+
   function price(sp, q, data) {
     return Math.round(sp.price * data.gear.economy.rarityMult[sp.rarity] * sizeFactor(q, data));
   }
@@ -185,7 +197,7 @@ G.sim.economy = (function () {
 
   return {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
-    sizeFactor: sizeFactor, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
+    sizeFactor: sizeFactor, sizeQ: sizeQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
     ownsRod: ownsRod, nextLadderRod: nextLadderRod, buyRod: buyRod, useRod: useRod, loseLure: loseLure,
     nextItem: nextItem, buy: buy, buyBait: buyBait, useBait: useBait, recordCatch: recordCatch,
     canUnlock: canUnlock, unlock: unlock, restoreCabin: restoreCabin
