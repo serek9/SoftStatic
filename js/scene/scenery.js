@@ -337,5 +337,5 @@ G.scene.scenery = (function () {
     }
   };
 
-  return { pines: pines, red: red };
+  return { pines: pines, red: red, ROOM_THINGS: ROOM_THINGS }; // ROOM_THINGS: Phase 50.1's gallery
 })();
