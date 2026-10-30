@@ -74,6 +74,7 @@ G.core.save = (function () {
       flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 },
       tapes: [],
       settings: { volume: 0.8, mute: false, dogBark: true }, // dogBark: Phase 42
+      look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)
       rng: null              // G.rng state, restored on load unless ?seed is given
     };
   }
@@ -89,6 +90,10 @@ G.core.save = (function () {
     var d = defaults();
     for (var k in d) if (!(k in s)) s[k] = d[k];
     for (k in d.settings) if (!(k in s.settings)) s.settings[k] = d.settings[k]; // Phase 42: settings added later
+    // Phase 47: save.look is new in v5 saves, filled like any later field; an id that is not a
+    // string goes back to the default (an unknown string is drawn as the default, data/looks.js).
+    if (!s.look || typeof s.look !== 'object') s.look = d.look;
+    for (k in d.look) if (typeof s.look[k] !== 'string') s.look[k] = d.look[k];
     return s;
   }
 

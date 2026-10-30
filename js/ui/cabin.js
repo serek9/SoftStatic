@@ -9,7 +9,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // plaques on the back wall over a fog window and an armchair, a stone fireplace on the
 // right. Each stage changes the room: derelict (holes to the night, cobwebs, a cold hearth),
 // patched, the fire lit (and animated), a rug and a floor lamp, then curtains, a quilt and a
-// painting. Esc or M goes back out on the water.
+// painting. Esc or M goes back out on the water. Phase 47: A (or a tap on the door, the left
+// edge) opens the fisher-and-dog picker (G.ui.look) over the room.
 G.ui = G.ui || {};
 G.ui.cabin = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu, B = G.gfx.bake, A = G.gfx.paint;
@@ -329,6 +330,7 @@ G.ui.cabin = (function () {
     t += dt;
     G.sim.clock.step(G.state.save, null, dt, G.rng, G.data);
     if (inp.pressed('back') || inp.pressed('map')) { G.core.state.change('sailing'); return; }
+    if (inp.pressed('left')) { G.ui.menu.open('look', 'cabin'); return; } // Phase 47: the door (A, or a tap on it) opens the picker
     if (inp.pressed('action')) restore();
   }
 
@@ -372,7 +374,7 @@ G.ui.cabin = (function () {
     if (txt.stored && !msg) F.drawText(ctx, txt.stored, 428 - F.measure(txt.stored), 24, 'fog_light');
     F.drawText(ctx, FOOT, 632 - FOOT_W, 344, 'fog_light');
   }
-  var FOOT = 'SPACE restore   ESC leave', FOOT_W = F.measure(FOOT);
+  var FOOT = 'SPACE restore   A door: fisher & dog   ESC leave', FOOT_W = F.measure(FOOT);
 
   return {
     native: true,

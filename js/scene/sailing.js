@@ -1538,7 +1538,7 @@ G.scene.sailing = (function () {
     // Phase 42: the dog's voice; quiet while a fish bites or is hooked.
     voiceIn.on = save.settings.dogBark !== false;
     voiceIn.block = run.bite.slot >= 0 || run.fsm === 'hooked';
-    if (dog.voice(run.dog, dt, voiceIn, G.vrng)) G.audio.engine.cue('bark', b.x, 1);
+    if (dog.voice(run.dog, dt, voiceIn, G.vrng)) G.audio.engine.cue('bark', b.x, dog.barkPitch()); // Phase 47: the breed's pitch
     G.ui.hud.update(dt, run);
     camStep(run, dt);
     G.scene.underwater.viewStep(run, dt, loc);

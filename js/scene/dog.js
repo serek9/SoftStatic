@@ -14,30 +14,67 @@ G.scene.dog = (function () {
   var FRAMES = { bark: 2, pet: 2, sleep: 2 };
   var SPRITE = {};
   for (var i = 0; i < POSES.length; i++) SPRITE[POSES[i]] = 'dog_' + POSES[i];
-  var DOG = ['dog_dark', 'dog', 'dog_hi'], EAR = ['ink', 'dog_dark', 'dog'];
+  // Phase 47: the breed being painted (data/looks.js): its coat, ear and muzzle ramps, the
+  // pale chest, the shapes of its ears and tail, and its bulk. Set by img() around a painting.
+  var L = null, DOG = null, EAR = null;
+
+  // The ear while the head faces ahead (o.earUp: pricked by the alert). A golden's drops, a
+  // husky's always stands, a St. Bernard's hangs heavy, a poodle's is a long fluffy fall.
+  function ear(c, hx, hy, up) {
+    var e = L.ears;
+    if (e === 'prick') { A.limb(c, hx - 1, hy - 2, hx - 0.5, hy - (up ? 6.5 : 6), 1.4, EAR, 0.1); return; }
+    if (up) { A.limb(c, hx - 1, hy - 2, hx - 1.5, hy - 5.5, 1.3, EAR, 0); return; }
+    if (e === 'heavy') A.limb(c, hx - 2, hy - 2, hx - 3.2, hy + 2.8, 1.9, EAR, 0);
+    else if (e === 'pom') A.blob(c, hx - 2.6, hy + 1.4, 1.9, 3.1, EAR, { bias: 0.15 });
+    else A.limb(c, hx - 2, hy - 2, hx - 3, hy + 2, 1.4, EAR, 0);
+  }
+  // The tail from t0 toward t1: a golden's feather, a husky's curl over its back, a St.
+  // Bernard's low hang, a poodle's short tail with its pompom.
+  function tail(c, t0, t1) {
+    var t = L.tail;
+    if (t === 'curl') { A.limb(c, t0[0], t0[1], t0[0] - 1, t0[1] - 5, 1.4, DOG, 0.1); A.limb(c, t0[0] - 1, t0[1] - 5, t0[0] + 2, t0[1] - 6, 1.3, DOG, 0.2); }
+    else if (t === 'low') A.limb(c, t0[0], t0[1], t0[0] - 2, t0[1] + 4, 1.7, DOG, 0);
+    else if (t === 'pom') { A.limb(c, t0[0], t0[1], (t0[0] + t1[0]) / 2, (t0[1] + t1[1]) / 2, 0.9, DOG, 0.1); A.blob(c, (t0[0] + t1[0]) / 2, (t0[1] + t1[1]) / 2 - 0.5, 1.9, 1.8, DOG, { bias: 0.15 }); }
+    else A.limb(c, t0[0], t0[1], t1[0], t1[1], 1.3, DOG, 0.1);
+  }
 
   function head(c, hx, hy, o) {
-    if (o.earUp) { A.limb(c, hx - 1, hy - 2, hx - 1.5, hy - 5.5, 1.3, EAR, 0); }
+    if (o.earUp && L.ears !== 'prick') ear(c, hx, hy, true);
+    if (L.ears === 'pom' && !o.away) A.blob(c, hx - 0.5, hy - 3.2, 2.6, 1.8, DOG, { bias: 0.2 }); // the poodle's topknot
     A.blob(c, hx, hy, 4, 3.6, DOG, { bias: 0.1 });
     if (!o.away) {
-      A.blob(c, hx + 3.6, hy + 1.4, 2.6, 1.7, DOG, { bias: 0.25 });
+      A.blob(c, hx + 3.6, hy + 1.4, 2.6, 1.7, L.muzzle, { bias: 0.25 });
+      if (L.face === 'mask') { A.box(c, L.chest, Math.round(hx), Math.round(hy), 3, 1); A.px(c, L.chest, Math.round(hx + 2), Math.round(hy - 2)); } // pale under the eye, a pale brow
+      if (L.face === 'blaze') { A.box(c, L.chest, Math.round(hx + 2), Math.round(hy - 3), 1, 3); A.box(c, L.coat[0], Math.round(hx), Math.round(hy - 1), 3, 1); }
       A.px(c, 'ink', Math.round(hx + 6), Math.round(hy + 0.6));
       if (o.shut) A.box(c, 'ink', Math.round(hx), Math.round(hy - 1), 2, 1); else A.px(c, 'ink', Math.round(hx + 1), Math.round(hy - 1));
-      if (o.mouth) { A.box(c, 'blood', Math.round(hx + 3), Math.round(hy + 3), 3, 1); A.px(c, 'dog_dark', Math.round(hx + 5), Math.round(hy + 4)); }
-      if (!o.earUp) A.limb(c, hx - 2, hy - 2, hx - 3, hy + 2, 1.4, EAR, 0);
+      if (o.mouth) { A.box(c, 'blood', Math.round(hx + 3), Math.round(hy + 3), 3, 1); A.px(c, L.coat[0], Math.round(hx + 5), Math.round(hy + 4)); }
+      if (!o.earUp || L.ears === 'prick') ear(c, hx, hy, o.earUp);
     } else {
-      A.limb(c, hx - 2, hy - 2, hx - 2.5, hy - 5, 1.2, EAR, 0); A.limb(c, hx + 2, hy - 2, hx + 2.5, hy - 5, 1.2, EAR, 0);
-      A.box(c, 'dog_dark', Math.round(hx - 1), Math.round(hy + 1), 3, 1);
+      if (L.ears === 'prick' || L.ears === 'drop') { A.limb(c, hx - 2, hy - 2, hx - 2.5, hy - 5, 1.2, EAR, 0); A.limb(c, hx + 2, hy - 2, hx + 2.5, hy - 5, 1.2, EAR, 0); }
+      else { A.blob(c, hx - 3.4, hy + 0.5, 1.6, 2.6, EAR, { bias: 0.1 }); A.blob(c, hx + 3.4, hy + 0.5, 1.6, 2.6, EAR, { bias: 0.1 }); } // heavy ears hang either side
+      A.box(c, L.coat[0], Math.round(hx - 1), Math.round(hy + 1), 3, 1);
+    }
+  }
+  // A curled coat: the shadow key in small rings over the haunch, the back and the chest.
+  var CURLS = [[4, 12], [7, 11], [10, 12], [5, 15], [8, 14], [11, 15], [3, 14], [9, 10], [-1, -2], [1, 1], [-2, 2], [0, 4]];
+  function curls(c, cx, cy) {
+    for (var i = 0; i < CURLS.length; i++) {
+      var x = i < 8 ? CURLS[i][0] : cx + CURLS[i][0], y = i < 8 ? CURLS[i][1] : cy + CURLS[i][1];
+      A.px(c, L.coat[0], x, y); A.px(c, L.coat[2], x - 1, y - 1);
     }
   }
   function sitting(c, o) {
-    A.limb(c, o.t0[0], o.t0[1], o.t1[0], o.t1[1], 1.3, DOG, 0.1);                          // the tail
-    A.blob(c, 8, 13, 6.5, 4.5, DOG, { bias: -0.05 });
-    A.blob(c, 6, 14.5, 4.5, 3.5, DOG, { bias: 0.05 });
-    A.blob(c, o.cx || 16, o.cy || 11, 4.5, 5.5, DOG, { bias: 0.15 });
-    A.box(c, 'dog_hi', (o.cx || 16) + 1, (o.cy || 11) - 1, 2, 4);                            // the pale chest
-    if (o.leg) A.limb(c, o.leg[0], o.leg[1], o.leg[2], o.leg[3], 1.4, DOG, 0.1);
-    else A.limb(c, 17, 13, 17, 18, 1.4, DOG, 0.1);
+    var b = L.bulk;
+    tail(c, o.t0, o.t1);                                                                     // the tail
+    A.blob(c, 8, 13, 6.5 * b, 4.5 * b, DOG, { bias: -0.05 });
+    A.blob(c, 6, 14.5, 4.5 * b, 3.5 * b, DOG, { bias: 0.05 });
+    A.blob(c, o.cx || 16, o.cy || 11, 4.5 * b, 5.5 * b, DOG, { bias: 0.15 });
+    A.box(c, L.chest, (o.cx || 16) + 1, (o.cy || 11) - 1, b > 1 ? 3 : 2, b > 1 ? 5 : 4);       // the pale chest
+    if (L.curly) curls(c, o.cx || 16, o.cy || 11);
+    var LEG = L.paleLegs ? L.muzzle : DOG;
+    if (o.leg) A.limb(c, o.leg[0], o.leg[1], o.leg[2], o.leg[3], 1.4, LEG, 0.1);
+    else A.limb(c, 17, 13, 17, 18, 1.4, LEG, 0.1);
     head(c, o.hx, o.hy, o);
   }
   var PAINTERS = {
@@ -52,19 +89,29 @@ G.scene.dog = (function () {
     bark: function (c, f) { if (f) PAINTERS.alert(c); else sitting(c, { t0: [3, 11], t1: [2, 6], hx: 18, hy: 5, mouth: true }); },
     pet: function (c, f) { sitting(c, { t0: [3, 11], t1: f ? [0, 12] : [2, 5], hx: 18, hy: 4, shut: true }); },
     sleep: function (c, f) {
-      A.limb(c, 3, 16, 1, 13, 1.3, DOG, 0.1);
-      A.blob(c, 11, 16 + (f ? 0.5 : 0), 9.5, 3.5 - (f ? 0.5 : 0), DOG, { bias: 0.05 });
-      A.blob(c, 19, 15, 3.6, 2.8, DOG, { bias: 0.15 }); A.blob(c, 22, 16, 2, 1.4, DOG, { bias: 0.25 });
+      if (L.tail === 'feather') A.limb(c, 3, 16, 1, 13, 1.3, DOG, 0.1); else tail(c, [3, 16], [1, 13]);
+      A.blob(c, 11, 16 + (f ? 0.5 : 0), 9.5 * L.bulk, (3.5 - (f ? 0.5 : 0)) * L.bulk, DOG, { bias: 0.05 });
+      A.blob(c, 19, 15, 3.6, 2.8, DOG, { bias: 0.15 }); A.blob(c, 22, 16, 2, 1.4, L.muzzle, { bias: 0.25 });
       A.px(c, 'ink', 23, 15); A.box(c, 'ink', 19, 14, 2, 1);
-      A.limb(c, 17, 13, 16, 16, 1.3, EAR, 0);
+      if (L.ears === 'prick') A.limb(c, 18, 13, 17, 10.5, 1.2, EAR, 0.1);
+      else if (L.ears === 'pom' || L.ears === 'heavy') A.blob(c, 16.5, 15, 1.7, 2.6, EAR, { bias: 0.1 });
+      else A.limb(c, 17, 13, 16, 16, 1.3, EAR, 0);
     }
   };
-  var art = {};
-  function img(pose, f, flip) {
-    var key = pose + f + (flip ? '<' : '');
+  // Paintings per breed (arts[look id]), each pose and frame on first use.
+  var arts = {};
+  function breed(lk) { return typeof lk === 'object' && lk ? lk : G.data.lookOf(G.data.looks.dogs, lk || (G.state.save && G.state.save.look ? G.state.save.look.dog : '')); }
+  function img(pose, f, flip, B) {
+    var art = arts[B.id] || (arts[B.id] = {}), key = pose + f + (flip ? '<' : '');
     if (art[key]) return art[key];
-    if (flip) return (art[key] = G.gfx.bake.flipped(img(pose, f, false), 'x'));
-    return (art[key] = G.gfx.bake.layer(W, H, function (c) { A.reset(); PAINTERS[pose](c, f); A.reset(); }));
+    if (flip) return (art[key] = G.gfx.bake.flipped(img(pose, f, false, B), 'x'));
+    return (art[key] = G.gfx.bake.layer(W, H, function (c) { L = B; DOG = B.coat; EAR = B.ear; A.reset(); PAINTERS[pose](c, f); A.reset(); }));
+  }
+  // Phase 47: paints every pose and frame of a breed, both ways. Returns the ms it took.
+  function prebake(lk) {
+    var t0 = typeof performance !== 'undefined' ? performance.now() : 0, B = breed(lk);
+    for (var i = 0; i < POSES.length; i++) for (var f = 0; f < (FRAMES[POSES[i]] || 1); f++) { img(POSES[i], f, false, B); img(POSES[i], f, true, B); }
+    return typeof performance !== 'undefined' ? performance.now() - t0 : 0;
   }
 
   var T = { alert: 0.5, point: 0.7 }, HOLD = 0.6;
@@ -203,19 +250,23 @@ G.scene.dog = (function () {
   // stream back in the wind of a moving boat; the sleeping dog keeps its ears down.
   var HEAD = { idle: [18, 5], alert: [18, 4], point: [20, 8], look_down: [18, 9], stare: [17, 5], bark: [18, 5], pet: [18, 4] };
 
-  // wind 0..1 (optional): how fast the boat moves; above 0.3 an ear flutters back.
-  function draw(ctx, d, x, y, flip, wind) {
-    var n = FRAMES[d.pose] || 1, f = Math.floor(d.t * (d.pose === 'pet' ? 7 : (d.pose === 'sleep' ? 0.7 : 5))) % n;
-    ctx.drawImage(img(d.pose, f, flip), x, y, W / HI, H / HI);
+  // wind 0..1 (optional): how fast the boat moves; above 0.3 an ear flutters back (a husky's
+  // stands). lk (optional, Phase 47): a breed's id or record instead of save.look's.
+  function draw(ctx, d, x, y, flip, wind, lk) {
+    var B = breed(lk), n = FRAMES[d.pose] || 1, f = Math.floor(d.t * (d.pose === 'pet' ? 7 : (d.pose === 'sleep' ? 0.7 : 5))) % n;
+    ctx.drawImage(img(d.pose, f, flip, B), x, y, W / HI, H / HI);
     var h = HEAD[d.pose];
-    if (!h || !(wind > 0.3)) return;
+    if (!h || !(wind > 0.3) || B.ears === 'prick') return;
     var P = G.gfx.sprites.PALETTE, len = 2 + Math.round(2 * Math.min(1, wind)), flap = Math.round(Math.sin(d.t * 22)), q = 1 / HI;
     for (var i = 0; i < len; i++) {
       var ex = h[0] - 4 - i, ey = h[1] - 1 + (i > 0 ? flap : 0);
-      ctx.fillStyle = P[i === len - 1 ? 'dog' : 'dog_dark'];
+      ctx.fillStyle = P[i === len - 1 ? B.ear[2] : B.ear[1]];
       ctx.fillRect(x + (flip ? W - 1 - ex : ex) * q, y + ey * q, q, q);
     }
   }
 
-  return { POSES: POSES, T: T, CUE: CUE, PET: PET, VOICE: VOICE, request: request, voice: voice, create: create, setPose: setPose, pet: pet, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
+  // Phase 47: the woof's playback rate for the breed on the boat.
+  function barkPitch(lk) { return breed(lk).bark; }
+
+  return { POSES: POSES, FRAMES: FRAMES, prebake: prebake, barkPitch: barkPitch, breed: breed, T: T, CUE: CUE, PET: PET, VOICE: VOICE, request: request, voice: voice, create: create, setPose: setPose, pet: pet, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
 })();

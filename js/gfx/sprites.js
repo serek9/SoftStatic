@@ -36,7 +36,11 @@ G.gfx.sprites = (function () {
     stone_lit: '#908b88', hair_lit: '#b4b0a6', paper_dark: '#a3956f', cream: '#e6dcc2',
     skin_shadow: '#8e5a4c', skin_lit: '#e0b49a',
     teal_dark: '#16302e', teal: '#22494a', teal_hi: '#356a66', teal_lit: '#4d8a80',
-    plum_hi: '#734862', flame: '#e07a2a', brass_hi: '#d0a050', moss_lit: '#7a8a50', rug_hi: '#b8473a'
+    plum_hi: '#734862', flame: '#e07a2a', brass_hi: '#d0a050', moss_lit: '#7a8a50', rug_hi: '#b8473a',
+    // Phase 47 (looks): a yellow oilskin, a faded denim, a darker skin ramp.
+    slicker_dark: '#5a4a1c', slicker: '#8a7228', slicker_hi: '#b09a40',
+    denim_dark: '#1c2433', denim: '#2c3a50', denim_hi: '#45597a',
+    umber_deep: '#2e1c18', umber_dark: '#4a2e24', umber: '#6e4634', umber_hi: '#8e6048'
   };
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.

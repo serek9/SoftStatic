@@ -15,9 +15,21 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.scene = G.scene || {};
 G.scene.fisher = (function () {
   var A = G.gfx.paint, HI = 2;
-  var COAT = ['ink', 'coat_dark', 'coat', 'coat_hi'], FAR = ['ink', 'ink', 'coat_dark', 'coat'];
-  var SKIN = ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi'], SKIN_FAR = ['flesh_dark', 'flesh_dark', 'skin_shadow', 'flesh'];
-  var CAP = ['rust_dark', 'cap', 'rust_hi'], STONES = ['ink', 'stone_dark', 'stone', 'stone_hi', 'stone_lit'];
+  var STONES = ['ink', 'stone_dark', 'stone', 'stone_hi', 'stone_lit'];
+  // Phase 47: the look (data/looks.js) gives every key the figure is painted in: the coat's
+  // ramps for the body, collar and sleeves (the far arm a step darker), the skin, the hat and
+  // its shape, the hair and a beard. The shapes are the same for every look (PLAN_TACKLE.md
+  // §4.4), so the shoulders and the arms' bones, and so the IK joints, are the same too.
+  var ramps = {};
+  function look(lk) {
+    var L = typeof lk === 'object' && lk ? lk : G.data.lookOf(G.data.looks.fishers, lk || (G.state.save && G.state.save.look ? G.state.save.look.fisher : ''));
+    var R = ramps[L.id];
+    if (!R) {
+      var c = L.coat, k = L.skin;
+      R = ramps[L.id] = { L: L, COAT: ['ink', c[0], c[1], c[2]], FAR: ['ink', 'ink', c[0], c[1]], SKIN: k, SKIN_FAR: [k[0], k[0], k[1], k[2]] };
+    }
+    return R;
+  }
   var SH_N = [12, 15], SH_F = [8, 15];        // shoulders, image px
   var UPPER = 5, FORE = 4.6;                  // the arm's two bones, image px
   var REST = [18.5, 18, 16, 19, 15, 19];      // the rod pose keeps Phase 18's painted arm: hand, upper arm's end, forearm's start
@@ -339,57 +351,107 @@ G.scene.fisher = (function () {
 
   // ---- Drawing --------------------------------------------------------------------------
 
-  function paintBody(c) {
-    A.blob(c, 9, 19, 8, 8, COAT, { bias: 0.05 });
-    A.box(c, 'coat_dark', 3, 20, 2, 6);
+  function paintBody(c, R) {
+    A.blob(c, 9, 19, 8, 8, R.COAT, { bias: 0.05 });
+    if (R.L.check) checks(c, R.L.coat[0], R.L.check);
+    A.box(c, R.L.coat[0], 3, 20, 2, 6);
+  }
+  // Phase 47: a check shirt: bands two px wide in the coat's dark key, three across and three
+  // down, inside the body's rim, darker (key) where they cross.
+  function checks(c, band, key) {
+    for (var y = 11; y < 26; y++) for (var x = 1; x < 18; x++) {
+      var h = y % 4 === 1 || y % 4 === 2, v = x % 4 === 1 || x % 4 === 2;
+      if (!h && !v) continue;
+      var nx = (x - 9) / 8, ny = (y - 19) / 8;
+      if (nx * nx + ny * ny < 0.75) A.px(c, h && v ? key : band, x, y);
+    }
   }
   // The collar and the shoulder's light, over the near arm's shoulder (as painted before 33).
-  function paintCollar(c) {
-    A.box(c, 'coat_hi', 5, 14, 6, 1);
-    A.box(c, 'coat_dark', 6, 13, 8, 2);
+  function paintCollar(c, R) {
+    A.box(c, R.L.coat[2], 5, 14, 6, 1);
+    A.box(c, R.L.coat[0], 6, 13, 8, 2);
   }
 
   // tilt 0 ahead, 1 down (the face lower, the brim over it), 2 back (chin up, the brim raised).
-  function paintHead(c, tilt) {
-    var dy = tilt === 1 ? 1 : (tilt === 2 ? -1 : 0);
-    A.blob(c, 10, 9, 4.5, 4.8, SKIN, { bias: 0.1 });
-    if (tilt === 2) { A.box(c, 'skin_shadow', 11, 12, 3, 1); A.px(c, 'skin_hi', 14, 10); }
-    else { A.box(c, 'skin_shadow', 10, 12 + Math.max(0, dy), 4, 1); A.px(c, 'skin_shadow', 13, 11 + dy); }
-    A.px(c, 'ink', 12, 8 + dy); A.px(c, 'skin_hi', 13, 9 + dy); A.px(c, 'flesh_dark', 7, 9);
-    A.blob(c, 9, 4.5, 5, 3.5, CAP, { bias: 0.1 }); A.box(c, 'rust_dark', 4, 6, 10, 1);
-    A.box(c, 'cap', 12, 5 + dy, 5, 2); A.box(c, 'rust_dark', 12, 6 + dy, 5, 1);       // the brim
-    A.box(c, 'stone_dark', 5, 7, 2, 4);                                              // hair at the back
+  function paintHead(c, tilt, R) {
+    var dy = tilt === 1 ? 1 : (tilt === 2 ? -1 : 0), L = R.L, k = L.skin, H = L.hatKeys;
+    A.blob(c, 10, 9, 4.5, 4.8, R.SKIN, { bias: 0.1 });
+    if (tilt === 2) { A.box(c, k[1], 11, 12, 3, 1); A.px(c, k[3], 14, 10); }
+    else { A.box(c, k[1], 10, 12 + Math.max(0, dy), 4, 1); A.px(c, k[1], 13, 11 + dy); }
+    A.px(c, 'ink', 12, 8 + dy); A.px(c, k[3], 13, 9 + dy); A.px(c, k[0], 7, 9);
+    if (L.beard) {                                                                   // Phase 47: round the chin and up the jaw
+      A.blob(c, tilt === 2 ? 12 : 11.5, 12.5 + Math.max(0, dy) * 0.5, 3.2, 2.2, L.beard, { bias: 0.1 });
+      A.box(c, L.beard[0], 7, 10, 1, 2); A.box(c, L.beard[1], 12, 11 + dy, 2, 1);
+    }
+    HATS[L.hat](c, H, dy);
+    A.box(c, L.hair, 5, 7, 2, 4);                                                    // hair at the back
   }
+  // Phase 47: the hats, over the head; H dark, mid, light; dy the head's tilt at the brim.
+  var HATS = {
+    cap: function (c, H, dy) {
+      A.blob(c, 9, 4.5, 5, 3.5, H, { bias: 0.1 }); A.box(c, H[0], 4, 6, 10, 1);
+      A.box(c, H[1], 12, 5 + dy, 5, 2); A.box(c, H[0], 12, 6 + dy, 5, 1);          // the brim
+    },
+    knit: function (c, H) {                                                          // a ribbed cuff and a bobble
+      A.blob(c, 9.5, 4.5, 5.2, 4, H, { bias: 0.1 }); A.blob(c, 9, 0.6, 1.6, 1.3, H, { bias: 0.2 });
+      A.box(c, H[0], 4, 6, 11, 2);
+      for (var x = 5; x < 15; x += 2) A.px(c, H[1], x, 6);
+    },
+    bucket: function (c, H, dy) {                                                    // a soft crown, the brim all round, turned down at its edges
+      A.blob(c, 9.5, 4.2, 4.4, 3.4, H, { bias: 0.1 }); A.box(c, H[0], 5, 6, 9, 1);
+      A.box(c, H[1], 3, 7, 7, 1); A.px(c, H[0], 2, 8); A.px(c, H[0], 3, 8);
+      A.box(c, H[1], 10, 7 + dy, 6, 1); A.box(c, H[0], 11, 8 + dy, 4, 1); A.px(c, H[0], 16, 8 + dy);
+    },
+    lamp: function (c, H, dy) {                                                      // a beanie, its strap and a headlamp
+      A.blob(c, 9.5, 4.8, 5, 3.6, H, { bias: 0.1 }); A.box(c, H[0], 4, 6, 11, 2);
+      A.box(c, 'ink', 13, 5 + dy, 3, 2); A.px(c, 'stone_hi', 13, 5 + dy); A.px(c, 'lamp_glow', 15, 6 + dy);
+    }
+  };
 
   // An arm from shoulder (sx, sy) to hand (hx, hy), image px, in a 40×40 canvas offset by 10.
-  function paintArm(c, sx, sy, hx, hy, far) {
+  function paintArm(c, sx, sy, hx, hy, far, R) {
     var dx = hx - sx, dy = hy - sy, d = Math.sqrt(dx * dx + dy * dy) || 0.01;
     var dc = Math.max(Math.abs(UPPER - FORE) + 0.5, Math.min(UPPER + FORE - 0.05, d));
     var a = Math.atan2(dy, dx), b = Math.acos(Math.max(-1, Math.min(1, (UPPER * UPPER + dc * dc - FORE * FORE) / (2 * UPPER * dc))));
     var e1x = sx + Math.cos(a + b) * UPPER, e1y = sy + Math.sin(a + b) * UPPER;
     var e2x = sx + Math.cos(a - b) * UPPER, e2y = sy + Math.sin(a - b) * UPPER;
     var ex = e1y > e2y ? e1x : e2x, ey = e1y > e2y ? e1y : e2y;                    // the elbow hangs low
-    var o = 10, keys = far ? FAR : COAT, fx0 = ex, fy0 = ey;
+    var o = 10, keys = far ? R.FAR : R.COAT, fx0 = ex, fy0 = ey;
     if (!far && hx === REST[0] && hy === REST[1]) { ex = REST[2]; ey = REST[3]; fx0 = REST[4]; fy0 = REST[5]; }
     A.limb(c, sx + o, sy + o, ex + o, ey + o, 2.6, keys, 0.1);
     A.limb(c, fx0 + o, fy0 + o, hx + o, hy + o, 2.2, keys, 0.1);
-    A.blob(c, hx + o, hy + o, 1.8, 1.6, far ? SKIN_FAR : SKIN, { bias: 0.1 });
+    A.blob(c, hx + o, hy + o, 1.8, 1.6, far ? R.SKIN_FAR : R.SKIN, { bias: 0.1 });
   }
 
-  var art = {};
-  function img(key, flip, paint) {
-    var k = key + (flip ? '<' : '');
-    if (art[k]) return art[k];
-    if (flip) return (art[k] = G.gfx.bake.flipped(img(key, false, paint), 'x'));
-    return (art[k] = paint());
+  // Paintings by key: the look's own (arts[look id]: body, collar, heads, arms), and the
+  // items and the cooler, the same for every look (art).
+  var art = {}, arts = {};
+  function img(key, flip, paint, dict) {
+    var k = key + (flip ? '<' : ''), D = dict || art;
+    if (D[k]) return D[k];
+    if (flip) return (D[k] = G.gfx.bake.flipped(img(key, false, paint, D), 'x'));
+    return (D[k] = paint());
   }
+  function own(R) { return arts[R.L.id] || (arts[R.L.id] = {}); }
   function layer(w, h, fn) { return G.gfx.bake.layer(w, h, function (c) { A.reset(); fn(c); A.reset(); }); }
-  function bodyImg(flip) { return img('body', flip, function () { return layer(20, 26, paintBody); }); }
-  function collarImg(flip) { return img('collar', flip, function () { return layer(20, 26, paintCollar); }); }
-  function headImg(tilt, flip) { return img('head' + tilt, flip, function () { return layer(20, 26, function (c) { paintHead(c, tilt); }); }); }
-  function armImg(far, ix, iy, flip) {
+  function bodyImg(flip, R) { return img('body', flip, function () { return layer(20, 26, function (c) { paintBody(c, R); }); }, own(R)); }
+  function collarImg(flip, R) { return img('collar', flip, function () { return layer(20, 26, function (c) { paintCollar(c, R); }); }, own(R)); }
+  function headImg(tilt, flip, R) { return img('head' + tilt, flip, function () { return layer(20, 26, function (c) { paintHead(c, tilt, R); }); }, own(R)); }
+  function armImg(far, ix, iy, flip, R) {
     var s = far ? SH_F : SH_N;
-    return img((far ? 'af' : 'an') + ix + ',' + iy, flip, function () { return layer(40, 40, function (c) { paintArm(c, s[0], s[1], ix, iy, far); }); });
+    return img((far ? 'af' : 'an') + ix + ',' + iy, flip, function () { return layer(40, 40, function (c) { paintArm(c, s[0], s[1], ix, iy, far, R); }); }, own(R));
+  }
+  // Phase 47: paints a look's body, collar, heads and the arms of the rod pose, both ways, so
+  // a change of look shows at once. Returns the time it took (ms) when performance exists.
+  function prebake(lk) {
+    var t0 = typeof performance !== 'undefined' ? performance.now() : 0, R = look(lk), p = POSES.rod;
+    for (var f = 0; f < 2; f++) {
+      bodyImg(!!f, R); collarImg(!!f, R);
+      for (var h = 0; h < 3; h++) headImg(h, !!f, R);
+      armImg(false, Math.round((p.n[0] + 6) * HI * 2) / 2, Math.round((p.n[1] + 15) * HI * 2) / 2, !!f, R);
+      armImg(true, Math.round((p.f[0] + 6) * HI * 2) / 2, Math.round((p.f[1] + 15) * HI * 2) / 2, !!f, R);
+    }
+    return typeof performance !== 'undefined' ? performance.now() - t0 : 0;
   }
   // Items held in the near hand, painted small: the thermos cup.
   // Each is drawn centred on the hand, standing on it.
@@ -428,17 +490,18 @@ G.scene.fisher = (function () {
 
   // Draws the fisher for a boat at screen x sx, seat line y (with heave), facing f, leaning
   // back by lean, at shear dy (the hull's pitch at his seat). t: the boat's time, for the steam.
-  function draw(ctx, fs, sx, y, f, lean, dy, t, dyP) {
-    var flip = f < 0, L = sx - (flip ? 4 : 6) - f * lean, top = y - 15 + dy, P = G.gfx.sprites.PALETTE;
+  // lk (optional, Phase 47): a look id or record instead of save.look's.
+  function draw(ctx, fs, sx, y, f, lean, dy, t, dyP, lk) {
+    var R = look(lk), flip = f < 0, L = sx - (flip ? 4 : 6) - f * lean, top = y - 15 + dy, P = G.gfx.sprites.PALETTE;
     var nix = Math.round((fs.nx + 6) * HI * 2) / 2, niy = Math.round((fs.ny + 15) * HI * 2) / 2; // half view px: the rod hand sits at 18.5
     var fix = Math.round((fs.fx + 6) * HI * 2) / 2, fiy = Math.round((fs.fy + 15) * HI * 2) / 2;
-    var up = fs.ny < -8.5, near = armImg(false, nix, niy, flip);                  // a hand at his mouth goes over his face
+    var up = fs.ny < -8.5, near = armImg(false, nix, niy, flip, R);               // a hand at his mouth goes over his face
     drawCord(ctx, fs, sx, y, f, lean, dy, dyP || 0);
-    put(ctx, armImg(true, fix, fiy, flip), L - 5, top - 5);
-    put(ctx, bodyImg(flip), L, top);
+    put(ctx, armImg(true, fix, fiy, flip, R), L - 5, top - 5);
+    put(ctx, bodyImg(flip, R), L, top);
     if (!up) put(ctx, near, L - 5, top - 5);
-    put(ctx, collarImg(flip), L, top);
-    put(ctx, headImg(fs.head, flip), L, top);
+    put(ctx, collarImg(flip, R), L, top);
+    put(ctx, headImg(fs.head, flip, R), L, top);
     if (up) put(ctx, near, L - 5, top - 5);
     if (fs.item) {
       var it = ITEMS[fs.item], hx = sx + f * fs.nx - f * lean, hy = y + fs.ny + dy;
@@ -518,5 +581,7 @@ G.scene.fisher = (function () {
 
   return { K: K, POSES: POSES, ACTS: ACTS, HOLDER: HOLDER, HOLDER_ANGLE: HOLDER_ANGLE, create: create, step: step, start: start, abort: abort,
     CLIPS: CLIPS, STOW_ANGLE: STOW_ANGLE, TILLER: TILLER, HELM: HELM,
-    rodLocal: rodLocal, draw: draw, drawHolder: drawHolder, drawHelm: drawHelm, drawCooler: drawCooler, drawCan: drawCan, drink: drink, choose: choose, info: info, armCount: function () { var n = 0; for (var k in art) if (k[0] === 'a' && k[k.length - 1] !== '<') n++; return n; } };
+    rodLocal: rodLocal, draw: draw, drawHolder: drawHolder, drawHelm: drawHelm, drawCooler: drawCooler, drawCan: drawCan, drink: drink, choose: choose, info: info,
+    prebake: prebake, look: function (lk) { return look(lk).L; }, armImg: function (far, ix, iy, flip, lk) { return armImg(far, ix, iy, flip, look(lk)); }, SH_N: SH_N, SH_F: SH_F,
+    armCount: function () { var n = 0, D = own(look()); for (var k in D) if (k[0] === 'a' && k[k.length - 1] !== '<') n++; return n; } };
 })();
