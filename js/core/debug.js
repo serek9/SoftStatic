@@ -286,6 +286,9 @@ G.core.debug = (function () {
     // dbg.fisher() returns the fisher (Phase 33): pose, hands (near x, y, far x, y; local px),
     // holder (the rod in it), act, step, actT, idleT and wait (the director's timer), returning.
     fisher: function () { return G.scene.fisher.info(G.state.run.fisher); },
+    // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
+    // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
+    dangle: function () { return G.scene.sailing.dangle(); },
     // dbg.idle(name) starts an idle act ('thermos', 'rest', ...); dbg.idle(null) ends the one playing.
     idle: function (name) {
       var fs = G.state.run.fisher;

@@ -21,20 +21,29 @@ G.scene.fisher = (function () {
   var SH_N = [12, 15], SH_F = [8, 15];        // shoulders, image px
   var UPPER = 5, FORE = 4.6;                  // the arm's two bones, image px
   var REST = [18.5, 18, 16, 19, 15, 19];      // the rod pose keeps Phase 18's painted arm: hand, upper arm's end, forearm's start
-  var HOLDER = [-1, -4.5], HOLDER_ANGLE = 38; // the rod holder on the gunwale, local; the rod's angle in it
+  var HOLDER = [3.5, -4.5], HOLDER_ANGLE = 38; // the rod holder on the gunwale before his knees, local; the rod's angle in it
   var K = { ease: 12, fast: 32, grab: 0.8 };  // the hands' springs (rad/s): moving, and going back to the rod; px to take the rod
 
   // Poses: the near hand (n) and the far hand (f), local world px.
   var POSES = {
     rod:    { n: [3.25, -6], f: [2.6, -6.4] },   // both hands on the rod
     knees:  { n: [2.2, -4.2], f: [1.2, -4.4] },  // resting on his knees
-    holder: { n: [-1, -4.5], f: [1.2, -4.4] },   // the near hand at the holder
+    holder: { n: [3.5, -4.5], f: [1.2, -4.4] },  // the near hand at the holder
     cup:    { n: [3.2, -7.2], f: [1.2, -4.4] },  // holding a cup before him
-    mouth:  { n: [1.6, -9.4], f: [1.2, -4.4] }   // the cup at his mouth
+    mouth:  { n: [1.6, -9.4], f: [1.2, -4.4] },  // the cup at his mouth
+    // Phase 34: the lure before his face, taken off the line hanging from the upright rod.
+    lureTake: { n: [1.6, -10], f: [1.2, -4.4] },
+    lureLook: { n: [3.0, -9.2], f: [2.6, -9.0] },
+    baitA:  { n: [3.2, -9.3], f: [2.2, -9.6] },
+    baitB:  { n: [3.0, -9.0], f: [3.0, -8.6] },
+    tug:    { n: [4.8, -7.8], f: [2.6, -9.0] }    // pulled down and out a little, so the line bends the tip
   };
 
   // Acts: steps of {d: s, pose, rod: 'hand' | 'holder', head: 0 ahead, 1 down, 2 back, item, angle}.
   // The near hand carries the rod to the holder before it lets go, and comes back for it.
+  // Phase 34: line (px of line the lure hangs on), reel (the handle's turns a second), bail
+  // (open: the line runs out), held (the lure in the near hand), tug (he tugs the knot: the
+  // line pulls the tip), cue (a sound at the step's start). An act may set its holder angle.
   var PLACE = [{ d: 0.5, pose: 'holder', rod: 'hand', angle: HOLDER_ANGLE }, { d: 0.35, pose: 'knees', rod: 'holder' }];
   var TAKE = [{ d: 0.45, pose: 'holder', rod: 'holder' }, { d: 0.4, pose: 'rod', rod: 'hand' }];
   var ACTS = {
@@ -47,9 +56,29 @@ G.scene.fisher = (function () {
       { d: 0.6, pose: 'knees', rod: 'holder' }
     ], TAKE) },
     // Waiting for a bite: the rod in the holder, his hands on his knees.
-    rest: { mode: 'wait', steps: PLACE.concat([{ d: 7, pose: 'knees', rod: 'holder' }], TAKE) }
+    rest: { mode: 'wait', steps: PLACE.concat([{ d: 7, pose: 'knees', rod: 'holder' }], TAKE) },
+    // Phase 34: preparing the lure. The rod stands upright in the holder; line runs out until
+    // the lure hangs before his face; he takes it, looks it over, works fresh bait onto the hook,
+    // tugs the knot, lets it swing, takes the rod back and reels the lure up under the tip.
+    lure: { mode: 'casts', holder: 96, steps: [
+      { d: 0.5, pose: 'holder', rod: 'hand', angle: 96 },
+      { d: 0.3, pose: 'knees', rod: 'holder' },
+      { d: 1.3, pose: 'knees', rod: 'holder', line: 16.4, bail: true },
+      { d: 0.5, pose: 'lureTake', rod: 'holder', line: 16.4 },
+      { d: 1.4, pose: 'lureLook', rod: 'holder', held: true, head: 1 },
+      { d: 0.3, pose: 'baitA', rod: 'holder', held: true, head: 1, cue: 'bait' },
+      { d: 0.3, pose: 'baitB', rod: 'holder', held: true, head: 1 },
+      { d: 0.3, pose: 'baitA', rod: 'holder', held: true, head: 1, cue: 'bait' },
+      { d: 0.3, pose: 'baitB', rod: 'holder', held: true, head: 1, cue: 'hooked' },
+      { d: 0.25, pose: 'tug', rod: 'holder', held: true, head: 1, tug: true },
+      { d: 0.4, pose: 'lureLook', rod: 'holder', held: true },
+      { d: 0.5, pose: 'knees', rod: 'holder' },
+      { d: 0.45, pose: 'holder', rod: 'holder' },
+      { d: 0.4, pose: 'rod', rod: 'hand' },
+      { d: 1.6, pose: 'rod', rod: 'hand', line: 3, reel: 2.2 }
+    ] }
   };
-  var BY_MODE = { casts: ['thermos'], wait: ['rest'] };
+  var BY_MODE = { casts: ['thermos', 'lure'], wait: ['rest'] };
   var WAIT = { casts: [6, 6], wait: [8, 7] }; // s of nothing happening before an act: least, plus up to
 
   var cur = null; // the fisher state the boat draws (one fisher)
@@ -57,7 +86,8 @@ G.scene.fisher = (function () {
   function create() {
     var p = POSES.rod;
     return cur = { nx: p.n[0], ny: p.n[1], nvx: 0, nvy: 0, fx: p.f[0], fy: p.f[1], fvx: 0, fvy: 0,
-      pose: 'rod', head: 0, item: '', rodAt: 'hand', angle: null,
+      pose: 'rod', head: 0, item: '', rodAt: 'hand', angle: null, holderA: HOLDER_ANGLE,
+      line: null, reel: 0, bail: false, held: false, tug: false, cue: '',
       act: '', step: 0, t: 0, idleT: 0, wait: 0, ret: false, fast: false, acts: 0 };
   }
 
@@ -68,12 +98,16 @@ G.scene.fisher = (function () {
 
   function setStep(fs, st) {
     fs.pose = st.pose; fs.rodAt = st.rod; fs.head = st.head || 0; fs.item = st.item || '';
-    fs.angle = st.rod === 'holder' ? HOLDER_ANGLE : (st.angle === undefined ? null : st.angle);
+    fs.angle = st.rod === 'holder' ? fs.holderA : (st.angle === undefined ? null : st.angle);
+    fs.line = st.line === undefined ? null : st.line; fs.reel = st.reel || 0; fs.bail = !!st.bail;
+    fs.held = !!st.held; fs.tug = !!st.tug; fs.cue = st.cue || '';
   }
+  function clearStep(fs) { fs.line = null; fs.reel = 0; fs.bail = false; fs.held = false; fs.tug = false; fs.cue = ''; }
 
   function start(fs, name) {
     if (!ACTS[name]) return false;
-    fs.act = name; fs.step = 0; fs.t = 0; fs.ret = false; fs.fast = false; fs.acts++;
+    fs.act = name; fs.step = 0; fs.t = 0; fs.ret = false; fs.fast = false; fs.acts++; fs.idleT = 0;
+    fs.holderA = ACTS[name].holder || HOLDER_ANGLE;
     setStep(fs, ACTS[name].steps[0]);
     return true;
   }
@@ -83,7 +117,8 @@ G.scene.fisher = (function () {
   function abort(fs) {
     if (!fs.act && !fs.ret) return;
     fs.act = ''; fs.item = ''; fs.head = 0; fs.fast = true; fs.ret = true;
-    if (fs.rodAt === 'holder') { fs.pose = 'holder'; fs.angle = HOLDER_ANGLE; }
+    clearStep(fs);
+    if (fs.rodAt === 'holder') { fs.pose = 'holder'; fs.angle = fs.holderA; }
     else { fs.pose = 'rod'; fs.angle = null; }
   }
 
@@ -96,7 +131,7 @@ G.scene.fisher = (function () {
         fs.t += dt;
         while (fs.act && fs.t >= a.steps[fs.step].d) {
           fs.t -= a.steps[fs.step].d;
-          if (++fs.step >= a.steps.length) { fs.act = ''; fs.pose = 'rod'; fs.rodAt = 'hand'; fs.angle = null; fs.item = ''; fs.head = 0; }
+          if (++fs.step >= a.steps.length) { fs.act = ''; fs.pose = 'rod'; fs.rodAt = 'hand'; fs.angle = null; fs.item = ''; fs.head = 0; clearStep(fs); }
           else setStep(fs, a.steps[fs.step]);
         }
       }
@@ -236,7 +271,7 @@ G.scene.fisher = (function () {
   // dbg.fisher(): the pose, the hands (local px), where the rod is, the act and its time.
   function info(fs) {
     return { pose: fs.pose, hands: [+fs.nx.toFixed(2), +fs.ny.toFixed(2), +fs.fx.toFixed(2), +fs.fy.toFixed(2)], holder: fs.rodAt === 'holder',
-      act: fs.act, step: fs.step, actT: +fs.t.toFixed(2), idleT: +fs.idleT.toFixed(2), wait: +fs.wait.toFixed(2), returning: fs.ret, head: fs.head, item: fs.item };
+      act: fs.act, step: fs.step, actT: +fs.t.toFixed(2), idleT: +fs.idleT.toFixed(2), wait: +fs.wait.toFixed(2), returning: fs.ret, head: fs.head, item: fs.item, line: fs.line, held: fs.held, reel: fs.reel };
   }
 
   return { K: K, POSES: POSES, ACTS: ACTS, HOLDER: HOLDER, HOLDER_ANGLE: HOLDER_ANGLE, create: create, step: step, start: start, abort: abort,

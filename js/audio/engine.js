@@ -261,6 +261,9 @@ G.audio.engine = (function () {
         for (var i = 0; i < 4; i++) playBuf(pick(KIT.drip), 0.012, panAt(run.boat.x), 0.9 + 0.3 * G.vrng.next(), bus.water, 0.3 + i * 0.22 + 0.1 * G.vrng.next());
         break;
       case 'nibble': playBuf(pick(KIT.tick), 0.018, panAt(run.boat.x), 0.9 + 0.2 * G.vrng.next()); note('nibble'); break;
+      // Phase 34: preparing the lure: fresh bait worked onto the hook, and the hook set in it.
+      case 'bait': playBuf(pick(KIT.tick), 0.012, panAt(run.boat.x), 1.4 + 0.2 * G.vrng.next()); note('bait'); break;
+      case 'hooked': playBuf(pick(KIT.tick), 0.02, panAt(run.boat.x), 1.7); playBuf(pick(KIT.pop), 0.008, panAt(run.boat.x), 2.2, null, 0.05); note('hooked'); break;
     }
   }
 
@@ -559,7 +562,7 @@ G.audio.engine = (function () {
       if (held) { turns = F.mode === 'tired' ? 2.2 : 0.7; load = Math.min(1, 0.4 + F.T); }
     } else if (fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest') {
       if (c.ly < prev.ly - 0.01) { turns = 2.2; load = 0.3 + 0.7 * G.gfx.rope.st.taut; }
-    }
+    } else if (run.fisher && run.fisher.reel > 0) { turns = run.fisher.reel; load = 0.15; } // Phase 34: reeling the hanging lure up
     prev.D = F.D; prev.ly = c.ly;
     set(amb.whirO.frequency, Math.max(20, turns * 26), 0.05);
     set(amb.whirBP.frequency, TR.whir[0], 0.05); amb.whirBP.Q.value = TR.whir[1];
