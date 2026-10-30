@@ -283,6 +283,16 @@ G.core.debug = (function () {
     },
     // dbg.rodLoad(x) forces the load on the rod's tip (0..1); dbg.rodLoad(null) gives it back to the scene.
     rodLoad: function (x) { G.gfx.rod.st.force = (x === null || x === undefined) ? null : +x; return G.gfx.rod.st.force; },
+    // dbg.fisher() returns the fisher (Phase 33): pose, hands (near x, y, far x, y; local px),
+    // holder (the rod in it), act, step, actT, idleT and wait (the director's timer), returning.
+    fisher: function () { return G.scene.fisher.info(G.state.run.fisher); },
+    // dbg.idle(name) starts an idle act ('thermos', 'rest', ...); dbg.idle(null) ends the one playing.
+    idle: function (name) {
+      var fs = G.state.run.fisher;
+      if (name === null || name === undefined) { G.scene.fisher.abort(fs); return true; }
+      if (!G.scene.fisher.start(fs, name)) { console.log('acts: ' + Object.keys(G.scene.fisher.ACTS).join(', ')); return false; }
+      return true;
+    },
     // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
     poke: function (x, s) {
       var b = G.state.run.boat;

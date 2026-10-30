@@ -347,6 +347,7 @@ G.scene.sailing = (function () {
     run.loc = id;
     run.boat = boat.create(loc.start);
     run.dog = dog.create();
+    run.fisher = G.scene.fisher.create(); // Phase 33: his hands, the holder, the idle director
     run.cam = { x: 0, y: 0 };
     run.cam.x = camTarget(run);
     run.uw = { alpha: 0 }; // how far the underwater cross-section has faded in
@@ -585,6 +586,7 @@ G.scene.sailing = (function () {
           out[1] = 0.1 + Math.min(0.15, run.bite.t * 0.2) + 0.3 * (u < 0.08 ? u / 0.08 : Math.exp(-(u - 0.08) * 7));
         }
     }
+    if (run.fisher && run.fisher.angle !== null) out[0] = run.fisher.angle; // Phase 33: in the holder, or raised in an act
     return out;
   }
 
@@ -1318,6 +1320,21 @@ G.scene.sailing = (function () {
     return pv.on && pv.pl && pv.ps.plan.result !== G.sim.passive.EMPTY && pv.t >= pv.ps.plan.wait;
   }
 
+  // ---- The fisher (Phase 33) ---------------------------------------------------
+  // The idle director's context: between casts (stopped, no line, not passive, no anomaly) or
+  // waiting for a bite with nothing interested; any key held or pressed ends an act. The keys
+  // still do what they always do on this step: the director only reads them.
+  var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still'];
+  var fisherIn = { mode: null, input: false };
+  function fisherStep(run, dt) {
+    var inp = G.core.input, any = false;
+    for (var i = 0; i < KEYS_ANY.length; i++) if (inp.held(KEYS_ANY[i]) || inp.pressed(KEYS_ANY[i])) { any = true; break; }
+    var quiet = !run.passive.on && !run.anom.on;
+    fisherIn.mode = quiet && run.fsm === 'sailing' && run.boat.stopped ? 'casts' : (quiet && run.fsm === 'waiting' && run.bite.slot < 0 ? 'wait' : null);
+    fisherIn.input = any;
+    G.scene.fisher.step(run.fisher, dt, fisherIn, G.vrng);
+  }
+
   // ---- Scene -------------------------------------------------------------------
 
   // Resumes at the saved location; coming back from the shop or cabin keeps the run as it was.
@@ -1369,6 +1386,7 @@ G.scene.sailing = (function () {
     boat.motion(b, move, dt, surf.at(boat.bow(b)) / HI, surf.at(boat.stern(b)) / HI);
     if (b.wakeHit) fx.ripple(b.x, loc.waterY + 2, 8, 22, 1.6); // the water lifts the hull: a ring
     G.scene.underwater.swimStep(run, dt); // Phase 27: the swimmers' beat, turns and pitch (the mouth reads them)
+    fisherStep(run, dt); // Phase 33: the idle director and the hands, before the rod reads them
     rodStep(run, dt); // Phase 31: the rod bends under the line before the rope reads its tip
     ropeStep(run, dt); // Phase 21: after everything that moves the rod tip, the lure or the fish
     G.scene.underwater.bodyStep(run, dt, loc); // Phase 22: the lure's heading and flutter
@@ -1448,13 +1466,12 @@ G.scene.sailing = (function () {
 
   function drawDog(c, x, y, flip, wind) { dog.draw(c, G.state.run.dog, x, y, flip, wind); }
 
-  var gearLook = { rod: 0, lantern: false, finder: false, night: 0, sip: false, lineKey: 'fog_light', lineA: 0.6 };
+  var gearLook = { rod: 0, lantern: false, finder: false, night: 0, fisher: null, lineKey: 'fog_light', lineA: 0.6 };
   function drawBoat(c, fisher) {
     var run = G.state.run, g = G.state.save.gear, fsm = run.fsm;
     gearLook.rod = g.rod || 0; gearLook.lantern = !!g.lantern; gearLook.finder = !!g.depthFinder;
     gearLook.night = 1 - greyF(hourNow());
-    // P2-2: between casts, still, the fisher drinks from a thermos now and then.
-    gearLook.sip = run.fsm === 'sailing' && run.boat.stopped && !passiveFighting(run) && (run.boat.t % 34) > 31;
+    gearLook.fisher = run.fisher; // Phase 33: P2-2's thermos is one of his idle acts now
     // Phase 31: the line along the rod in the same colour as the line out (drawCast).
     var fight = fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing';
     gearLook.lineKey = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : run.fight.T) : 'fog_light';

@@ -20,12 +20,11 @@ G.scene.boat = (function () {
 
   // Phase 18: the boat, the fisher and the gear are painted in the 640×360 view's pixels
   // (HI per world pixel) and drawn at 1/HI size, in the same world boxes as before: a wooden
-  // rowboat with lapped planks, a lit gunwale, a rust stripe and an outboard motor; the
-  // fisher in a red cap and a green field jacket, hands on the rod; a lantern on a pole.
+  // rowboat with lapped planks, a lit gunwale, a rust stripe and an outboard motor; a lantern
+  // on a pole. The fisher is js/scene/fisher.js since Phase 33.
   // Each faces right; mirrored copies are made on first use.
   var A = G.gfx.paint, HI = 2;
   var WOOD = ['wood_deep', 'wood_dark', 'wood', 'wood_mid', 'wood_hi'], STONES = ['ink', 'stone_dark', 'stone', 'stone_hi', 'stone_lit'];
-  var COAT = ['ink', 'coat_dark', 'coat', 'coat_hi'], SKIN = ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi'], CAP = ['rust_dark', 'cap', 'rust_hi'];
   var ART = {
     hull: { w: 68, h: 16, paint: function (c) {
       // Per column: the gunwale rises to the bow; the bottom sweeps up to meet it at the bow
@@ -51,23 +50,6 @@ G.scene.boat = (function () {
       A.blob(c, 5, 4, 4.5, 3.8, STONES, { bias: 0.15 }); A.box(c, 'stone_dark', 1, 6, 8, 2);
       A.box(c, 'rust_hi', 2, 3, 5, 1);
       A.slab(c, 4, 8, 3, 6, STONES); A.slab(c, 2, 13, 7, 3, STONES);
-    } },
-    fisher: { w: 20, h: 26, paint: function (c, sip) {
-      // Jacket: shoulders, a back, the arms reaching forward to the rod (or the cup).
-      A.blob(c, 9, 19, 8, 8, COAT, { bias: 0.05 });
-      A.box(c, 'coat_dark', 3, 20, 2, 6);
-      A.limb(c, 12, 15, 16, 19, 2.6, COAT, 0.1);
-      if (!sip) { A.limb(c, 15, 19, 18, 18, 2.2, COAT, 0.1); A.blob(c, 18.5, 18, 1.8, 1.6, SKIN, { bias: 0.1 }); }
-      else { A.limb(c, 14, 18, 15, 13, 2.2, COAT, 0.1); A.blob(c, 15, 12, 1.6, 1.6, SKIN); A.slab(c, 15, 9, 3, 4, STONES); }
-      A.box(c, 'coat_hi', 5, 14, 6, 1);
-      // Head, collar, a stubbled jaw, the cap with its brim forward.
-      A.box(c, 'coat_dark', 6, 13, 8, 2);
-      A.blob(c, 10, 9, 4.5, 4.8, SKIN, { bias: 0.1 });
-      A.box(c, 'skin_shadow', 10, 12, 4, 1); A.px(c, 'skin_shadow', 13, 11);
-      A.px(c, 'ink', 12, 8); A.px(c, 'skin_hi', 13, 9); A.px(c, 'flesh_dark', 7, 9);
-      A.blob(c, 9, 4.5, 5, 3.5, CAP, { bias: 0.1 }); A.box(c, 'rust_dark', 4, 6, 10, 1);
-      A.box(c, 'cap', 12, 5, 5, 2); A.box(c, 'rust_dark', 12, 6, 5, 1);                 // the brim
-      A.box(c, 'stone_dark', 5, 7, 2, 4);                                              // hair at the back
     } },
     lantern: { w: 6, h: 8, paint: function (c) {
       A.box(c, 'stone_dark', 2, 0, 2, 1); A.box(c, 'stone_dark', 1, 1, 4, 1);
@@ -202,11 +184,14 @@ G.scene.boat = (function () {
   // hold it ROD.baseX px ahead of the boat's centre and ROD.baseY px above the waterline.
   var ROD = { len: 22, baseX: 3, baseY: -6 };
 
-  // Writes the hands (the rod's base) into out for a boat centred at cx with waterline wy.
+  // Writes the rod's base into out for a boat centred at cx with waterline wy: the fisher's
+  // near hand, or the holder (Phase 33, G.scene.fisher.rodLocal; ROD.baseX/baseY before).
   // Phase 24: the base rides the hull's shear and the fisher's lean.
+  var rl = [0, 0];
   function rodBase(b, cx, wy, out) {
-    out[0] = cx + b.facing * ROD.baseX - b.facing * b.lean;
-    out[1] = wy + bob(b) + ROD.baseY + shear(b, ROD.baseX);
+    G.scene.fisher.rodLocal(rl);
+    out[0] = cx + b.facing * rl[0] - b.facing * b.lean;
+    out[1] = wy + bob(b) + rl[1] + shear(b, rl[0]);
     return out;
   }
 
@@ -324,8 +309,8 @@ G.scene.boat = (function () {
 
   // sx is the boat centre on screen, wy the waterline. Passengers sit behind the hull's
   // gunwale, so they are drawn first. withFisher false leaves the boat empty, rod and all (P10.2).
-  // gear (optional): {rod: tier, lantern: bool, finder: bool, night: 0..1, sip: bool,
-  // lineKey, lineA: the line's colour and alpha along the rod}.
+  // gear (optional): {rod: tier, lantern: bool, finder: bool, night: 0..1, fisher: his state
+  // (Phase 33), lineKey, lineA: the line's colour and alpha along the rod}.
   // Draws a painted image sheared by the pitch: in 2-view-px columns, each at its own height.
   function putSheared(ctx, b, cv, x, y, sx) {
     var cols = cv.width / 2;
@@ -338,17 +323,8 @@ G.scene.boat = (function () {
   function draw(ctx, b, sx, wy, withFisher, drawDog, gear) {
     var flip = b.facing < 0, y = wy + bob(b), f = b.facing, P = S.PALETTE;
     if (withFisher) {
-      var sip = gear && gear.sip;
-      put(ctx, img('fisher', flip, sip), (flip ? sx - 3 : sx - 6) - f * b.lean, y - 15 + shear(b, -1));
-      if (sip) { // steam from the cup, rising and thinning
-        ctx.fillStyle = P.fog_light;
-        for (var k = 0; k < 4; k++) {
-          var u = (b.t * 0.8 + k / 4) % 1, cx = (flip ? sx - 2.5 : sx + 2.5) - f * b.lean;
-          ctx.globalAlpha = 0.5 * (1 - u);
-          ctx.fillRect(cx + Math.round(Math.sin(u * 6 + k) * 2) / HI, y - 11.5 - Math.round(u * 12) / HI, 1 / HI, 1 / HI);
-        }
-        ctx.globalAlpha = 1;
-      }
+      // Phase 33: the posable fisher (js/scene/fisher.js) and what he holds.
+      if (gear && gear.fisher) G.scene.fisher.draw(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -1), b.t);
     }
     if (drawDog) drawDog(ctx, flip ? sx - 16 : sx + 4, y - 14 + shear(b, 10), flip, Math.abs(b.vx) / P_SPEED);
     // The rod reaches out over the dog in the bow, so it is drawn after him: its bend shows whole.
@@ -375,7 +351,7 @@ G.scene.boat = (function () {
     ctx.drawImage(mcv, 0, 0, mcv.width, 16, mx, my, mcv.width / HI, 8);
     ctx.drawImage(mcv, 0, 16, mcv.width, mcv.height - 16, mx - f * tilt, my + 8, mcv.width / HI, (mcv.height - 16) / HI);
     putSheared(ctx, b, img('hull', flip), sx - 17, y - 6, sx);
-    if (withFisher) drawReel(ctx, b, sx, wy);
+    if (withFisher) { G.scene.fisher.drawHolder(ctx, sx, y, f, b.lean, shear(b, -1)); drawReel(ctx, b, sx, wy); }
     if (gear && gear.finder && (Math.floor(b.t * 1.25) & 1)) {
       ctx.fillStyle = P.neon_teal; ctx.fillRect(sx - f * 10, y - 3.5, 1, 1 / HI);
     }
