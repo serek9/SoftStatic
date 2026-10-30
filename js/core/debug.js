@@ -273,6 +273,16 @@ G.core.debug = (function () {
     // head down positive when swimming its way), frame (fishgen.FR), speed and vy (px/s),
     // len (world px); null when the slot is empty.
     fishBody: function (i) { return G.scene.underwater.fishBody(i === undefined ? 0 : i); },
+    // dbg.rodBody() returns the rod (Phase 31): load 0..1, dir (the line's pull, local: x
+    // forward, y up), tip (world px), bendDeg (butt to tip, negative bends forward and down),
+    // top3 and butt (shares of the bend in the top third and the lower half), tier, taper, ms.
+    rodBody: function () {
+      var R = G.gfx.rod, s = R.st, b = G.state.run.boat, t = G.scene.boat.rodTip(b, b.x, G.scene.sailing.loc().waterY, [0, 0]);
+      return { load: +s.load.toFixed(3), dir: [+s.fx.toFixed(3), +s.fy.toFixed(3)], tip: [+t[0].toFixed(2), +t[1].toFixed(2)], bendDeg: +s.bendDeg.toFixed(1),
+        top3: +s.top3.toFixed(3), butt: +s.butt.toFixed(3), tier: s.tier, taper: s.taper, ms: +s.ms.toFixed(4) };
+    },
+    // dbg.rodLoad(x) forces the load on the rod's tip (0..1); dbg.rodLoad(null) gives it back to the scene.
+    rodLoad: function (x) { G.gfx.rod.st.force = (x === null || x === undefined) ? null : +x; return G.gfx.rod.st.force; },
     // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
     poke: function (x, s) {
       var b = G.state.run.boat;
