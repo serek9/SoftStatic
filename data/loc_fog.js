@@ -47,12 +47,15 @@ G.data.locations.fog = {
     { id: 'ridge', kind: 'mountains', parallax: 0.14, base: 102, amp: 24, color: 'mount_mid', lit: 'mount_lit', dark: 'night_deep', haze: 'fog_dark', featureKey: 'night_deep',
       features: [{ kind: 'tower', x: 120 }, { kind: 'mast', x: 330 }] },
     { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 84, h: 20, color: 'fog_mid', alpha: 0.32, drift: 1.2 },
-    { id: 'trees', kind: 'forest', parallax: 0.3, base: 106, height: 17, gap: [2, 6], mix: { pine: 1 },
+    { id: 'trees', kind: 'forest', parallax: 0.3, base: 106, height: 17, gap: [2, 6], mix: { pine: 0.75, spruce: 0.25 },
       keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' } } },
     { id: 'fog_near', kind: 'fog', parallax: 0.42, y: 97, h: 12, color: 'fog_light', alpha: 0.16, drift: 2.4 },
-    { id: 'woods', kind: 'forest', parallax: 0.5, base: 110, height: 36, gap: [8, 46], mix: { pine: 1 },
+    { id: 'woods', kind: 'forest', parallax: 0.5, base: 110, height: 36, gap: [8, 46], mix: { pine: 0.62, spruce: 0.22, birch: 0.08, dead: 0.08 }, place: 4417,
       keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' }, birch: { bark: 'birch', dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'birch' } } },
-    { id: 'shore', kind: 'bank', parallax: 0.6, height: 4, reeds: 0.8, rockEvery: 38 },
+    // Phase 49: the shore's things, scattered from its own placement seed (place): pads on the
+    // water, fallen trunks, cattail clumps; features stand where the data puts them (layer px).
+    { id: 'shore', kind: 'bank', parallax: 0.6, height: 4, reeds: 0.8, rockEvery: 38, place: 7741, pads: 7, trunks: 2, cattails: 4,
+      features: [{ kind: 'posts', x: 180, n: 5 }, { kind: 'moored', x: 236 }, { kind: 'lodge', x: 560 }, { kind: 'duckbox', x: 700 }] },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
 
@@ -60,6 +63,28 @@ G.data.locations.fog = {
   // the water that drifts over the boat (fog layers drift by their own `drift`, px/s).
   sky: { moonX: 92, glowX: 236 },
   mist: { h: 7, alpha: 0.13, drift: 3 },
+
+  // Life (presentation only, js/scene/life.js). under (Phase 48): how many crayfish, snails,
+  // fry clouds and tadpole clouds, whether a turtle and an eel live here, and what the bake
+  // paints on the bed (mussels, caddis cases, litter, roots, a drowned tree, algae, ribbon and
+  // fern weed per px, lily stems). above (Phase 49): who lives on the water, on the shore and
+  // in the air, each with hours: [[from, to], ...] in game hours (wrapping past midnight), and
+  // where: x [lo, hi] in its own layer's px (p: its parallax, 1 = the boat's distance),
+  // perches {x, y: px above the waterline}, layer: the painted layer it walks on.
+  life: {
+    under: { cray: 7, snail: 8, fry: 5, tad: 2, turtle: true, eel: true, mussel: 10, caddis: false, litter: ['bottle', 'lure', 'bottle'], roots: 2, tree: 1, ribbon: 0.025, fern: 0.02, lily: 5, algae: 0.6 },
+    above: {
+      ducks: { p: 0.9, x: [330, 960], young: 4, hours: [[5, 21]] },
+      heron: { x: [1060, 1170], hours: [[4.5, 10], [16, 22]] },
+      kingfisher: { perches: [{ x: 985, y: 25 }, { x: 331, y: 26 }, { x: 560, y: 25 }], hours: [[6, 18.5]] },
+      loon: { p: 0.85, x: [200, 880], hours: [[0, 24]], call: [[4.5, 6.5], [18, 21.5]] },
+      dragonflies: { n: 5, x: [[20, 200], [1000, 1180]], hours: [[9, 17.5]] },
+      frog: { hours: [[7, 2]] },
+      striders: { n: 6, x: [[20, 180], [1020, 1180]], hours: [[8, 18.5]] },
+      deer: { layer: 'shore', x: [300, 470], hours: [[4.75, 7.5], [17.5, 20.25]] },
+      beaver: { layer: 'shore', hours: [[19, 5]] }
+    }
+  },
 
   // On the water at the boat's distance (parallax 1): x is where the landmark is centred.
   landmarks: [

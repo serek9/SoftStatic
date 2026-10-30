@@ -209,8 +209,8 @@ G.scene.sailing = (function () {
       var tops = A.mountains(ctx, L, w, wy, rng);
       for (var i = 0; i < (L.features || []).length; i++) { var f = L.features[i]; FEATURES[f.kind](ctx, f.x, tops[f.x], L.featureKey || L.color, L.lit); }
     },
-    forest: function (ctx, L, w, wy, rng) { A.forest(ctx, L, w, wy, rng); },
-    bank: function (ctx, L, w, wy, rng) { A.shore(ctx, L, w, wy, rng); },
+    forest: function (ctx, L, w, wy, rng) { return A.forest(ctx, L, w, wy, rng); },
+    bank: function (ctx, L, w, wy, rng) { return A.shore(ctx, L, w, wy, rng); },
     // Fog (Phase 18): three soft bands, one inside the other, each with a slowly wandering top
     // and bottom edge, filled flat at its own alpha, so the fog reads as banks of mist.
     fog: function (ctx, L, w, wy, rng) {
@@ -289,12 +289,19 @@ G.scene.sailing = (function () {
   //   reflect(c, run, loc): inside the mirror pass only, after the anomaly deltas
   //   debugLine(run): the module's overlay line
   var NO_SCENERY = {}, scen = NO_SCENERY;
+  // Phase 49: what each layer's painter says it painted (kinds of tree, the shore's things),
+  // by the layer's cache key; kept like boundsByLoc, since a cached layer is not painted again.
+  var paintedKinds = {}, bakeMs = {};
 
   function bakeLayer(L, i) {
     var w = (VIEW_W + Math.ceil((loc.width - VIEW_W) * L.parallax)) * HI, wy = loc.waterY * HI;
-    var rng = new G.core.rng.Rng(loc.seed * 31 + i), paint = (scen.paint && scen.paint[L.kind]) || PAINT[L.kind];
+    // Phase 49: a layer with its own placement seed (L.place) scatters its things from it.
+    var rng = new G.core.rng.Rng(L.place || loc.seed * 31 + i), paint = (scen.paint && scen.paint[L.kind]) || PAINT[L.kind];
     var key = 'loc:' + loc.id + ':' + L.id, fog = L.kind === 'fog', cv = B.cached(key, function () {
-      return B.layer(w, wy, function (ctx) { A.reset(); paint(ctx, scaleL(L), w, wy, rng); A.reset(); });
+      var t0 = performance.now();
+      var c = B.layer(w, wy, function (ctx) { A.reset(); var k = paint(ctx, scaleL(L), w, wy, rng); if (k && k.length) paintedKinds[key] = k; A.reset(); });
+      bakeMs[key] = performance.now() - t0;
+      return c;
     });
     // Phase 15: the light of the hour. Each painted layer is also baked graded for night
     // (cooler and darker) and for the grey hours (flatter), and drawn over itself by the
@@ -1585,6 +1592,7 @@ G.scene.sailing = (function () {
     drawSky(c);
     for (var i = 0; i < layers.length; i++) {
       var L = layers[i], oxN = Math.round(camPx * L.p * HI), vw = VIEW_W * HI, wh = wy * HI;
+      if (L.p === 1) G.scene.life.drawFar(c, camPx, wy - camPy); // Phase 49: the birds further out than the boat, before the landmarks
       if (L.fog) {
         c.globalAlpha = fa;
         drawWrapped(c, L.cv, L.w, camPx * L.p + run.boat.t * L.drift, -camPy, wy);
@@ -1596,6 +1604,7 @@ G.scene.sailing = (function () {
         c.globalAlpha = 1;
       }
       if (scen.afterLayer) scen.afterLayer(c, L.id, oxN / HI, camPy, run, loc);
+      G.scene.life.afterLayer(c, L.id, oxN / HI, wy - camPy); // Phase 49: what lives on this layer
     }
     var nf = nightF(hourNow());
     bats(c, nf);
@@ -1619,7 +1628,7 @@ G.scene.sailing = (function () {
   }
 
   // The mirror pass (gfx/water.js): the scene above the waterline, mirrored.
-  function drawAbove(c) { drawBackdrop(c); drawBoat(c, mirrorFisher()); drawMist(c); }
+  function drawAbove(c) { G.scene.life.mirror(true); drawBackdrop(c); G.scene.life.mirror(false); drawBoat(c, mirrorFisher()); drawMist(c); }
 
   // The waterline between the mirror and the cross-section (Phase 20), one column per view
   // pixel from the surface's heights (gfx/surface.js). The surface sits `lift` px above the
@@ -1746,6 +1755,7 @@ G.scene.sailing = (function () {
     drawWaterline(ctx, wy - camPy + band, cols, wl, band === 0 ? a : 0);
     ctx.drawImage(glint, camPx * HI, 0, VIEW_W * HI, 1, 0, wy - camPy, VIEW_W, 1 / HI);
     drawPosts(ctx, wy - camPy);
+    G.scene.life.drawSurface(ctx, camPx, camPy); // Phase 49: lily pads, the frog, the striders
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
     if (band === 0) { // Phase 20: the hull sits in the water; the surface washes over its bottom
@@ -1784,6 +1794,12 @@ G.scene.sailing = (function () {
     dangle: function () { return { on: dg.on, th: +dg.th.toFixed(3), om: +dg.om.toFixed(3), len: +dg.len.toFixed(2), off: [+dg.ox.toFixed(2), +dg.oy.toFixed(2)] }; }, // dbg.dangle (Phase 34)
     scenery: function () { return scen === NO_SCENERY ? null : scen; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },
+    // dbg.shore() (Phase 49): for each layer of this water, the kinds its painter painted and its bake's ms (on its first bake).
+    painted: function () {
+      var o = {};
+      for (var i = 0; i < loc.layers.length; i++) { var k = 'loc:' + loc.id + ':' + loc.layers[i].id; o[loc.layers[i].id] = { kinds: paintedKinds[k] || [], ms: bakeMs[k] === undefined ? null : +bakeMs[k].toFixed(1) }; }
+      return o;
+    },
     skyLum: function () { return skyLum; }
   };
 })();

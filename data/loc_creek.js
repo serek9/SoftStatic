@@ -20,18 +20,32 @@ G.data.locations.creek = {
   layers: [
     { id: 'hills', kind: 'mountains', parallax: 0.1, base: 92, amp: 30, color: 'mount_mid', lit: 'mount_lit', dark: 'night_deep', haze: 'fog_dark' },
     { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 88, h: 14, color: 'fog_mid', alpha: 0.22, drift: 0.8 },
-    { id: 'forest', kind: 'forest', parallax: 0.35, base: 104, height: 26, gap: [2, 7], mix: { pine: 0.6, round: 0.25, birch: 0.15 },
+    { id: 'forest', kind: 'forest', parallax: 0.35, base: 104, height: 26, gap: [2, 7], mix: { pine: 0.5, round: 0.22, birch: 0.15, spruce: 0.08, dead: 0.05 },
       keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' }, round: { dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'wood_dark' }, birch: { bark: 'birch', dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'birch' } } },
     { id: 'trunks', kind: 'trunks', parallax: 0.55, color: 'night_ink', crown: 'moss_dark', top: 18, gap: [26, 70] },
     { id: 'fog_near', kind: 'fog', parallax: 0.6, y: 100, h: 10, color: 'fog_light', alpha: 0.12, drift: 1.6 },
-    { id: 'bank', kind: 'bank', parallax: 0.7, height: 5, reeds: 1, rockEvery: 30, reedH: 14 },
+    // Phase 49: the bank's things (see loc_fog.js): fallen trunks reaching into the water, the beaver's lodge, an old dock's posts.
+    { id: 'bank', kind: 'bank', parallax: 0.7, height: 5, reeds: 1, rockEvery: 30, reedH: 14, place: 5521, trunks: 4, cattails: 3,
+      features: [{ kind: 'lodge', x: 640 }, { kind: 'posts', x: 300, n: 3 }] },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
 
   // Presentation only (see loc_fog.js).
   sky: { moonX: 150, glowX: 60 },
   mist: { h: 5, alpha: 0.09, drift: 2 },
-  life: { fireflies: 16 },
+  // Life (see loc_fog.js). Fireflies along the bank at night (audit P2-1).
+  life: {
+    fireflies: 16,
+    under: { cray: 9, snail: 4, fry: 4, tad: 2, turtle: false, eel: true, mussel: 6, caddis: true, litter: ['bottle', 'lure'], roots: 5, tree: 0, ribbon: 0.03, fern: 0.008, lily: 0, algae: 0.5 },
+    above: {
+      ducks: { p: 0.9, x: [200, 1100], young: 3, hours: [[5.5, 20.5]] },
+      heron: { x: [1120, 1230], hours: [[4.5, 10.5], [15.5, 21.5]] },
+      kingfisher: { perches: [{ x: 250, y: 31 }, { x: 720, y: 28 }], hours: [[6, 19]] },
+      dragonflies: { n: 6, x: [[30, 300], [1000, 1270]], hours: [[9.5, 17]] },
+      deer: { layer: 'bank', x: [180, 330], hours: [[5, 7.75], [17.25, 20]] },
+      beaver: { layer: 'bank', hours: [[18.5, 5.5]] }
+    }
+  },
 
   // cabin: on stilts at the water's edge, roof sagging. snag: dead branches out of the water;
   // the same branches reach down to the bottom in the cross-section (underwater.snags).

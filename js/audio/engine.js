@@ -298,6 +298,25 @@ G.audio.engine = (function () {
       // Phase 39: the bait shop: a footstep on the boards; the third board from the door hums.
       case 'step': playBuf(pick(KIT.knock), 0.007, 0, 1.5 + 0.2 * G.vrng.next()); note('step'); break;
       case 'creak': tone('sine', 96, 88, 0.7, 0.02, 0); tone('sine', 192, 180, 0.5, 0.008, 0, 0.05); note('creak'); break;
+      // Phase 49: the life above the water. Small splashes: a heron's strike, a bird going
+      // under, a frog plopping in, a beaver's tail slap (the loudest, still under a lure's).
+      case 'strike': waterSplash(0.12, x, 'strike'); break;
+      case 'dive': waterSplash(0.08, x, 'dive'); break;
+      case 'plop': waterSplash(0.05, x, 'plop'); break;
+      case 'slap': waterSplash(0.2, x, 'slap'); break;
+      // The loon's wail across the water: a slow rise, a long held note and a fall, every part
+      // with a soft attack, and the far shore giving it back fainter two seconds later.
+      case 'loon':
+        s = spotAt(x);
+        for (var e = 0; e < 2; e++) {
+          var g = (e ? 0.3 : 1) * 0.024 * (0.4 + 0.6 * s.att), pn = e ? -s.pan * 0.6 : s.pan, at = e * 2.2;
+          tone('sine', 520, 770, 0.8, g, pn, at, bus.water, 0.25);
+          tone('sine', 770, 790, 1.4, g, pn, at + 0.65, bus.water, 0.2);
+          tone('sine', 790, 590, 1.0, g * 0.8, pn, at + 1.9, bus.water, 0.2);
+          tone('sine', 1540, 1580, 1.4, g * 0.12, pn, at + 0.65, bus.water, 0.3);
+        }
+        note('loon');
+        break;
     }
   }
 

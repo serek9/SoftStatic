@@ -291,6 +291,17 @@ G.core.debug = (function () {
     // dbg.lifeSpawn('turtle' | 'eel' | 'dart') brings a visitor now.
     life: function () { return G.scene.life.state(); },
     lifeSpawn: function (kind) { return G.scene.life.spawn(kind); },
+    // dbg.lifeAbove() returns the life above the water (Phase 49): each creature of this water's
+    // table with its alpha, place, px from the boat on screen and what it is doing; the liminal
+    // touches (lim 0..1, ducks facing the boat, the heron standing still, the deer's missing
+    // reflection) and how often each act has happened. dbg.lifeShowing() lists who is seen now.
+    // dbg.lifeSpawn also takes 'ducks', 'heron', 'kingfisher', 'loon', 'frog', 'deer', 'beaver',
+    // 'fox' (out now, in their hours) and 'strike', 'duckdive', 'loondive', 'kingdive', 'call' (the loon's).
+    lifeAbove: function () { return G.scene.life.above(); },
+    lifeShowing: function () { return G.scene.life.showing(); },
+    // dbg.shore() returns, for each layer of this water, the kinds its painter painted (trees,
+    // the shore's things) and the ms its first bake took (Phase 49).
+    shore: function () { return G.scene.sailing.painted(); },
     // dbg.rodBody() returns the rod (Phase 31): load 0..1, dir (the line's pull, local: x
     // forward, y up), tip (world px), bendDeg (butt to tip, negative bends forward and down),
     // top3 and butt (shares of the bend in the top third and the lower half), tier, taper, ms.

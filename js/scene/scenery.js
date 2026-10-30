@@ -225,6 +225,33 @@ G.scene.scenery = (function () {
     return moverCv[kind] || (moverCv[kind] = G.gfx.bake.layer(m.w, m.h, function (c) { A.reset(); m.paint(c); A.reset(); }));
   }
 
+  // Phase 49: the floor's things, standing on the floor's top at fy (layer px).
+  var ROOM_THINGS = {
+    pot: function (c, x, fy) {
+      for (var r = 0; r < 8; r++) A.box(c, r < 1 ? 'rust_hi' : (r < 5 ? 'rust' : 'rust_dark'), x - 5 + (r >> 2), fy - 8 + r, 10 - (r >> 2) * 2, 1);
+      for (var k = 0; k < 7; k++) {
+        var d = k - 3, len = 8 + (3 - Math.abs(d)) * 3;
+        for (var s = 0; s < len; s++) A.px(c, s > len * 0.6 ? 'moss' : 'moss_dark', x + Math.round(d * s * 0.45), fy - 9 - Math.round(s * (1 - Math.abs(d) * 0.12)) + Math.round(s * s * Math.abs(d) * 0.012));
+      }
+    },
+    chair: function (c, x, fy) {
+      A.slab(c, x - 5, fy - 22, 2, 22, WOOD); A.slab(c, x + 4, fy - 10, 2, 10, WOOD);
+      A.slab(c, x - 5, fy - 11, 11, 2, WOOD);
+      for (var y = 0; y < 3; y++) A.box(c, 'wood_dark', x - 4, fy - 20 + y * 3, 1, 1);
+      A.box(c, 'wood_mid', x - 5, fy - 22, 2, 1);
+    },
+    table: function (c, x, fy) {
+      A.slab(c, x - 7, fy - 13, 14, 2, WOOD); A.slab(c, x - 6, fy - 11, 2, 11, WOOD); A.slab(c, x + 4, fy - 11, 2, 11, WOOD);
+      A.box(c, 'stone_dark', x - 1, fy - 20, 2, 7); A.box(c, 'stone_dark', x - 3, fy - 14, 6, 1);
+      for (var r = 0; r < 6; r++) A.box(c, r < 1 ? 'dusk_rose' : 'blood', x - 3 - (r >> 1), fy - 26 + r, 6 + (r >> 1) * 2, 1);
+    },
+    door: function (c, x, fy) {
+      A.box(c, 'ink', x - 8, fy - 40, 16, 40);
+      A.box(c, 'bone', x - 10, fy - 42, 2, 42); A.box(c, 'bone', x + 8, fy - 42, 2, 42); A.box(c, 'bone', x - 10, fy - 42, 20, 2);
+      A.box(c, 'stone', x + 9, fy - 41, 1, 41); A.box(c, 'stone', x - 9, fy - 41, 18, 1);
+    }
+  };
+
   var red = {
     paint: {
       // Heavy curtains where the mist would be: deep folds to a wavy hem, with gaps.
@@ -241,12 +268,18 @@ G.scene.scenery = (function () {
           x0 += pw + rng.int(L.gap[0], L.gap[1]);
         }
       },
-      // The zigzag floor for a shore: black and bone chevrons.
+      // The zigzag floor for a shore: black and bone chevrons. Phase 49: things stand on it at
+      // the water's edge (L.features, layer px): a potted fern, a straight chair, a side table
+      // with an unlit lamp, a door frame standing alone and opening on nothing. Returns the
+      // kinds it painted.
       zigzag: function (ctx, L, w, wy) {
         A.area(ctx, 0, wy - L.height, w, L.height, function (x, y) {
           var r = y - (wy - L.height), shift = Math.abs((r % 12) - 6);
           return (((x + shift) / 6) | 0) & 1 ? L.color : L.alt;
         });
+        var kinds = ['floor'], f = L.features || [], fy = wy - L.height;
+        for (var i = 0; i < f.length; i++) if (ROOM_THINGS[f[i].kind]) { ROOM_THINGS[f[i].kind](ctx, f[i].x, fy); if (kinds.indexOf(f[i].kind) < 0) kinds.push(f[i].kind); }
+        return kinds;
       }
     },
 
