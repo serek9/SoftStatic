@@ -65,10 +65,14 @@ G.core.input = (function () {
     return !!((M && M.current()) || sc === 'shop' || sc === 'cabin');
   }
 
+  // A tap on one of the catch card's keys chooses it and presses the action (Phase 46).
+  function cardTap(gx, gy) { var c = G.ui && G.ui.card; return !!(c && c.tap(gx, gy)); }
+
   // Which action a touch at game pixel (gx, gy) presses.
   function zone(gx, gy) {
     var b = hit(gx, gy);
     if (b) return b;
+    if (cardTap(gx, gy)) return 'action';
     if (gx < 128) return 'left';
     if (gx >= 512) return 'right';
     if (inMenu()) { if (gy < 108) return 'up'; if (gy >= 252) return 'down'; }
@@ -96,7 +100,7 @@ G.core.input = (function () {
     canvas.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
       gamePt(canvas, e.clientX, e.clientY, pt);
-      press('mouse0', (mouseNear || touched) && hit(pt[0], pt[1]) || 'action'); // a shown button, else the cast
+      press('mouse0', (mouseNear || touched) && hit(pt[0], pt[1]) || (cardTap(pt[0], pt[1]), 'action')); // a shown button, else the cast (or the card's key)
     });
     canvas.addEventListener('mousemove', function (e) { gamePt(canvas, e.clientX, e.clientY, pt); mouseNear = pt[1] >= 300 && pt[0] >= 440; });
     canvas.style.touchAction = 'none';

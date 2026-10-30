@@ -61,9 +61,11 @@ G.ui.menu = (function () {
 
   // ---- Pause menu ------------------------------------------------------------------------
 
+  // TODO(P47.3): 'Fisher & dog' goes between Dog barks and Export save.
   var ITEMS = ['Resume', 'Volume', 'Sound', 'Dog barks', 'Export save', 'Import save'];
-  var PX = 70, PY = 34, PW = 180, PH = 112;
-  var sel = 0, msg = '', msgKey = 'fog_light', dirty = false, lastExport = '';
+  // Phase 46: the panel's bounds (at the right edge), where the values and the message sit.
+  var PRECT = G.ui.panel.place(176, 136, 'right', [0, 0, 176, 136]), VAL_X = 110, MSG_Y = 94;
+  var sel = 0, msg = '', msgLines = [], msgKey = 'fog_light', dirty = false, lastExport = '';
 
   // Volume as tenths so the shown bar and the stored value always agree.
   function volume(d) {
@@ -72,7 +74,7 @@ G.ui.menu = (function () {
     dirty = true;
   }
 
-  function say(s, key) { msg = s; msgKey = key || 'fog_light'; }
+  function say(s, key) { msg = s; msgLines = s ? S.fine.wrap(s, PRECT[2] - 2 * G.ui.panel.PAD) : []; msgKey = key || 'fog_light'; }
 
   // Saves first (so lastSeen and the RNG are current), then copies the string. Without
   // clipboard access the browser's own prompt shows it for copying.
@@ -116,7 +118,7 @@ G.ui.menu = (function () {
   }
 
   var pause = {
-    open: function () { sel = 0; msg = ''; dirty = false; },
+    open: function () { sel = 0; say(''); dirty = false; },
     update: function () {
       var inp = G.core.input, st = G.state.save.settings;
       if (inp.pressed('pause') || inp.pressed('back')) { pause.close(); return false; }
@@ -137,40 +139,38 @@ G.ui.menu = (function () {
     },
     // The audio engine (js/audio/engine.js) reads save.settings.volume and mute every step.
     close: function () { if (dirty) G.core.save.autosave('settings'); dirty = false; },
-    // Phase 18: drawn in the 640×360 view's pixels: a wooden board with the choices.
+    // Phase 46: a narrow list in the small panel (G.ui.panel) at the right edge, over the
+    // world (nothing dimmed): the choices, the volume as ten ticks, a word from export or
+    // import, and the keys.
     draw: function (ctx) {
-      var st = G.state.save.settings, F = S.fine, X = 180, Y = 60, W = 280, H = 240, i;
-      dim(ctx, 0.6);
-      ctx.fillStyle = P.ink; ctx.fillRect(X - 3, Y - 3, W + 6, H + 6);
-      ctx.fillStyle = P.wood_mid; ctx.fillRect(X - 2, Y - 2, W + 4, H + 4);
-      ctx.fillStyle = P.wood_dark; ctx.fillRect(X, Y, W, H);
-      ctx.fillStyle = P.wood_deep; ctx.fillRect(X + 6, Y + 6, W - 12, H - 12);
-      F.bold(ctx, 'PAUSED', X + (W >> 1) - (F.measureBold('PAUSED') >> 1), Y + 16, 'bone');
+      var U = G.ui.panel, st = G.state.save.settings, F = S.fine, X = PRECT[0], Y = PRECT[1], W = PRECT[2], i, x;
+      U.frame(ctx, X, Y, W, PRECT[3], 'PAUSED');
       for (i = 0; i < ITEMS.length; i++) {
-        var y = Y + 46 + i * 24, on = i === sel, key = on ? 'signal_amber' : 'fog_light';
-        if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(X + 16, y - 5, W - 32, 19); F.bold(ctx, '>', X + 24, y, key); }
-        F.bold(ctx, ITEMS[i], X + 38, y, key);
+        var y = U.top(Y) + i * U.ROW, on = i === sel, key = on ? 'signal_amber' : 'fog_light';
+        if (on) U.row(ctx, X + 3, y, W - 6);
+        F.drawText(ctx, ITEMS[i], U.left(X) + 3, y, key);
         if (ITEMS[i] === 'Volume') {
           for (var k = 0; k < 10; k++) {
-            ctx.fillStyle = P[k < Math.round(st.volume * 10) && !st.mute ? (on ? 'signal_amber' : 'fog_light') : 'fog_dark'];
-            ctx.fillRect(X + 140 + k * 11, y + 1, 8, 7);
+            ctx.fillStyle = P[k < Math.round(st.volume * 10) && !st.mute ? key : 'fog_dark'];
+            ctx.fillRect(X + VAL_X + k * 5, y + 1, 3, 6);
           }
-        } else if (ITEMS[i] === 'Sound') F.bold(ctx, st.mute ? 'off' : 'on', X + 140, y, key);
-        else if (ITEMS[i] === 'Dog barks') F.bold(ctx, st.dogBark === false ? 'off' : 'on', X + 140, y, key);
+        } else if (ITEMS[i] === 'Sound') F.drawText(ctx, st.mute ? 'off' : 'on', X + VAL_X, y, key);
+        else if (ITEMS[i] === 'Dog barks') F.drawText(ctx, st.dogBark === false ? 'off' : 'on', X + VAL_X, y, key);
       }
-      if (msg) F.drawText(ctx, msg, X + (W >> 1) - (F.measure(msg) >> 1), Y + H - 44, msgKey);
-      F.drawText(ctx, PAUSE_HINT, X + (W >> 1) - (F.measure(PAUSE_HINT) >> 1), Y + H - 24, 'fog_mid');
+      for (i = 0; i < msgLines.length && i < 2; i++) F.drawText(ctx, msgLines[i], U.left(X), Y + MSG_Y + i * U.ROW, msgKey);
+      x = U.left(X);
+      x += U.hint(ctx, 'W/S', 'choose', x, Y + PRECT[3] - U.PAD - U.KEY_H);
+      U.hint(ctx, 'A/D', 'change', x, Y + PRECT[3] - U.PAD - U.KEY_H);
     }
   };
   pause.native = true;
-  var PAUSE_HINT = 'W/S choose   A/D change';
 
   return {
     open: open, update: update, draw: draw, mapAllowed: mapAllowed,
     isOpen: function () { return cur !== null; },
     native: function () { return !!(cur && cur.native); },
     current: function () { return curName; },
-    exportSave: exportSave, importSave: importSave,
+    exportSave: exportSave, importSave: importSave, rect: function () { return PRECT; },
     lastExport: function () { return lastExport; },
     message: function () { return msg; },
     dim: dim, panel: panel, centre: centre, axis: axis
