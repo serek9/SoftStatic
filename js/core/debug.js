@@ -283,6 +283,29 @@ G.core.debug = (function () {
     },
     // dbg.rodLoad(x) forces the load on the rod's tip (0..1); dbg.rodLoad(null) gives it back to the scene.
     rodLoad: function (x) { G.gfx.rod.st.force = (x === null || x === undefined) ? null : +x; return G.gfx.rod.st.force; },
+    // dbg.fisher() returns the fisher (Phase 33): pose, hands (near x, y, far x, y; local px),
+    // holder (the rod in it), act, step, actT, idleT and wait (the director's timer), returning;
+    // Phase 35: can (on the gunwale), sips, beerRest, night and drink (what he would drink now).
+    fisher: function () {
+      var fs = G.state.run.fisher, o = G.scene.fisher.info(fs), night = G.scene.sailing.night();
+      o.night = night; o.drink = G.scene.fisher.drink(fs, night); // Phase 35: what he would drink now
+      return o;
+    },
+    // dbg.shop() returns the bait shop's walk (Phase 36): the tile (c, r), facing, moving, steps,
+    // the dog (c, r, sitting), the mode ('room' or 'panel') and what he faces.
+    shop: function () { return G.ui.shop.info(); },
+    // dbg.shopWalk('RRRUU') walks him through the shop a tile per letter (U, D, L, R), by the walk's rules.
+    shopWalk: function (path) { return G.core.state.sceneName() === 'shop' ? G.ui.shop.walkPath(path || '') : 'not in the shop'; },
+    // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
+    // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
+    dangle: function () { return G.scene.sailing.dangle(); },
+    // dbg.idle(name) starts an idle act ('thermos', 'rest', ...); dbg.idle(null) ends the one playing.
+    idle: function (name) {
+      var fs = G.state.run.fisher;
+      if (name === null || name === undefined) { G.scene.fisher.abort(fs); return true; }
+      if (!G.scene.fisher.start(fs, name)) { console.log('acts: ' + Object.keys(G.scene.fisher.ACTS).join(', ')); return false; }
+      return true;
+    },
     // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
     poke: function (x, s) {
       var b = G.state.run.boat;
@@ -309,7 +332,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
-      pages.push('swim', 'sprites', 'baits', 'fx');
+      pages.push('swim', 'sprites', 'baits', 'fx', 'shop');
       page = 0; t = 0;
     }
 
@@ -406,6 +429,20 @@ G.core.debug = (function () {
           ctx.drawImage(cyc < 4 ? FG.partSwimmer(base, '', FG.BEAT[cyc], false, false) : FG.partSwimmer(base, '', TURN[cyc - 4], false, cyc >= 6), 528, y1);
           if (bb === 0) for (fi = 0; fi < 7; fi++) F.drawText(ctx, FRN[fi], 64 + fi * 64, 344, 'fog_mid');
         }
+      } else if (name === 'shop') {
+        // Phase 40: the bait shop's room as baked, and its sprites: the fisher and the dog in
+        // each facing and frame, Rusty's frames (down, side, his back).
+        var SR = G.ui.shopRoom, DS = ['down', 'up', 'right', 'left'];
+        ctx.drawImage(SR.bake(), 8, 40);
+        F.drawText(ctx, 'room (baked)', 8, 26, 'fog_mid');
+        F.drawText(ctx, 'fisher', 404, 26, 'fog_mid'); F.drawText(ctx, 'dog', 516, 26, 'fog_mid');
+        for (var di = 0; di < 4; di++) for (var fr2 = 0; fr2 < 3; fr2++) {
+          ctx.drawImage(SR.sprite('fisher', DS[di], fr2), 404 + fr2 * 34, 40 + di * 34);
+          ctx.drawImage(SR.sprite('dog', DS[di], [0, 1, 3][fr2]), 516 + fr2 * 34, 40 + di * 34);
+        }
+        F.drawText(ctx, 'rusty', 404, 186, 'fog_mid');
+        for (fr2 = 0; fr2 < 4; fr2++) { ctx.drawImage(SR.sprite('rusty', 'down', fr2), 404 + fr2 * 34, 200); ctx.drawImage(SR.sprite('rusty', 'right', fr2), 404 + fr2 * 34, 236); }
+        ctx.drawImage(SR.sprite('rusty', 'up', 0), 540, 200);
       } else if (name === 'baits') {
         // Phase 22: each bait's body in every heading (both flutter phases), drawn ×3 on water.
         var UWm = G.scene.underwater, ids = ['worm', 'cricket', 'minnow', 'unlabelled'];

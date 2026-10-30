@@ -1,7 +1,7 @@
 # SoftStatic: The Rod and the Fisher, Phases 31–35
 
 **Date:** 2026-10-30. **Repo state:** Phases 1–30 done (PLAN.md §8.1), `main` at `bef55c8`.
-**Status:** Asked for by the user on 2026-10-30 ("make a plan to improve the realism on the rod bend (like an actual fishing rod) and make animations of preparing the lure and opening a beer when nothing happens or he is waiting. start with the first phase"). Phase 31 is done (PLAN.md §8.1, 8.3 #153–157); Phases 32–35 wait for the user.
+**Status:** Asked for by the user on 2026-10-30 ("make a plan to improve the realism on the rod bend (like an actual fishing rod) and make animations of preparing the lure and opening a beer when nothing happens or he is waiting. start with the first phase"). Phase 31 is done (PLAN.md §8.1, 8.3 #153–157), and 31b fixed it after the user saw it bend both ways under tension (8.3 #158–164): a stable solver with inertia (32.1 done there), the line's stretch, the load only through a tight line, the waiting line's belly and the bite's tugs, and `node tools/balance.js --rod`. Phases 32–35 are done (8.3 #165–187): the plan is complete. The user asked on 2026-10-30 for the rest in turn, then a bait-shop plan.
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like PLAN_REALISM.md and PLAN_FISHSWIM.md, this file adds phases after the approved spec and does not edit §0–§7 or Appendix V.
 
 The user asked for two things:
@@ -64,14 +64,14 @@ Presentation only.
 
 | ID | Task | Files | Done when |
 |---|---|---|---|
-| 32.1 | **Inertia.** Each joint is a damped spring around the shape 31.1 solves, lighter toward the tip, so the rod overshoots and settles. The hook-set and head shakes become impulses on it instead of added bend. | js/gfx/rod.js, js/scene/sailing.js | After a load drops from 1 to 0 the tip overshoots, changes sign at least twice and is within 5% of rest in 0.4–0.8 s. |
+| 32.1 | **Inertia.** *(Done in 31b: PLAN.md 8.3 #159.)* Each joint is a damped spring around the shape 31.1 solves, lighter toward the tip, so the rod overshoots and settles. The hook-set and head shakes become impulses on it instead of added bend. | js/gfx/rod.js, js/scene/sailing.js | After a load drops from 1 to 0 the tip overshoots, changes sign at least twice and is within 5% of rest in 0.4–0.8 s. |
 | 32.2 | **The cast loads the rod.** The hands' angular acceleration is an inertial load on the blank: as the rod is swung back the tip lags, and on the flick it loads backward, then whips forward past the line and rebounds. The scripted ±3 bend goes. The lure leaves from the tip as it whips. | js/gfx/rod.js, js/scene/sailing.js | During the flick the tip trails the straight rod by at least 3 world px, then overshoots it; the lure's flight still starts at the drawn tip and lands on the marker. |
 | 32.3 | **The bite through the tip.** A bite pulls the tip down in nods at the fish's rhythm (the whole rod tilts at most 2°); nibbles tick it. | js/scene/sailing.js | The tip moves at least 2 world px on a bite (the P1-4 cue), with the hands' angle changing by 2° at most. |
 | 32.4 | **The reel.** The reel's handle turns while reeling, at the reel's speed; the bail opens on the cast and closes when the lure lands. | js/scene/boat.js | The handle's frame changes only while the action key is held with a line out. |
 
 ## Phase 33: The fisher's hands
 
-Presentation only.
+Presentation only. *Built in a new file, `js/scene/fisher.js` (`G.scene.fisher`), instead of boat.js and sailing.js: the figure, its poses and the director belong together (8.3 #172).*
 
 | ID | Task | Files | Done when |
 |---|---|---|---|

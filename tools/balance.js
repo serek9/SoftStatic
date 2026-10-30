@@ -8,6 +8,7 @@
 //   node tools/balance.js --passive               passive income against active (V7: 60% ±5%),
 //                                                 and time away fished twice gives the same result
 //   node tools/balance.js --fight                 how fights end by player and gear tier (Phase 23)
+//   node tools/balance.js --rod                   the rod's bend: shapes, action, springing (PLAN_ROD.md)
 // It loads the same files index.html loads, in the same order, into a vm context.
 'use strict';
 const vm = require('vm'), fs = require('fs'), path = require('path');
@@ -486,6 +487,135 @@ function fightCheck() {
   return ok ? 0 : 1;
 }
 
+// ---- --rod ----------------------------------------------------------------------------------
+// The rod as a tapered blank (js/gfx/rod.js, Phase 31 and its fix): settled shapes over every
+// tier, load, angle of the hands and direction of the line (it never bends against the line,
+// never into an S, never turns its tip past the line, always settles), the action and power of
+// the tiers, how closely the tip follows a tight line, and how it springs when a load comes or
+// goes (one smooth curve while it moves, an overshoot, settled in under a second).
+
+function rodCheck() {
+  const ctx = vm.createContext({});
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/gfx/rod.js'), 'utf8'), ctx, { filename: 'js/gfx/rod.js' });
+  const R = ctx.G.gfx.rod, N = R.N, D2R = Math.PI / 180, L = R.K.len, TIERS = R.K.taper.length;
+  const dirOf = deg => [Math.cos(deg * D2R), Math.sin(deg * D2R)];      // world direction, degrees below the facing
+  const step = (a, load, deg, tier) => { const d = dirOf(deg); R.solve(a, load, d[0], d[1], 1, tier, DT); };
+  const settle = (a, load, deg, tier, n) => { for (let i = 0; i < (n || 600); i++) step(a, load, deg, tier); };
+  const tipDeg = () => -Math.atan2(R.jy[N] - R.jy[N - 1], R.jx[N] - R.jx[N - 1]) / D2R; // degrees below the facing
+  const sShape = () => { let pos = 0, neg = 0; for (let i = 0; i < N; i++) { const v = R.d[i] / D2R; if (v > 0.5) pos++; if (v < -0.5) neg++; } return pos > 0 && neg > 0; };
+  const fresh = () => R.reset();
+  const checks = [];
+  const add = (what, pass, got) => checks.push([what, pass, got]);
+
+  // Unloaded, straight.
+  let dev = 0;
+  for (let t = 0; t < TIERS; t++) { fresh(); settle(40, 0, 90, t, 60); for (let i = 0; i <= N; i++) { const s = i * R.SEG; dev = Math.max(dev, Math.hypot(R.jx[i] - Math.cos(40 * D2R) * s, R.jy[i] - Math.sin(40 * D2R) * s)); } }
+  add('unloaded, every joint on the straight rod (< 0.5 px)', dev < 0.5, dev.toFixed(3) + ' px');
+
+  // The sweep of settled shapes.
+  let shapes = 0, against = 0, s = 0, past = 0, unsettled = 0, worstPast = 0;
+  for (let t = 0; t < TIERS; t++) for (const a of [20, 40, 58, 70, 90]) for (const deg of [-20, 0, 30, 50, 70, 89, 120]) for (const load of [0.05, 0.2, 0.4, 0.6, 0.8, 1, 1.3]) {
+    fresh(); settle(a, load, deg, t);
+    shapes++;
+    const x0 = R.jx[N], y0 = R.jy[N]; step(a, load, deg, t);
+    if (Math.hypot(R.jx[N] - x0, R.jy[N] - y0) > 0.01) unsettled++;
+    const want = Math.sign(-Math.sin((a + deg) * D2R));                    // the line's moment about the hands, straight rod
+    if (Math.abs(Math.sin((a + deg) * D2R)) > 0.05 && Math.sign(R.st.bendDeg) !== want && Math.abs(R.st.bendDeg) > 0.5) against++;
+    if (sShape()) s++;
+    // The tip turns from the hands' direction toward the line's, the way the rod bends, and may
+    // reach the line but not pass it: the bend (the tip's whole turn) is at most the turn to the line.
+    const ccw = R.st.bendDeg > 0, toLine = (((ccw ? (-deg) - a : a - (-deg)) % 360) + 360) % 360;
+    const over = Math.max(0, Math.abs(R.st.bendDeg) - toLine);
+    if (over > 3) past++;
+    worstPast = Math.max(worstPast, over);
+  }
+  add('settled shapes never bend against the line (' + shapes + ' shapes)', against === 0, against + ' against');
+  add('settled shapes never bend into an S', s === 0, s + ' S-shapes');
+  add('the tip never turns past the line (3° slack)', past === 0, past + ' past, worst ' + worstPast.toFixed(1) + '°');
+  add('every shape settles (tip still to 0.01 px)', unsettled === 0, unsettled + ' unsettled');
+
+  // Action, power and the progressive bend, pulling 50° down with the hands at 58°.
+  const at = (t, load) => { fresh(); settle(58, load, 50, t); return { top3: R.st.top3, butt: R.st.butt, mis: 50 - tipDeg(), bend: R.st.bendDeg }; };
+  let prog = true, progGot = [];
+  for (let t = 0; t < TIERS; t++) { const a = at(t, 0.2), b = at(t, 1); if (!(b.top3 < a.top3 && b.butt > a.butt && b.butt >= 0.2)) prog = false; progGot.push(t + ': ' + a.top3.toFixed(2) + '>' + b.top3.toFixed(2) + ' / ' + a.butt.toFixed(2) + '<' + b.butt.toFixed(2)); }
+  add('progressive at every tier (top third falls, lower half grows to 20%+)', prog, progGot.join('  '));
+  const fast = at(TIERS - 1, 0.2), slow = at(0, 0.2);
+  add('the fast tier bends 60%+ in its top third at load 0.2', fast.top3 >= 0.6, (100 * fast.top3).toFixed(0) + '%');
+  add('the slow tier bends lower than the fast', slow.butt > fast.butt, slow.butt.toFixed(2) + ' vs ' + fast.butt.toFixed(2));
+  const small = []; for (let t = 0; t < TIERS; t++) { fresh(); settle(50, 0.02, -40, t); small.push(Math.hypot(R.jx[N] - Math.cos(50 * D2R) * L, R.jy[N] - Math.sin(50 * D2R) * L)); }
+  add('every tier has the same power (small load, ±10%)', Math.max(...small) / Math.min(...small) <= 1.1, small.map(v => v.toFixed(2)).join(' ') + ' px');
+  let mis6 = 0, mis1 = 0; for (let t = 0; t < TIERS; t++) { mis6 = Math.max(mis6, Math.abs(at(t, 0.6).mis)); mis1 = Math.max(mis1, Math.abs(at(t, 1).mis)); }
+  add('a tight line: the tip within 18° of it at load 0.6, 8° at load 1', mis6 <= 18 && mis1 <= 8, mis6.toFixed(1) + '°, ' + mis1.toFixed(1) + '°');
+
+  // Springing: one smooth curve while it moves (an S only near straight), an overshoot, settled.
+  let sMoving = 0, frames = 0;
+  const watch = (n, a, load, deg, t) => { for (let i = 0; i < n; i++) { step(a, load, deg, t); frames++; if (sShape() && Math.abs(R.st.bendDeg) > 6) sMoving++; } };
+  for (let t = 0; t < TIERS; t++) {
+    fresh(); watch(90, 58, 1, 50, t); watch(90, 58, 0, 50, t);              // a load comes, then goes
+    watch(90, 58, 0.8, 50, t); watch(60, 58, 0.8, -20, t); watch(60, 58, 0.8, 50, t); // the line swings up and back
+    watch(60, 90, 0.4, 50, t); watch(60, 40, 0.4, 50, t);                    // the hands lift and lower the rod
+  }
+  add('while it springs, one curve (no S bent more than 6°)', sMoving === 0, sMoving + ' of ' + frames + ' steps');
+  let relOk = true, relGot = [];
+  for (let t = 0; t < TIERS; t++) {
+    fresh(); settle(58, 1, 50, t);
+    const b0 = R.st.bendDeg; let flips = 0, last = Math.sign(b0), settleT = -1;
+    for (let i = 1; i <= 120; i++) {
+      step(58, 0, 50, t);
+      const sg = Math.abs(R.st.bendDeg) > 1 ? Math.sign(R.st.bendDeg) : 0; if (sg !== 0 && sg !== last) { flips++; last = sg; }
+      if (Math.abs(R.st.bendDeg) > 0.05 * Math.abs(b0)) settleT = -1; else if (settleT < 0) settleT = i * DT;
+    }
+    relGot.push(t + ': ' + flips + ' swing(s), ' + (settleT < 0 ? 'never' : settleT.toFixed(2) + ' s'));
+    if (flips < 1 || settleT < 0.25 || settleT > 1.0) relOk = false;
+  }
+  add('let go at full load: it swings past straight and settles within 5% in 0.25-1.0 s', relOk, relGot.join('  '));
+
+  // The cast (Phase 32): held back at 120° (the lure's weight on the tip), the stroke to 20° in
+  // 0.12 s eased as sailing.js eases it (it gathers speed and stops short), then up to 40° in
+  // 0.3 s, the lure gone from the tip. While it swings the tip trails the straight rod; the stop
+  // whips it forward past straight, and it springs back past the bend it comes to rest at (the
+  // line's pull and the rising hands keep that bend forward); one curve throughout.
+  let castOk = true, castGot = [];
+  for (let t = 0; t < TIERS; t++) {
+    fresh();
+    const ds = (a, l, deg, hang) => { const d = dirOf(deg); R.solve(a, l, d[0], d[1], 1, t, DT, true, hang); };
+    for (let i = 0; i < 60; i++) ds(120, 0.05, 90, true);
+    let trail = 0, whip = 0, castS = 0, phase = 0, low = 0, after = -1e9, rest = 0;
+    const straightTip = a => [Math.cos(a * D2R) * L, Math.sin(a * D2R) * L];
+    for (let i = 1; i <= 7; i++) {                                                 // the stroke, 0.12 s
+      const u = Math.min(1, i * DT / 0.12), a = 120 + (20 - 120) * u * u * (2 - u);
+      ds(a, 0.05, 90, true);
+      const st0 = straightTip(R.st.a / D2R);
+      if (R.st.bendDeg > 0) trail = Math.max(trail, Math.hypot(R.jx[N] - st0[0], R.jy[N] - st0[1]));
+      if (sShape() && Math.abs(R.st.bendDeg) > 6) castS++;
+    }
+    for (let i = 1; i <= 120; i++) {                                               // the stop, then up to wait
+      const u = Math.min(1, i * DT / 0.3), a = 20 + 20 * (1 - Math.cos(Math.PI * u)) / 2;
+      ds(a, 0.06, 30, false);
+      const b = R.st.bendDeg, st0 = straightTip(R.st.a / D2R), off = Math.hypot(R.jx[N] - st0[0], R.jy[N] - st0[1]);
+      if (phase === 0 && b < 0) phase = 1;
+      if (phase === 1) { if (b < 0) whip = Math.max(whip, off); if (b < low) low = b; else if (b > low + 1) phase = 2; }
+      if (phase === 2 && i <= 60) after = Math.max(after, b);
+      if (sShape() && Math.abs(b) > 6) castS++;
+      rest = b;
+    }
+    const rebound = after - rest;
+    castGot.push(t + ': trails ' + trail.toFixed(1) + ' px, whips ' + whip.toFixed(1) + ' px, rebounds ' + rebound.toFixed(0) + '°' + (castS ? ', ' + castS + ' S' : ''));
+    if (trail < 3 || whip < 2 || rebound < 2 || castS > 0) castOk = false;
+  }
+  add('the cast: the tip trails 3+ px on the stroke, whips 2+ px past and rebounds, one curve', castOk, castGot.join('  '));
+
+  // Cost and NaN.
+  let nan = false; for (let i = 0; i < 20000; i++) { R.solve(20 + (i * 37) % 80, ((i * 13) % 17) / 12, Math.sin(i * 0.3), Math.cos(i * 0.7), i % 2 ? 1 : -1, i % TIERS, DT); if (!isFinite(R.jx[N]) || !isFinite(R.jy[N])) nan = true; }
+  const t0 = process.hrtime.bigint(); for (let i = 0; i < 5000; i++) R.solve(58, ((i * 13) % 17) / 12, 1, 1, 1, i % TIERS, DT);
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6 / 5000;
+  add('20,000 random steps without NaN; a step under 0.05 ms', !nan && ms < 0.05, (nan ? 'NaN, ' : '') + ms.toFixed(4) + ' ms');
+
+  let ok = true;
+  for (const [what, pass, got] of checks) { console.log((pass ? 'PASS ' : 'FAIL ') + what + ': ' + got); ok = ok && pass; }
+  return ok ? 0 : 1;
+}
+
 // ---- Main ---------------------------------------------------------------------------------
 
 if (require.main === module) {
@@ -506,8 +636,9 @@ if (require.main === module) {
   if (args.includes('--saves')) code = savesCheck() || code;
   if (args.includes('--passive')) code = passiveCheck() || code;
   if (args.includes('--fight')) code = fightCheck() || code;
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --replay <seed> [minutes]');
+  if (args.includes('--rod')) code = rodCheck() || code;
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --replay <seed> [minutes]');
     code = 2;
   }
   process.exit(code);

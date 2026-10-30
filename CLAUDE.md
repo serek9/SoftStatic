@@ -33,6 +33,7 @@ node tools/balance.js --pacing                   # economy against the V8 target
 node tools/balance.js --passive                  # passive income share and time away
 node tools/balance.js --saves                    # saves from every milestone still load
 node tools/balance.js --fight                    # how fights end by player and gear (Phase 23)
+node tools/balance.js --rod                      # the rod's bend: shapes, action, springing (Phase 31b)
 ```
 
 On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`.

@@ -1042,7 +1042,11 @@ G.scene.underwater = (function () {
     ctx.drawImage(lureImg(bait, k, ph), Math.round(x * HI) / HI - LS / (2 * HI), Math.round(y * HI) / HI - LS / (2 * HI), LS / HI, LS / HI);
   }
 
+  // Phase 32: whether the line is being reeled in the fight this step (the reel's handle turns).
+  function fightReel() { return fightIn.reel; }
+
   return {
+    fightReel: fightReel,
     flow: flow, weedFrame: weedFrame, bodyStep: bodyStep, swimStep: swimStep, SW: SW, SB: SB, startle: startle,
     shoals: function () { // dbg.shoals: the far fish (far-layer x, y, velocity, shoal, scare left, facing)
       var out = [];
