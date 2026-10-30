@@ -303,6 +303,14 @@ G.core.debug = (function () {
       o.night = night; o.drink = G.scene.fisher.drink(fs, night); // Phase 35: what he would drink now
       return o;
     },
+    // dbg.setup() returns the setup panel (Phase 45): open, col, sel, top, the rods and hooks
+    // listed, its rect and the line under the columns; plus the gear in the save, the act
+    // queued for the fisher and the one playing.
+    setup: function () {
+      var o = G.ui.setup.info(), g = G.state.save.gear;
+      o.rod = g.rod; o.bait = g.bait; o.queued = G.scene.sailing.tackleAct(); o.act = G.state.run.fisher ? G.state.run.fisher.act : '';
+      return o;
+    },
     // dbg.shop() returns the bait shop's walk (Phase 36): the tile (c, r), facing, moving, steps,
     // the dog (c, r, sitting), the mode ('room' or 'panel') and what he faces.
     shop: function () { return G.ui.shop.info(); },

@@ -1394,7 +1394,7 @@ G.scene.sailing = (function () {
   // The idle director's context: between casts (stopped, no line, not passive, no anomaly) or
   // waiting for a bite with nothing interested; any key held or pressed ends an act. The keys
   // still do what they always do on this step: the director only reads them.
-  var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still'];
+  var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still', 'setup'];
   var voiceIn = { on: true, block: false }; // Phase 42
   var fisherIn = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
   function fisherStep(run, dt) {
@@ -1402,6 +1402,7 @@ G.scene.sailing = (function () {
     for (var i = 0; i < KEYS_ANY.length; i++) if (inp.held(KEYS_ANY[i]) || inp.pressed(KEYS_ANY[i])) { any = true; break; }
     var quiet = !run.passive.on && !run.anom.on;
     fisherIn.mode = quiet && run.fsm === 'sailing' && run.boat.stopped ? 'casts' : (quiet && run.fsm === 'waiting' && run.bite.slot < 0 ? 'wait' : null);
+    if (G.ui.setup.isOpen()) fisherIn.mode = null; // Phase 45: he waits while you choose
     fisherIn.input = any;
     fisherIn.night = greyF(hourNow()) < 0.5; // Phase 35: a beer at dusk and at night, the thermos in the grey hours
     // Phase 41: under way (or the cord pulled) he stows the rod and takes the tiller; the tiller
@@ -1410,7 +1411,51 @@ G.scene.sailing = (function () {
     fisherIn.helm = run.fsm === 'sailing' && !run.passive.on && (!b.stopped || b.startT >= 0 || (run.move !== 0 && b.motor));
     fisherIn.cord = b.startT >= 0 ? b.startT / boat.M.start : -1;
     fisherIn.steer = Math.max(-1, Math.min(1, b.ax * 0.01 + 0.4 * b.throttle));
+    tackleStep(run, any);
     G.scene.fisher.step(run.fisher, dt, fisherIn, G.vrng);
+  }
+
+  // ---- The setup panel (Phase 45) ----------------------------------------------
+  // S opens it on the boat with the line out of the water (sailing, stopped or under way, not
+  // passive). While it is open it has the keys: the boat does not sail and nothing is cast,
+  // but the world goes on. When it closes, a new rod or a new hook queues the fisher's short
+  // act for it (fisher.js swap, tie, swaptie), played on the first quiet step with the boat
+  // stopped; any key, a cast above all, cuts it short as it does every act. Under way the rod
+  // lies in the clips and he takes it up when the boat stops, so a rod change needs no act.
+  var tackleAct = '';
+  function setupStep(run, toggled) {
+    var su = G.ui.setup, inp = G.core.input;
+    if (su.isOpen()) {
+      if (run.fsm !== 'sailing' || run.passive.on) su.close();
+      else if (!su.update()) tackleAfter();
+      return true;
+    }
+    if (toggled || !inp.pressed('setup') || run.fsm !== 'sailing' || run.passive.on) return false;
+    su.open();
+    return true;
+  }
+  function tackleAfter() {
+    var c = G.ui.setup.changes();
+    if (c.rod || c.hook) tackleAct = c.rod && c.hook ? 'swaptie' : (c.rod ? 'swap' : 'tie');
+  }
+  function tackleStep(run, any) {
+    if (!tackleAct) return;
+    var fs = run.fisher;
+    if (run.fsm !== 'sailing' || run.passive.on) tackleAct = '';
+    else if (fisherIn.helm || fs.helm) tackleAct = tackleAct === 'swap' ? '' : 'tie';
+    else if (fisherIn.mode === 'casts' && !any && !fs.act && !fs.ret) { G.scene.fisher.start(fs, tackleAct); tackleAct = ''; }
+  }
+
+  // Phase 45: true when a tap at view pixel (gx, gy) is on the dog and he can be petted now
+  // (the boat sitting still between casts, not passive, no panel open). Reads state only.
+  function dogTap(gx, gy) {
+    var run = G.state.run, b = run && run.boat;
+    if (!b || !loc || G.core.state.sceneName() !== 'sailing' || run.fsm !== 'sailing' || run.passive.on || !b.stopped || G.ui.setup.isOpen()) return false;
+    if (G.ui.menu.current()) return false;
+    var sx = Math.round(b.x - run.cam.x), y = loc.waterY - camPy + boat.bob(b);
+    var dx = b.facing < 0 ? sx - 16 : sx + 4, dy = y - 14 + boat.shear(b, 10);
+    var wx = gx / HI, wy = gy / HI;
+    return wx >= dx - 2 && wx < dx + 14 && wy >= dy - 2 && wy < dy + 12;
   }
 
   // ---- Scene -------------------------------------------------------------------
@@ -1429,6 +1474,7 @@ G.scene.sailing = (function () {
     // that key does nothing else this step.
     var toggled = inp.pressed('passive') || (pv.on && (inp.move() !== 0 || inp.pressed('action')));
     if (toggled) { if (pv.on) passiveOff(run, true); else passiveOn(run); }
+    var setupOn = setupStep(run, toggled); // Phase 45: before the gear's effects, so a pick counts this step
     G.sim.economy.effects(save, G.data, run.gearFx);
     var hour0 = save.clock;
     G.sim.clock.step(save, null, dt, G.rng, G.data);
@@ -1437,9 +1483,10 @@ G.scene.sailing = (function () {
     G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);
     anomalyStep(run, save, dt);
     owlStep(run, save, hour0, dt);
-    if (!toggled && !pv.on) castStep(run, dt); // a fight passive took over goes on in catchStep
-    // Audit P1-6: S or the down arrow pets the dog while the boat sits still between casts.
-    if (run.fsm === 'sailing' && !pv.on && b.stopped && inp.pressed('down')) dog.pet(run.dog);
+    if (!toggled && !pv.on && !setupOn) castStep(run, dt); // a fight passive took over goes on in catchStep
+    // Audit P1-6: the down arrow pets the dog while the boat sits still between casts. Phase 45:
+    // ↓ alone or a tap on him; S (down and setup together) opens the setup panel instead.
+    if (run.fsm === 'sailing' && !pv.on && b.stopped && !setupOn && inp.pressed('down') && !inp.pressed('setup')) dog.pet(run.dog);
     fishStep(run, dt);
     riseStep(run, dt);
     rainAcc += rainK() * 6 * dt; // rings where the drizzle meets the water
@@ -1457,7 +1504,7 @@ G.scene.sailing = (function () {
       var choice = pv.on ? (run.fsmT >= PASSIVE.card ? 'sell' : null) : G.ui.card.update(dt); // passive sells
       if (choice) { G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing'); }
     }
-    var move = run.fsm === 'sailing' && !pv.on && !toggled ? (inp.move() || sailMove(dt)) : 0;
+    var move = run.fsm === 'sailing' && !pv.on && !toggled && !setupOn ? (inp.move() || sailMove(dt)) : 0;
     run.move = move;
     boat.outboard(b, move, dt); // Phase 26: the motor first; only a running motor pushes the boat
     boat.step(b, move, dt, loc.width);
@@ -1712,11 +1759,12 @@ G.scene.sailing = (function () {
     drawCast(ctx);
     drawDangle(ctx); // Phase 34
     G.ui.hud.draw(ctx, run, wy);
+    G.ui.setup.draw(ctx); // Phase 45
     G.ui.card.draw(ctx);
   }
 
   return {
-    HI: HI, owl: owl,
+    HI: HI, owl: owl, dogTap: dogTap, tackleAct: function () { return tackleAct; },
     load: load, tp: tp, enter: enter, exit: exit, setPassive: setPassive, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit

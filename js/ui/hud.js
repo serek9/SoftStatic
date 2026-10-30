@@ -139,7 +139,7 @@ G.ui.hud = (function () {
     V.begin(ctx, false);
   }
 
-  // 14.6: the on-screen buttons (TAB, J, M, P, ESC), over menus too (index.html draws them
+  // 14.6: the on-screen buttons (TAB, J, M, S, P, ESC), over menus too (index.html draws them
   // last). Shown once a touch has been seen, or while the mouse is near them.
   function drawButtons(ctx) {
     var I = G.core.input;

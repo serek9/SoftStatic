@@ -51,7 +51,7 @@ G.ui.menu = (function () {
       return true;
     }
     if (scene === 'gallery') return false;
-    if (inp.pressed('pause') || (scene === 'sailing' && inp.pressed('back'))) return open('pause');
+    if (inp.pressed('pause') || (scene === 'sailing' && inp.pressed('back') && !G.ui.setup.isOpen())) return open('pause'); // Esc closes the setup panel (Phase 45)
     if (inp.pressed('journal')) return open('journal');
     if (inp.pressed('map') && mapAllowed()) return open('map');
     return false;
