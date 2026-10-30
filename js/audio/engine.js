@@ -273,6 +273,9 @@ G.audio.engine = (function () {
       // Phase 35: a can cracked open (a snap, then the hiss), and a can set down on the gunwale.
       case 'crack': playBuf(pick(KIT.tick), 0.016, panAt(run.boat.x), 2.4); playBuf(KIT.hiss, 0.01, panAt(run.boat.x), 1, null, 0.02); note('crack'); break;
       case 'candown': playBuf(pick(KIT.knock), 0.012, panAt(run.boat.x), 2.6); note('candown'); break;
+      // Phase 39: the bait shop: a footstep on the boards; the third board from the door hums.
+      case 'step': playBuf(pick(KIT.knock), 0.007, 0, 1.5 + 0.2 * G.vrng.next()); note('step'); break;
+      case 'creak': tone('sine', 96, 88, 0.7, 0.02, 0); tone('sine', 192, 180, 0.5, 0.008, 0, 0.05); note('creak'); break;
     }
   }
 
@@ -341,6 +344,7 @@ G.audio.engine = (function () {
     amb.buzz = gain(0, bus.sfx); amb.buzzO = osc('square', 40); amb.buzzO.connect(filter('bandpass', 2600, 2, amb.buzz));
     amb.uwBed = gain(0, bus.amb); src.connect(filter('lowpass', 260, 1.2, amb.uwBed));
     amb.motor = makeMotor(ac, noiseBuf, bus.amb); // Phase 24 (on the ambience bus: muffled indoors with the rest)
+    amb.fridge = gain(0, bus.sfx); var fo = osc('sine', 60), fo2 = osc('sine', 120); fo.connect(amb.fridge); fo2.connect(gain(0.4, amb.fridge)); // Phase 39
   }
 
   function set(param, v, tc) { param.setTargetAtTime(v, ac.currentTime, tc || 0.25); }
@@ -403,6 +407,7 @@ G.audio.engine = (function () {
       var notes = rare === 'legendary' ? [220, 277.2, 329.6, 415.3] : [261.6, 329.6, 392];
       for (var i = 0; i < notes.length; i++) tone('sine', notes[i], notes[i] * 0.995, 2.4, 0.03, (i - 1) * 0.2, i * 0.12, bus.music, 0.25);
     },
+    bell: function () { tone('sine', 1568, 1562, 0.9, 0.025, 0); tone('sine', 2093, 2088, 0.7, 0.015, 0, 0.11); }, // Phase 39: the shop door's bell
     coin: function () { tone('sine', 1318.5, 1318.5, 0.12, 0.025, 0.1); tone('sine', 1760, 1760, 0.22, 0.02, 0.1, 0.07); },
     buy: function () { click(0.6, 0.06, 0); tone('sine', 140, 90, 0.12, 0.05, 0, 0.02); SOUNDS.coin(); },
     page: function () { hiss('lowpass', 1500, 600, 0.7, 0.08, 0.02, 0); },
@@ -493,7 +498,8 @@ G.audio.engine = (function () {
     set(ambLP.frequency, scene === 'sailing' ? 18000 : 520, 0.3);
 
     if (menu !== prev.menu) { if (menu && menu !== 'tape') play('page'); prev.menu = menu; }
-    if (scene !== prev.scene) { if (prev.scene) play('page'); prev.scene = scene; prev.coins = save.coins; }
+    if (scene !== prev.scene) { if (prev.scene) play(scene === 'shop' || prev.scene === 'shop' ? 'bell' : 'page'); prev.scene = scene; prev.coins = save.coins; }
+    set(amb.fridge.gain, scene === 'shop' ? 0.01 : 0, 0.5);                            // Phase 39: the tank's pump hums in the shop
     if (scene === 'shop' && save.coins < prev.coins) play('buy');
     if (scene !== 'sailing' || !run.boat) { prev.coins = save.coins; ambience(save, run, dt, false); return; }
 
@@ -639,7 +645,7 @@ G.audio.engine = (function () {
     var b = run.boat;
     if (b) amb.motor.update(b.rpm, b.throttle, outside && b.motor, outside && b.startT >= 0, ac.currentTime);
     set(amb.stream.gain, loc === 'creek' ? 0.018 : 0);
-    set(amb.rain.gain, outside && G.scene.sailing.rain ? 0.035 * G.scene.sailing.rain() : 0, 0.8);
+    set(amb.rain.gain, G.scene.sailing.rain ? (outside ? 0.035 : (G.core.state.sceneName() === 'shop' ? 0.03 : 0)) * G.scene.sailing.rain() : 0, 0.8); // Phase 39: on the shop's glass, muffled
     set(amb.drone.gain, (red ? 0.06 : 0.025 + 0.025 * L.night) * (loc === 'pines' ? 0.6 : 1));
     set(amb.sour.detune, 12 + u * 55, 1.5);
     var lamp = loc === 'pines' && run.scen && G.scene.scenery.pines.lampLit ? G.scene.scenery.pines.lampLit(run.scen.t) : true;

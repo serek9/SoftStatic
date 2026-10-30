@@ -245,6 +245,12 @@ G.ui.shopRoom = (function () {
   var RCAP = ['reed', 'paper_dark', 'paper', 'bone'];
   function paintRusty(c, dir, fr) {
     var side = dir === 'side';
+    if (dir === 'up') {                                                                // his back (39.3: facing the wall)
+      A.blob(c, 16, 22, 8.5, 7, CANV, { bias: 0.05 });
+      A.blob(c, 16, 11, 5, 5, RSKIN, { bias: 0.1 }); box(c, 'stone_hi', 12, 13, 8, 3);
+      A.blob(c, 16, 9, 5.5, 4.5, RCAP, { bias: 0.1 });
+      return;
+    }
     A.blob(c, 16, 22, side ? 6.5 : 8.5, 7, CANV, { bias: 0.05 });
     box(c, 'reed', 15, 17, 2, 10);                                                     // the jacket's opening
     if (fr === 3) { box(c, 'ink', 7, 22, 18, 9); box(c, 'paper', 8, 23, 16, 7); box(c, 'paper_dark', 8, 25, 16, 1); box(c, 'paper_dark', 8, 27, 10, 1); } // the paper
@@ -369,26 +375,101 @@ G.ui.shopRoom = (function () {
     for (i = 0; i < 4; i++) ctx.fillRect(cx + 1 + i * 5, cy + 1, 1, 14);                // the crate's slats over them
   }
 
-  // Draws the room, the glass, Rusty behind his counter, the dog and the fisher, the one
-  // further down the room in front. rusty: {face, fr} (Phase 37); stock: what the shelves hold (38).
-  function draw(ctx, st, t, hour, rusty, stock) {
-    ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
-    ctx.drawImage(bake(), OX, OY);
-    // The windows' glass (36: a still dusk; Phase 39 gives it the hour).
+  // ---- Light, life and the strange (Phase 39) -------------------------------------------
+  // The windows show the lake at the hour: the sky in the lake's own keys (sailing.skyColor,
+  // five bands, rebaked when the hour moves by 0.05), the far shore, the water, the fog over it
+  // and drizzle on the glass. The room's light: at night the room darkens but for the lamp's
+  // stepped pools (a mask baked once), by day a flat grey. Dust in the lamplight, bubbles in
+  // the tank, steam from Rusty's cup. env: {hour, night, grey, rain, fog, strange, st} where
+  // strange is '' or 'clock' | 'figure' and st its time 0..1.
+  var FIGURE_WIN = 10, LAMP = [5.5 * T + 16, 3.4 * T], skyKey = -1, skyCss = ['', '', '', '', ''], skyOut = [0, 0, 0], mask = null;
+  function refreshSky(hour) {
+    var k = Math.floor(hour * 20);
+    if (k === skyKey) return;
+    skyKey = k;
+    for (var i = 0; i < 5; i++) { G.scene.sailing.skyColor(hour, i / 5 * 0.9, skyOut); skyCss[i] = 'rgb(' + skyOut[0] + ',' + skyOut[1] + ',' + skyOut[2] + ')'; }
+  }
+  function bakeMask() {
+    return G.gfx.bake.layer(W, H, function (c) {
+      c.fillStyle = P.ink;
+      for (var y = 0; y < H; y += 2) for (var x = 0; x < W; x += 2) {
+        if (y >= 8 && y < 26 && MAP[0][(x / T) | 0] === 'W') continue;                 // the glass keeps the dusk outside
+        var dx = (x - LAMP[0]) / 1.15, dy = y - LAMP[1], d = Math.sqrt(dx * dx + dy * dy);
+        var a = d < 46 ? 0 : (d < 78 ? 0.18 : (d < 118 ? 0.34 : 0.5));                // four steps, 2 px cells
+        if (!a) continue;
+        c.globalAlpha = a; c.fillRect(x, y, 2, 2);
+      }
+      c.globalAlpha = 1;
+    });
+  }
+  function drawWindows(ctx, env, t) {
+    refreshSky(env.hour);
     for (var c = 0; c < COLS; c++) {
       if (MAP[0][c] !== 'W') continue;
-      var left = MAP[0][c - 1] !== 'W', gx = OX + c * T + (left ? 6 : 0), gw = T - 6;
-      ctx.fillStyle = P.night_blue; ctx.fillRect(gx, OY + 8, gw, 6);
-      ctx.fillStyle = P.dusk_violet; ctx.fillRect(gx, OY + 14, gw, 5);
-      ctx.fillStyle = P.water_deep; ctx.fillRect(gx, OY + 19, gw, 7);
-      ctx.fillStyle = P.wood_deep; ctx.fillRect(left ? gx + gw - 1 : gx, OY + 8, 1, 18); ctx.fillRect(gx, OY + 16, gw, 1);
+      var left = MAP[0][c - 1] !== 'W', gx = OX + c * T + (left ? 6 : 0), gw = T - 6, y0 = OY + 8;
+      for (var i = 0; i < 5; i++) { ctx.fillStyle = skyCss[i]; ctx.fillRect(gx, y0 + i * 2, gw, 2); }
+      ctx.fillStyle = P.mount_far; ctx.fillRect(gx, y0 + 10, gw, 2);                     // the far shore
+      ctx.fillStyle = P.pine_dark; ctx.fillRect(gx, y0 + 11, gw, 1);
+      ctx.fillStyle = P.water_deep; ctx.fillRect(gx, y0 + 12, gw, 6);                     // the water
+      ctx.fillStyle = skyCss[4]; ctx.globalAlpha = 0.35; ctx.fillRect(gx, y0 + 13, gw, 1); ctx.globalAlpha = 1;
+      if (env.strange === 'figure' && c === FIGURE_WIN) {                                 // 39.3: someone on the far shore, in one window
+        ctx.globalAlpha = Math.min(1, Math.min(env.st, 1 - env.st) * 4) * 0.9; ctx.fillStyle = P.fog_mid; // pale: a dark one is lost against the night
+        ctx.fillRect(gx + 12, y0 + 4, 2, 2); ctx.fillRect(gx + 11, y0 + 6, 4, 6); ctx.fillRect(gx + 11, y0 + 12, 1, 1); ctx.fillRect(gx + 14, y0 + 12, 1, 1);
+        ctx.globalAlpha = 1;
+      }
+      if (env.fog > 0) { ctx.globalAlpha = Math.min(0.6, env.fog * 0.5); ctx.fillStyle = P.fog_mid; ctx.fillRect(gx, y0 + 8, gw, 8); ctx.globalAlpha = 1; }
+      if (env.rain > 0.05) {                                                             // drizzle on the glass
+        ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.5;
+        var n = Math.round(env.rain * 6);
+        for (i = 0; i < n; i++) { var u = (t * (0.7 + i * 0.13) + i * 0.29) % 1; ctx.fillRect(gx + (i * 7 + 3) % gw, y0 + Math.floor(u * 16), 1, 2); }
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = P.wood_deep; ctx.fillRect(left ? gx + gw - 1 : gx, y0, 1, 18); ctx.fillRect(gx, y0 + 8, gw, 1); // the mullions
     }
-    // The clock's hands at the hour (39.2 refines it).
-    var h = ((hour % 12) + 12) % 12, cx = OX + CLOCK * T + 16, cy = OY + 14;
+  }
+  // The clock at the game hour (the minute hand to the quarter and finer); 39.3 runs it back.
+  function drawClock(ctx, env) {
+    var cx = OX + CLOCK * T + 16, cy = OY + 14, back = env.strange === 'clock' ? env.st * 4 * Math.PI : 0;
+    var ha = (((env.hour % 12) + 12) % 12) / 12 * 2 * Math.PI, ma = (env.hour % 1) * 2 * Math.PI - back, i;
     ctx.fillStyle = P.ink;
-    var ha = h / 12 * 2 * Math.PI, ma = (hour % 1) * 2 * Math.PI;
-    for (var i = 1; i <= 3; i++) ctx.fillRect(Math.round(cx + Math.sin(ma) * i), Math.round(cy - Math.cos(ma) * i), 1, 1);
+    for (i = 1; i <= 4; i++) ctx.fillRect(Math.round(cx + Math.sin(ma) * i), Math.round(cy - Math.cos(ma) * i), 1, 1);
     for (i = 1; i <= 2; i++) ctx.fillRect(Math.round(cx + Math.sin(ha) * i), Math.round(cy - Math.cos(ha) * i), 1, 1);
+  }
+  function drawLight(ctx, env, t, rusty) {
+    if (env.night > 0.02) {
+      if (!mask) mask = bakeMask();
+      ctx.globalAlpha = env.night; ctx.drawImage(mask, OX, OY); ctx.globalAlpha = 1;
+      // Dust drifting in the lamplight.
+      ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.45 * env.night;
+      for (var i = 0; i < 9; i++) {
+        var a = t * (0.05 + i * 0.011) + i * 2.1, r = 10 + (i * 7) % 30;
+        ctx.fillRect(Math.round(OX + LAMP[0] + Math.cos(a) * r * 1.1), Math.round(OY + LAMP[1] + Math.sin(a * 1.3) * r * 0.8), 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    } else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(OX, OY + 28, W, H - 28); ctx.globalAlpha = 1; } // below the glass and the clock
+    // The lamp, hung over the rug: its shade and the bulb's glow (lit at night).
+    var lx = OX + LAMP[0], ly = OY + LAMP[1] - 30;
+    ctx.fillStyle = P.stone_dark; ctx.fillRect(lx, OY, 1, ly - OY); ctx.fillRect(lx - 5, ly, 11, 3);
+    ctx.fillStyle = env.night > 0.3 ? P.lamp_glow : P.stone; ctx.fillRect(lx - 2, ly + 3, 5, 2);
+    // The tank's bubbles; steam from Rusty's cup on the counter.
+    ctx.fillStyle = P.water_foam;
+    for (i = 0; i < 3; i++) { var u = (t * 0.5 + i / 3) % 1; ctx.fillRect(OX + T + 22 - i * 4, OY + 5 * T + 22 - Math.floor(u * 16), 1, 1); }
+    var cx = OX + 9 * T + 22, cy = OY + 3 * T - 2;
+    if (!rusty || rusty.fr !== 2) {
+      ctx.fillStyle = P.ink; ctx.fillRect(cx - 1, cy - 1, 5, 4); ctx.fillStyle = P.cream; ctx.fillRect(cx, cy, 3, 2);
+      ctx.fillStyle = P.fog_light;
+      for (i = 0; i < 3; i++) { var v = (t * 0.6 + i / 3) % 1; ctx.globalAlpha = 0.5 * (1 - v); ctx.fillRect(cx + 1 + Math.round(Math.sin(v * 6 + i)), cy - 2 - Math.floor(v * 9), 1, 1); }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Draws the room, the glass, Rusty behind his counter, the dog and the fisher, the one
+  // further down the room in front. rusty: {face, fr} (Phase 37); stock: what the shelves hold
+  // (38); env: the hour, the light and the strange (39).
+  function draw(ctx, st, t, hour, rusty, stock, env) {
+    ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
+    ctx.drawImage(bake(), OX, OY);
+    if (env) { drawWindows(ctx, env, t); drawClock(ctx, env); }
     if (stock) drawStock(ctx, stock, t);
     if (rusty) ctx.drawImage(sprite('rusty', rusty.face, rusty.fr), OX + RUSTY[0] * T, OY + RUSTY[1] * T - 6);
     // The dog and the fisher, the one further down the room in front.
@@ -400,6 +481,7 @@ G.ui.shopRoom = (function () {
     var fimg = sprite('fisher', st.face, ffr), dimg = sprite('dog', dg.face, dfr);
     if (dy > fy + 6) { ctx.drawImage(fimg, Math.round(fx), Math.round(fy)); ctx.drawImage(dimg, Math.round(dx), Math.round(dy)); }
     else { ctx.drawImage(dimg, Math.round(dx), Math.round(dy)); ctx.drawImage(fimg, Math.round(fx), Math.round(fy)); }
+    if (env) drawLight(ctx, env, t, rusty);
   }
 
   return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,

@@ -182,6 +182,30 @@ G.ui.shop = (function () {
   var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]] };
   var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
   var stock = { rod: 0, lantern: false, finder: false, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
+  // Phase 39: the hour and the light for the room (the lake's: Fogbound's drizzle and fog),
+  // and the strange: at Fogbound's unease 0.4 or more, now and then and one at a time, the
+  // clock running back for 3 s or a figure on the far shore in the window for 6 s; at 0.6 or
+  // more, half the time, Rusty facing the wall when you come in, until you speak to him.
+  // Quiet, short, never in the way (§0.14). G.vrng: presentation only.
+  var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, strange: '', st: 0 };
+  var odd = { kind: '', t: 0, len: 0, cool: 20, wall: false, seen: { clock: 0, figure: 0, wall: 0 } };
+  var ODD_LEN = { clock: 3, figure: 6 };
+  function shopUnease() { return G.sim.unease.get(G.state.save, 'fog'); }
+  function envStep(dt) {
+    var save = G.state.save, sc = G.scene.sailing, L = sc.light(G.sim.clock.wrap(save.clock));
+    env.hour = save.clock; env.night = L.night; env.grey = L.grey;
+    env.rain = sc.rain(); env.fog = sc.fogAlpha();
+    var u = shopUnease();
+    if (odd.kind) {
+      odd.t += dt;
+      if (odd.t >= odd.len) { odd.kind = ''; odd.cool = 40 + 40 * G.vrng.next(); }
+    } else if (u >= 0.4) {
+      odd.cool -= dt;
+      if (odd.cool <= 0) { odd.kind = G.vrng.next() < 0.5 ? 'clock' : 'figure'; odd.t = 0; odd.len = ODD_LEN[odd.kind]; odd.seen[odd.kind]++; }
+    }
+    env.strange = odd.kind; env.st = odd.kind ? odd.t / odd.len : 0;
+  }
+
   function stockStep() {
     var g = G.state.save.gear;
     stock.rod = g.rod; stock.lantern = !!g.lantern; stock.finder = !!g.depthFinder;
@@ -292,6 +316,9 @@ G.ui.shop = (function () {
     row = 0; col = 0; t = 0;
     walk = R.create(); faced = ''; open = ''; R.bake();
     packs.minnow = 0; packs.cricket = 0;
+    odd.kind = ''; odd.cool = 20 + 20 * G.vrng.next();
+    odd.wall = shopUnease() >= 0.6 && G.vrng.next() < 0.5; // 39.3: he has his back to you
+    if (odd.wall) odd.seen.wall++;
     line_ = pickLine(save, G.data.dialogue, save.clock);
     describe();
     say('');
@@ -305,16 +332,23 @@ G.ui.shop = (function () {
     G.sim.clock.step(save, null, dt, G.rng, G.data);
     uneaseIn.loc = G.state.run.loc;
     G.sim.unease.step(save, uneaseIn, dt, G.rng, G.data);
+    var steps0 = walk.steps;
     if (open) openStep(dt); else roomStep(dt);
     rustyStep();
     stockStep();
+    envStep(dt);
+    if (walk.steps !== steps0) { // 39.4: a footstep; the third board from the door hums
+      G.audio.engine.cue('step');
+      if (walk.tc === R.MAT[0] && walk.tr === R.MAT[1] - 2) G.audio.engine.cue('creak');
+    }
   }
 
   // Rusty reads his paper; every 11 s a sip from his cup; a blink every 4.3 s. Spoken to, he
   // looks up at whoever is at the counter (down, or left at its side).
   function rustyStep() {
     var serving = open !== '' && from === 'rusty';
-    rusty.face = serving && walk.c < R.RUSTY[0] - 1 ? 'left' : 'down';
+    if (serving) odd.wall = false;                                                   // spoken to, he turns round
+    rusty.face = odd.wall ? 'up' : (serving && walk.c < R.RUSTY[0] - 1 ? 'left' : 'down');
     if (serving) rusty.fr = (t % 4.3) > 4.12 ? 1 : 0;
     else rusty.fr = (t % 11) > 9.4 ? 2 : 3;
   }
@@ -386,7 +420,7 @@ G.ui.shop = (function () {
 
   function draw(ctx) {
     var save = G.state.save, i;
-    R.draw(ctx, walk, t, save.clock, rusty, stock);
+    R.draw(ctx, walk, t, save.clock, rusty, stock, env);
     if (!open) return;
     if (open === 'box' || open === 'choice') {
       frame(ctx, BOX.x, BOX.y, BOX.w, BOX.h);
@@ -437,7 +471,7 @@ G.ui.shop = (function () {
     act: function () { act(); return txt.msg.join(' '); },
     text: function () { return txt; },
     // dbg.shop(): where he stands and faces, the dog, what he faces, what is open over the room.
-    info: function () { return walk ? { c: walk.c, r: walk.r, face: walk.face, moving: walk.moving, steps: walk.steps, dog: [walk.dog.c, walk.dog.r, walk.dog.sit], faced: faced, open: open, page: page, pages: pages.length, choice: CHOICES[choice], items: list.length, sel: sel, from: from, rusty: [rusty.face, rusty.fr], shown: R.shown(), bakeMs: +R.bakeMs().toFixed(1), room: [R.OX, R.OY, R.COLS * R.T, R.ROWS * R.T], blocked: R.blocked().length } : null; },
+    info: function () { return walk ? { c: walk.c, r: walk.r, face: walk.face, moving: walk.moving, steps: walk.steps, dog: [walk.dog.c, walk.dog.r, walk.dog.sit], faced: faced, open: open, page: page, pages: pages.length, choice: CHOICES[choice], items: list.length, sel: sel, from: from, rusty: [rusty.face, rusty.fr], shown: R.shown(), strange: odd.kind, oddSeen: odd.seen, env: env, bakeMs: +R.bakeMs().toFixed(1), room: [R.OX, R.OY, R.COLS * R.T, R.ROWS * R.T], blocked: R.blocked().length } : null; },
     walk: function () { return walk; },
     icon: icon
   };
