@@ -23,6 +23,14 @@ G.scene.fisher = (function () {
   var REST = [18.5, 18, 16, 19, 15, 19];      // the rod pose keeps Phase 18's painted arm: hand, upper arm's end, forearm's start
   var HOLDER = [3.5, -4.5], HOLDER_ANGLE = 38; // the rod holder on the gunwale before his knees, local; the rod's angle in it
   var K = { ease: 12, fast: 32, grab: 0.8 };  // the hands' springs (rad/s): moving, and going back to the rod; px to take the rod
+  // Phase 41 (PLAN_TACKLE.md): under way the rod lies in two clips along the gunwale, its butt
+  // by his hip and its tip past the bow, and his near hand is on the tiller's grip; the far
+  // hand pulls the motor's cord on a pull-start. CLIPS: the butt's place, local; STOW_ANGLE:
+  // the rod's angle there; TILLER: the grip; PIVOT: where the tiller and the cord leave the
+  // motor's head (boat.js draws the motor at local x -21..-11, its head's front at -15); CORD: the far hand reaching
+  // back for the cord's handle and where the pull ends. HELM: each stage's least time (s).
+  var CLIPS = [-3.2, -5.1], STOW_ANGLE = 2, TILLER = [-4.3, -6], PIVOT = [-15, -5.4];
+  var CORD = { reach: [-5.6, -5.4], pull: [-1, -9.6] }, HELM = { stow: 0.3, reach: 0.25, free: 0.25 };
 
   // Poses: the near hand (n) and the far hand (f), local world px.
   var POSES = {
@@ -39,7 +47,10 @@ G.scene.fisher = (function () {
     tug:    { n: [4.8, -7.8], f: [2.6, -9.0] },   // pulled down and out a little, so the line bends the tip
     // Phase 35: into the cooler behind him; to the can's place on the gunwale by his hip.
     cooler: { n: [-4.2, -5.4], f: [1.2, -4.4] },
-    canSpot: { n: [-2.2, -5.0], f: [1.2, -4.4] }
+    canSpot: { n: [-2.2, -5.0], f: [1.2, -4.4] },
+    // Phase 41: the near hand at the clips (laying the rod down, taking it up) and on the tiller.
+    clips:  { n: [-3.2, -5.1], f: [1.2, -4.4] },
+    tiller: { n: [-4.3, -6], f: [1.2, -4.4] }
   };
   var COOLER = [-5, -4], CAN = [-2.2, -4.2]; // the cooler (its middle, on the floor behind him) and the can's place, local
 
@@ -124,7 +135,8 @@ G.scene.fisher = (function () {
       pose: 'rod', head: 0, item: '', rodAt: 'hand', angle: null, holderA: HOLDER_ANGLE,
       line: null, reel: 0, bail: false, held: false, tug: false, cue: '',
       can: false, sips: 0, beerRest: 0,
-      act: '', step: 0, t: 0, idleT: 0, wait: 0, ret: false, fast: false, acts: 0 };
+      act: '', step: 0, t: 0, idleT: 0, wait: 0, ret: false, fast: false, acts: 0,
+      helm: 0, helmT: 0, cord: -1, steer: 0, stows: 0 };
   }
 
   function spring(x, v, target, w, dt) {
@@ -178,10 +190,75 @@ G.scene.fisher = (function () {
     return rng.next() < (fs.can && night ? 0.65 : 0.5) ? d : other;
   }
 
+  var quietCtx = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
+  function noActs(ctx) {
+    quietCtx.input = ctx.input; quietCtx.night = ctx.night; quietCtx.helm = ctx.helm; quietCtx.cord = ctx.cord; quietCtx.steer = ctx.steer;
+    return quietCtx;
+  }
+
+  // The tiller's grip, local: swung a little by steer (the turn and the throttle seen from the
+  // side, foreshortened), and in his hand once he holds it.
+  var gp = [0, 0];
+  function grip(fs, out) {
+    out[0] = TILLER[0] + 0.5 * fs.steer; out[1] = TILLER[1] - 0.3 * Math.abs(fs.steer);
+    return out;
+  }
+  function holding(fs) { return fs.helm === 3 || ((fs.helm === 2 || fs.helm === 4) && fs.pose === 'tiller' && near(fs, TILLER)); }
+
+  function near(fs, pt) { return Math.abs(fs.nx - pt[0]) + Math.abs(fs.ny - pt[1]) < K.grab; }
+
+  // Phase 41: the helm. Stages: 1 the rod carried to the clips, 2 the hand reaching back to the
+  // tiller, 3 steering; when the boat has stopped, 4 the hand back at the clips, 5 the rod
+  // carried up to his hands. Each stage waits for the hand to arrive and its least time; a key
+  // pressed while he takes the rod up (a cast) hurries the hands, so the cast is never held.
+  // The rod lies in the clips from stage 1's end to stage 4's; the lure is reeled up snug under
+  // the tip-top there (line 1) so it does not swing about under way.
+  function helmStep(fs, dt, ctx) {
+    fs.steer += ((ctx.helm ? ctx.steer || 0 : 0) - fs.steer) * Math.min(1, 6 * dt);
+    if (!ctx.helm && !fs.helm) return;
+    fs.helmT += dt;
+    if (ctx.helm) {
+      if (fs.act || fs.ret) { fs.act = ''; fs.ret = false; fs.item === 'can' && (fs.can = true); fs.item = ''; clearStep(fs); }
+      if (!fs.helm || fs.helm === 5) { fs.helm = 1; fs.helmT = 0; fs.stows++; fs.fast = false; }
+      else if (fs.helm === 4) { fs.helm = 2; fs.helmT = 0; fs.fast = false; }
+    } else if (fs.helm === 1) { fs.helm = 5; fs.helmT = 0; }       // stopped before the rod was down: bring it back
+    else if (fs.helm === 2 || fs.helm === 3) { fs.helm = 4; fs.helmT = 0; }
+    if (!ctx.helm && ctx.input && fs.helm >= 4) fs.fast = true;
+    fs.head = 0;
+    switch (fs.helm) {
+      case 1:
+        if (fs.rodAt === 'holder') { // resting in the holder: the hand fetches it first
+          fs.pose = 'holder'; fs.angle = fs.holderA; fs.line = 1;
+          if (near(fs, HOLDER)) { fs.rodAt = 'hand'; fs.helmT = 0; }
+          break;
+        }
+        fs.pose = 'clips'; fs.rodAt = 'hand'; fs.angle = STOW_ANGLE; fs.line = 1;
+        if (near(fs, CLIPS) && fs.helmT >= HELM.stow) { fs.rodAt = 'clips'; fs.helm = 2; fs.helmT = 0; fs.cue = 'clip'; }
+        break;
+      case 2:
+        fs.pose = 'tiller'; fs.rodAt = 'clips'; fs.angle = STOW_ANGLE; fs.line = 1;
+        if (near(fs, grip(fs, gp)) && fs.helmT >= HELM.reach) { fs.helm = 3; fs.helmT = 0; }
+        break;
+      case 3:
+        fs.pose = 'tiller'; fs.rodAt = 'clips'; fs.angle = STOW_ANGLE; fs.line = 1;
+        break;
+      case 4:
+        fs.pose = 'clips'; fs.rodAt = 'clips'; fs.angle = STOW_ANGLE; fs.line = 1;
+        if (near(fs, CLIPS) && (fs.helmT >= HELM.free || fs.fast)) { fs.rodAt = 'hand'; fs.helm = 5; fs.helmT = 0; fs.cue = 'clip'; }
+        break;
+      case 5:
+        fs.pose = 'rod'; fs.rodAt = 'hand'; fs.angle = null; fs.line = null;
+        if (Math.abs(fs.nx - POSES.rod.n[0]) + Math.abs(fs.ny - POSES.rod.n[1]) < 0.1) { fs.helm = 0; fs.helmT = 0; fs.fast = false; }
+        break;
+    }
+  }
+
   // ctx: {mode: 'casts' | 'wait' | null (nothing to do but fish), input: a key held or pressed,
-  // night: dusk or night (Phase 35)}.
+  // night: dusk or night (Phase 35); Phase 41: helm (the boat under way or starting), cord
+  // (0..1 through a pull-start, or -1), steer (-1..1: the tiller pushed by the turn and the throttle)}.
   function step(fs, dt, ctx, rng) {
     if (fs.beerRest > 0) fs.beerRest -= dt;
+    if (fs.helm || ctx.helm) ctx = noActs(ctx);
     if (fs.act) {
       var a = ACTS[fs.act];
       if (ctx.input || a.modes.indexOf(ctx.mode) < 0) abort(fs);
@@ -201,12 +278,19 @@ G.scene.fisher = (function () {
         if (fs.idleT >= fs.wait) { start(fs, choose(fs, ctx.mode, ctx.night, rng)); fs.idleT = 0; fs.wait = 0; }
       } else { fs.idleT = 0; fs.wait = 0; }
     }
-    // The hands.
-    var p = POSES[fs.pose], w = fs.fast ? K.fast : K.ease;
-    fs.nvx = spring(fs.nx, fs.nvx, p.n[0], w, dt); fs.nx += dt * fs.nvx;
-    fs.nvy = spring(fs.ny, fs.nvy, p.n[1], w, dt); fs.ny += dt * fs.nvy;
-    fs.fvx = spring(fs.fx, fs.fvx, p.f[0], w, dt); fs.fx += dt * fs.fvx;
-    fs.fvy = spring(fs.fy, fs.fvy, p.f[1], w, dt); fs.fy += dt * fs.fvy;
+    helmStep(fs, dt, ctx);
+    // The hands. Phase 41: on a pull-start the far hand reaches back for the cord, then pulls.
+    var p = POSES[fs.pose], w = fs.fast ? K.fast : K.ease, ftx = p.f[0], fty = p.f[1], fw = w, ntx = p.n[0], nty = p.n[1];
+    if (fs.pose === 'tiller') { grip(fs, gp); ntx = gp[0]; nty = gp[1]; }
+    fs.cord = fs.helm && ctx.cord >= 0 ? ctx.cord : -1;
+    if (fs.cord >= 0) {
+      var cp = fs.cord < 0.35 ? CORD.reach : CORD.pull;
+      ftx = cp[0]; fty = cp[1]; fw = K.fast;
+    }
+    fs.nvx = spring(fs.nx, fs.nvx, ntx, w, dt); fs.nx += dt * fs.nvx;
+    fs.nvy = spring(fs.ny, fs.nvy, nty, w, dt); fs.ny += dt * fs.nvy;
+    fs.fvx = spring(fs.fx, fs.fvx, ftx, fw, dt); fs.fx += dt * fs.fvx;
+    fs.fvy = spring(fs.fy, fs.fvy, fty, fw, dt); fs.fy += dt * fs.fvy;
     // Going back: the hand reaches the holder, takes the rod, and brings it to its place.
     if (fs.ret) {
       if (fs.rodAt === 'holder' && Math.abs(fs.nx - HOLDER[0]) + Math.abs(fs.ny - HOLDER[1]) < K.grab) { fs.rodAt = 'hand'; fs.pose = 'rod'; fs.angle = null; }
@@ -222,6 +306,7 @@ G.scene.fisher = (function () {
   function rodLocal(out) {
     if (!cur) { out[0] = 3; out[1] = -6; return out; }
     if (cur.rodAt === 'holder') { out[0] = HOLDER[0]; out[1] = HOLDER[1]; }
+    else if (cur.rodAt === 'clips') { out[0] = CLIPS[0]; out[1] = CLIPS[1]; }
     else { out[0] = cur.nx; out[1] = cur.ny; }
     return out;
   }
@@ -317,11 +402,12 @@ G.scene.fisher = (function () {
 
   // Draws the fisher for a boat at screen x sx, seat line y (with heave), facing f, leaning
   // back by lean, at shear dy (the hull's pitch at his seat). t: the boat's time, for the steam.
-  function draw(ctx, fs, sx, y, f, lean, dy, t) {
+  function draw(ctx, fs, sx, y, f, lean, dy, t, dyP) {
     var flip = f < 0, L = sx - (flip ? 4 : 6) - f * lean, top = y - 15 + dy, P = G.gfx.sprites.PALETTE;
     var nix = Math.round((fs.nx + 6) * HI * 2) / 2, niy = Math.round((fs.ny + 15) * HI * 2) / 2; // half view px: the rod hand sits at 18.5
     var fix = Math.round((fs.fx + 6) * HI * 2) / 2, fiy = Math.round((fs.fy + 15) * HI * 2) / 2;
     var up = fs.ny < -8.5, near = armImg(false, nix, niy, flip);                  // a hand at his mouth goes over his face
+    drawCord(ctx, fs, sx, y, f, lean, dy, dyP || 0);
     put(ctx, armImg(true, fix, fiy, flip), L - 5, top - 5);
     put(ctx, bodyImg(flip), L, top);
     if (!up) put(ctx, near, L - 5, top - 5);
@@ -343,6 +429,53 @@ G.scene.fisher = (function () {
     }
   }
 
+  // A 1-view-px line between world points (whole view pixels).
+  function vline(ctx, x0, y0, x1, y1) {
+    x0 = Math.round(x0 * HI); y0 = Math.round(y0 * HI); x1 = Math.round(x1 * HI); y1 = Math.round(y1 * HI);
+    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy, q = 1 / HI;
+    for (;;) {
+      ctx.fillRect(x0 * q, y0 * q, q, q);
+      if (x0 === x1 && y0 === y1) break;
+      var e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  }
+
+  // Phase 41: the pull-start's cord, from the motor's head to his far hand, drawn before him
+  // (it runs to his far side; the motor, drawn after him, covers its root). dyP: the shear at the pivot.
+  function drawCord(ctx, fs, sx, y, f, lean, dy, dyP) {
+    if (fs.cord < 0) return;
+    var P = G.gfx.sprites.PALETTE;
+    ctx.fillStyle = P.cream;
+    vline(ctx, sx + f * PIVOT[0], y + PIVOT[1] - 0.5 + dyP, sx + f * fs.fx - f * lean, y + fs.fy + dy);
+  }
+
+  // Phase 41: the tiller, from the motor's head forward to its grip, and the rod's two clips on
+  // the gunwale, drawn over the hull. The grip is in his near hand while he steers (leaning
+  // with him), else it rests where it was left; twist (0..1, the throttle) turns the grip's mark.
+  function drawHelm(ctx, fs, sx, y, f, lean, dy, dyP, twist) {
+    var P = G.gfx.sprites.PALETTE, hold = holding(fs);
+    grip(fs, gp);
+    var gx = sx + f * (hold ? fs.nx : gp[0]) - (hold ? f * lean : 0), gy = y + (hold ? fs.ny : gp[1]) + dy + 0.5;
+    var px = sx + f * PIVOT[0], py = y + PIVOT[1] + dyP;
+    ctx.fillStyle = P.ink; vline(ctx, px, py + 0.5, gx - f * 1.5, gy + 0.5);
+    ctx.fillStyle = P.stone; vline(ctx, px, py, gx - f * 1.5, gy);
+    // The grip: rubber, 2 px long, a lit mark that rolls round as the throttle opens.
+    var x0 = Math.round((gx - (f > 0 ? 2 : 0)) * HI) / HI, y0 = Math.round((gy - 0.5) * HI) / HI;
+    ctx.fillStyle = P.ink; ctx.fillRect(x0, y0, 2, 1);
+    ctx.fillStyle = P.stone_dark; ctx.fillRect(x0, y0, 2, 1 / HI);
+    var m = Math.floor((twist || 0) * 3.99);
+    ctx.fillStyle = P.stone_hi; ctx.fillRect(x0 + (f > 0 ? m : 3 - m) / HI, y0, 1 / HI, 1 / HI);
+    // The clips: two short posts from the gunwale up to where the rod lies.
+    var ca = Math.cos(STOW_ANGLE * Math.PI / 180), ta = Math.tan(STOW_ANGLE * Math.PI / 180);
+    for (var i = 0; i < 2; i++) {
+      var d = i ? 10 : 2, cx = Math.round((sx + f * (CLIPS[0] + d * ca) - f * lean) * HI) / HI, top = Math.round((y + CLIPS[1] - d * ta + 0.5 + dy) * HI) / HI;
+      ctx.fillStyle = P.ink; ctx.fillRect(cx - 0.5, top, 1, Math.max(0.5, y - 4.5 + dy - top));
+      ctx.fillStyle = P.stone_hi; ctx.fillRect(f > 0 ? cx - 0.5 : cx, top, 1 / HI, 1 / HI);
+    }
+  }
+
   // The rod holder: a short tube on the gunwale at the holder, drawn over the hull.
   function drawHolder(ctx, sx, y, f, lean, dy) {
     var P = G.gfx.sprites.PALETTE, x = Math.round((sx + f * HOLDER[0] - f * lean) * HI) / HI, yy = Math.round((y + HOLDER[1] + dy) * HI) / HI;
@@ -353,10 +486,11 @@ G.scene.fisher = (function () {
   // dbg.fisher(): the pose, the hands (local px), where the rod is, the act and its time.
   function info(fs) {
     return { pose: fs.pose, hands: [+fs.nx.toFixed(2), +fs.ny.toFixed(2), +fs.fx.toFixed(2), +fs.fy.toFixed(2)], holder: fs.rodAt === 'holder',
-      act: fs.act, step: fs.step, actT: +fs.t.toFixed(2), idleT: +fs.idleT.toFixed(2), wait: +fs.wait.toFixed(2), returning: fs.ret, head: fs.head, item: fs.item, line: fs.line, held: fs.held, reel: fs.reel,
+      act: fs.act, step: fs.step, helm: fs.helm, helmT: +fs.helmT.toFixed(2), clips: fs.rodAt === 'clips', cord: +fs.cord.toFixed(2), steer: +fs.steer.toFixed(2), stows: fs.stows, tiller: holding(fs), actT: +fs.t.toFixed(2), idleT: +fs.idleT.toFixed(2), wait: +fs.wait.toFixed(2), returning: fs.ret, head: fs.head, item: fs.item, line: fs.line, held: fs.held, reel: fs.reel,
       can: fs.can, sips: fs.sips, beerRest: +Math.max(0, fs.beerRest).toFixed(1) };
   }
 
   return { K: K, POSES: POSES, ACTS: ACTS, HOLDER: HOLDER, HOLDER_ANGLE: HOLDER_ANGLE, create: create, step: step, start: start, abort: abort,
-    rodLocal: rodLocal, draw: draw, drawHolder: drawHolder, drawCooler: drawCooler, drawCan: drawCan, drink: drink, choose: choose, info: info, armCount: function () { var n = 0; for (var k in art) if (k[0] === 'a' && k[k.length - 1] !== '<') n++; return n; } };
+    CLIPS: CLIPS, STOW_ANGLE: STOW_ANGLE, TILLER: TILLER, HELM: HELM,
+    rodLocal: rodLocal, draw: draw, drawHolder: drawHolder, drawHelm: drawHelm, drawCooler: drawCooler, drawCan: drawCan, drink: drink, choose: choose, info: info, armCount: function () { var n = 0; for (var k in art) if (k[0] === 'a' && k[k.length - 1] !== '<') n++; return n; } };
 })();

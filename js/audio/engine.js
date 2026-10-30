@@ -273,6 +273,8 @@ G.audio.engine = (function () {
       // Phase 35: a can cracked open (a snap, then the hiss), and a can set down on the gunwale.
       case 'crack': playBuf(pick(KIT.tick), 0.016, panAt(run.boat.x), 2.4); playBuf(KIT.hiss, 0.01, panAt(run.boat.x), 1, null, 0.02); note('crack'); break;
       case 'candown': playBuf(pick(KIT.knock), 0.012, panAt(run.boat.x), 2.6); note('candown'); break;
+      // Phase 41: the rod's butt laid in the gunwale's clips, or lifted out of them.
+      case 'clip': playBuf(pick(KIT.knock), 0.01, panAt(run.boat.x), 1.9 + 0.2 * G.vrng.next()); note('clip'); break;
       // Phase 39: the bait shop: a footstep on the boards; the third board from the door hums.
       case 'step': playBuf(pick(KIT.knock), 0.007, 0, 1.5 + 0.2 * G.vrng.next()); note('step'); break;
       case 'creak': tone('sine', 96, 88, 0.7, 0.02, 0); tone('sine', 192, 180, 0.5, 0.008, 0, 0.05); note('creak'); break;

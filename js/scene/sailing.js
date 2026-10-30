@@ -890,6 +890,14 @@ G.scene.sailing = (function () {
   }
 
   // Moves the boat to world x (clamped), stops it and snaps the camera.
+  // dbg.sail(dir, s) (Phase 41): steer as if A (-1) or D (1) were held for s seconds.
+  var sail = { dir: 0, t: 0 };
+  function sailMove(dt) {
+    if (sail.t <= 0) return 0;
+    sail.t -= dt;
+    return sail.dir;
+  }
+
   function tp(x) {
     var run = G.state.run, m = boat.P.margin;
     run.boat.x = clamp(x, m, loc.width - m);
@@ -1383,7 +1391,7 @@ G.scene.sailing = (function () {
   // waiting for a bite with nothing interested; any key held or pressed ends an act. The keys
   // still do what they always do on this step: the director only reads them.
   var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still'];
-  var fisherIn = { mode: null, input: false, night: false };
+  var fisherIn = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
   function fisherStep(run, dt) {
     var inp = G.core.input, any = false;
     for (var i = 0; i < KEYS_ANY.length; i++) if (inp.held(KEYS_ANY[i]) || inp.pressed(KEYS_ANY[i])) { any = true; break; }
@@ -1391,6 +1399,12 @@ G.scene.sailing = (function () {
     fisherIn.mode = quiet && run.fsm === 'sailing' && run.boat.stopped ? 'casts' : (quiet && run.fsm === 'waiting' && run.bite.slot < 0 ? 'wait' : null);
     fisherIn.input = any;
     fisherIn.night = greyF(hourNow()) < 0.5; // Phase 35: a beer at dusk and at night, the thermos in the grey hours
+    // Phase 41: under way (or the cord pulled) he stows the rod and takes the tiller; the tiller
+    // swings with the turn (the boat's acceleration) and the throttle.
+    var b = run.boat;
+    fisherIn.helm = run.fsm === 'sailing' && !run.passive.on && (!b.stopped || b.startT >= 0 || (run.move !== 0 && b.motor));
+    fisherIn.cord = b.startT >= 0 ? b.startT / boat.M.start : -1;
+    fisherIn.steer = Math.max(-1, Math.min(1, b.ax * 0.01 + 0.4 * b.throttle));
     G.scene.fisher.step(run.fisher, dt, fisherIn, G.vrng);
   }
 
@@ -1438,7 +1452,8 @@ G.scene.sailing = (function () {
       var choice = pv.on ? (run.fsmT >= PASSIVE.card ? 'sell' : null) : G.ui.card.update(dt); // passive sells
       if (choice) { G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing'); }
     }
-    var move = run.fsm === 'sailing' && !pv.on && !toggled ? inp.move() : 0;
+    var move = run.fsm === 'sailing' && !pv.on && !toggled ? (inp.move() || sailMove(dt)) : 0;
+    run.move = move;
     boat.outboard(b, move, dt); // Phase 26: the motor first; only a running motor pushes the boat
     boat.step(b, move, dt, loc.width);
     var surf = G.gfx.surface; // Phase 24: pitch, heave and the outboard, on the surface under the hull
@@ -1708,6 +1723,7 @@ G.scene.sailing = (function () {
     waterLight: function () { return waterLight; },
     loc: function () { return loc; },
     night: function () { return fisherIn.night; }, // Phase 35: what the idle director takes as dusk or night
+    sail: function (dir, secs) { sail.dir = dir < 0 ? -1 : 1; sail.t = secs === undefined ? 1 : +secs; return sail; },
     dangle: function () { return { on: dg.on, th: +dg.th.toFixed(3), om: +dg.om.toFixed(3), len: +dg.len.toFixed(2), off: [+dg.ox.toFixed(2), +dg.oy.toFixed(2)] }; }, // dbg.dangle (Phase 34)
     scenery: function () { return scen === NO_SCENERY ? null : scen; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },

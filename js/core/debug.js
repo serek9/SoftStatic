@@ -299,6 +299,9 @@ G.core.debug = (function () {
     // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
     // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
     dangle: function () { return G.scene.sailing.dangle(); },
+    // dbg.sail(dir, s) steers left (-1) or right (1) for s seconds, as the keys would (Phase 41:
+    // the fisher stows the rod and takes the tiller; dbg.fisher() shows helm, clips, tiller).
+    sail: function (dir, s) { G.scene.sailing.sail(dir, s); return 'sailing ' + (dir < 0 ? 'left' : 'right') + ' for ' + (s === undefined ? 1 : s) + ' s'; },
     // dbg.idle(name) starts an idle act ('thermos', 'rest', ...); dbg.idle(null) ends the one playing.
     idle: function (name) {
       var fs = G.state.run.fisher;

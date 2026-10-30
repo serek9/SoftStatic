@@ -325,7 +325,7 @@ G.scene.boat = (function () {
     if (withFisher) {
       // Phase 33: the posable fisher (js/scene/fisher.js) and what he holds; Phase 35: the cooler behind him.
       G.scene.fisher.drawCooler(ctx, sx, y, f, shear(b, -5));
-      if (gear && gear.fisher) G.scene.fisher.draw(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -1), b.t);
+      if (gear && gear.fisher) G.scene.fisher.draw(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -1), b.t, shear(b, -12));
     }
     if (drawDog) drawDog(ctx, flip ? sx - 16 : sx + 4, y - 14 + shear(b, 10), flip, Math.abs(b.vx) / P_SPEED);
     // The rod reaches out over the dog in the bow, so it is drawn after him: its bend shows whole.
@@ -354,6 +354,7 @@ G.scene.boat = (function () {
     putSheared(ctx, b, img('hull', flip), sx - 17, y - 6, sx);
     if (withFisher) {
       G.scene.fisher.drawHolder(ctx, sx, y, f, b.lean, shear(b, -1));
+      if (gear && gear.fisher) G.scene.fisher.drawHelm(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -1), shear(b, -12), b.throttle); // Phase 41
       if (gear && gear.fisher) G.scene.fisher.drawCan(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -2)); // Phase 35: a can on the gunwale
       drawReel(ctx, b, sx, wy);
     }
