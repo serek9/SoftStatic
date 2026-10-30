@@ -31,8 +31,11 @@ G.scene.underwater = (function () {
   var mx = new Float32Array(MN), my = new Float32Array(MN), mp = new Float32Array(MN);
   var motesReady = false;
   // Background silhouettes (V3.4): far, dark, drifting; never interact with anything.
-  var BGN = 4, BG_BASE = ['carp', 'pike', 'catfish', 'trout'];
-  var bx = new Float32Array(BGN), by = new Float32Array(BGN), bv = new Float32Array(BGN);
+  // Phase 30: the far silhouettes are loose shoals (see shoalStep).
+  var SHN = 3, SHMAX = 7, BN = SHN * SHMAX, SH_BASE = ['perch', 'trout', 'carp'];
+  var bx = new Float32Array(BN), by = new Float32Array(BN), bvx = new Float32Array(BN), bvy = new Float32Array(BN);
+  var bon = new Uint8Array(BN), bsc = new Float32Array(BN), bfl = new Float32Array(BN), bph = new Float32Array(BN), bface = new Int8Array(BN), bturn = new Float32Array(BN);
+  var shDir = new Float32Array(SHN), shY = new Float32Array(SHN), shT = new Float32Array(SHN), shV = new Float32Array(SHN), shL = new Float32Array(SHN), shH = new Float32Array(SHN);
   // Phase 19: streaks the current carries along where a water has one (loc.current, the creek).
   var CN = 22, cx = new Float32Array(CN), cy = new Float32Array(CN), cl = new Float32Array(CN);
   var stats = { ms: 0, fishMs: 0 };
@@ -242,10 +245,8 @@ G.scene.underwater = (function () {
       for (var q = 0; q < frs.length * 4; q++) FG.swimmer(i, frs[q >> 2], (q & 2) > 0, (q & 1) > 0);
       for (q = 0; q < 4; q++) FG.swimmer(i, q < 2 ? FG.FR.ROLL : FG.FR.SHAKE, false, (q & 1) > 0); // Phase 29: only ever hooked, in colour
     }
-    for (q = 0; q < 12; q++) { // the far silhouettes' and the heavy shadow's beat
-      FG.baseSwimmer(BG_BASE[q & 3], 1, FG.BEAT[(q >> 2) + 1], true, false); FG.baseSwimmer(BG_BASE[q & 3], 1, FG.BEAT[(q >> 2) + 1], true, true);
-      FG.baseSwimmer('catfish', 2, FG.BEAT[q % 3 + 1], true, (q & 1) > 0);
-    }
+    for (q = 0; q < 12; q++) FG.baseSwimmer('catfish', 2, FG.BEAT[q % 3 + 1], true, (q & 1) > 0); // the heavy shadow's beat
+    for (q = 0; q < SHN * 4 * 2; q++) FG.baseSwimmer(SH_BASE[q % SHN], 1, [0, 1, 3, 5][(q / SHN | 0) % 4], true, q >= SHN * 4); // the shoals' beat and quick turn (Phase 30)
     return set;
   }
 
@@ -336,14 +337,14 @@ G.scene.underwater = (function () {
 
     if (!motesReady) {
       for (var i = 0; i < MN; i++) { mx[i] = G.vrng.range(0, 1200); my[i] = G.vrng.range(0, set.H); mp[i] = G.vrng.range(0, 6.28); }
-      for (var b = 0; b < BGN; b++) { bx[b] = G.vrng.range(0, 640); by[b] = G.vrng.range(20, loc.maxDepth - 10); bv[b] = G.vrng.range(2, 5) * (G.vrng.next() < 0.5 ? -1 : 1); }
+      shoalSetup(loc);
       for (var c = 0; c < CN; c++) { cx[c] = G.vrng.range(0, VIEW_W + 40); cy[c] = G.vrng.range(0.05, 0.9); cl[c] = G.vrng.range(4, 11); }
       motesReady = true;
     }
     if (uw.alpha > 0) {
       var f0 = flow(loc, 0), f1 = flow(loc, loc.maxDepth);
       for (var j = 0; j < MN; j++) { mp[j] += dt * 0.8; my[j] += dt * 1.5; mx[j] += (Math.sin(mp[j]) * 2 + f0 + (f1 - f0) * Math.min(1, (my[j] % set.H) / loc.maxDepth)) * dt; }
-      for (var k = 0; k < BGN; k++) bx[k] += bv[k] * dt;
+      shoalStep(run, loc, dt);
       var cur = loc.current;
       // Faster than the lure drifts (the eye needs it), slower with depth, as the drift is (Phase 22: the same flow).
       if (cur && !cur.lake) for (var q = 0; q < CN; q++) cx[q] += (f0 + (f1 - f0) * cy[q]) * 4 * dt;
@@ -520,6 +521,121 @@ G.scene.underwater = (function () {
     }
   }
 
+  // ---- Far shoals (Phase 30) -------------------------------------------------------------
+  // The far silhouettes (parallax 0.5, wrapping every FAR px) are SHN loose shoals of 3-7.
+  // Each fish steers by its shoal (separation, alignment, cohesion) toward the shoal's own
+  // cruise (a heading that sometimes turns round, a depth), and a hard spacing rule keeps any
+  // two of a shoal from overlapping. A splash (fx.onSplash) or the boat moving overhead
+  // startles the fish within reach: they dart away and down in a burst, then regroup.
+  // Visual only: G.vrng, stepped in update(), drawn from the arrays.
+  var FAR = 640, SB = {
+    cruise0: 2, cruise1: 5,   // px/s a shoal cruises at
+    turn0: 10, turn1: 25,     // s between a shoal turning round
+    sepX: 0.85, sepY: 0.7,    // spacing: a pair must be this × length apart across, or × height down
+    kSep: 3, kAli: 1.2, kCoh: 0.35, kGoal: 0.8, // 1/s steering weights
+    cohR: 60,                 // px: a member further than this from its shoal swims harder back
+    vmax: 8, scareV: 22,      // px/s at most, and fleeing
+    scareR0: 30, scareRK: 60, // px of reach: scareR0 + scareRK × splash power
+    scareT: 1.6,              // s a scare lasts (fading)
+    scareA: 12,               // 1/s: how fast a startled fish reaches its flight
+    boatV: 6, boatR: 40,      // the boat moving faster than boatV px/s scares fish within boatR of it (down counts half)
+    turnT: 0.12,              // s of the quick turn frame when a startled fish whips round
+    deep: 0.5                 // × the water's deepest: shoals keep above this, so the near bed (drawn over the far layer) rarely hides them
+  };
+  fx.listen(function (x, power) { startle(x, power, 0); }); // every splash
+  function wrapD(d) { return d - FAR * Math.round(d / FAR); } // a far-space difference, shortest way round
+  function shoalSetup(loc) {
+    for (var i = 0; i < BN; i++) bon[i] = 0;
+    for (var k = 0; k < SHN; k++) {
+      var cvs = G.gfx.fishgen.baseSwimmer(SH_BASE[k], 1, 0, true, false);
+      shL[k] = cvs.width / HI * 0.8; shH[k] = cvs.height / HI * 0.55; // the body's length and depth (world px)
+      shDir[k] = G.vrng.next() < 0.5 ? -1 : 1; shV[k] = G.vrng.range(SB.cruise0, SB.cruise1);
+      shY[k] = G.vrng.range(16, Math.max(20, loc.maxDepth * SB.deep)); shT[k] = G.vrng.range(SB.turn0, SB.turn1);
+      var n = SH_BASE[k] === 'carp' ? 3 + (G.vrng.next() * 2 | 0) : 4 + (G.vrng.next() * 4 | 0), x0 = k * FAR / SHN + G.vrng.range(0, 80);
+      for (var j = 0; j < n; j++) {
+        var i2 = k * SHMAX + j;
+        bon[i2] = 1; bx[i2] = x0 + (j % 3) * shL[k] * 1.1 + G.vrng.range(-3, 3); by[i2] = shY[k] + ((j / 3) | 0) * shH[k] * 1.1 + G.vrng.range(-2, 2);
+        bvx[i2] = shDir[k] * shV[k]; bvy[i2] = 0; bsc[i2] = 0; bfl[i2] = 0; bph[i2] = G.vrng.next(); bface[i2] = shDir[k]; bturn[i2] = 0;
+      }
+    }
+  }
+  // Startles the far fish around world x (a splash of power 0..1.5 at the surface, or the
+  // boat). The far layer's x for it is where it sits on the screen, at parallax 0.5.
+  var lastCam = 0;
+  function startle(x, power, depth, reach) {
+    var fxw = x - lastCam * 0.5 + 160, R = reach /* the far x drawn where world x is drawn */ || SB.scareR0 + SB.scareRK * Math.min(1, power);
+    for (var i = 0; i < BN; i++) {
+      if (!bon[i]) continue;
+      var dx = wrapD(bx[i] - fxw), dy = by[i] - (depth || 0);
+      if (dx * dx + dy * dy * 0.5 > R * R) continue;
+      var dir = dx >= 0 ? 1 : -1;
+      if (bsc[i] < 0.5 && bface[i] !== dir) bturn[i] = SB.turnT; // it whips round
+      bsc[i] = SB.scareT; bfl[i] = dir; bface[i] = dir;
+    }
+  }
+  function shoalStep(run, loc, dt) {
+    lastCam = run.cam.x;
+    var b = run.boat, i, j, k;
+    if (Math.abs(b.vx) > SB.boatV) startle(b.x, 0, 0, SB.boatR); // the hull overhead: fish near the top under it
+    for (k = 0; k < SHN; k++) { shT[k] -= dt; if (shT[k] <= 0) { shT[k] = G.vrng.range(SB.turn0, SB.turn1); shDir[k] = -shDir[k]; shY[k] = clamp(shY[k] + G.vrng.range(-10, 10), 16, Math.max(20, loc.maxDepth * SB.deep)); } }
+    for (i = 0; i < BN; i++) {
+      if (!bon[i]) continue;
+      k = (i / SHMAX) | 0;
+      var cx0 = 0, cy0 = 0, ax = 0, ay = 0, sx = 0, sy = 0, n = 0;
+      for (j = k * SHMAX; j < k * SHMAX + SHMAX; j++) {
+        if (!bon[j] || j === i) continue;
+        var dx = wrapD(bx[j] - bx[i]), dy = by[j] - by[i];
+        cx0 += dx; cy0 += dy; ax += bvx[j]; ay += bvy[j]; n++;
+        var ux = Math.abs(dx) / (shL[k] * 1.3), uy = Math.abs(dy) / (shH[k] * 1.4), u = Math.max(ux, uy);
+        if (u < 1) { sx -= (dx >= 0 ? 1 : -1) * (1 - u) * shL[k]; sy -= (dy >= 0 ? 1 : -1) * (1 - u) * shH[k] * 0.5; }
+      }
+      var gx = shDir[k] * shV[k], gy = (shY[k] - by[i]) * 0.3, tx = bvx[i], ty = bvy[i];
+      if (n) {
+        cx0 /= n; cy0 /= n; ax /= n; ay /= n;
+        var far = Math.sqrt(cx0 * cx0 + cy0 * cy0) > SB.cohR ? 3 : 1;
+        tx += (sx * SB.kSep + (ax - bvx[i]) * SB.kAli + cx0 * SB.kCoh * far + (gx - bvx[i]) * SB.kGoal) * dt;
+        ty += (sy * SB.kSep + (ay - bvy[i]) * SB.kAli + cy0 * SB.kCoh * far + (gy - bvy[i]) * SB.kGoal) * dt;
+      } else { tx += (gx - bvx[i]) * SB.kGoal * dt; ty += (gy - bvy[i]) * SB.kGoal * dt; }
+      if (bsc[i] > 0) { // startled: away and a little down, fast, fading out
+        var s = Math.min(1, bsc[i] / (SB.scareT * 0.5)), k2 = Math.min(1, SB.scareA * dt);
+        tx += (bfl[i] * SB.scareV * s - tx) * k2 * s; ty += (SB.scareV * 0.3 * s - ty) * k2 * s;
+        bsc[i] -= dt;
+      }
+      var sp = Math.sqrt(tx * tx + ty * ty), vm = bsc[i] > 0 ? SB.scareV : SB.vmax;
+      if (sp > vm) { tx *= vm / sp; ty *= vm / sp; }
+      if (Math.abs(ty) > 0.6 * Math.max(sp, 1) && bsc[i] <= 0) ty = (ty > 0 ? 0.6 : -0.6) * Math.max(sp, 1);
+      bvx[i] = tx; bvy[i] = ty;
+      bph[i] += (1 + Math.sqrt(tx * tx + ty * ty) / 4) * dt; // the beat: faster as it goes
+      bturn[i] = Math.max(0, bturn[i] - dt);
+      if (bsc[i] <= 0 && Math.abs(tx) > 1) { var nf = tx > 0 ? 1 : -1; if (nf !== bface[i]) { bface[i] = nf; bturn[i] = SB.turnT * 2; } }
+    }
+    for (i = 0; i < BN; i++) if (bon[i]) {
+      bx[i] += bvx[i] * dt; bx[i] -= FAR * Math.floor(bx[i] / FAR);
+      by[i] = clamp(by[i] + bvy[i] * dt, 12, Math.max(14, loc.maxDepth * SB.deep + 16));
+    }
+    // The spacing rule: no two of a shoal closer than sepX × length across while within
+    // sepY × height down; pushed apart along the easier way, three passes.
+    for (var it = 0; it < 3; it++) for (k = 0; k < SHN; k++) for (i = k * SHMAX; i < k * SHMAX + SHMAX; i++) {
+      if (!bon[i]) continue;
+      for (j = i + 1; j < k * SHMAX + SHMAX; j++) {
+        if (!bon[j]) continue;
+        var ddx = wrapD(bx[j] - bx[i]), ddy = by[j] - by[i], mx2 = SB.sepX * shL[k] - Math.abs(ddx), my2 = SB.sepY * shH[k] - Math.abs(ddy);
+        if (mx2 <= 0 || my2 <= 0) continue;
+        if (my2 * shL[k] < mx2 * shH[k]) { var py = (ddy >= 0 ? 1 : -1) * my2 * 0.5 + (ddy >= 0 ? 0.01 : -0.01); by[i] -= py; by[j] += py; }
+        else { var px = (ddx >= 0 ? 1 : -1) * mx2 * 0.5 + (ddx >= 0 ? 0.01 : -0.01); bx[i] -= px; bx[j] += px; }
+      }
+    }
+  }
+  function drawShoals(ctx, camPx, wyS) {
+    var FG = G.gfx.fishgen;
+    for (var i = 0; i < BN; i++) {
+      if (!bon[i]) continue;
+      var k = (i / SHMAX) | 0, xs = ((bx[i] - camPx * 0.5) % FAR + FAR) % FAR - 160; // parallax 0.5, wrapping
+      var fr = bturn[i] > 0 ? FG.FR.TURN2 : FG.BEAT[Math.floor(bph[i] * 4) & 3];
+      drawSwimmer(ctx, FG.baseSwimmer(SH_BASE[k], 1, fr, true, bface[i] < 0), xs, wyS + by[i]);
+    }
+  }
+
   // P2-3: the boat's lantern at night throws a faint cone down into the water from the bow,
   // in four flat steps of alpha.
   var cone = null, CONE_HW = 30; // half its width at the bottom, world px
@@ -592,10 +708,7 @@ G.scene.underwater = (function () {
     ctx.drawImage(set.far, fo, 0, fw, HH, 0, wyS, fw / HI, H);
     if (fw < VW) ctx.drawImage(set.far, 0, 0, VW - fw, HH, fw / HI, wyS, (VW - fw) / HI, H);
     ctx.globalAlpha = alpha * 0.3;
-    for (var b = 0; b < BGN; b++) {
-      var bxs = ((bx[b] - camPx * 0.5) % 640 + 640) % 640 - 160; // parallax 0.5, wrapping
-      drawSwimmer(ctx, G.gfx.fishgen.baseSwimmer(BG_BASE[b], 1, G.gfx.fishgen.BEAT[Math.floor(t * 4 + b) & 3], true, bv[b] < 0), bxs, wyS + by[b]); // a 1 Hz beat
-    }
+    drawShoals(ctx, camPx, wyS);
     drawCone(ctx, loc, camPx, wyS, alpha);
     ctx.globalAlpha = alpha;
     drawLayer(ctx, set.bottom, camPx, wyS, H);
@@ -930,7 +1043,12 @@ G.scene.underwater = (function () {
   }
 
   return {
-    flow: flow, weedFrame: weedFrame, bodyStep: bodyStep, swimStep: swimStep, SW: SW,
+    flow: flow, weedFrame: weedFrame, bodyStep: bodyStep, swimStep: swimStep, SW: SW, SB: SB, startle: startle,
+    shoals: function () { // dbg.shoals: the far fish (far-layer x, y, velocity, shoal, scare left, facing)
+      var out = [];
+      for (var i = 0; i < BN; i++) if (bon[i]) out.push({ i: i, shoal: (i / SHMAX) | 0, x: +bx[i].toFixed(2), y: +by[i].toFixed(2), vx: +bvx[i].toFixed(2), vy: +bvy[i].toFixed(2), scared: +Math.max(0, bsc[i]).toFixed(2), face: bface[i], L: +shL[(i / SHMAX) | 0].toFixed(2), H: +shH[(i / SHMAX) | 0].toFixed(2) });
+      return out;
+    },
     fishBody: function (i) { // dbg.fishBody: slot 0..7, or 'hook'
       var bd = bodies[i === 'hook' ? HOOKB : i];
       if (!bd || bd.uid < 0) return null;

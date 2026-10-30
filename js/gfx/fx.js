@@ -115,14 +115,17 @@ G.gfx.fx = (function () {
   function splash(px, y, power) {
     emit('splash', px, y - 1, 8 + Math.round(10 * power));
     if (G.gfx.surface) G.gfx.surface.poke(px, 0.25 + 0.75 * power); // Phase 20: and dents the surface
+    if (onSplash) onSplash(px, power); // Phase 30: the far fish startle
     ripple(px, y + 2, 1, 7, 0.7);
     ripple(px, y + 3, 3, 12 + 8 * power, 1.6);
   }
 
   function clear() { n = 0; rn = 0; }
+  var onSplash = null;
 
   return {
     setFlow: function (v) { flow = v; },
+    listen: function (fn) { onSplash = fn; }, // Phase 30: fn(x, power) on every splash
     MAX: MAX, RMAX: RMAX, emit: emit, ripple: ripple, splash: splash, update: update, draw: draw, clear: clear,
     count: function () { return n; },
     ripples: function () { return rn; },

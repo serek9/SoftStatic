@@ -1,7 +1,7 @@
 # SoftStatic: Fish Swimming Phases 27–30
 
 **Date:** 2026-10-30. **Repo state:** Phases 1–26 done (PLAN.md §8.1), `main` at `d1baf85`.
-**Status:** Asked for by the user on 2026-10-30 ("make a plan to improve fish swim realism and start with it"). Phases 27–29 are done (PLAN.md §8.1); the user asked on 2026-10-30 for 29 and then the rest in turn.
+**Status:** Asked for by the user on 2026-10-30 ("make a plan to improve fish swim realism and start with it"). Phases 27–30 are all done (PLAN.md §8.1); the user asked on 2026-10-30 for 29 and then the rest in turn.
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like PLAN_REALISM.md, this file adds phases after the approved spec and does not edit §0–§7 or Appendix V.
 
 The user asked for one thing: fish should swim more realistically.
