@@ -8,14 +8,14 @@ G.core.input = (function () {
   // Phase 45: setup opens the tackle panel on the boat. S presses it and down together, so S
   // still moves down every menu and walks the shop; on the boat only ↓ alone (or a tap on the
   // dog) pets him.
-  var NAMES = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still', 'setup'];
+  var NAMES = ['left', 'right', 'action', 'pause', 'journal', 'map', 'up', 'down', 'back', 'still', 'setup'];
   var KEYS = {
     KeyA: 'left', ArrowLeft: 'left',
     KeyD: 'right', ArrowRight: 'right',
     KeyW: 'up', ArrowUp: 'up',
     KeyS: ['down', 'setup'], ArrowDown: 'down',
     Space: 'action', Enter: 'action',
-    KeyP: 'pause', KeyJ: 'journal', KeyM: 'map', Tab: 'passive', Escape: 'back',
+    KeyP: 'pause', KeyJ: 'journal', KeyM: 'map', Escape: 'back',
     KeyH: 'still' // audit P3-2: hide the HUD for a still picture
   };
 
@@ -57,7 +57,6 @@ G.core.input = (function () {
   // edges steer and the middle is the action (hold to charge or reel); in a menu, the edges
   // are left and right, the top and bottom middle are up and down, the centre is the action.
   var BUTTONS = [
-    { act: 'passive', label: 'TAB', x: 428, y: 332, w: 40, h: 22 },
     { act: 'journal', label: 'J', x: 472, y: 332, w: 28, h: 22 },
     { act: 'map', label: 'M', x: 504, y: 332, w: 28, h: 22 },
     { act: 'setup', label: 'S', x: 536, y: 332, w: 28, h: 22 }, // Phase 45: the tackle panel, next to M

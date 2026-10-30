@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // lures you have, with their counts). It is not an overlay: the world goes on behind it (the
 // boat drifts, the clock runs); the sailing scene gives it the keys while it is open and does
 // not sail or cast. ↑/↓ (and W) move, A/D or ←/→ switch column, Space picks, S or Esc closes.
-// A pick goes into save.gear at once (rod, bait), so the next cast and passive mode use it;
+// A pick goes into save.gear at once (rod, bait), so the next cast uses it;
 // what changed is kept for the scene, which plays the fisher's short act for it (changes()).
 G.ui = G.ui || {};
 G.ui.setup = (function () {

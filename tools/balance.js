@@ -5,8 +5,8 @@
 //   node tools/balance.js --saves                 saves from each milestone load and play (14.8)
 //   node tools/balance.js --replay <seed> [min]   a deterministic headless session, run twice;
 //                                                 prints its hash and fails if the runs differ
-//   node tools/balance.js --passive               passive income against active (V7: 60% ±5%),
-//                                                 and time away fished twice gives the same result
+//   node tools/balance.js --passive               Phase 52: no income without fishing (passive mode
+//                                                 and time away are gone)
 //   node tools/balance.js --fight                 how fights end by player and gear tier (Phase 23)
 //   node tools/balance.js --rod                   the rod's bend: shapes, action, springing (PLAN_ROD.md)
 // It loads the same files index.html loads, in the same order, into a vm context.
@@ -162,21 +162,12 @@ function validate(G, opts) {
   if (!(g.lantern.nightDepth > g.nightDepth)) err('lantern: must show deeper fish than without it');
   if (!(g.depthFinder.bands > 0)) err('depth finder: needs depth bands');
   ['pull0', 'pull1', 'tired0', 'tired1', 'pullRise', 'easeFall', 'run', 'tiredRise', 'release', 'recover', 'slipT', 'slipD', 'escape', 'd0',
-    'holdLate', 'holdPassive', 'slackT', 'holdLoss', 'jumpLoss', 'shakeLen0', 'shakeLen1', 'shakeGap0', 'shakeGap1', 'shakeRise', 'jumpRate', 'jumpLen', 'jumpHigh', 'jumpSpike']
+    'holdLate', 'slackT', 'holdLoss', 'jumpLoss', 'shakeLen0', 'shakeLen1', 'shakeGap0', 'shakeGap1', 'shakeRise', 'jumpRate', 'jumpLen', 'jumpHigh', 'jumpSpike']
     .forEach(k => { if (!(typeof g.fight[k] === 'number' && g.fight[k] > 0)) err('fight constant ' + k); });
 
-  // D5: passive.incomeMult is set once, in data/gear.js, and nowhere else.
-  if (!(g.passive.incomeMult > 0 && g.passive.incomeMult < 1)) err('passive.incomeMult must be between 0 and 1');
-  const defs = [];
-  (function walk(dir) {
-    for (const n of fs.readdirSync(path.join(ROOT, dir))) {
-      const p = path.join(dir, n);
-      if (n === '.git' || n === 'node_modules') continue;
-      if (fs.statSync(path.join(ROOT, p)).isDirectory()) walk(p);
-      else if (n.endsWith('.js') && p !== path.join('tools', 'balance.js') && /incomeMult\s*[:=]/.test(stripCode(fs.readFileSync(path.join(ROOT, p), 'utf8')))) defs.push(p);
-    }
-  })('.');
-  if (defs.length !== 1 || defs[0] !== path.join('data', 'gear.js')) err('D5: incomeMult must be defined only in data/gear.js (found in ' + defs.join(', ') + ')');
+  // Phase 52: passive income is gone; nothing may bring it back (V7, D5 retired).
+  if (g.passive) err('gear.passive: passive mode was removed in Phase 52');
+  if (G.sim.passive) err('js/sim/passive.js: passive mode was removed in Phase 52');
 
   return { errors, warnings };
 }
@@ -361,7 +352,7 @@ function session(G, seed, opts) {
           const f = school.fish[bite.slot], sp = data.fish[f.sp], q = S.economy.sizeQ(rng.next(), data), sz = S.economy.size(sp, q, {});
           st.cur = { sp: f.sp, id: sp.id, q, len: sz.len, w: sz.w,
             price: S.economy.price(sp, q, data), hintRefs: sp.hintRefs, windowCatch: Object.keys(latched)[0] || null };
-          S.fight.start(fight, f.sp, sp, fx, rng, data, S.bite.hold(bite.t, false, data)); // Phase 23: the hold from the hook-set time
+          S.fight.start(fight, f.sp, sp, fx, rng, data, S.bite.hold(bite.t, data)); // Phase 23: the hold from the hook-set time
           f.active = false; S.fish_ai.scatter(school); S.bite.reset(bite);
           lure.active = false; st.phase = 'fight'; st.t = 0; h(f.sp);
         } else if (st.t >= P.giveUp) { lure.active = false; st.phase = 'reel'; st.t = 0; }
@@ -489,7 +480,7 @@ function pacing() {
 // 14.8: a save as each milestone wrote it (the shapes of save.js defaults() at those commits,
 // with some play in them) must load in today's game: through the real export/import string,
 // migrated to the current version, with every field today's defaults have, and usable by
-// the economy, the passive sim and the unlock checks.
+// the economy and the unlock checks.
 
 const OLD_SAVES = [
   { from: 'Phase 1 (2f90f2b), v1', save: { version: 1, coins: 12, gear: {}, baits: {}, journal: {}, kept: [], cabinLevel: 0, unlocks: {}, unease: {}, clock: 0, lastSeen: 0, flags: {}, tapes: [], settings: {}, rng: null } },
@@ -543,8 +534,6 @@ function savesCheck() {
         if (!(fx.maxMass > 0 && fx.castMax > 0)) probs.push('gear effects');
         if (!Array.isArray(s.gear.rods) || !s.gear.rods.includes(s.gear.rod)) probs.push('the rod in hand is not owned');
         for (const id in G.data.locations) E.canUnlock(s, id, G.data);
-        const ps = G.sim.passive.create(s, s.loc || 'fog', G.data);
-        G.sim.passive.plan(ps, new G.core.rng.Rng(1), G.data);
         for (const id in s.journal) if (!G.data.fish.some(f => f.id === id)) probs.push('journal species ' + id + ' no longer exists');
         if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
         const want = o.look || { fisher: 'red_cap', dog: 'golden' }; // Phase 47: kept when chosen, the default when absent or broken
@@ -560,41 +549,26 @@ function savesCheck() {
 }
 
 // ---- --passive ----------------------------------------------------------------------------
-// V7: passive earns about 60% of active income (passive.incomeMult, D5). Both start from a new
-// save on Fogbound at 19:00 with the starter gear (the active model does not shop here) and
-// fish the same game time on the same seeds. Then time away is fished twice from the same
-// save and seed, which must give the same save and tape.
+// Phase 52 (the user, 2026-10-30: "remove passive income"): passive mode (TAB) and time away
+// are gone. Coins come only from fish the player lands and sells. Checks: the passive sim is
+// not loaded and the data has no passive multiplier; no key or button starts it; and a save
+// that has been away for 8 hours loads with the same coins and journal it was saved with.
 
 function passiveCheck() {
-  const seeds = [11, 22, 33, 44, 55, 66, 77, 88, 99, 110], secs = 3600;
-  let act = 0, pas = 0;
-  console.log('seed   active coins/h   passive coins/h   ratio   passive catches');
-  for (const seed of seeds) {
-    const a = session(load(), seed, { shop: false });
-    a.run(secs);
-    const G = load(), save = G.core.save.defaults(), ps = G.sim.passive.create(save, 'fog', G.data), rng = new G.core.rng.Rng(seed);
-    let t = 0, n = 0;
-    while (t < secs) { t += G.sim.passive.cycle(ps, rng, G.data); if (ps.plan.result === G.sim.passive.CAUGHT) n++; }
-    const ah = a.save.coins * 3600 / secs, ph = save.coins * 3600 / t;
-    act += ah; pas += ph;
-    console.log(String(seed).padEnd(6) + ' ' + ah.toFixed(0).padStart(14) + ' ' + ph.toFixed(0).padStart(17) + ' ' + (ph / ah).toFixed(3).padStart(7) + ' ' + String(n).padStart(17));
-  }
-  const ratio = pas / act, mult = load().data.gear.passive.incomeMult;
-  console.log('\npassive / active over all seeds: ' + ratio.toFixed(3) + ' (incomeMult ' + mult + '; before it: ' + (ratio / mult).toFixed(3) + ')');
-  const pass = ratio >= 0.55 && ratio <= 0.65;
-  console.log((pass ? 'PASS' : 'FAIL') + ' passive income ' + (ratio * 100).toFixed(1) + '% of active (target 60% ±5%)');
-
-  const runAway = () => {
-    const G = load(), save = G.core.save.defaults(), rng = new G.core.rng.Rng(4242);
-    save.lastSeen = 1e12; save.clock = 23;
-    const tape = G.sim.passive.away(save, 1e12 + 5 * 3600 * 1000, rng, G.data);
-    return { json: JSON.stringify(save), tape };
-  };
-  const x = runAway(), y = runAway(), same = x.json === y.json;
-  console.log('away 5 h: ' + x.tape.caught + ' caught, ' + x.tape.lost + ' lost, +' + x.tape.coins + ' coins, ' + x.tape.entries.length + ' tape lines, gap ' +
-    (x.tape.gap ? x.tape.gap.from.toFixed(2) + '-' + x.tape.gap.to.toFixed(2) : 'none') + ', phantom ' + (x.tape.phantom || 'none') + ', clock ' + x.tape.from.toFixed(2) + ' -> ' + x.tape.to.toFixed(2));
-  console.log((same ? 'PASS' : 'FAIL') + ' time away: the same save and seed give ' + (same ? 'the same' : 'a different') + ' result');
-  return pass && same ? 0 : 1;
+  const G = load();
+  let bad = 0;
+  const gone = !G.sim.passive && !G.data.gear.passive;
+  console.log((gone ? 'PASS' : 'FAIL') + ' no passive sim and no passive.incomeMult');
+  const src = fs.readFileSync(path.join(ROOT, 'js/core/input.js'), 'utf8'), html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const noKey = !/'passive'/.test(src) && !/Tab:/.test(src) && !/passive\.js|tape\.js|away\(/.test(html);
+  console.log((noKey ? 'PASS' : 'FAIL') + ' no TAB key, no button and no time-away call at boot');
+  const SV = G.core.save, s0 = SV.defaults();
+  s0.coins = 37; s0.lastSeen = 1e12; s0.journal.gloam_perch = { caught: 2, bestLen: 20, bestW: 0.3, hints: [], seen: true, phantom: false };
+  const r = SV.importString(SV.exportString(JSON.parse(JSON.stringify(s0))));
+  const same = r.ok && r.save.coins === 37 && r.save.journal.gloam_perch.caught === 2 && Object.keys(r.save.journal).length === 1;
+  console.log((same ? 'PASS' : 'FAIL') + ' a save away for hours loads as it was saved (coins ' + (r.ok ? r.save.coins : '-') + ')');
+  bad = (gone ? 0 : 1) + (noKey ? 0 : 1) + (same ? 0 : 1);
+  return bad ? 1 : 0;
 }
 
 // ---- --fight --------------------------------------------------------------------------------
@@ -606,7 +580,7 @@ function passiveCheck() {
 
 function fightCheck() {
   const G = load(), F = G.sim.fight, d = G.data, g = d.gear, N = 60;
-  const hold = G.sim.bite.hold(P.hookDelay, false, d);
+  const hold = G.sim.bite.hold(P.hookDelay, d);
   const players = [
     ['always', () => 1], ['never', () => 0],
     ['tapping', (st, rng, m) => { if ((m.left -= DT) <= 0) { m.on = !m.on; m.left = rng.range(0.1, 0.5); } return m.on ? 1 : 0; }],
@@ -614,7 +588,7 @@ function fightCheck() {
     ['skill 0.8', (st, rng) => F.autoPlayer(st, 0.8, rng)], ['skill 0.85', (st, rng) => F.autoPlayer(st, 0.85, rng)]
   ];
   const all = {};
-  console.log('hook hold at a 0.5 s hook-set: ' + hold.toFixed(3) + '  (instant 1, late ' + g.fight.holdLate + ', passive ' + g.fight.holdPassive + ')');
+  console.log('hook hold at a 0.5 s hook-set: ' + hold.toFixed(3) + '  (instant 1, late ' + g.fight.holdLate + ')');
   console.log('tier  player       landed  snapped  thrown  run out  (s to a loss)');
   for (let tier = 0; tier < g.lines.length; tier++) { // the five ladder tiers (Phase 43: with the rod's small-fish hold)
     const gear = { lineStrength: g.lines[tier].strength, reelSpeed: g.reels[tier].speed, maxMass: g.rods[tier].maxMass, smallHook: g.rods[tier].smallHook };

@@ -39,7 +39,7 @@ G.ui.card = (function () {
   }
 
   function isOpen() { return cur !== null; }
-  // Called every step while the card shows, in active and passive play alike.
+  // Called every step while the card shows.
   function tick(dt) { at += dt; }
   // 0 when it opens, 1 once it has slid into place (0.25 s, easing out).
   function shownBy() { var u = Math.min(1, at / 0.25); return 1 - (1 - u) * (1 - u) * (1 - u); }

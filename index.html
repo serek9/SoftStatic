@@ -42,7 +42,6 @@
 <script src="js/sim/bite.js"></script>
 <script src="js/sim/fight.js"></script>
 <script src="js/sim/economy.js"></script>
-<script src="js/sim/passive.js"></script>
 <!-- gfx -->
 <script src="js/gfx/bake.js"></script>
 <script src="js/gfx/sprites.js"></script>
@@ -73,7 +72,6 @@
 <script src="js/ui/shop.js"></script>
 <script src="js/ui/map.js"></script>
 <script src="js/ui/cabin.js"></script>
-<script src="js/ui/tape.js"></script>
 <!-- audio -->
 <script src="js/audio/engine.js"></script>
 
@@ -81,7 +79,7 @@
 <script>
 (function () {
   var q = new URLSearchParams(location.search);
-  // ?compact (12.5): a 160×90 view with no HUD for a second monitor, fishing passively. The
+  // ?compact (12.5): a 160×90 view with no HUD for a second monitor. The
   // game still draws at 640×360 into an offscreen canvas, which is shrunk onto the page.
   G.core.compact = q.has('compact');
   var V = G.core.view, W = G.core.compact ? 160 : V.W, H = G.core.compact ? 90 : V.H;
@@ -121,10 +119,6 @@
   G.core.state.register('cabin', G.ui.cabin);
   G.core.state.register('gallery', G.core.debug.gallery);
   G.core.state.change(q.has('gallery') ? 'gallery' : 'sailing');
-  if (!q.has('gallery')) {
-    G.ui.tape.away(Date.now()); // 12.3: time away is fished passively, and the tape shows it
-    if (G.core.compact) G.scene.sailing.setPassive(true);
-  }
 
   // Another tab owns the save (12.5): this one waits, and a click or key brings it back here.
   function reclaim() { if (G.core.save.lost()) { G.core.save.claim(); location.reload(); } }
@@ -138,7 +132,7 @@
     F.drawText(c, B, 320 - (F.measure(B) >> 1), 176, 'fog_mid');
   }
 
-  // An open overlay (pause, journal, map, tape) takes the step and the scene waits (9.2).
+  // An open overlay (pause, journal, map, look picker) takes the step and the scene waits (9.2).
   G.core.loop.start({
     update: function (dt) { if (!G.ui.menu.update(dt)) G.core.state.update(dt); G.audio.engine.step(dt); },
     // Each part draws in its own space (G.core.view): the scene, the overlay, the buttons.

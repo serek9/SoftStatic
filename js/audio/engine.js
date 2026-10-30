@@ -538,7 +538,7 @@ G.audio.engine = (function () {
     set(bus.sfx.gain, BUS.sfx * (menu === 'pause' ? 0.3 : 1), 0.1);
     set(ambLP.frequency, scene === 'sailing' ? 18000 : 520, 0.3);
 
-    if (menu !== prev.menu) { if (menu && menu !== 'tape') play('page'); prev.menu = menu; }
+    if (menu !== prev.menu) { if (menu) play('page'); prev.menu = menu; }
     if (scene !== prev.scene) { if (prev.scene) play(scene === 'shop' || prev.scene === 'shop' ? 'bell' : 'page'); prev.scene = scene; prev.coins = save.coins; }
     set(amb.fridge.gain, scene === 'shop' ? 0.01 : 0, 0.5);                            // Phase 39: the tank's pump hums in the shop
     if (scene === 'shop' && save.coins < prev.coins) play('buy');
@@ -614,7 +614,7 @@ G.audio.engine = (function () {
     var turns = 0, load = 0, dD = 0;
     if (fsm === 'fighting' || fsm === 'hooked') {
       dD = (F.D - prev.D) / dt;
-      var held = run.passive.on ? dD < -1e-4 : G.core.input.held('action');
+      var held = G.core.input.held('action');
       if (held) { turns = F.mode === 'tired' ? 2.2 : 0.7; load = Math.min(1, 0.4 + F.T); }
     } else if (fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest') {
       if (c.ly < prev.ly - 0.01) { turns = 2.2; load = 0.3 + 0.7 * G.gfx.rope.st.taut; }
@@ -640,12 +640,6 @@ G.audio.engine = (function () {
     set(amb.spool.gain, fly ? Math.min(0.025, spd * 0.00025) : 0, 0.03);
     set(amb.spoolBP.frequency, 700 + Math.min(2500, spd * 9), 0.03);
     prev.lx = c.lx; prev.cly = c.ly;
-
-    // Passive: the float going out and a catch coming in.
-    var pv = run.passive;
-    if (pv.on && pv.pl && !prev.pl) waterSplash(0.15, pv.x, 'float');
-    if (pv.cycles > prev.cycles && pv.note.charAt(0) === '+') { waterSplash(0.45, pv.x, 'catch'); play('coin'); }
-    prev.pl = pv.on && pv.pl; prev.cycles = pv.cycles;
 
     // The Pines' traffic light: its relay clicks as it changes.
     if (loc === 'pines' && run.scen) { if (run.scen.on !== prev.sig) play('relay', panAt(G.data.locations.pines.landmarks[1].x)); prev.sig = run.scen.on; }

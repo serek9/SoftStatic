@@ -240,23 +240,8 @@ G.core.debug = (function () {
       if (!G.scene.sailing.forceAnomaly(id)) return 'anomalies: ' + G.data.anomalies.list.map(function (a) { return a.id; }).join(', ');
       return dbg.anomaly();
     },
-    // dbg.passive(true|false) turns passive mode on or off (as TAB does); dbg.passive() reads it.
-    passive: function (on) { return on === undefined ? G.state.run.passive.on : G.scene.sailing.setPassive(on); },
-    // dbg.away(seconds) plays out that much time away now (12.3), as a reload would, and opens the tape.
-    away: function (secs) {
-      var save = G.state.save, now = Date.now();
-      if (G.state.run.fsm !== 'sailing') return 'reel in first';
-      save.lastSeen = now - (secs || 0) * 1000;
-      var tp = G.ui.tape.away(now);
-      return tp ? { caught: tp.caught, lost: tp.lost, coins: tp.coins, lines: tp.entries.length, gap: tp.gap, phantom: tp.phantom } : 'under a minute: nothing to fish';
-    },
-    // dbg.tape(i) returns saved tape i (0 is the newest) as its shown lines.
-    tape: function (i) {
-      var tp = G.state.save.tapes[i || 0];
-      if (!tp) return null;
-      G.ui.tape.show(tp);
-      return G.ui.tape.rows();
-    },
+    // Phase 52: passive mode and time away are gone, and dbg.passive, dbg.away and dbg.tape with them.
+    passive: function () { return 'passive mode was removed in Phase 52'; },
     // dbg.restore() pays for the next cabin stage; returns the level.
     restore: function () { G.sim.economy.restoreCabin(G.state.save, G.data); G.core.save.autosave('purchase'); return G.state.save.cabinLevel; },
     // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).

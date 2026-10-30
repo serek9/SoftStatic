@@ -30,7 +30,7 @@ python3 -m http.server 5517 --bind 127.0.0.1    # then open http://127.0.0.1:551
 node tools/balance.js --validate                 # data and code checks (exit 1 on errors)
 node tools/balance.js --replay 12345             # determinism
 node tools/balance.js --pacing                   # economy against the V8 targets
-node tools/balance.js --passive                  # passive income share and time away
+node tools/balance.js --passive                  # passive income is gone and stays gone (Phase 52)
 node tools/balance.js --saves                    # saves from every milestone still load
 node tools/balance.js --fight                    # how fights end by player and gear (Phase 23)
 node tools/balance.js --rod                      # the rod's bend: shapes, action, springing (Phase 31b)

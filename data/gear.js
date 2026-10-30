@@ -47,8 +47,7 @@ G.data.gear = {
     { id: 'minnow', name: 'Minnows', cost: 6, pack: 10, attract: 1.4, rareBoost: 1.3 },
     { id: 'unlabelled', name: '', label: false, cost: 47, pack: 1, attract: 1.1, rareBoost: 3.0 }
   ],
-  // Phase 43: lures. Not used up by a cast: one is lost when the line snaps (never in passive
-  // mode), and counted in save.baits like the baits. cost is per lure, sold `pack` at a time.
+  // Phase 43: lures. Not used up by a cast: one is lost when the line snaps, and counted in save.baits like the baits. cost is per lure, sold `pack` at a time.
   // swim: where it fishes (the scene: sink × the bait's sink speed, down to maxDepthM m; 'top'
   // floats; 'dive' dives while reeled). Fish take them by fish.lures.
   lures: [
@@ -69,12 +68,12 @@ G.data.gear = {
     tiredRise: 0.06, release: 0.45, recover: 0.03,
     slipT: 0.6, slipD: 0.1, escape: 3,
     d0: 0.6,
-    // Phase 23 (R2): the hook hold and what works it loose. hold*: H at the hook-set (late,
-    // passive); slackT: below this T the line is slack; holdLoss and jumpLoss: H lost per s in
+    // Phase 23 (R2): the hook hold and what works it loose. holdLate: H at a hook-set at the
+    // bite window's end; slackT: below this T the line is slack; holdLoss and jumpLoss: H lost per s in
     // a shake or a jump on a slack line; shakes last shakeLen0..1 s, every shakeGap0..1 s
     // divided by the fish's speed; shakeRise: extra T per s reeling in one; jumps: chance per s
     // = fish.jumps × jumpRate when D < 0.5, jumpLen s long, a jump above jumpHigh adds jumpSpike T/s.
-    holdLate: 0.7, holdPassive: 0.85, slackT: 0.12, holdLoss: 0.7, jumpLoss: 0.6,
+    holdLate: 0.7, slackT: 0.12, holdLoss: 0.7, jumpLoss: 0.6,
     shakeLen0: 0.4, shakeLen1: 1.0, shakeGap0: 1.2, shakeGap1: 3, shakeRise: 0.25,
     jumpRate: 0.25, jumpLen: 1, jumpHigh: 0.6, jumpSpike: 0.6
   },
@@ -92,8 +91,6 @@ G.data.gear = {
     { name: 'Stove Lit', cost: 400, plaques: 6 },
     { name: 'Rug and Lamp', cost: 900, plaques: 8 },
     { name: 'Restored', cost: 2000, plaques: 10 }
-  ],
-
-  // Passive mode earns this share of active income (D5). The only place it is set.
-  passive: { incomeMult: 0.63 } // Phase 23: was 0.6; the fight change moved passive to 56.8% of active
+  ]
+  // Phase 52: passive mode (and passive.incomeMult, D5) is gone: no income without fishing.
 };
