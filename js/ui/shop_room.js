@@ -243,12 +243,40 @@ G.ui.shopRoom = (function () {
     }
   }
 
+  // Rusty from above (Phase 37), old, worn down to the game's mood: a pale canvas jacket, a
+  // white beard, a paper-coloured cap. Facing down or left (toward whoever is at his counter);
+  // frames 0 standing, 1 blinking, 2 a sip from his cup, 3 reading the paper.
+  var CANV = ['reed', 'reed_hi', 'paper_dark', 'paper'], RSKIN = ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi'], BEARD = ['stone_hi', 'birch', 'bone'];
+  var RCAP = ['reed', 'paper_dark', 'paper', 'bone'];
+  function paintRusty(c, dir, fr) {
+    var side = dir === 'side';
+    A.blob(c, 16, 22, side ? 6.5 : 8.5, 7, CANV, { bias: 0.05 });
+    box(c, 'reed', 15, 17, 2, 10);                                                     // the jacket's opening
+    if (fr === 3) { box(c, 'ink', 7, 22, 18, 9); box(c, 'paper', 8, 23, 16, 7); box(c, 'paper_dark', 8, 25, 16, 1); box(c, 'paper_dark', 8, 27, 10, 1); } // the paper
+    else if (fr === 2) { A.limb(c, side ? 18 : 21, 20, side ? 20 : 19, 14, 1.8, CANV, 0.1); box(c, 'ink', side ? 19 : 17, 10, 5, 5); box(c, 'cream', side ? 20 : 18, 11, 3, 3); } // the cup up
+    else { A.blob(c, side ? 20 : 9, 27, 1.6, 1.4, RSKIN); if (!side) A.blob(c, 23, 27, 1.6, 1.4, RSKIN); }
+    var hy = fr === 3 ? 12 : 11;
+    A.blob(c, side ? 15 : 16, hy, 5, 5, RSKIN, { bias: 0.1 });
+    if (side) {
+      A.blob(c, 19, hy + 3, 3, 3, BEARD, { bias: 0.2 });
+      A.blob(c, 14, hy - 4, 5, 3.5, RCAP, { bias: 0.1 }); box(c, 'reed', 17, hy - 2, 5, 2);
+      if (fr !== 1 && fr !== 3) px(c, 'ink', 18, hy);
+      box(c, 'stone_hi', 10, hy - 2, 2, 4);
+    } else {
+      A.blob(c, 16, hy + 3.5, 4, 3, BEARD, { bias: 0.2 });
+      A.blob(c, 16, hy - 4, 5.5, 3.5, RCAP, { bias: 0.1 }); box(c, 'reed', 10, hy - 2, 12, 2);
+      if (fr === 3) { /* reading: the cap's brim hides his eyes */ }
+      else if (fr === 1) { box(c, 'skin_shadow', 13, hy, 2, 1); box(c, 'skin_shadow', 17, hy, 2, 1); }
+      else { px(c, 'ink', 14, hy); px(c, 'ink', 18, hy); }
+    }
+  }
+
   var art = {};
   function sprite(kind, dir, fr) {
     var flip = dir === 'left', d = dir === 'left' || dir === 'right' ? 'side' : dir, key = kind + d + fr + (flip ? '<' : '');
     if (art[key]) return art[key];
     if (flip) return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr), 'x'));
-    return (art[key] = G.gfx.bake.layer(32, 32, function (c) { A.reset(); (kind === 'dog' ? paintDog : paintFisher)(c, d, fr); A.reset(); }));
+    return (art[key] = G.gfx.bake.layer(32, 32, function (c) { A.reset(); (kind === 'dog' ? paintDog : (kind === 'rusty' ? paintRusty : paintFisher))(c, d, fr); A.reset(); }));
   }
 
   // ---- The walk ---------------------------------------------------------------------------
@@ -309,8 +337,9 @@ G.ui.shopRoom = (function () {
   }
   function blockedList() { var o = []; for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) if (isBlocked(c, r)) o.push([c, r]); return o; }
 
-  // Draws the room, the glass, the dog and the fisher, in rows so the nearer one is in front.
-  function draw(ctx, st, t, hour) {
+  // Draws the room, the glass, Rusty behind his counter, the dog and the fisher, the one
+  // further down the room in front. rusty: {face, fr} (Phase 37).
+  function draw(ctx, st, t, hour, rusty) {
     ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
     ctx.drawImage(bake(), OX, OY);
     // The windows' glass (36: a still dusk; Phase 39 gives it the hour).
@@ -328,6 +357,7 @@ G.ui.shopRoom = (function () {
     var ha = h / 12 * 2 * Math.PI, ma = (hour % 1) * 2 * Math.PI;
     for (var i = 1; i <= 3; i++) ctx.fillRect(Math.round(cx + Math.sin(ma) * i), Math.round(cy - Math.cos(ma) * i), 1, 1);
     for (i = 1; i <= 2; i++) ctx.fillRect(Math.round(cx + Math.sin(ha) * i), Math.round(cy - Math.cos(ha) * i), 1, 1);
+    if (rusty) ctx.drawImage(sprite('rusty', rusty.face, rusty.fr), OX + RUSTY[0] * T, OY + RUSTY[1] * T - 6);
     // The dog and the fisher, the one further down the room in front.
     var dg = st.dog, u = st.moving ? st.t : 1;
     var fx = OX + (st.c + (st.tc - st.c) * u) * T, fy = OY + (st.r + (st.tr - st.r) * u) * T - 6;
