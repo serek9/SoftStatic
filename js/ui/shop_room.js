@@ -30,6 +30,7 @@ G.ui.shopRoom = (function () {
   var OBJECTS = [
     { id: 'rack', c: 1, r: 1, w: 2, h: 1, block: true, talk: 'rack' },        // rods, reels and lines
     { id: 'jar', c: 3, r: 1, w: 1, h: 1, block: true, talk: 'jar' },          // the low shelf and the unlabelled jar
+    { id: 'case', c: 4, r: 1, w: 1, h: 1, block: true, talk: 'lures' },       // Phase 43: the lure case under the window
     { id: 'gear', c: 6, r: 1, w: 1, h: 1, block: true, talk: 'gear' },        // lantern and depth finder
     { id: 'counter', c: 8, r: 2, w: 1, h: 2, block: true, talk: 'rusty' },
     { id: 'counter2', c: 9, r: 3, w: 2, h: 1, block: true, talk: 'rusty' },
@@ -131,13 +132,22 @@ G.ui.shopRoom = (function () {
   function paintRack(c, x0, y0) {                                                    // a rod rack against the wall
     box(c, 'wood_deep', x0 + 2, y0 - 18, 60, 26); box(c, 'wood_dark', x0 + 3, y0 - 17, 58, 24);
     box(c, 'wood_mid', x0 + 2, y0 + 8, 60, 3); box(c, 'wood_dark', x0 + 2, y0 + 11, 60, 14); box(c, 'wood_deep', x0 + 2, y0 + 25, 60, 2);
-    for (var i = 0; i < 4; i++) box(c, 'wood_deep', x0 + 10 + i * 13, y0 + 10, 4, 2);   // the slots the rods stand in (drawn live, 38.2)
+    for (var i = 0; i < 5; i++) box(c, 'wood_deep', x0 + 8 + i * 10, y0 + 10, 4, 2);   // the slots the rods stand in (drawn live, 38.2; five since 43)
     box(c, 'stone_dark', x0 + 8, y0 - 15, 48, 2);                                    // the bar they lean on
   }
   function paintJarShelf(c, x0, y0) {                                                // a low shelf under the window
     box(c, 'wood_deep', x0 + 2, y0 + 6, 28, 20); box(c, 'wood_mid', x0 + 2, y0 + 6, 28, 3); box(c, 'wood_dark', x0 + 3, y0 + 9, 26, 15);
     box(c, 'ink', x0 + 6, y0 - 2, 10, 10); box(c, 'teal_dark', x0 + 7, y0 - 1, 8, 8); box(c, 'teal', x0 + 8, y0, 4, 6); box(c, 'stone', x0 + 7, y0 - 2, 8, 2); // the jar
     box(c, 'ink', x0 + 19, y0 + 1, 8, 7); box(c, 'paper_dark', x0 + 20, y0 + 2, 6, 5);                                // a tin
+  }
+  // Phase 43: a glass-topped lure case on short legs: rows of lures in their trays.
+  function paintCase(c, x0, y0) {
+    box(c, 'wood_deep', x0 + 3, y0 + 4, 26, 20); box(c, 'wood_mid', x0 + 3, y0 + 4, 26, 2); box(c, 'wood_dark', x0 + 4, y0 + 18, 24, 6);
+    box(c, 'ink', x0 + 5, y0 + 6, 22, 12); box(c, 'water_dark', x0 + 6, y0 + 7, 20, 10);
+    var dots = ['brass_hi', 'rust_hi', 'moss_hi', 'signal_amber', 'flame'];
+    for (var i = 0; i < 5; i++) { box(c, dots[i], x0 + 7 + i * 4, y0 + 9, 2, 1); box(c, dots[(i + 2) % 5], x0 + 8 + i * 4, y0 + 13, 2, 1); }
+    box(c, 'fog_light', x0 + 7, y0 + 7, 6, 1);                                       // the glass's glint
+    box(c, 'wood_deep', x0 + 5, y0 + 24, 2, 3); box(c, 'wood_deep', x0 + 25, y0 + 24, 2, 3);
   }
   function paintGearShelf(c, x0, y0) {                                               // a tall shelf between the windows
     box(c, 'wood_deep', x0 + 1, y0 - 22, 30, 48); box(c, 'wood_dark', x0 + 3, y0 - 20, 26, 44);
@@ -173,7 +183,7 @@ G.ui.shopRoom = (function () {
       else floorTile(c, x, y, cc, r);
     }
     box(c, 'ink', CLOCK * T + 10, 8, 12, 12); box(c, 'paper', CLOCK * T + 11, 9, 10, 10); box(c, 'paper_dark', CLOCK * T + 11, 17, 10, 2); // the clock (its hands are live)
-    paintRack(c, T, T); paintJarShelf(c, 3 * T, T); paintGearShelf(c, 6 * T, T); paintCounter(c);
+    paintRack(c, T, T); paintJarShelf(c, 3 * T, T); paintCase(c, 4 * T, T); paintGearShelf(c, 6 * T, T); paintCounter(c);
     paintBox(c, T, 3 * T, 'worms'); paintBox(c, T, 4 * T, 'crickets'); paintBox(c, T, 5 * T, 'tank');
     A.reset();
   }
@@ -340,14 +350,15 @@ G.ui.shopRoom = (function () {
 
   // What the shelves hold (Phase 38): the rods not yet his on the rack (tiers above his own),
   // the lantern and the finder unless bought, and the minnows and crickets left this visit.
-  var ROD_KEYS = ['stone_hi', 'wood_hi', 'rust_hi', 'moss_hi', 'bone'], shown = { rods: 0, lantern: false, finder: false, minnows: 0, crickets: 0 };
+  // Phase 43: every rod not yet his stands on the rack, in its blank's colour (five slots).
+  var shown = { rods: 0, lantern: false, finder: false, minnows: 0, crickets: 0 };
   function drawStock(ctx, stock, t) {
-    var x0 = OX + T, y0 = OY + T, i, n = 0;
-    for (i = 1; i < ROD_KEYS.length; i++) {
-      if (i <= stock.rod) continue;
-      var x = x0 + 11 + (i - 1) * 13;
+    var x0 = OX + T, y0 = OY + T, i, n = 0, rods = G.data.gear.rods;
+    for (i = 1; i < rods.length; i++) {
+      if (stock.rods && stock.rods.indexOf(i) >= 0) continue;
+      var x = x0 + 9 + (i - 1) * 10;
       ctx.fillStyle = P.ink; ctx.fillRect(x, y0 - 16, 2, 28);
-      ctx.fillStyle = P[ROD_KEYS[i]]; ctx.fillRect(x, y0 - 16, 1, 28);
+      ctx.fillStyle = P[rods[i].look[0]]; ctx.fillRect(x, y0 - 16, 1, 28);
       ctx.fillStyle = P.wood_lit; ctx.fillRect(x - 1, y0 + 4, 3, 6);
       ctx.fillStyle = P.stone_dark; ctx.fillRect(x + 2, y0 + 1, 1, 2);
       n++;

@@ -113,7 +113,8 @@ G.core.debug = (function () {
     // dbg.buy(kind) buys the next 'rod' | 'reel' | 'line' | 'lantern' | 'depthFinder', or dbg.buy('bait', id, n).
     buy: function (kind, id, n) {
       var E = G.sim.economy, save = G.state.save;
-      var r = kind === 'bait' ? E.buyBait(save, id, n || 10, G.data) : E.buy(save, kind, G.data);
+      var r = kind === 'bait' || kind === 'lure' ? E.buyBait(save, id, n || 10, G.data) : (kind === 'rod' && id !== undefined ? E.buyRod(save, +id, G.data) : E.buy(save, kind, G.data));
+      if (kind === 'lure') kind = 'bait'; // Phase 43: dbg.buy('lure', 'spinner', 3); dbg.buy('rod', 5) buys the wand
       if (r === E.OK) { if (kind === 'bait') save.gear.bait = id; G.core.save.autosave('purchase'); }
       return ['ok', 'maxed', 'not enough coins', 'locked', 'unknown'][r];
     },
@@ -134,6 +135,9 @@ G.core.debug = (function () {
     },
     // dbg.pet() pets the dog (as S or the down arrow does while stopped); false if it is not ready.
     pet: function () { return G.scene.dog.pet(G.state.run.dog); },
+    // dbg.useRod(i) takes an owned rod in hand (Phase 43); dbg.tackle() lists the rack and the hook.
+    useRod: function (i) { var r = G.sim.economy.useRod(G.state.save, +i); return r === G.sim.economy.OK ? G.data.gear.rods[+i].name : 'not owned'; },
+    tackle: function () { var s = G.state.save, fx = G.state.run.gearFx; return { rods: s.gear.rods.slice(), rod: s.gear.rod, bait: s.gear.bait, lure: fx.lure, swim: fx.swim, counts: JSON.parse(JSON.stringify(s.baits)), smallHook: fx.smallHook, smallBoost: fx.smallBoost }; },
     // dbg.bark(why) asks the dog for a bout (Phase 42: 'jump', 'catch', 'bell', 'bird', 'cue'; with
     // no argument the next idle bout comes in 1 s); returns its voice: bouts, woofs said, s since
     // the last bout, s to the next idle one, the last reason, and the setting.
@@ -343,7 +347,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
-      pages.push('swim', 'sprites', 'baits', 'fx', 'shop');
+      pages.push('swim', 'sprites', 'baits', 'lures', 'fx', 'shop');
       page = 0; t = 0;
     }
 
@@ -464,6 +468,15 @@ G.core.debug = (function () {
           for (var dk = 0; dk < UWm.DIRS; dk++) for (var ph = 0; ph < 2; ph++) {
             ctx.drawImage(UWm.lureImg(ids[bi], dk, ph), 8 + dk * 39, 40 + bi * 82 + ph * 34, 33, 33);
           }
+        }
+      } else if (name === 'lures') {
+        // Phase 43: each lure's body in eight headings and both phases, ×3 on water.
+        var UWl = G.scene.underwater, lids = ['spinner', 'plug', 'grub', 'popper', 'jig'];
+        ctx.fillStyle = P.water_mid; ctx.fillRect(0, 18, 640, 342);
+        ctx.imageSmoothingEnabled = false;
+        for (var li = 0; li < lids.length; li++) {
+          F.drawText(ctx, lids[li], 8, 24 + li * 68, 'bone');
+          for (var lk = 0; lk < 8; lk++) for (var lp = 0; lp < 2; lp++) ctx.drawImage(UWl.lureImg(lids[li], lk * 2, lp), 60 + (lk * 2 + lp) * 36, 30 + li * 68, 33, 33);
         }
       } else if (name === 'fx') {
         // The particles are drawn in world pixels, as the sailing scene draws them.

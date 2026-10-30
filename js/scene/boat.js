@@ -68,7 +68,6 @@ G.scene.boat = (function () {
   // Draws a painted image at world (x, y), at 1/HI size.
   function put(ctx, cv, x, y) { ctx.drawImage(cv, x, y, cv.width / HI, cv.height / HI); }
 
-  var ROD_KEYS = ['stone_hi', 'wood_hi', 'rust_hi', 'moss_hi', 'bone'];
   var P_SPEED = 42; // px/s, the speed at which the dog's ears stream fully (P.maxV)
   var halo = null;
 
@@ -202,7 +201,6 @@ G.scene.boat = (function () {
   // reel seat, the blank (two pixels across its lower half, lit on top and shaded under, one
   // above), a reel hanging under it, guides on the underside that shrink toward the tip, and
   // the line from the reel through the guides to the tip in straight chords, under the blank.
-  var ROD_SHADE = ['stone', 'wood_mid', 'rust', 'moss', 'stone_hi'];
   var GUIDES = [0.22, 3, 0.42, 2, 0.6, 2, 0.75, 1, 0.88, 1]; // share of the length, ring height (view px)
   var rp = [0, 0], gvx = new Int16Array(8), gvy = new Int16Array(8), nx = 0, ny = 1, rodF = 1;
 
@@ -235,10 +233,10 @@ G.scene.boat = (function () {
 
   function drawRod(ctx, b, sx, wy, tier, lineKey, lineA) {
     var R = G.gfx.rod, f = b.facing, P = S.PALETTE, L = R.K.len, i, s, vx, vy, lx = -9999, ly = -9999;
-    tier = Math.max(0, Math.min(ROD_KEYS.length - 1, tier | 0));
+    var look = (G.data.gear.rods[tier | 0] || G.data.gear.rods[0]).look; // Phase 43: the blank's keys from the rod's data
     rodF = f;
     rodBase(b, sx, wy, rp);
-    var bx = rp[0], by = rp[1], key = ROD_KEYS[tier], shade = ROD_SHADE[tier];
+    var bx = rp[0], by = rp[1], key = look[0], shade = look[1];
     // The line: from the reel's spool through each guide's ring to the tip.
     var n = 0;
     normAt(R, 1.7); R.at(1.7, rp);

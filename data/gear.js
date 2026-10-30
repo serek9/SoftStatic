@@ -1,7 +1,12 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // Gear and economy data (V8). Every item does something mechanical:
-//   rod:   castMax (px a full cast reaches), maxMass (kg, D4: heavier fish never bite), attract
+//   rod:   castMax (px a full cast reaches), maxMass (kg, D4: heavier fish never bite), attract;
+//          Phase 43: rods are a rack you own (save.gear.rods), not a ladder. power (its name),
+//          action 0 slow .. 4 extra fast (gfx/rod.js bends it so), smallHook (the hook hold a
+//          fish under smallFrac of maxMass starts with: a stiff rod tears a small mouth),
+//          smallBoost (× the weight of species of smallMass kg or less), look [palette keys of
+//          the blank], ladder (false: not one of the upgrades the pacing model buys in turn)
 //   reel:  speed (D shrink while reeling a tired fish, V4)
 //   line:  strength (how fast tension builds against a pulling fish, V4)
 //   bait:  attract (fish turn up sooner) and rareBoost (rare and legendary weights)
@@ -10,12 +15,16 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.data = G.data || {};
 G.data.gear = {
   rods: [
-    { id: 'rod_0', name: 'Cane Rod', cost: 0, castMax: 110, maxMass: 3, attract: 1.0 },
-    { id: 'rod_1', name: 'Fibreglass Rod', cost: 90, castMax: 122, maxMass: 4.5, attract: 1.05 },
-    { id: 'rod_2', name: 'Graphite Rod', cost: 420, castMax: 134, maxMass: 7, attract: 1.1 },
-    { id: 'rod_3', name: 'Lacquered Rod', cost: 1400, castMax: 146, maxMass: 11, attract: 1.15 },
-    { id: 'rod_4', name: 'The Long Rod', cost: 4200, castMax: 160, maxMass: 18, attract: 1.2 }
+    { id: 'rod_0', name: 'Cane Rod', cost: 0, castMax: 110, maxMass: 3, attract: 1.0, power: 'light', action: 0, smallHook: 1, smallBoost: 1, look: ['stone_hi', 'stone'] },
+    { id: 'rod_1', name: 'Fibreglass Rod', cost: 90, castMax: 122, maxMass: 4.5, attract: 1.05, power: 'medium light', action: 1, smallHook: 0.95, smallBoost: 1, look: ['wood_hi', 'wood_mid'] },
+    { id: 'rod_2', name: 'Graphite Rod', cost: 420, castMax: 134, maxMass: 7, attract: 1.1, power: 'medium', action: 2, smallHook: 0.9, smallBoost: 1, look: ['rust_hi', 'rust'] },
+    { id: 'rod_3', name: 'Lacquered Rod', cost: 1400, castMax: 146, maxMass: 11, attract: 1.15, power: 'medium heavy', action: 3, smallHook: 0.82, smallBoost: 1, look: ['moss_hi', 'moss'] },
+    { id: 'rod_4', name: 'The Long Rod', cost: 4200, castMax: 160, maxMass: 18, attract: 1.2, power: 'heavy', action: 4, smallHook: 0.75, smallBoost: 1, look: ['bone', 'stone_hi'] },
+    // Phase 43: the small-fish rod, off the ladder (index 5 keeps older saves' indices).
+    { id: 'rod_5', name: 'Ultralight Wand', cost: 60, castMax: 104, maxMass: 1.2, attract: 1.0, power: 'ultralight', action: 3, smallHook: 1, smallBoost: 1.6, look: ['teal_hi', 'teal'], ladder: false }
   ],
+  rodSmall: { frac: 0.15, mass: 0.4 },
+  topDepthM: 1, // Phase 43: m a surface lure counts as for which fish come (they rise to it) // smallHook below frac × maxMass; smallBoost for species of mass kg or less
   reels: [
     { id: 'reel_0', name: 'Tin Reel', cost: 0, speed: 0.12 },
     { id: 'reel_1', name: 'Click Reel', cost: 70, speed: 0.15 },
@@ -37,6 +46,17 @@ G.data.gear = {
     { id: 'cricket', name: 'Crickets', cost: 3, pack: 10, attract: 1.25, rareBoost: 1.0 },
     { id: 'minnow', name: 'Minnows', cost: 6, pack: 10, attract: 1.4, rareBoost: 1.3 },
     { id: 'unlabelled', name: '', label: false, cost: 47, pack: 1, attract: 1.1, rareBoost: 3.0 }
+  ],
+  // Phase 43: lures. Not used up by a cast: one is lost when the line snaps (never in passive
+  // mode), and counted in save.baits like the baits. cost is per lure, sold `pack` at a time.
+  // swim: where it fishes (the scene: sink × the bait's sink speed, down to maxDepthM m; 'top'
+  // floats; 'dive' dives while reeled). Fish take them by fish.lures.
+  lures: [
+    { id: 'spinner', name: 'Brass Spinner', cost: 18, pack: 2, attract: 1.3, rareBoost: 1.1, swim: 'mid', sink: 0.6, maxDepthM: 7 },
+    { id: 'plug', name: 'Minnow Plug', cost: 26, pack: 1, attract: 1.35, rareBoost: 1.2, swim: 'dive', sink: 0, maxDepthM: 4 },
+    { id: 'grub', name: 'Soft Grub', cost: 6, pack: 4, attract: 1.25, rareBoost: 1.0, swim: 'bed', sink: 1, maxDepthM: 99 },
+    { id: 'popper', name: 'Cup Popper', cost: 22, pack: 1, attract: 1.25, rareBoost: 1.15, swim: 'top', sink: 0, maxDepthM: 0 },
+    { id: 'jig', name: 'Feather Jig', cost: 14, pack: 2, attract: 1.3, rareBoost: 1.25, swim: 'lift', sink: 1.8, maxDepthM: 99 }
   ],
   lantern: { id: 'lantern', name: 'Storm Lantern', cost: 250, nightDepth: 999 },     // px: no night silhouettes
   depthFinder: { id: 'depth_finder', name: 'Depth Finder', cost: 180, bands: 4 },  // m between bands on the HUD

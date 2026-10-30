@@ -11,7 +11,8 @@ G.sim = G.sim || {};
 G.sim.fish_ai = (function () {
   var MAX = 8;
   var W = {
-    baitLiked: 2, baitOther: 0.6, // baitLikes match / no match (no effect when baitLikes is empty)
+    baitLiked: 2, baitOther: 0.6, // baitLikes match / no match (no effect when baitLikes is empty); Phase 43: a lure loved / ignored
+    lureLoved: 1.3,               // × awareness: a lure it loves (its flash, its wobble) draws it from farther
     depthFalloff: 4,              // m outside the habitat at which weight bottoms out
     depthFloor: 0.05,
     hourLiked: 1.6, hourOther: 0.7, // timeLikes match / no match (no effect when empty)
@@ -65,7 +66,8 @@ G.sim.fish_ai = (function () {
       if (!open) return 0;
     }
     var v = ctx.rarity[f.rarity];
-    if (f.baitLikes.length) v *= f.baitLikes.indexOf(ctx.bait) >= 0 ? W.baitLiked : W.baitOther;
+    if (ctx.lure || f.baitLikes.length) v *= TAKE_W[interest(f, ctx.bait, ctx.lure)]; // Phase 43: lures by fish.lures
+    if (ctx.smallBoost && f.mass <= ctx.smallMass) v *= ctx.smallBoost;             // Phase 43: the ultralight rod
     if (f.rarity === 'rare' || f.rarity === 'legendary') v *= ctx.rareBoost || 1; // bait (V8), cast spot (§2)
     if (f.rarity === 'legendary') v *= ctx.legendBoost || 1;                        // a legendary spot (10.3)
     if (ctx.depthM !== null) {
@@ -147,7 +149,16 @@ G.sim.fish_ai = (function () {
     return null;
   }
 
-  function baitOk(sp, bait) { return sp.baitLikes.length === 0 || sp.baitLikes.indexOf(bait) >= 0; }
+  // Phase 43: how much a species wants what is on the hook: 0 ignores it, 1 takes it, 2 loves
+  // it. Live baits by baitLikes (listed: 2; an empty list takes every bait: 1); lures by
+  // fish.lures (not listed: 0).
+  var TAKE_W = [W.baitOther, 1, W.baitLiked]; // the species weight by interest
+  function interest(sp, bait, lure) {
+    if (lure) return (sp.lures && sp.lures[bait]) || 0;
+    if (!sp.baitLikes.length) return 1;
+    return sp.baitLikes.indexOf(bait) >= 0 ? 2 : 0;
+  }
+  function baitOk(sp, bait, lure) { return interest(sp, bait, lure) > 0; }
 
   function ease(v, target, k, dt) { return v + (target - v) * Math.min(1, k * dt); }
 
@@ -238,7 +249,7 @@ G.sim.fish_ai = (function () {
         var gw = speed * 0.35, fa = Math.abs(f.flow), drawn = lure.active && Math.abs(dx) < sp.awareness * A.scent && f.dir * dx > 0;
         if (fa > 0.5 && !drawn && f.dir * f.flow > 0 && gw > fa * 0.8) gw = fa * 0.8;
         swim(f, sp, f.dir * gw, (f.home - f.y) * 0.5, speed, true, dt);
-        if (lure.active && dist < sp.awareness && baitOk(sp, lure.bait)) setState(f, 'notice');
+        if (lure.active && baitOk(sp, lure.bait, lure.lure) && dist < sp.awareness * (lure.lure && interest(sp, lure.bait, true) === 2 ? W.lureLoved : 1)) setState(f, 'notice');
         break;
 
       case 'notice': // a pause: it stops (holding its place in a current) and turns toward the lure
@@ -358,6 +369,6 @@ G.sim.fish_ai = (function () {
     MAX: MAX, W: W, A: A, M: M,
     weightOf: weightOf, speciesWeights: speciesWeights, pickSpecies: pickSpecies,
     createSchool: createSchool, spawn: spawn, stepFish: stepFish, stepSchool: stepSchool,
-    count: count, interested: interested, interestLevel: interestLevel, scatter: scatter, clear: clear
+    interest: interest, count: count, interested: interested, interestLevel: interestLevel, scatter: scatter, clear: clear
   };
 })();

@@ -34,6 +34,7 @@ node tools/balance.js --passive                  # passive income share and time
 node tools/balance.js --saves                    # saves from every milestone still load
 node tools/balance.js --fight                    # how fights end by player and gear (Phase 23)
 node tools/balance.js --rod                      # the rod's bend: shapes, action, springing (Phase 31b)
+node tools/balance.js --tackle                   # each bait and lure's income at each water (Phase 43)
 ```
 
 On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`.
