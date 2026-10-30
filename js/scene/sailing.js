@@ -31,7 +31,7 @@ G.scene.sailing = (function () {
     flick: 0.12,     // s the rod takes to whip forward before the lure leaves
     flickAngle: 20, restAngle: 50, waitAngle: 40, backAngle: 70
   };
-  var tip = [0, 0], pose = [0, 0];
+  var tip = [0, 0], pose = [0, 0, 0];
 
   // ---- Life (audit P2-1, P2-2) --------------------------------------------------------
   // Fish rising: every few seconds a ring above a fish swimming shallower than 4 m, so the
@@ -444,7 +444,7 @@ G.scene.sailing = (function () {
     c.t += dt;
     if (c.t < CAST.flick) return;
     if (!c.flying) {
-      boat.rodTip(run.boat, run.boat.x, wy, CAST.flickAngle, tip);
+      boat.rodTip(run.boat, run.boat.x, wy, tip); // the bent tip as the flick ends (Phase 31)
       c.x0 = tip[0]; c.y0 = tip[1];
       c.T = 0.45 + Math.abs(c.x1 - c.x0) / 260;
       c.h = 10 + c.dist * 0.18;
@@ -528,49 +528,73 @@ G.scene.sailing = (function () {
     }
   }
 
-  // Rod angle and bend for the current state, written into out.
+  // Phase 31: the rod's pose for the current state, written into out: [0] the angle the hands
+  // hold (degrees up from the facing), [1] the load on the tip (0..1 of the rod's rating) and
+  // [2] where it pulls: ROD_LINE along the line, ROD_DOWN straight down (the lure hanging from
+  // the tip), ROD_BACK across the rod toward its back (a stand-in for the cast's load until
+  // Phase 32). G.gfx.rod bends the blank from these (rodStep).
+  var ROD_LINE = 0, ROD_DOWN = 1, ROD_BACK = 2;
   function rodPose(run, out) {
     var c = run.cast, back = CAST.restAngle + CAST.backAngle * Math.sqrt(c.charge), u;
+    out[2] = ROD_LINE;
     switch (run.fsm) {
       case 'charging':
-        out[0] = back; out[1] = 3 * Math.sqrt(c.charge);
+        out[0] = back; out[1] = 0.04 + 0.12 * Math.sqrt(c.charge); out[2] = ROD_DOWN;
         break;
       case 'casting':
+        out[2] = ROD_BACK;
         if (c.t < CAST.flick) {
           u = c.t / CAST.flick;
-          out[0] = back + (CAST.flickAngle - back) * u; out[1] = -3 * u;
+          out[0] = back + (CAST.flickAngle - back) * u; out[1] = 0.3 * u;
         } else {
           u = Math.min(1, (c.t - CAST.flick) / 0.3);
-          out[0] = CAST.flickAngle + (CAST.waitAngle - CAST.flickAngle) * u; out[1] = -3 * (1 - u);
+          out[0] = CAST.flickAngle + (CAST.waitAngle - CAST.flickAngle) * u; out[1] = 0.3 * (1 - u);
         }
         break;
       case 'sailing':
         if (run.passive.on && run.passive.pl) { // 12.2: fishing by itself; bent while a fish is on
           var on = passiveFighting(run);
-          out[0] = CAST.waitAngle + (on ? 4 : 0); out[1] = on ? 4 + 2 * Math.sin(run.passive.t * 9) : 1;
-        } else { out[0] = CAST.restAngle; out[1] = 0; }
+          out[0] = CAST.waitAngle + (on ? 4 : 0); out[1] = on ? 0.45 + 0.15 * Math.sin(run.passive.t * 9) : 0.03;
+        } else { out[0] = CAST.restAngle; out[1] = 0.02; out[2] = ROD_DOWN; }
         break;
       case 'card':
-        out[0] = CAST.restAngle; out[1] = 0;
+        out[0] = CAST.restAngle; out[1] = 0.02; out[2] = ROD_DOWN;
         break;
       case 'hooked':
       case 'fighting':
-        // Pull: bent hard toward the fish. Tired: relaxed. Both deepen with tension.
+        // The rod held high and the blank taking the fish: pulling, the load follows tension;
+        // a tired fish loads it less.
         var F = run.fight;
-        out[0] = CAST.waitAngle + 8 - 10 * F.T;
-        out[1] = F.mode === 'pull' ? 4 + 5 * F.T : 1 + 2 * F.T;
-        if (run.fsm === 'hooked') out[1] += 6 * (1 - Math.min(1, run.hook.t / 0.3)); // the hook-set snaps the rod (P1-4)
-        if (F.shake > 0) { out[0] -= 5 * Math.abs(Math.sin(run.boat.t * 26)); out[1] += 2; } // Phase 23: a head shake knocks the tip
+        out[0] = CAST.waitAngle + 18 - 8 * F.T;
+        out[1] = F.mode === 'pull' ? 0.3 + 0.7 * F.T : 0.1 + 0.3 * F.T;
+        if (run.fsm === 'hooked') out[1] += 0.5 * (1 - Math.min(1, run.hook.t / 0.3)); // the hook-set loads the rod (P1-4)
+        if (F.shake > 0) { out[0] -= 3 * Math.abs(Math.sin(run.boat.t * 26)); out[1] += 0.15 * Math.abs(Math.sin(run.boat.t * 26)); } // Phase 23: a head shake knocks the tip
         break;
       case 'landing':
-        out[0] = 70; out[1] = 2;
+        out[0] = 70; out[1] = 0.35;
         break;
       default:
-        out[0] = CAST.waitAngle; out[1] = 1;
-        // Bite cue (7.1): the rod tip bobs while a fish is on the bite.
-        if (run.bite.slot >= 0) out[0] -= 9 * Math.abs(Math.sin(run.bite.t * 12)); // about 2 px at the tip (P1-4)
+        out[0] = CAST.waitAngle; out[1] = 0.03; // the line's own weight
+        // Bite cue (7.1): the fish pulls the tip down in nods (P1-4).
+        if (run.bite.slot >= 0) { u = Math.abs(Math.sin(run.bite.t * 12)); out[0] -= 4 * u; out[1] = 0.15 + 0.2 * u; }
     }
     return out;
+  }
+
+  // Phase 31: bends the rod for this step, before the rope reads its tip. The line pulls the
+  // tip toward its third point (last step's), or straight down while the lure hangs from it.
+  var ROD_K = 3;
+  function rodStep(run) {
+    var b = run.boat, st = rope.st, dx = 0, dy = 1;
+    rodPose(run, pose);
+    if (pose[2] === ROD_LINE && st.mode !== rope.OFF) {
+      dx = rope.x[ROD_K] - rope.x[0]; dy = rope.y[ROD_K] - rope.y[0];
+      if (dx * dx + dy * dy < 0.25) { dx = 0; dy = 1; }
+    } else if (pose[2] === ROD_BACK) {
+      var a = (pose[0] + b.show) * Math.PI / 180;
+      dx = -b.facing * Math.sin(a); dy = -Math.cos(a);
+    }
+    G.gfx.rod.solve(pose[0] + b.show, pose[1], dx, dy, b.facing, G.state.save.gear.rod || 0);
   }
 
   // A line in the view's pixels between world points (dotted: every other pixel pair). The
@@ -606,7 +630,7 @@ G.scene.sailing = (function () {
   function lurePos(run, out) {
     var c = run.cast, b = run.boat, fsm = run.fsm;
     if (fsm === 'casting') {
-      if (c.flying) { out[0] = c.lx; out[1] = c.ly; } else { boat.rodTip(b, b.x, loc.waterY, rodPose(run, pose)[0], out); }
+      if (c.flying) { out[0] = c.lx; out[1] = c.ly; } else { boat.rodTip(b, b.x, loc.waterY, out); }
       return out;
     }
     if (fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') return G.scene.underwater.mouth(loc, 0, 0, out);
@@ -631,7 +655,7 @@ G.scene.sailing = (function () {
     var fsm = run.fsm, st = rope.st, b = run.boat, F = run.fight, pv = run.passive;
     var was = ropeFsm;
     ropeFsm = fsm;
-    boat.rodTip(b, b.x, loc.waterY, rodPose(run, pose)[0], tipW);
+    boat.rodTip(b, b.x, loc.waterY, tipW);
     // A snap or a thrown fish: the far end goes, and the line is reeled in loose.
     if (fsm === 'sailing' && was === 'fighting' && st.mode === rope.PINNED) {
       var snap = F.result === G.sim.fight.SNAP;
@@ -700,8 +724,7 @@ G.scene.sailing = (function () {
     }
     var st = rope.st;
     if (st.mode === rope.OFF) return;
-    rodPose(run, pose);
-    boat.rodTip(b, Math.round(b.x - run.cam.x), wy, pose[0], tip);
+    boat.rodTip(b, Math.round(b.x - run.cam.x), wy, tip);
     var passive = fsm === 'sailing' && run.passive.on && run.passive.pl, fight = fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing';
     var end = null;
     if (st.mode === rope.PINNED) {
@@ -1311,6 +1334,7 @@ G.scene.sailing = (function () {
     boat.motion(b, move, dt, surf.at(boat.bow(b)) / HI, surf.at(boat.stern(b)) / HI);
     if (b.wakeHit) fx.ripple(b.x, loc.waterY + 2, 8, 22, 1.6); // the water lifts the hull: a ring
     G.scene.underwater.swimStep(run, dt); // Phase 27: the swimmers' beat, turns and pitch (the mouth reads them)
+    rodStep(run); // Phase 31: the rod bends under the line before the rope reads its tip
     ropeStep(run, dt); // Phase 21: after everything that moves the rod tip, the lure or the fish
     G.scene.underwater.bodyStep(run, dt, loc); // Phase 22: the lure's heading and flutter
     fx.setFlow(G.scene.underwater.flow(loc, 8)); // bubbles drift with the water
@@ -1389,15 +1413,18 @@ G.scene.sailing = (function () {
 
   function drawDog(c, x, y, flip, wind) { dog.draw(c, G.state.run.dog, x, y, flip, wind); }
 
-  var gearLook = { rod: 0, lantern: false, finder: false, night: 0, sip: false };
+  var gearLook = { rod: 0, lantern: false, finder: false, night: 0, sip: false, lineKey: 'fog_light', lineA: 0.6 };
   function drawBoat(c, fisher) {
-    var run = G.state.run, g = G.state.save.gear;
-    rodPose(run, pose);
+    var run = G.state.run, g = G.state.save.gear, fsm = run.fsm;
     gearLook.rod = g.rod || 0; gearLook.lantern = !!g.lantern; gearLook.finder = !!g.depthFinder;
     gearLook.night = 1 - greyF(hourNow());
     // P2-2: between casts, still, the fisher drinks from a thermos now and then.
     gearLook.sip = run.fsm === 'sailing' && run.boat.stopped && !passiveFighting(run) && (run.boat.t % 34) > 31;
-    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, fisher !== false, drawDog, pose[0], pose[1], gearLook);
+    // Phase 31: the line along the rod in the same colour as the line out (drawCast).
+    var fight = fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing';
+    gearLook.lineKey = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : run.fight.T) : 'fog_light';
+    gearLook.lineA = fight ? 0.85 : 0.6;
+    boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, fisher !== false, drawDog, gearLook);
   }
 
   // The mirror pass (gfx/water.js): the scene above the waterline, mirrored.
@@ -1549,7 +1576,7 @@ G.scene.sailing = (function () {
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
     skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
-    rodPose: function () { return rodPose(G.state.run, [0, 0]); }, // debug: [angle, bend] now
+    rodPose: function () { return rodPose(G.state.run, [0, 0, 0]); }, // debug: [angle, load, pull] now
     lift: function () { return plift.t; },
     floatY: function (x) { return floatY(x); },
     lureAt: function () { var r = G.state.run, o = [0, 0]; return r.passive.on && r.passive.pl ? floatPos(r, o) : lurePos(r, o); }, // debug: where the rope's far end is held // Phase 20: the surface's height at world x, as floats sit on it

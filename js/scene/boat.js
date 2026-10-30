@@ -198,39 +198,117 @@ G.scene.boat = (function () {
   // Phase 24: the heave on the surface (it was a 1 px sine), in view pixels; down positive.
   function bob(b) { return -Math.round(b.heave * HI) / HI; }
 
-  // The rod: a straight 22 px pole from the fisher's hands (Phase 15: the larger fisher's).
-  // angle is in degrees up from the facing direction (90 = straight up, above 90 leans back).
+  // The rod (Phase 31): G.gfx.rod bends it in update(); this places and draws it. The hands
+  // hold it ROD.baseX px ahead of the boat's centre and ROD.baseY px above the waterline.
   var ROD = { len: 22, baseX: 3, baseY: -6 };
 
-  // Writes the rod tip into out for a boat centred at cx (world or screen) with waterline wy.
-  // Phase 24: the base rides the hull's shear and the fisher's lean; the rod tilts with the pitch.
-  function rodTip(b, cx, wy, angle, out) {
-    var a = (angle + b.show) * D2R, f = b.facing, bx = cx + f * ROD.baseX - f * b.lean, by = wy + bob(b) + ROD.baseY + shear(b, ROD.baseX);
-    out[0] = bx + f * Math.cos(a) * ROD.len;
-    out[1] = by - Math.sin(a) * ROD.len;
+  // Writes the hands (the rod's base) into out for a boat centred at cx with waterline wy.
+  // Phase 24: the base rides the hull's shear and the fisher's lean.
+  function rodBase(b, cx, wy, out) {
+    out[0] = cx + b.facing * ROD.baseX - b.facing * b.lean;
+    out[1] = wy + bob(b) + ROD.baseY + shear(b, ROD.baseX);
     return out;
   }
 
-  // Draws the rod as a quadratic curve. bend > 0 bows its middle forward and down
-  // (loaded), bend < 0 bows it back (the whip of a cast). The tip stays where rodTip says.
-  function drawRod(ctx, b, sx, wy, angle, bend, key) {
-    var a = (angle + b.show) * D2R, f = b.facing;
-    var bx = sx + f * ROD.baseX - f * b.lean, by = wy + bob(b) + ROD.baseY + shear(b, ROD.baseX);
-    var tx = bx + f * Math.cos(a) * ROD.len, ty = by - Math.sin(a) * ROD.len;
-    var mx = (bx + tx) / 2 + f * Math.sin(a) * bend, my = (by + ty) / 2 + Math.cos(a) * bend;
-    var steps = (ROD.len + 4) * HI;
-    ctx.fillStyle = S.PALETTE[key || 'stone_hi'];
-    for (var i = 0; i <= steps; i++) {
-      var u = i / steps, v = 1 - u;
-      ctx.fillRect(Math.round((v * v * bx + 2 * u * v * mx + u * u * tx) * HI) / HI, Math.round((v * v * by + 2 * u * v * my + u * u * ty) * HI) / HI, 1 / HI, i < steps * 0.25 ? 2 / HI : 1 / HI);
+  // Writes the bent rod's tip into out (Phase 31: where G.gfx.rod last put it).
+  function rodTip(b, cx, wy, out) { rodBase(b, cx, wy, out); return G.gfx.rod.tip(b.facing, out[0], out[1], out); }
+
+  // The rod's parts, drawn in view pixels along the blank: a cork butt behind the hands, the
+  // reel seat, the blank (two pixels across its lower half, lit on top and shaded under, one
+  // above), a reel hanging under it, guides on the underside that shrink toward the tip, and
+  // the line from the reel through the guides to the tip in straight chords, under the blank.
+  var ROD_SHADE = ['stone', 'wood_mid', 'rust', 'moss', 'stone_hi'];
+  var GUIDES = [0.22, 3, 0.42, 2, 0.6, 2, 0.75, 1, 0.88, 1]; // share of the length, ring height (view px)
+  var rp = [0, 0], gvx = new Int16Array(8), gvy = new Int16Array(8), nx = 0, ny = 1, rodF = 1;
+
+  // The underside's normal (world, unit) at s px along the rod, for the facing rodF, into nx, ny.
+  function normAt(R, s) {
+    var k = Math.max(0, Math.min(R.N - 1, Math.floor(s / R.SEG)));
+    var ux = R.jx[k + 1] - R.jx[k], uy = R.jy[k + 1] - R.jy[k], l = Math.sqrt(ux * ux + uy * uy) || 1;
+    nx = rodF * uy / l; ny = ux / l;
+  }
+  function dot(ctx, vx, vy) { ctx.fillRect(vx / HI, vy / HI, 1 / HI, 1 / HI); }
+  // A line of view pixels between view points.
+  function vline(ctx, x0, y0, x1, y1) {
+    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+    for (;;) {
+      dot(ctx, x0, y0);
+      if (x0 === x1 && y0 === y1) break;
+      var e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
     }
-    ctx.fillStyle = S.PALETTE.ink;                                                     // the reel
-    ctx.fillRect(Math.round((bx + f * 2.5) * HI) / HI - 1, Math.round((by + 0.5) * HI) / HI, 2, 1.5);
+  }
+  // One pixel of blank at view (vx, vy), and with thick its shaded pixel on the underside.
+  function blank(ctx, vx, vy, thick, k1, k2) {
+    var P = S.PALETTE;
+    ctx.fillStyle = P[k1]; dot(ctx, vx, vy);
+    if (!thick) return;
+    ctx.fillStyle = P[k2];
+    if (Math.abs(nx) > Math.abs(ny)) dot(ctx, vx + (nx > 0 ? 1 : -1), vy); else dot(ctx, vx, vy + (ny > 0 ? 1 : -1));
+  }
+
+  function drawRod(ctx, b, sx, wy, tier, lineKey, lineA) {
+    var R = G.gfx.rod, f = b.facing, P = S.PALETTE, L = R.K.len, i, s, vx, vy, lx = -9999, ly = -9999;
+    tier = Math.max(0, Math.min(ROD_KEYS.length - 1, tier | 0));
+    rodF = f;
+    rodBase(b, sx, wy, rp);
+    var bx = rp[0], by = rp[1], key = ROD_KEYS[tier], shade = ROD_SHADE[tier];
+    // The line: from the reel's spool through each guide's ring to the tip.
+    var n = 0;
+    normAt(R, 1.7); R.at(1.7, rp);
+    gvx[n] = Math.round((bx + f * rp[0]) * HI + nx * 4 + f * Math.cos(R.st.a)); gvy[n++] = Math.round((by - rp[1]) * HI + ny * 4);
+    for (i = 0; i < GUIDES.length; i += 2) {
+      s = GUIDES[i] * L; normAt(R, s); R.at(s, rp);
+      gvx[n] = Math.round((bx + f * rp[0]) * HI + nx * GUIDES[i + 1]); gvy[n++] = Math.round((by - rp[1]) * HI + ny * GUIDES[i + 1]);
+    }
+    gvx[n] = Math.round((bx + f * R.jx[R.N]) * HI); gvy[n++] = Math.round((by - R.jy[R.N]) * HI);
+    ctx.globalAlpha = lineA; ctx.fillStyle = P[lineKey || 'fog_light'];
+    for (i = 1; i < n; i++) vline(ctx, gvx[i - 1], gvy[i - 1], gvx[i], gvy[i]);
+    ctx.globalAlpha = 1;
+    // The butt and its cork grip, behind the hands along their angle, with a cap.
+    var ca = Math.cos(R.st.a), sa = Math.sin(R.st.a);
+    normAt(R, 0);
+    for (s = -4.5; s < 0; s += 0.35) {
+      vx = Math.round((bx + f * ca * s) * HI); vy = Math.round((by - sa * s) * HI);
+      if (vx === lx && vy === ly) continue;
+      lx = vx; ly = vy;
+      blank(ctx, vx, vy, true, s < -4 ? 'ink' : 'wood_lit', s < -4 ? 'ink' : 'wood_mid');
+    }
+    // The blank, from the fore grip and the reel seat to the tip.
+    for (s = 0; s <= L; s += 0.35) {
+      R.at(s, rp);
+      vx = Math.round((bx + f * rp[0]) * HI); vy = Math.round((by - rp[1]) * HI);
+      if (vx === lx && vy === ly) continue;
+      lx = vx; ly = vy;
+      normAt(R, s);
+      if (s < 0.8) blank(ctx, vx, vy, true, 'wood_lit', 'wood_mid');
+      else if (s < 2.6) blank(ctx, vx, vy, true, 'stone_hi', 'stone_dark');
+      else blank(ctx, vx, vy, s < L * 0.5, key, shade);
+    }
+    // The guides: a wrap on the blank and a ring under it.
+    for (i = 0; i < GUIDES.length; i += 2) {
+      s = GUIDES[i] * L; normAt(R, s); R.at(s, rp);
+      vx = Math.round((bx + f * rp[0]) * HI); vy = Math.round((by - rp[1]) * HI);
+      ctx.fillStyle = P.ink; dot(ctx, vx, vy);
+      ctx.fillStyle = P.stone_lit; dot(ctx, gvx[i / 2 + 1], gvy[i / 2 + 1]);
+    }
+    ctx.fillStyle = P.stone_lit; dot(ctx, gvx[n - 1], gvy[n - 1]);                       // the tip-top
+    // The reel: a stem down from the seat, the body, its handle.
+    normAt(R, 1.7); R.at(1.7, rp);
+    vx = Math.round((bx + f * rp[0]) * HI); vy = Math.round((by - rp[1]) * HI);
+    ctx.fillStyle = P.stone_dark;
+    dot(ctx, Math.round(vx + nx * 2), Math.round(vy + ny * 2));
+    var rx = Math.round(vx + nx * 4), ry = Math.round(vy + ny * 4);
+    ctx.fillRect((rx - 1) / HI, (ry - 1) / HI, 3 / HI, 3 / HI);
+    ctx.fillStyle = P.stone_hi; dot(ctx, rx - f, ry - 1);
+    ctx.fillStyle = P.ink; dot(ctx, rx - 2 * f, ry); dot(ctx, rx, ry + 1);
   }
 
   // sx is the boat centre on screen, wy the waterline. Passengers sit behind the hull's
   // gunwale, so they are drawn first. withFisher false leaves the boat empty, rod and all (P10.2).
-  // gear (optional): {rod: tier, lantern: bool, finder: bool, night: 0..1}.
+  // gear (optional): {rod: tier, lantern: bool, finder: bool, night: 0..1, sip: bool,
+  // lineKey, lineA: the line's colour and alpha along the rod}.
   // Draws a painted image sheared by the pitch: in 2-view-px columns, each at its own height.
   function putSheared(ctx, b, cv, x, y, sx) {
     var cols = cv.width / 2;
@@ -240,7 +318,7 @@ G.scene.boat = (function () {
     }
   }
 
-  function draw(ctx, b, sx, wy, withFisher, drawDog, rodAngle, rodBend, gear) {
+  function draw(ctx, b, sx, wy, withFisher, drawDog, gear) {
     var flip = b.facing < 0, y = wy + bob(b), f = b.facing, P = S.PALETTE;
     if (withFisher) {
       var sip = gear && gear.sip;
@@ -254,7 +332,7 @@ G.scene.boat = (function () {
         }
         ctx.globalAlpha = 1;
       }
-      drawRod(ctx, b, sx, wy, rodAngle, rodBend, gear ? ROD_KEYS[Math.min(gear.rod, ROD_KEYS.length - 1)] : null);
+      drawRod(ctx, b, sx, wy, gear ? gear.rod : 0, gear && gear.lineKey, gear ? gear.lineA : 0.6);
     }
     if (drawDog) drawDog(ctx, flip ? sx - 16 : sx + 4, y - 14 + shear(b, 10), flip, Math.abs(b.vx) / P_SPEED);
     if (gear && gear.lantern) {
@@ -295,5 +373,5 @@ G.scene.boat = (function () {
   // World x of the bow.
   function bow(b) { return b.x + b.facing * 17; }
 
-  return { P: P, M: M, ROD: ROD, create: create, step: step, outboard: outboard, motion: motion, shear: shear, draw: draw, bob: bob, stern: stern, bow: bow, rodTip: rodTip };
+  return { P: P, M: M, ROD: ROD, create: create, step: step, outboard: outboard, motion: motion, shear: shear, draw: draw, bob: bob, stern: stern, bow: bow, rodBase: rodBase, rodTip: rodTip };
 })();
