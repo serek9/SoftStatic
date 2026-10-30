@@ -64,7 +64,7 @@ G.core.save = (function () {
       // gained a late hint (10.5).
       flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 },
       tapes: [],
-      settings: { volume: 0.8, mute: false },
+      settings: { volume: 0.8, mute: false, dogBark: true }, // dogBark: Phase 42
       rng: null              // G.rng state, restored on load unless ?seed is given
     };
   }
@@ -79,6 +79,7 @@ G.core.save = (function () {
     // Fields added after a save was made start from their defaults.
     var d = defaults();
     for (var k in d) if (!(k in s)) s[k] = d[k];
+    for (k in d.settings) if (!(k in s.settings)) s.settings[k] = d.settings[k]; // Phase 42: settings added later
     return s;
   }
 

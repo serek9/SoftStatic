@@ -73,7 +73,62 @@ G.scene.dog = (function () {
   // how long it stares or barks (s), and how far the boat must go before it barks again.
   var CUE = { stareR: 110, stare: 4, barkR: 80, bark: 2.5, rearm: 160 };
 
-  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0, barkArmed: true, cue: '', petT: 0 }; }
+  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0, barkArmed: true, cue: '', petT: 0,
+    voiceT: 0, since: 999, woofs: 0, woofT: 0, want: '', wantT: 0, bouts: 0, said: 0, last: '' }; }
+
+  // Phase 42 (PLAN_TACKLE.md): the dog's voice. Now and then, by itself, a bout of 1-3 soft
+  // woofs (VOICE.gap0..gap1 s apart); and as a reaction to something (request(): a fish
+  // jumping near the boat, a big catch landed, the shop's bell; birds in Phase 49), but not
+  // within VOICE.react s of the last bout. Never while a fish bites or is being hooked (the
+  // scene says when: ctx.block), never while it sleeps or is being petted, and not at all
+  // with settings.dogBark off (ctx.on false): then only the legendary cue's pose remains, silent.
+  // G.vrng only: the voice is presentation.
+  var VOICE = { gap0: 180, gap1: 480, react: 90, delay: 0.4, woof0: 0.35, woof1: 0.55, retry: 45 };
+  var REACT = { jump: 1, catch: 1, bell: 1, bird: 1, cue: 1 };
+
+  // Asks for a bout: why (a REACT key). The cue's bark always answers; the rest only after a quiet spell.
+  function request(d, why) {
+    if (!REACT[why] || d.woofs > 0 || d.want) return false;
+    if (why !== 'cue' && d.since < VOICE.react) return false;
+    d.want = why; d.wantT = VOICE.delay;
+    return true;
+  }
+
+  function startBout(d, n, why, rng, pose) {
+    d.woofs = n; d.woofT = 0; d.since = 0; d.bouts++; d.last = why;
+    if (pose && !(d.manual > 0 && (d.pose === 'stare' || d.pose === 'pet'))) setPose(d, 'bark', n * VOICE.woof1 + 0.4);
+  }
+
+  // Steps the voice; returns how many woofs to play this step (0 or 1).
+  // ctx: {on: the setting, block: a bite or the hook-set under way}.
+  function voice(d, dt, ctx, rng) {
+    d.since += dt;
+    if (d.voiceT <= 0) d.voiceT = VOICE.gap0 + (VOICE.gap1 - VOICE.gap0) * rng.next();
+    var quiet = !ctx.on || ctx.block || d.pose === 'sleep' || d.pose === 'pet';
+    if (d.want) {
+      d.wantT -= dt;
+      if (quiet && d.want !== 'cue') d.want = '';
+      else if (d.wantT <= 0) {
+        if (ctx.on && !ctx.block) startBout(d, d.want === 'cue' ? 2 : 1 + Math.floor(rng.next() * 2), d.want, rng, d.want !== 'cue');
+        d.want = '';
+      }
+    }
+    if (d.woofs === 0) {
+      d.voiceT -= dt;
+      if (d.voiceT <= 0) {
+        if (quiet) d.voiceT = VOICE.retry;                  // not now: try again in a while
+        else if (d.since < VOICE.react) d.voiceT = VOICE.react - d.since; // a bout just now: not on its heels
+        else { startBout(d, 1 + Math.floor(rng.next() * 3), 'idle', rng, true); d.voiceT = 0; }
+      }
+      return 0;
+    }
+    if (ctx.block || !ctx.on) { d.woofs = 0; return 0; }  // a bite cuts a bout short
+    d.woofT -= dt;
+    if (d.woofT > 0) return 0;
+    d.woofs--; d.said++;
+    d.woofT = VOICE.woof0 + (VOICE.woof1 - VOICE.woof0) * rng.next();
+    return 1;
+  }
 
   // Returns false for an unknown pose. manual (s) keeps the pose against step() (debug).
   function setPose(d, pose, manual) {
@@ -117,6 +172,7 @@ G.scene.dog = (function () {
         if (d.barkArmed && dist <= CUE.barkR && legendHere(loc.id, data.fish)) {
           d.barkArmed = false;
           setPose(d, 'bark', CUE.bark); d.cue = s.id;
+          request(d, 'cue'); // Phase 42: heard too, when barks are on
           return s.id;
         }
       }
@@ -161,5 +217,5 @@ G.scene.dog = (function () {
     }
   }
 
-  return { POSES: POSES, T: T, CUE: CUE, PET: PET, create: create, setPose: setPose, pet: pet, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
+  return { POSES: POSES, T: T, CUE: CUE, PET: PET, VOICE: VOICE, request: request, voice: voice, create: create, setPose: setPose, pet: pet, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
 })();

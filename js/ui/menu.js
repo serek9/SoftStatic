@@ -61,7 +61,7 @@ G.ui.menu = (function () {
 
   // ---- Pause menu ------------------------------------------------------------------------
 
-  var ITEMS = ['Resume', 'Volume', 'Sound', 'Export save', 'Import save'];
+  var ITEMS = ['Resume', 'Volume', 'Sound', 'Dog barks', 'Export save', 'Import save'];
   var PX = 70, PY = 34, PW = 180, PH = 112;
   var sel = 0, msg = '', msgKey = 'fog_light', dirty = false, lastExport = '';
 
@@ -124,10 +124,12 @@ G.ui.menu = (function () {
       var lr = axis('left', 'right');
       if (ITEMS[sel] === 'Volume' && lr) volume(lr);
       if (ITEMS[sel] === 'Sound' && lr) { st.mute = !st.mute; dirty = true; }
+      if (ITEMS[sel] === 'Dog barks' && lr) { st.dogBark = !st.dogBark; dirty = true; }
       if (!inp.pressed('action')) return true;
       switch (ITEMS[sel]) {
         case 'Resume': pause.close(); return false;
         case 'Sound': st.mute = !st.mute; dirty = true; break;
+        case 'Dog barks': st.dogBark = !st.dogBark; dirty = true; break; // Phase 42
         case 'Export save': exportSave(); break;
         case 'Import save': askImport(); break;
       }
@@ -137,7 +139,7 @@ G.ui.menu = (function () {
     close: function () { if (dirty) G.core.save.autosave('settings'); dirty = false; },
     // Phase 18: drawn in the 640×360 view's pixels: a wooden board with the choices.
     draw: function (ctx) {
-      var st = G.state.save.settings, F = S.fine, X = 180, Y = 72, W = 280, H = 216, i;
+      var st = G.state.save.settings, F = S.fine, X = 180, Y = 60, W = 280, H = 240, i;
       dim(ctx, 0.6);
       ctx.fillStyle = P.ink; ctx.fillRect(X - 3, Y - 3, W + 6, H + 6);
       ctx.fillStyle = P.wood_mid; ctx.fillRect(X - 2, Y - 2, W + 4, H + 4);
@@ -154,6 +156,7 @@ G.ui.menu = (function () {
             ctx.fillRect(X + 140 + k * 11, y + 1, 8, 7);
           }
         } else if (ITEMS[i] === 'Sound') F.bold(ctx, st.mute ? 'off' : 'on', X + 140, y, key);
+        else if (ITEMS[i] === 'Dog barks') F.bold(ctx, st.dogBark === false ? 'off' : 'on', X + 140, y, key);
       }
       if (msg) F.drawText(ctx, msg, X + (W >> 1) - (F.measure(msg) >> 1), Y + H - 44, msgKey);
       F.drawText(ctx, PAUSE_HINT, X + (W >> 1) - (F.measure(PAUSE_HINT) >> 1), Y + H - 24, 'fog_mid');

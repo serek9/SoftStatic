@@ -134,6 +134,14 @@ G.core.debug = (function () {
     },
     // dbg.pet() pets the dog (as S or the down arrow does while stopped); false if it is not ready.
     pet: function () { return G.scene.dog.pet(G.state.run.dog); },
+    // dbg.bark(why) asks the dog for a bout (Phase 42: 'jump', 'catch', 'bell', 'bird', 'cue'; with
+    // no argument the next idle bout comes in 1 s); returns its voice: bouts, woofs said, s since
+    // the last bout, s to the next idle one, the last reason, and the setting.
+    bark: function (why) {
+      var d = G.state.run.dog;
+      if (why) G.scene.dog.request(d, why); else d.voiceT = 1;
+      return { bouts: d.bouts, said: d.said, since: +d.since.toFixed(1), next: +d.voiceT.toFixed(1), last: d.last, want: d.want, on: G.state.save.settings.dogBark !== false };
+    },
     // dbg.unease(v) sets the current location's unease (0..1); dbg.unease() reads it.
     unease: function (v) {
       var loc = G.state.run.loc;
@@ -299,6 +307,9 @@ G.core.debug = (function () {
     // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
     // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
     dangle: function () { return G.scene.sailing.dangle(); },
+    // dbg.sail(dir, s) steers left (-1) or right (1) for s seconds, as the keys would (Phase 41:
+    // the fisher stows the rod and takes the tiller; dbg.fisher() shows helm, clips, tiller).
+    sail: function (dir, s) { G.scene.sailing.sail(dir, s); return 'sailing ' + (dir < 0 ? 'left' : 'right') + ' for ' + (s === undefined ? 1 : s) + ' s'; },
     // dbg.idle(name) starts an idle act ('thermos', 'rest', ...); dbg.idle(null) ends the one playing.
     idle: function (name) {
       var fs = G.state.run.fisher;
