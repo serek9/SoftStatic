@@ -277,7 +277,7 @@ G.ui.cabin = (function () {
 
   function texts() {
     var save = G.state.save, stages = G.data.gear.cabin, next = stages[save.cabinLevel + 1];
-    txt.title = 'THE CABIN  ' + stages[save.cabinLevel].name;
+    txt.title = 'THE CABIN: ' + stages[save.cabinLevel].name.toUpperCase();
     txt.next = next ? 'Restore: ' + next.name + ' ' + next.cost + 'c' : 'Fully restored.';
     txt.stored = stored > 0 ? '+' + stored + ' in the icebox' : '';
   }
@@ -365,16 +365,22 @@ G.ui.cabin = (function () {
       ctx.drawImage(img, cx - (img.width >> 1), top + 4 + ((PLAQUE_H - 18 - img.height) >> 1)); // flipped: facing the door
       F.drawText(ctx, m.len, cx - (m.lenW >> 1), top + PLAQUE_H - 12, 'wood_deep');
     }
-    F.bold(ctx, txt.title, 152, 10, 'bone');
-    F.drawText(ctx, msg || txt.next, 152, 24, msg ? 'fog_light' : 'signal_amber');
-    if (save.coins !== lastCoins) { lastCoins = save.coins; txt.coins = '' + save.coins; }
-    var cw = F.measureBold(txt.coins);
-    F.bold(ctx, txt.coins, 428 - cw, 10, 'bone');
-    ctx.drawImage(coin, 428 - cw - 12, 10);
-    if (txt.stored && !msg) F.drawText(ctx, txt.stored, 428 - F.measure(txt.stored), 24, 'fog_light');
-    F.drawText(ctx, FOOT, 632 - FOOT_W, 344, 'fog_light');
+    // Phase 54: the cabin's words in a small panel at the top centre, in the shared style: its
+    // stage on the tab, the coins beside it, the next restoration (or the last word), the
+    // icebox, and the keys.
+    var U = G.ui.panel, px = HEAD[0], py = HEAD[1];
+    if (save.coins !== lastCoins) { lastCoins = save.coins; txt.coins = '  ' + save.coins; }
+    U.frame(ctx, px, py, HEAD[2], HEAD[3], txt.title, txt.coins, 'bone');
+    ctx.drawImage(coin, U.asideX(px, HEAD[2], txt.coins), py + 4);
+    var ty = U.top(py);
+    F.drawText(ctx, msg || txt.next, U.left(px), ty, msg ? 'fog_light' : 'signal_amber');
+    if (txt.stored && !msg) F.drawText(ctx, txt.stored, px + HEAD[2] - U.PAD - F.measure(txt.stored), ty, 'fog_light');
+    var hx = U.left(px), hy = py + HEAD[3] - U.PAD - U.KEY_H;
+    hx += U.hint(ctx, 'SPACE', 'restore', hx, hy);
+    hx += U.hint(ctx, 'A', 'door: fisher & dog', hx, hy);
+    U.hint(ctx, 'ESC', 'leave', hx, hy);
   }
-  var FOOT = 'SPACE restore   A door: fisher & dog   ESC leave', FOOT_W = F.measure(FOOT);
+  var HEAD = G.ui.panel.place(300, 50, 'top', [0, 0, 300, 50]); HEAD[2] = 300; HEAD[3] = 50;
 
   return {
     native: true,

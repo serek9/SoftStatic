@@ -485,18 +485,10 @@ G.ui.shop = (function () {
   }
 
   // ---- Drawing --------------------------------------------------------------------------
-  // A window in the Pokémon way: ink, a dark wood frame, cream inside with a paper rule.
-  function frame(ctx, x, y, w, h) {
-    ctx.fillStyle = P.ink; ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
-    ctx.fillStyle = P.wood_dark; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-    ctx.fillStyle = P.wood_hi; ctx.fillRect(x - 2, y - 2, w + 4, 1);
-    ctx.fillStyle = P.cream; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = P.paper; ctx.fillRect(x + 2, y + h - 3, w - 4, 1); ctx.fillRect(x + w - 3, y + 2, 1, h - 4);
-  }
   function lines(ctx, ls, x, y, max, key) { for (var i = 0; i < ls.length && i < max; i++) F.drawText(ctx, ls[i], x, y + i * F.LINE_H, key); }
   // A small arrow: down (more to read) or right (the choice).
   function arrow(ctx, x, y, right) {
-    ctx.fillStyle = P.wood_deep;
+    ctx.fillStyle = P.signal_amber;
     for (var i = 0; i < 4; i++) { if (right) ctx.fillRect(x + i, y + i, 1, 7 - i * 2); else ctx.fillRect(x + i, y + i, 7 - i * 2, 1); }
   }
 
@@ -505,16 +497,20 @@ G.ui.shop = (function () {
     R.draw(ctx, walk, t, save.clock, rusty, stock, env);
     if (!open) return;
     if (open === 'box' || open === 'choice') {
-      frame(ctx, BOX.x, BOX.y, BOX.w, BOX.h);
-      var left = Math.floor(open === 'box' ? typed : 1e9), pg = pages[Math.min(page, pages.length - 1)], key = crimson ? 'crimson' : 'wood_deep';
+      // Phase 54: the text box in the shared panel style, Rusty's name on its tab.
+      G.ui.panel.frame(ctx, BOX.x, BOX.y - G.ui.panel.TAB, BOX.w, BOX.h + G.ui.panel.TAB, 'RUSTY');
+      var left = Math.floor(open === 'box' ? typed : 1e9), pg = pages[Math.min(page, pages.length - 1)], key = crimson ? 'neon_red' : 'bone';
       for (i = 0; i < pg.length && left > 0; i++) { F.drawText(ctx, pg[i].substring(0, left), BOX.x + 14, BOX.y + 12 + i * (F.LINE_H + 6), key); left -= pg[i].length; }
       if (open === 'box' && typed >= pageLen() && ((t * 2) | 0) % 2) arrow(ctx, BOX.x + BOX.w - 20, BOX.y + BOX.h - 14, false);
     }
     if (open === 'choice') {
-      frame(ctx, CH.x, CH.y, CH.w, CH.h);
+      // Phase 54: Buy, Talk, Leave as a list in a small panel, the chosen row on the list's bar.
+      var U = G.ui.panel;
+      U.frame(ctx, CH.x, CH.y - U.TAB, CH.w, CH.h + U.TAB - 14, '');
       for (i = 0; i < CHOICES.length; i++) {
-        F.bold(ctx, CHOICES[i], CH.x + 26, CH.y + 12 + i * 24, 'wood_deep');
-        if (i === choice) arrow(ctx, CH.x + 12, CH.y + 13 + i * 24, true);
+        var cy = CH.y + 8 + i * 22;
+        if (i === choice) { ctx.fillStyle = P.rust_dark; ctx.fillRect(CH.x + 3, cy - 4, CH.w - 6, 16); ctx.fillStyle = P.signal_amber; ctx.fillRect(CH.x + 3, cy - 4, 1, 16); }
+        F.bold(ctx, CHOICES[i], CH.x + 16, cy, i === choice ? 'signal_amber' : 'bone');
       }
     }
     if (open === 'items') {
