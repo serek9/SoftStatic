@@ -60,7 +60,7 @@ G.data.fish = [
     id: 'mist_carp', name: 'Mist Carp', rarity: 'uncommon', locations: ['fog'],
     habitat: { depthMin: 6, depthMax: 20 }, speed: 1.0, strength: 1.0, fatigue: 0.07, mass: 2.2,
     lengthCm: [40, 70], weightKg: [1.2, 3.0], awareness: 38, caution: 0.5,
-    baitLikes: ['worm'], timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], windows: [], uneaseMin: 0, lineShy: true, price: 22, lures: { grub: 1, jig: 1 },
+    baitLikes: ['worm'], timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], windows: [], uneaseMin: 0, price: 22, lures: { grub: 1, jig: 1 },
     desc: 'Heavier in the grey hours, when the fog sits low on the water.', hintRefs: ['hour:grey'],
     look: { base: 'carp', wrongness: 1, parts: ['zipper'], palette: 'bronze', seed: 202 }
   },

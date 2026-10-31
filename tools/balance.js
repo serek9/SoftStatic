@@ -280,7 +280,8 @@ const P = {
   huntDepthM: 24,  // m: where it fishes for the Red Room's key fish in its window
   lureX: 600
 };
-const PLAN = ['line', 'reel', 'rod', 'lantern', 'depthFinder', 'creek', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'red', 'line', 'rod', 'reel'];
+// Phase 53: 'fluoro' buys the fluorocarbon spool and puts it on (line-shy fish then bite).
+const PLAN = ['line', 'reel', 'rod', 'lantern', 'depthFinder', 'creek', 'fluoro', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'red', 'line', 'rod', 'reel'];
 
 function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
@@ -323,7 +324,7 @@ function session(G, seed, opts) {
   function shop() {
     while (st.plan < PLAN.length) {
       const k = PLAN[st.plan], E = S.economy;
-      const r = data.locations[k] ? E.unlock(save, k, data) : E.buy(save, k, data);
+      const r = data.locations[k] ? E.unlock(save, k, data) : (k === 'fluoro' ? E.buyLineType(save, k, data) : E.buy(save, k, data));
       if (r === E.OK || r === E.MAXED) { if (r === E.OK) { event(k); if (data.locations[k] && k !== 'red') moveTo(k); } st.plan++; } else break;
     }
   }
