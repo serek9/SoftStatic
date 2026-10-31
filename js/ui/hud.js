@@ -2,9 +2,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // HUD (9.1): the clock, coins and the bait going on the hook in the top-left corner (over
 // the sky, clear of the boat), and the depth readout in the top-right while the lure is
-// under water. Hidden while the catch card is open, and in the ?compact view (12.5). Between
-// casts the top-right says how to start passive mode, and while it is on, what it just
-// caught (12.2). Every string is rebuilt only when the value it shows changes, never per frame.
+// under water. Hidden while the catch card is open, and in the ?compact view (12.5).
+// (Phase 52: the passive-mode hints are gone with it.) Every string is rebuilt only when the value it shows changes, never per frame.
 G.ui = G.ui || {};
 // Phase 18: drawn in the 640×360 view's pixels with the fine font (it switches the view to
 // native for itself, since the sailing scene that calls it draws in world pixels).
@@ -16,21 +15,19 @@ G.ui.hud = (function () {
   var lastCoins = -1, coinStr = '';
   var lastBait = '', lastCount = -1, baitStr = '';
   // Audit P1-7: after IDLE s with nothing happening (no input, no new coins or bait, no line
-  // out, no passive news) the corner text fades out over FADE s, and comes back at once. The
-  // "TAB passive" hint goes away once passive has been used this session.
-  var IDLE = 6, FADE = 1, idle = 0, seenCoins = -1, seenBait = '', tabUsed = false;
+  // out) the corner text fades out over FADE s, and comes back at once.
+  var IDLE = 6, FADE = 1, idle = 0, seenCoins = -1, seenBait = '';
   var still = false; // audit P3-2: H hides every corner until pressed again
   // Phase 43: a short note under the bait (a lure lost), shown for NOTE s.
   var NOTE = 4, note = '', noteT = 0;
   function say(s) { note = s; noteT = NOTE; idle = 0; }
 
   function update(dt, run) {
-    var save = G.state.save, pv = run.passive;
+    var save = G.state.save;
     idle += dt;
     if (noteT > 0) noteT -= dt;
     if (G.core.input.pressed('still')) still = !still;
-    if (pv.on) tabUsed = true;
-    if (G.core.input.any() || run.fsm !== 'sailing' || pv.noteT > 0 || save.coins !== seenCoins || run.gearFx.bait !== seenBait) idle = 0;
+    if (G.core.input.any() || run.fsm !== 'sailing' || save.coins !== seenCoins || run.gearFx.bait !== seenBait) idle = 0;
     seenCoins = save.coins; seenBait = run.gearFx.bait;
   }
 
@@ -110,8 +107,6 @@ G.ui.hud = (function () {
     }
   }
 
-  var PASSIVE_ON = 'PASSIVE  TAB', PASSIVE_OFF = 'TAB passive';
-
   function draw(ctx, run, waterY) {
     if (G.ui.card.isOpen() || G.core.compact || still) return;
     V.begin(ctx, true);
@@ -122,13 +117,8 @@ G.ui.hud = (function () {
       ctx.drawImage(coinImg(), cx, Y);
       label(ctx, coinText(save.coins), cx + 12, Y, 'paper');
       label(ctx, baitText(save, run.gearFx.bait), X, Y + 14, 'fog_light');
-      var pv = run.passive;
-      if (pv.on) {
-        label(ctx, PASSIVE_ON, 632 - F.measure(PASSIVE_ON), Y, 'signal_amber');
-      } else if (run.fsm === 'sailing' && !tabUsed) F.drawText(ctx, PASSIVE_OFF, 632 - F.measure(PASSIVE_OFF), Y, 'fog_mid'); // also a button (14.6)
       ctx.globalAlpha = 1;
     }
-    if (run.passive.on && run.passive.noteT > 0) label(ctx, run.passive.note, 632 - F.measure(run.passive.note), Y + 14, 'paper');
     if (noteT > 0) { ctx.globalAlpha = Math.min(1, noteT); label(ctx, note, X, Y + 28, 'paper'); ctx.globalAlpha = 1; }
 
     if (G.scene.underwater.UNDER[run.fsm]) {

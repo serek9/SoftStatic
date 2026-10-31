@@ -8,6 +8,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // jumps 0..1 (optional, Phase 23): how often it leaps while pulling near the boat (fight.js).
 // lures (Phase 43): lure id -> 2 loves it (it notices it from 1.3× as far), 1 takes it; a lure
 // not listed is ignored (the fish swims past it). Live baits still go by baitLikes.
+// lineShy (optional, Phase 53): it sees any line but fluorocarbon (gear lineTypes seen) and,
+// having circled the lure, turns away instead of nibbling.
 G.data = G.data || {};
 
 G.data.windows = [
@@ -159,7 +161,7 @@ G.data.fish = [
     id: 'ash_trout', name: 'Ash Trout', rarity: 'rare', locations: ['creek'],
     habitat: { depthMin: 4, depthMax: 12 }, speed: 1.8, strength: 1.3, fatigue: 0.08, mass: 1.6, jumps: 0.4,
     lengthCm: [40, 65], weightKg: [1.0, 2.4], awareness: 66, caution: 0.6,
-    baitLikes: ['minnow', 'worm'], timeLikes: [1, 2, 3, 4], windows: [], uneaseMin: 0.4, price: 85, lures: { spinner: 1, popper: 2, plug: 1, grub: 1, jig: 1 },
+    baitLikes: ['minnow', 'worm'], timeLikes: [1, 2, 3, 4], windows: [], uneaseMin: 0.4, lineShy: true, price: 85, lures: { spinner: 1, popper: 2, plug: 1, grub: 1, jig: 1 },
     desc: 'Two tails, and it swims with both. It comes after one in the morning, once the creek has gone quiet around you.', hintRefs: ['unease', 'hour:night'],
     look: { base: 'trout', wrongness: 2, parts: ['owl_eyes', 'second_tail'], palette: 'ink', seed: 128 }
   },
@@ -209,7 +211,7 @@ G.data.fish = [
     id: 'neon_koi', name: 'Neon Koi', rarity: 'uncommon', locations: ['pines'],
     habitat: { depthMin: 2, depthMax: 10 }, speed: 1.3, strength: 1.0, fatigue: 0.08, mass: 1.8,
     lengthCm: [35, 55], weightKg: [1.0, 2.6], awareness: 48, caution: 0.5,
-    baitLikes: ['cricket', 'minnow'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 45, lures: { popper: 2 },
+    baitLikes: ['cricket', 'minnow'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, lineShy: true, price: 45, lures: { popper: 2 },
     desc: 'Red as the diner sign. It opens its mouth as if to order. Only after dark.', hintRefs: ['hour:night'],
     look: { base: 'koi', wrongness: 1, parts: ['human_mouth'], palette: 'koi', seed: 135 }
   },
@@ -284,7 +286,7 @@ G.data.fish = [
     id: 'lamp_koi', name: 'Lamp Koi', rarity: 'uncommon', locations: ['red'],
     habitat: { depthMin: 3, depthMax: 12 }, speed: 1.3, strength: 1.1, fatigue: 0.08, mass: 2.2,
     lengthCm: [36, 58], weightKg: [1.2, 3.2], awareness: 48, caution: 0.5,
-    baitLikes: ['minnow', 'worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 70, lures: { popper: 1, grub: 1, plug: 1 },
+    baitLikes: ['minnow', 'worm'], timeLikes: [], windows: [], uneaseMin: 0, lineShy: true, price: 70, lures: { popper: 1, grub: 1, plug: 1 },
     desc: 'A mouth where no mouth should be, and lumps under the skin. Minnows draw it.', hintRefs: ['bait:minnow'],
     look: { base: 'koi', wrongness: 2, parts: ['human_mouth', 'growths'], palette: 'koi', seed: 145 }
   },

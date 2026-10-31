@@ -8,10 +8,15 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Phase 18: drawn in the 640×360 view's pixels: a folded paper chart with the waters as
 // painted lakes (shallows, a shore line), pines and peaks around them, a dotted route, a
 // compass, the shop and the cabin as little houses and the boat where you are.
+// Phase 54: in the shared panel style (G.ui.panel), as every menu: the chart is a panel titled
+// THE WATERS over the world (nothing dimmed), drawn in the panel's night colours: a faint grid
+// for the folds, the lakes in water keys inside a pale shore, the route and the compass in fog,
+// the names in bone and the chosen one in amber on the list's bar.
 G.ui = G.ui || {};
 G.ui.map = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, M = G.ui.menu, E = G.sim.economy, F = S.fine, A = G.gfx.paint;
-  var CX = 16, CY = 16, CW = 608, CH = 328, FADE = 0.35;
+  var FX = 8, FY = 8, FW = 624, FH = 344;                               // the panel (Phase 54)
+  var CX = 16, CY = 16 + 6, CW = 608, CH = 322, FADE = 0.35;           // the chart inside it
 
   // Where each stop sits on the chart (presentation only), in map order.
   var STOPS = [
@@ -30,22 +35,20 @@ G.ui.map = (function () {
     A.reset();
     A.area(ctx, 0, 0, CW, CH, function (xx, yy) {
       var fx = xx % (CW / 4), fy = yy % (CH / 2);
-      if (fx === 0 || fy === 0) return 'paper_dark';                                   // folds
-      if (fx === 1 || fy === 1) return 'cream';
-      var edge = Math.min(xx, CW - 1 - xx, yy, CH - 1 - yy);
-      return edge < 3 ? 'paper_dark' : (edge < 6 ? 'paper' : 'bone');
+      if ((fx === 0 || fy === 0) && (xx + yy) % 3 === 0) return 'fog_dark';             // the folds, a faint grid
+      return 'night_ink';
     });
     // Peaks along the top and pines scattered over the land.
     for (i = 0; i < 9; i++) {
-      var mx = 30 + i * 66 + rng.int(-10, 10), my = 52 + rng.int(-6, 8), mh = rng.int(14, 22);
-      for (y = 0; y < mh; y++) { A.box(ctx, 'paper_dark', mx - y, my - mh + y, y + 1, 1); A.box(ctx, 'reed_hi', mx + 1, my - mh + y, y, 1); }
-      A.box(ctx, 'cream', mx - 2, my - mh + 2, 3, 2);
+      var mx = 30 + i * 66 + rng.int(-10, 10), my = 46 + rng.int(-6, 8), mh = rng.int(14, 22);
+      for (y = 0; y < mh; y++) { A.box(ctx, 'fog_dark', mx - y, my - mh + y, y + 1, 1); A.box(ctx, 'night_blue', mx + 1, my - mh + y, y, 1); }
+      A.box(ctx, 'fog_mid', mx - 2, my - mh + 2, 3, 2);
     }
     for (i = 0; i < 70; i++) {
-      var tx = rng.int(20, CW - 20), ty = rng.int(70, CH - 30), near = false;
+      var tx = rng.int(20, CW - 20), ty = rng.int(64, CH - 30), near = false;
       for (var k = 0; k < STOPS.length; k++) { var st = STOPS[k]; if (st.kind === 'loc' && Math.abs(tx - st.x + CX) < st.rx + 10 && Math.abs(ty - st.y + CY) < st.ry + 12) near = true; }
       if (near) continue;
-      for (y = 0; y < 7; y++) A.box(ctx, y % 3 === 2 ? 'moss_dark' : 'moss', tx - (y >> 1), ty + y, (y >> 1) * 2 + 1, 1);
+      for (y = 0; y < 7; y++) A.box(ctx, y % 3 === 2 ? 'pine_dark' : 'moss_dark', tx - (y >> 1), ty + y, (y >> 1) * 2 + 1, 1);
       A.px(ctx, 'wood_dark', tx, ty + 7);
     }
     // The route between the waters, dotted.
@@ -54,29 +57,28 @@ G.ui.map = (function () {
       if (a.kind !== 'loc' && b.kind !== 'loc') continue;
       for (var u = 0; u <= 1; u += 0.006) {
         if ((u * 160 | 0) % 3) continue;
-        A.box(ctx, 'rust', Math.round(a.x - CX + (b.x - a.x) * u), Math.round(a.y - CY + (b.y - a.y) * u + Math.sin(u * 3.14) * 12), 2, 2);
+        A.box(ctx, 'fog_mid', Math.round(a.x - CX + (b.x - a.x) * u), Math.round(a.y - CY + (b.y - a.y) * u + Math.sin(u * 3.14) * 12), 2, 2);
       }
     }
-    // Each water as a lake: an ink shore, a band of shallows, deeper water inside.
+    // Each water as a lake: a pale shore, a band of shallows, deeper water inside.
     for (i = 0; i < STOPS.length; i++) {
       var s = STOPS[i];
       if (s.kind !== 'loc') continue;
-      var wob = [rng.range(0, 6.28), rng.range(0, 6.28)];
+      var red = s.fill === 'dusk_rose', wob = [rng.range(0, 6.28), rng.range(0, 6.28)];
       for (y = -s.ry - 2; y <= s.ry + 2; y++) for (x = -s.rx - 3; x <= s.rx + 3; x++) {
         var ang = Math.atan2(y / s.ry, x / s.rx), r = 1 + 0.08 * Math.sin(ang * 3 + wob[0]) + 0.05 * Math.sin(ang * 5 + wob[1]);
         var e = Math.sqrt((x * x) / (s.rx * s.rx) + (y * y) / (s.ry * s.ry)) / r;
         if (e > 1.06) continue;
-        var key = e > 1 ? 'wood' : (e > 0.82 ? (s.fill === 'dusk_rose' ? 'dusk_rose' : 'fog_light') : (s.fill === 'dusk_rose' ? 'crimson' : 'fog_mid'));
-        if (e <= 0.82 && e > 0.55 && (x + y * 3) % 23 === 0) key = 'fog_light';
+        var key = e > 1 ? 'fog_light' : (e > 0.82 ? (red ? 'blood' : 'water_hi') : (red ? 'crimson' : 'water_mid'));
+        if (e <= 0.82 && e > 0.55 && (x + y * 3) % 23 === 0) key = red ? 'dusk_rose' : 'water_hi';
         A.px(ctx, key, s.x - CX + x, s.y - CY + y);
       }
     }
     // A compass rose in the corner.
     var cxr = CW - 50, cyr = CH - 64;
-    for (i = -14; i <= 14; i++) { A.px(ctx, 'wood', cxr + i, cyr); A.px(ctx, 'wood', cxr, cyr + i); }
-    for (i = 0; i < 6; i++) { A.box(ctx, 'rust', cxr - (5 - i) / 2 | 0, cyr - 14 + i * 2, 6 - i, 2); }
-    F.bold(ctx, 'N', cxr - 2, cyr - 26, 'wood_dark');
-    F.bold(ctx, 'THE WATERS', 16, 12, 'wood_deep');
+    for (i = -14; i <= 14; i++) { A.px(ctx, 'fog_mid', cxr + i, cyr); A.px(ctx, 'fog_mid', cxr, cyr + i); }
+    for (i = 0; i < 6; i++) { A.box(ctx, 'signal_amber', cxr - (5 - i) / 2 | 0, cyr - 14 + i * 2, 6 - i, 2); }
+    F.bold(ctx, 'N', cxr - 2, cyr - 26, 'fog_light');
     A.reset();
   }
 
@@ -101,6 +103,7 @@ G.ui.map = (function () {
   var info = { name: '', status: '', key: 'wood', hint: '', lines: [] }; // hint: what Space does here
   // Phase 46: the place card, a small panel (G.ui.panel) at the bottom left, over the chart.
   var CARD = G.ui.panel.place(240, 74, 'bl', [0, 0, 240, 74]);
+  CARD[0] += 10; CARD[1] -= 10; // Phase 54: inside the chart's panel
 
   function stopName(s) {
     if (s.kind === 'shop') return 'Bait Shop';
@@ -145,7 +148,7 @@ G.ui.map = (function () {
 
   var names = [], nameW = [];
   function open() {
-    if (!chart) chart = G.gfx.bake.cached('map:chart640', function () { return G.gfx.bake.layer(CW, CH, paintChart); });
+    if (!chart) chart = G.gfx.bake.cached('map:chart640night', function () { return G.gfx.bake.layer(CW, CH, paintChart); });
     for (var k = 0; k < STOPS.length; k++) { names[k] = stopName(STOPS[k]); nameW[k] = F.measureBold(names[k]); }
     sel = 0;
     for (var i = 0; i < STOPS.length; i++) if (STOPS[i].id === G.state.run.loc) sel = i;
@@ -193,27 +196,27 @@ G.ui.map = (function () {
 
   function draw(ctx) {
     if (phase === 'in') { M.dim(ctx, 1 - t / FADE); return; }
-    M.dim(ctx, 0.6);
-    ctx.fillStyle = P.ink; ctx.fillRect(CX - 2, CY - 2, CW + 4, CH + 4);
+    var U = G.ui.panel;
+    U.frame(ctx, FX, FY, FW, FH, 'THE WATERS', G.state.save.coins + 'c', 'signal_amber');
     ctx.drawImage(chart, CX, CY);
     for (var i = 0; i < STOPS.length; i++) {
       var s = STOPS[i], on = i === sel;
       var open = s.kind !== 'loc' || !!G.state.save.unlocks[s.id];
       if (s.kind === 'loc') {
-        ctx.fillStyle = P[open ? 'ink' : 'wood_hi']; ctx.fillRect(s.x - 2, s.y - 2, 5, 5);
-        if (open) { ctx.fillStyle = P.cream; ctx.fillRect(s.x - 1, s.y - 1, 3, 3); }
+        ctx.fillStyle = P[open ? 'bone' : 'fog_mid']; ctx.fillRect(s.x - 2, s.y - 2, 5, 5);
+        if (open) { ctx.fillStyle = P.night_ink; ctx.fillRect(s.x - 1, s.y - 1, 3, 3); }
       } else ctx.drawImage(mark('house'), s.x - 7, s.y - 10);
       if (s.id === G.state.run.loc) ctx.drawImage(mark('boat'), s.x - 6, s.y - 18);
       var name = names[i], lx = s.x - (nameW[i] >> 1), ly = s.y + (s.ry || 8) + 6;
-      if (on) { ctx.fillStyle = P.paper_dark; ctx.fillRect(lx - 4, ly - 2, nameW[i] + 8, 13); }
-      F.bold(ctx, name, lx, ly, on ? 'rust' : (open ? 'wood_deep' : 'wood'));
+      if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(lx - 4, ly - 2, nameW[i] + 8, 13); ctx.fillStyle = P.signal_amber; ctx.fillRect(lx - 4, ly - 2, 1, 13); }
+      F.bold(ctx, name, lx, ly, on ? 'signal_amber' : (open ? 'bone' : 'fog_mid'));
       if (on) {
         ctx.fillStyle = P.signal_amber;
         ctx.fillRect(s.x - 10, s.y - 10, 6, 2); ctx.fillRect(s.x + 5, s.y - 10, 6, 2);
         ctx.fillRect(s.x - 10, s.y + 9, 6, 2); ctx.fillRect(s.x + 5, s.y + 9, 6, 2);
       }
     }
-    var U = G.ui.panel, x = CARD[0], y = CARD[1];
+    var x = CARD[0], y = CARD[1];
     U.frame(ctx, x, y, CARD[2], CARD[3], info.name);
     for (i = 0; i < info.lines.length && i < 3; i++) F.drawText(ctx, info.lines[i], U.left(x), U.top(y) + i * U.ROW, info.key === 'rust' ? 'rust_hi' : 'fog_light');
     var hx = U.left(x), hy = y + CARD[3] - U.PAD - U.KEY_H;

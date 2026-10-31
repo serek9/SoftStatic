@@ -46,30 +46,104 @@ G.scene.sailing = (function () {
   var rainAcc = 0;
   function rainK() {
     if (sky.opt && sky.opt.clouds === false) return 0;
-    var save = G.state.save, c = save.clock || 0, hr = Math.floor(c), f = c - hr;
+    var save = G.state.save, c = save.clock || 0, hr = Math.floor(c), f = c - hr, st = stormK();
     var k = clamp((G.sim.unease.get(save, loc.id) - 0.45) / 0.35, 0, 1);
-    if (k <= 0 || (S.hash(loc.seed, hr) & 3) !== 0) return 0;
-    return k * Math.min(1, f * 4, (1 - f) * 4);
+    if (k <= 0 || (S.hash(loc.seed, hr) & 3) !== 0) return st; // Phase 55: a storm brings its own rain
+    return Math.max(st, k * Math.min(1, f * 4, (1 - f) * 4));
+  }
+
+  // ---- Thunderstorms (Phase 55) -------------------------------------------------------
+  // In about one game hour in eleven (a hash of the hour and the place; never in the Red Room,
+  // which has no sky of clouds), a storm builds over the hour's first fifth and passes over its
+  // last fifth: stormK() 0..1. While it is up the sky darkens, the rain is heavy and slants
+  // (rainK takes the larger), the surface roughens, and lightning flashes every 6-18 s (fewer
+  // as it builds and passes, G.vrng): a soft flicker of fog_light over the sky (at most 0.4)
+  // and the water (0.18), so nothing gets brighter than dusk_high (fog_light is darker; §0.9),
+  // half the time with a bolt far off behind the hills; thunder follows 1-4 s later, quieter
+  // and lower the further off, rising slowly (no sudden loud sound, §0.14). The mirror shows
+  // it all (drawAbove draws the backdrop). Presentation only: it reads the clock.
+  var STORM = { every: 11, gapMin: 6, gapMax: 18, flashLen: 0.8, skyA: 0.4, waterA: 0.18, dark: 0.32 };
+  var storm = { force: -1, next: 4, t: -1, bolt: false, bx: 0, seed: 0, thunder: 0, dist: 0, n: 0, heard: 0 };
+  function stormK() {
+    if (storm.force >= 0) return storm.force;
+    if (!loc || (sky.opt && sky.opt.clouds === false)) return 0;
+    var c = G.state.save.clock || 0, hr = Math.floor(c), f = c - hr;
+    if (S.hash(loc.seed, hr * 31 + 7) % STORM.every !== 0) return 0;
+    return Math.min(1, f * 5, (1 - f) * 5);
+  }
+  function flash() {
+    var v = G.vrng;
+    storm.next = STORM.gapMin + (STORM.gapMax - STORM.gapMin) * v.next();
+    storm.t = 0; storm.n++; storm.bolt = v.next() < 0.5; storm.bx = 30 + v.next() * (VIEW_W - 60);
+    storm.seed = (v.next() * 1e9) | 0; storm.dist = v.next(); storm.thunder = 1 + 3 * storm.dist;
+    if (G.core.debug) G.core.debug.log('lightning (' + (storm.dist * 10).toFixed(1) + ' km)');
+  }
+  // One step: the flash fades, the thunder comes, and the next flash counts down with the storm.
+  function stormStep(dt) {
+    var k = stormK();
+    if (storm.t >= 0) { storm.t += dt; if (storm.t >= STORM.flashLen) storm.t = -1; }
+    if (storm.thunder > 0) { storm.thunder -= dt; if (storm.thunder <= 0) { storm.heard++; G.audio.engine.cue('thunder', 0, storm.dist); } }
+    if (k <= 0.05) { if (storm.next < 3) storm.next = 3; return; }
+    storm.next -= dt * k;
+    if (storm.next <= 0) flash();
+  }
+  // How bright the flash is now (0..1): a flicker, a second stronger one, then it fades; the
+  // further off, the dimmer.
+  function flashF() {
+    var t = storm.t;
+    if (t < 0) return 0;
+    var f = t < 0.06 ? 0.7 : (t < 0.12 ? 0.2 : (t < 0.2 ? 1 : Math.exp(-(t - 0.2) * 6)));
+    return f * (1 - 0.5 * storm.dist);
+  }
+  // Over the sky, before the hills: the storm's dark, the flash, and a bolt from the clouds
+  // down behind the far ridge (a jagged line with a branch, from the flash's own seed).
+  function drawStormSky(c) {
+    var k = stormK(), wy = loc.waterY - camPy, f = flashF();
+    if (k <= 0 && f <= 0) return;
+    c.fillStyle = P.night_ink; c.globalAlpha = STORM.dark * k;
+    c.fillRect(0, -camPy, VIEW_W, wy + camPy);
+    if (f > 0) {
+      c.fillStyle = P.fog_light; c.globalAlpha = STORM.skyA * f;
+      c.fillRect(0, -camPy, VIEW_W, wy + camPy);
+      if (storm.bolt && storm.t < 0.35) {
+        var x = storm.bx, y = -camPy + 6, n = 9, dy = (wy - 34 - y) / n, bx = 0, by = 0;
+        c.globalAlpha = Math.min(1, 1.6 * f);
+        for (var i = 0; i < n; i++) {
+          var ny = y + dy, nx = x + ((S.hash(storm.seed, i) % 9) - 4) * 1.5;
+          lineN = 0; line(c, x, y, nx, ny, false);
+          if (i === 3) { bx = nx; by = ny; }
+          x = nx; y = ny;
+        }
+        for (i = 0; i < 3; i++) { var ex = bx + ((S.hash(storm.seed, 40 + i) % 5) + 2) * (storm.seed & 1 ? 1 : -1), ey = by + 6; lineN = 0; line(c, bx, by, ex, ey, false); bx = ex; by = ey; }
+      }
+    }
+    c.globalAlpha = 1;
+  }
+  // Over the water: the flash on its surface.
+  function drawStormWater(c) {
+    var f = flashF();
+    if (f <= 0) return;
+    var wy = loc.waterY - camPy;
+    c.fillStyle = P.fog_light; c.globalAlpha = STORM.waterA * f;
+    c.fillRect(0, wy, VIEW_W, VIEW_H - wy);
+    c.globalAlpha = 1;
   }
   var RAIN_N = 60;
   function drawRain(c) {
     var k = rainK();
     if (k <= 0) return;
-    var t = G.state.run.boat.t, wy = loc.waterY - camPy, n = Math.round(RAIN_N * k);
-    c.fillStyle = P.fog_mid; c.globalAlpha = 0.4;
+    var st = stormK(), t = G.state.run.boat.t, wy = loc.waterY - camPy, n = Math.round(RAIN_N * k * (1 + 1.4 * st)), slant = 0.15 + 0.25 * st; // Phase 55: a storm's rain is heavier and slants
+    c.fillStyle = P.fog_mid; c.globalAlpha = 0.4 + 0.1 * st;
     for (var i = 0; i < n; i++) {
-      var y = ((S.hash(i, 22) % 200) + t * 110) % (wy + 12) - 6;
-      var x = (S.hash(i, 21) % 340) - 10 - Math.round(y * 0.15);
+      var y = ((S.hash(i, 22) % 200) + t * (110 + 60 * st)) % (wy + 12) - 6;
+      var x = (S.hash(i, 21) % 380) - 10 - Math.round(y * slant);
       c.fillRect(x, Math.round(y * HI) / HI, 0.5, 2);
     }
     c.globalAlpha = 1;
   }
-  var plift = { t: -1, sp: -1, x0: 0 }, PLIFT = 0.9;
-  // Small things painted in the view's pixels (Phase 18): the lure, the passive line's float
-  // (12.2), the bat's two wing beats.
+  // Small things painted in the view's pixels (Phase 18): the lure, the bat's two wing beats.
   var TINY = {
     lure: [6, 6, function (c) { A.blob(c, 3, 3, 2.5, 1.6, ['rust_dark', 'rust_hi', 'flame'], { bias: 0.1 }); A.px(c, 'bone', 4, 2); A.px(c, 'ink', 5, 3); A.px(c, 'stone_hi', 1, 5); A.px(c, 'stone_hi', 2, 5); }],
-    float: [4, 8, function (c) { A.box(c, 'stone_hi', 1, 0, 1, 1); A.blob(c, 2, 3, 1.6, 2, ['blood', 'neon_red'], { bias: 0.2 }); A.blob(c, 2, 5.5, 1.6, 1.5, ['paper', 'bone'], { bias: 0.1 }); A.box(c, 'ink', 1, 7, 2, 1); }],
     bat0: [12, 6, function (c) { A.box(c, 'night_ink', 5, 2, 2, 3); A.line(c, 'night_ink', 5, 2, 0, 0); A.line(c, 'night_ink', 6, 2, 11, 0); A.line(c, 'night_ink', 4, 3, 1, 1); A.line(c, 'night_ink', 7, 3, 10, 1); }],
     bat1: [12, 6, function (c) { A.box(c, 'night_ink', 5, 1, 2, 3); A.line(c, 'night_ink', 5, 2, 0, 4); A.line(c, 'night_ink', 6, 2, 11, 4); A.line(c, 'night_ink', 4, 2, 1, 3); A.line(c, 'night_ink', 7, 2, 10, 3); }]
   };
@@ -350,7 +424,7 @@ G.scene.sailing = (function () {
     bakeSky();
     bakeMist();
 
-    var run = G.state.run, pv = run.passive;
+    var run = G.state.run;
     run.loc = id;
     run.boat = boat.create(loc.start);
     run.dog = dog.create();
@@ -384,9 +458,6 @@ G.scene.sailing = (function () {
     run.spots = loc.spots || []; // where casts are worth more; a scenery module may move them
     run.scen = null;             // the scenery module's own run state
     if (scen.load) scen.load(run, loc);
-    // Passive mode (12.2) carries on across travel, with its tape; the next cycle starts here.
-    run.passive = pv || { on: false, ps: null, pl: false, t: 0, x: 0, tape: null, cycles: 0, note: '', noteT: 0 };
-    run.passive.ps = null; run.passive.pl = false;
     G.gfx.water.setDeltas(drawDeltas);
     G.gfx.surface.setup(loc); // Phase 20: a calm surface with this water's swell
     fx.clear();
@@ -412,6 +483,7 @@ G.scene.sailing = (function () {
     ctx.unease = G.sim.unease.get(save, loc.id);
     ctx.bait = li.bait; ctx.lure = li.lure;
     ctx.smallBoost = gx.smallBoost; ctx.smallMass = gx.smallMass; // Phase 43: the ultralight rod
+    ctx.lineSeen = gx.lineSeen;                                    // Phase 53: line-shy fish see it
     ctx.latched = c.latched;
     ctx.rodMaxMass = rodMaxOverride || gx.maxMass;
     // 8.4 #5: after a rod change the too-heavy flag is worked out again at once (it used to
@@ -564,10 +636,7 @@ G.scene.sailing = (function () {
         }
         break;
       case 'sailing':
-        if (run.passive.on && run.passive.pl) { // 12.2: fishing by itself; bent while a fish is on
-          var on = passiveFighting(run);
-          out[0] = CAST.waitAngle + (on ? 4 : 0); out[1] = on ? 0.45 + 0.15 * Math.sin(run.passive.t * 9) : 0.03;
-        } else { out[0] = CAST.restAngle; out[1] = 0.02; out[2] = ROD_DOWN; }
+        out[0] = CAST.restAngle; out[1] = 0.02; out[2] = ROD_DOWN;
         break;
       case 'card':
         out[0] = CAST.restAngle; out[1] = 0.02; out[2] = ROD_DOWN;
@@ -597,6 +666,7 @@ G.scene.sailing = (function () {
           u = (run.bite.t * 2.6) % 1;
           out[1] = 0.1 + Math.min(0.15, run.bite.t * 0.2) + 0.3 * (u < 0.08 ? u / 0.08 : Math.exp(-(u - 0.08) * 7));
         }
+        out[1] *= run.gearFx.lineFeel || 1; // Phase 53: a line without stretch (braid) carries every touch to the tip
     }
     if (run.fisher && run.fisher.angle !== null) out[0] = run.fisher.angle; // Phase 33: in the holder, or raised in an act
     return out;
@@ -634,7 +704,6 @@ G.scene.sailing = (function () {
     var held = G.core.input.held('action'), turns = 0, F = run.fight;
     if (fsm === 'fighting') { if (G.scene.underwater.fightReel() && !F.slipped) turns = REEL_TURNS * run.gearFx.reelSpeed * (1 - 0.5 * F.T); }
     else if ((fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest') && held && run.bite.slot < 0) turns = REEL_TURNS * run.gearFx.reelSpeed;
-    else if (passiveFighting(run)) turns = 0.5 * REEL_TURNS * run.gearFx.reelSpeed;
     else if (run.fisher.reel > 0) turns = run.fisher.reel;                         // Phase 34: reeling the lure up
     R.reel(dt, turns, (fsm === 'charging' || fsm === 'casting' || fsm === 'sinking' || run.fisher.bail) && turns === 0);
   }
@@ -650,7 +719,7 @@ G.scene.sailing = (function () {
   var dgTip = [0, 0];
   function dangleStep(run, dt) {
     var fsm = run.fsm, fs = run.fisher, b = run.boat;
-    var on = !run.passive.on && rope.st.mode === rope.OFF && (fsm === 'sailing' || fsm === 'charging' || fsm === 'card');
+    var on = rope.st.mode === rope.OFF && (fsm === 'sailing' || fsm === 'charging' || fsm === 'card');
     if (fsm === 'casting' && !run.cast.flying) on = true;
     boat.rodTip(b, b.x, loc.waterY, dgTip);
     if (!on) { dg.on = false; dg.init = false; return; }
@@ -735,16 +804,8 @@ G.scene.sailing = (function () {
     return out;
   }
 
-  // The float's place (world px) in passive mode; it rides the surface and a fish pulls it under.
-  function floatPos(run, out) {
-    var pv = run.passive, on = passiveFighting(run);
-    out[0] = pv.x + (on ? Math.round(Math.sin(pv.t * 31)) : 0);
-    out[1] = Math.round((floatY(pv.x) - 2 + (on ? 2 : 0)) * HI) / HI + 2; // the float's foot, where the line ties on
-    return out;
-  }
-
   function ropeStep(run, dt) {
-    var fsm = run.fsm, st = rope.st, b = run.boat, F = run.fight, pv = run.passive;
+    var fsm = run.fsm, st = rope.st, b = run.boat, F = run.fight;
     var was = ropeFsm;
     ropeFsm = fsm;
     boat.rodTip(b, b.x, loc.waterY, tipW);
@@ -762,16 +823,14 @@ G.scene.sailing = (function () {
       if (st.rest <= 2 || ropeT > ROPE.looseMax || fsm === 'charging') rope.off();
       return;
     }
-    var passive = fsm === 'sailing' && pv.on && pv.pl;
-    if (fsm !== 'casting' && !G.scene.underwater.UNDER[fsm] && !passive) { rope.off(); return; }
+    if (fsm !== 'casting' && !G.scene.underwater.UNDER[fsm]) { rope.off(); return; }
     // Until the lure flies it rides the tip, so the line is held there (Phase 32: the tip whips
     // too fast for 48 links to follow, and they trailed in a loop longer than the line out).
     if (st.mode === rope.OFF || (fsm === 'casting' && !run.cast.flying)) rope.reset(tipW[0], tipW[1]);
-    if (passive) floatPos(run, lurePt); else lurePos(run, lurePt);
+    lurePos(run, lurePt);
     rope.anchors(tipW[0], tipW[1], lurePt[0], lurePt[1]);
     var dx = lurePt[0] - tipW[0], dy = lurePt[1] - tipW[1], span = Math.sqrt(dx * dx + dy * dy), r = st.rest, k, pull = 0;
-    if (passive) r = span * 1.06 + 2;
-    else if (fsm === 'casting') r = Math.max(r, span * 1.12 + 1);                    // paying out behind the lure
+    if (fsm === 'casting') r = Math.max(r, span * 1.12 + 1);                    // paying out behind the lure
     else if (fsm === 'sinking') r = Math.max(r, span * 1.06 + 4);                    // the bail is open as it sinks
     else if (fsm === 'waiting' || fsm === 'interest') {
       // A bite takes the slack out over about a third of a second, then holds the line straight.
@@ -780,7 +839,7 @@ G.scene.sailing = (function () {
       else {
         // Waiting, the angler takes in the slack the sink left until a light belly remains;
         // a lure that drifts away draws line out.
-        var belly = span * ROPE.belly + 1.5;
+        var belly = span * lineType().belly + 1.5; // Phase 53: braid lies straighter, mono keeps a belly
         r = r > belly ? r - (r - belly) * Math.min(1, ROPE.takeUp * dt) : Math.max(r, span * 1.01);
       }
       nibT -= dt;
@@ -831,17 +890,16 @@ G.scene.sailing = (function () {
     var st = rope.st;
     if (st.mode === rope.OFF) return;
     boat.rodTip(b, Math.round(b.x - run.cam.x), wy, tip);
-    var passive = fsm === 'sailing' && run.passive.on && run.passive.pl, fight = fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing';
+    var fight = fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing';
     var end = null;
     if (st.mode === rope.PINNED) {
-      end = passive ? floatPos(run, lurePt) : lurePos(run, lurePt);
+      end = lurePos(run, lurePt);
       end[0] -= camPx; end[1] -= camPy;
     }
-    var F = run.fight, key = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : F.T) : 'fog_light';
+    var LT = lineType(), F = run.fight, key = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : F.T) : LT.key; // Phase 53: the line's own colour
     var vib = fsm === 'fighting' && F.mode === 'pull' ? (0.4 + 0.9 * F.T) * Math.sin(b.t * 47) : 0; // the taut line hums
     var hum = run.heavy.hum > 0 ? Math.round(Math.sin(b.t * 90)) : 0;
-    drawRope(ctx, end, key, fight ? 0.85 : 0.6, vib, hum);
-    if (passive) { ctx.drawImage(tinyArt('float'), Math.round(end[0] * HI) / HI - 1, end[1] - 3, 2, 4); return; }
+    drawRope(ctx, end, key, fight ? Math.max(LT.alpha, 0.5) + 0.25 : LT.alpha, vib, hum);
     if (fight) return;
     var lx, ly;
     if (end) { lx = end[0]; ly = end[1]; }
@@ -1086,27 +1144,28 @@ G.scene.sailing = (function () {
   }
 
   function drawSky(c) {
-    var wy = loc.waterY, h = hourNow(), t = G.state.run.boat.t, n = nightF(h), d = duskF(h), g = greyF(h);
+    var wy = loc.waterY, h = hourNow(), t = G.state.run.boat.t, n = nightF(h), d = duskF(h), g = greyF(h), st = stormK();
     var sx = Math.round(camPx * SKYP * HI);
     c.drawImage(skyCv, 0, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
     if (sky.glow && d > 0) {
       c.globalAlpha = d * 0.55;
       c.drawImage(sky.glow, Math.round(((sky.opt.glowX || 230) - camPx * SKYP) * HI) / HI - 100, wy - 46 - camPy, 200, 46);
     }
-    if (sky.stars && n > 0) {
-      c.globalAlpha = n * (1 - 0.6 * g);
+    if (sky.stars && n > 0 && st < 1) {
+      c.globalAlpha = n * (1 - 0.6 * g) * (1 - st); // Phase 55: a storm's clouds hide the stars and the moon
       c.drawImage(sky.stars, sx, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
-      c.globalAlpha = n * (0.35 + 0.35 * Math.sin(t * 1.3));
+      c.globalAlpha = n * (0.35 + 0.35 * Math.sin(t * 1.3)) * (1 - st);
       c.drawImage(sky.twinkle, sx, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
     }
     moonAt(h, moonPt);
+    moonPt[2] *= 1 - 0.95 * st;
     if (moonPt[2] > 0) {
       c.globalAlpha = moonPt[2];                           // a faint halo, then the disk
       c.drawImage(sky.halo, moonPt[0] - 12, moonPt[1] - 12, 24.5, 24.5);
       c.drawImage(sky.moon, moonPt[0] - 4, moonPt[1] - 4, 8.5, 8.5);
     }
     if (sky.clouds) {
-      var ox = camPx * CLOUD_P + t * CLOUD_DRIFT, cw = [n * 0.8, g * 0.6, d * 0.85, d * 0.55];
+      var ox = camPx * CLOUD_P + t * CLOUD_DRIFT, cw = [n * 0.8 + st, g * 0.6 + st * 0.8, d * 0.85, d * 0.55];
       for (var i = 0; i < 4; i++) {
         if (cw[i] <= 0.01) continue;
         c.globalAlpha = Math.min(1, cw[i]);
@@ -1261,81 +1320,6 @@ G.scene.sailing = (function () {
     c.globalAlpha = 1;
   }
 
-  // ---- Passive mode (12.2, V7) --------------------------------------------------
-  // TAB turns it on from any state. A lure in the water is reeled in; a fish already on the
-  // line is fought by the auto-player and sold, then the cycles start. Each cycle is
-  // sim/passive.js plan (decided as it starts, from the boat's spot), run in real time while
-  // the scene's own clock and unease go on, then apply: the same cycles time away uses.
-  // TAB, a move or the action key turns it off (never blocking input), and the tape of
-  // what it caught opens.
-  var PASSIVE = { reach: 60, card: 1.2 }; // px from the boat where the float sits; s the card shows
-
-  function passiveOn(run) {
-    var pv = run.passive, fsm = run.fsm, c = run.cast;
-    pv.on = true; pv.pl = false; pv.t = 0; pv.cycles = 0; pv.note = ''; pv.noteT = 0;
-    if (fsm === 'charging') G.core.state.go(run, 'sailing');
-    else if (fsm === 'casting' || fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest') {
-      if (fsm === 'casting') G.core.state.go(run, 'sinking');
-      fx.splash(c.x1, loc.waterY, 0.15);
-      G.core.state.go(run, 'sailing'); // reeled in: the fish drift off, the next cast starts clean
-    }
-    if (G.core.debug) G.core.debug.log('passive on (from ' + fsm + ')');
-  }
-
-  // show: open the tape of this stretch (when it fished at least once).
-  function passiveOff(run, show) {
-    var pv = run.passive, tape = pv.tape;
-    pv.on = false; pv.pl = false; pv.tape = null;
-    if (tape && tape.secs > 0) {
-      G.sim.passive.finish(tape, G.state.save, G.rng, G.data);
-      G.core.save.autosave('passive');
-      if (show) { G.ui.tape.show(tape); G.ui.menu.open('tape'); }
-    }
-    if (G.core.debug) G.core.debug.log('passive off');
-  }
-
-  function setPassive(on) {
-    var run = G.state.run;
-    if (!!on === run.passive.on) return run.passive.on;
-    if (on) passiveOn(run); else passiveOff(run, true);
-    return run.passive.on;
-  }
-
-  // Cycles run only while the boat is between casts; a fight it took over finishes first.
-  function passiveStep(run, dt) {
-    var pv = run.passive, PS = G.sim.passive, save = G.state.save;
-    if (pv.noteT > 0) pv.noteT -= dt;
-    if (plift.t >= 0) {
-      var k0 = Math.floor(plift.t * 12);
-      plift.t += dt;
-      if (Math.floor(plift.t * 12) !== k0) fx.emit('splash', plift.x0 + (run.boat.x - plift.x0) * plift.t / PLIFT, loc.waterY - Math.sin(plift.t / PLIFT * Math.PI) * 22, 1);
-      if (plift.t >= PLIFT) plift.t = -1;
-    }
-    if (!pv.on || run.fsm !== 'sailing') return;
-    if (!pv.ps) pv.ps = PS.create(save, loc.id, G.data);
-    if (!pv.tape) pv.tape = PS.newTape(save, loc.id, 'live');
-    if (!pv.pl) {
-      pv.x = clamp(Math.round(run.boat.x + run.boat.facing * PASSIVE.reach), 8, loc.width - 8);
-      G.sim.unease.castBoost(run.anom, run.spots, pv.x, G.data, pv.ps.boost); // where it fishes counts
-      PS.plan(pv.ps, G.rng, G.data);
-      pv.pl = true; pv.t = 0;
-      fx.splash(pv.x, loc.waterY, 0.2);
-      return;
-    }
-    pv.t += dt;
-    var pl = pv.ps.plan;
-    if (pv.t < pl.total) return;
-    var r = PS.apply(pv.ps, G.data);
-    PS.record(pv.tape, pv.ps, G.rng, G.data);
-    pv.cycles++; pv.pl = false; pv.noteT = 4;
-    if (r === PS.CAUGHT) {
-      pv.note = '+' + pl.coins + 'c ' + G.data.fish[pl.sp].name;
-      fx.splash(pv.x, loc.waterY, 0.5);
-      plift.t = 0; plift.sp = pl.sp; plift.x0 = pv.x;
-      G.core.save.autosave('catch');
-    } else pv.note = r === PS.LOST ? 'It got away.' : 'Nothing bit.';
-  }
-
   function riseStep(run, dt) {
     riseT -= dt;
     if (riseT > 0) return;
@@ -1382,32 +1366,101 @@ G.scene.sailing = (function () {
     c.globalAlpha = 1;
   }
 
-  // The passive catch rises from the float to the boat (P2-2).
-  function drawLift(c, run) {
-    if (plift.t < 0) return;
-    var u = plift.t / PLIFT, b = run.boat, tx = b.x + b.facing * 8;
-    var x = plift.x0 + (tx - plift.x0) * u, y = loc.waterY - 2 - Math.sin(u * Math.PI) * 22;
-    var pic = tx < plift.x0 ? G.gfx.fishgen.portraitFlipped(plift.sp, 30, 14) : G.gfx.fishgen.portrait(plift.sp, 30, 14, false), w = pic.width / HI, h = pic.height / HI;
-    c.drawImage(pic, Math.round((x - camPx - w / 2) * HI) / HI, Math.round((y - camPy - h / 2) * HI) / HI, w, h);
+  // ---- The line (Phase 53) ------------------------------------------------------
+  // The line type on the reel (data/gear.js lineTypes) for how it is drawn and how it hangs:
+  // its colour and alpha (fluorocarbon barely shows, braid is green and plain), how fast it
+  // sinks under water (rope.setSink) and the belly a waiting line keeps. A line-shy fish that
+  // turns away (fish_ai sets f.shied) is said once a cast on the HUD and writes the journal's
+  // 'line' hint for its species, caught or not.
+  function lineType() { return G.sim.economy.lineTypeById(G.state.save.gear.lineType, G.data); }
+  var shyCast = -1;
+  function lineStep(run) {
+    rope.setSink(lineType().sinkG);
+    var fish = run.school.fish;
+    for (var i = 0; i < fish.length; i++) {
+      var f = fish[i];
+      if (!f.active || f.shied !== 1) continue;
+      f.shied = 2;
+      var sp = G.data.fish[f.sp], j = G.state.save.journal[sp.id];
+      if (!j) j = G.state.save.journal[sp.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: true, phantom: false };
+      if (j.hints.indexOf('line') < 0) { j.hints.push('line'); G.core.save.autosave('hint'); }
+      if (shyCast !== run.cast.n) { shyCast = run.cast.n; G.ui.hud.say('It saw the line and turned away.'); }
+      if (G.core.debug) G.core.debug.log(sp.id + ' saw the line');
+    }
   }
 
-  // True while a passive cycle's fish is on (the float pulls under, the rod bends).
-  function passiveFighting(run) {
-    var pv = run.passive;
-    return pv.on && pv.pl && pv.ps.plan.result !== G.sim.passive.EMPTY && pv.t >= pv.ps.plan.wait;
+  // ---- Letting a fish go (Phase 51) ---------------------------------------------
+  // RELEASE on the catch card: the fish is back in his far hand by the gunwale; he swings it
+  // back, then out over the water, and lets go (fisher.toss drives the arm). It flies in an
+  // arc, turning, and goes in with a splash, a ring and a dent in the surface; then its shape
+  // slips away under the surface and fades. Presentation only: the catch is in the journal
+  // already and nothing is drawn from G.rng. A cast or the helm cuts the swing short: the
+  // fish leaves his hand at once.
+  var REL = { hold: 0.42, out: 0.16, back: 0.4, vx: 58, vy: -62, g: 240, swim: 1.6, dive: 9 };
+  var rel = { t: -1, sp: -1, len: 0, w: 0, x: 0, y: 0, vx: 0, vy: 0, flown: false, inT: -1, ix: 0, face: 1, n: 0 };
+  function releaseStart(run, sp, len, w) {
+    rel.t = 0; rel.sp = sp; rel.len = len; rel.w = w; rel.flown = false; rel.inT = -1; rel.face = run.boat.facing; rel.n++;
+    run.fisher.toss = 0;
+  }
+  function releaseStep(run, dt) {
+    var fs = run.fisher;
+    if (rel.t < 0) { fs.toss = -1; return; }
+    var b = run.boat, f = b.facing;
+    rel.t += dt;
+    var swinging = run.fsm === 'sailing' && !fs.helm && rel.t < REL.hold + REL.out + REL.back;
+    fs.toss = swinging ? rel.t : -1;
+    if (!rel.flown) {
+      rel.x = b.x + f * fs.fx - f * b.lean; rel.y = loc.waterY + boat.bob(b) + fs.fy + boat.shear(b, -1) + 1.5;
+      if (rel.t >= REL.hold + REL.out * 0.6 || !swinging) {
+        rel.flown = true; rel.face = f;
+        rel.vx = f * (swinging ? REL.vx : 18); rel.vy = swinging ? REL.vy : -10;
+      }
+    } else if (rel.inT < 0) {
+      rel.vy += REL.g * dt; rel.x += rel.vx * dt; rel.y += rel.vy * dt;
+      if (rel.vy > 0 && rel.y >= floatY(rel.x)) {
+        var k = Math.min(1, 0.3 + rel.w * 0.15);
+        rel.inT = 0; rel.ix = rel.x; rel.y = loc.waterY;
+        fx.splash(rel.x, loc.waterY, 0.25 + 0.4 * k);
+        fx.ripple(rel.x, loc.waterY + 1, 2, 10 + 8 * k, 1);
+        G.gfx.surface.poke(rel.x, 0.3 + 0.4 * k, 2 + 2 * k);
+        G.audio.engine.cue('jump', rel.x, 1);
+        if (G.core.debug) G.core.debug.log('released ' + G.data.fish[rel.sp].id);
+      }
+    } else {
+      rel.inT += dt;
+      if (rel.inT >= REL.swim) rel.t = -1;
+    }
+  }
+  // The fish in his hand or in the air: its portrait, sized by its length, nose down while
+  // held (the fall's own lean shown by a half-pixel step as it turns in the air).
+  function drawRelease(c, run) {
+    if (rel.t < 0) return;
+    var FG = G.gfx.fishgen, size = Math.max(8, Math.min(34, Math.round(rel.len * 0.55)));
+    if (rel.inT < 0) {
+      var right = rel.flown ? (rel.vx >= 0) : rel.face > 0, pic = right ? FG.portrait(rel.sp, size, size >> 1, false) : FG.portraitFlipped(rel.sp, size, size >> 1);
+      var w = pic.width / HI, h = pic.height / HI;
+      c.drawImage(pic, Math.round((rel.x - camPx - w / 2) * HI) / HI, Math.round((rel.y - camPy - h / 2) * HI) / HI, w, h);
+      return;
+    }
+    // Under the surface: it slips away, down and out, fading (a swimmer frame at its beat).
+    var u = rel.inT / REL.swim, cv = FG.swimmer(rel.sp, FG.BEAT[Math.floor(rel.inT * 8) & 3], false, rel.face < 0);
+    var x = rel.ix + rel.face * 34 * u, y = loc.waterY + 3 + REL.dive * u;
+    c.globalAlpha = 0.55 * (1 - u) * Math.min(1, rel.inT * 6);
+    c.drawImage(cv, Math.round((x - camPx - cv.width / (2 * HI)) * HI) / HI, Math.round((y - camPy - cv.midY / HI) * HI) / HI, cv.width / HI, cv.height / HI);
+    c.globalAlpha = 1;
   }
 
   // ---- The fisher (Phase 33) ---------------------------------------------------
-  // The idle director's context: between casts (stopped, no line, not passive, no anomaly) or
+  // The idle director's context: between casts (stopped, no line, no anomaly) or
   // waiting for a bite with nothing interested; any key held or pressed ends an act. The keys
   // still do what they always do on this step: the director only reads them.
-  var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'passive', 'up', 'down', 'back', 'still', 'setup'];
+  var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'up', 'down', 'back', 'still', 'setup'];
   var voiceIn = { on: true, block: false }; // Phase 42
   var fisherIn = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
   function fisherStep(run, dt) {
     var inp = G.core.input, any = false;
     for (var i = 0; i < KEYS_ANY.length; i++) if (inp.held(KEYS_ANY[i]) || inp.pressed(KEYS_ANY[i])) { any = true; break; }
-    var quiet = !run.passive.on && !run.anom.on;
+    var quiet = !run.anom.on;
     fisherIn.mode = quiet && run.fsm === 'sailing' && run.boat.stopped ? 'casts' : (quiet && run.fsm === 'waiting' && run.bite.slot < 0 ? 'wait' : null);
     if (G.ui.setup.isOpen()) fisherIn.mode = null; // Phase 45: he waits while you choose
     fisherIn.input = any;
@@ -1415,7 +1468,7 @@ G.scene.sailing = (function () {
     // Phase 41: under way (or the cord pulled) he stows the rod and takes the tiller; the tiller
     // swings with the turn (the boat's acceleration) and the throttle.
     var b = run.boat;
-    fisherIn.helm = run.fsm === 'sailing' && !run.passive.on && (!b.stopped || b.startT >= 0 || (run.move !== 0 && b.motor));
+    fisherIn.helm = run.fsm === 'sailing' && (!b.stopped || b.startT >= 0 || (run.move !== 0 && b.motor));
     fisherIn.cord = b.startT >= 0 ? b.startT / boat.M.start : -1;
     fisherIn.steer = Math.max(-1, Math.min(1, b.ax * 0.01 + 0.4 * b.throttle));
     tackleStep(run, any);
@@ -1423,21 +1476,21 @@ G.scene.sailing = (function () {
   }
 
   // ---- The setup panel (Phase 45) ----------------------------------------------
-  // S opens it on the boat with the line out of the water (sailing, stopped or under way, not
-  // passive). While it is open it has the keys: the boat does not sail and nothing is cast,
+  // S opens it on the boat with the line out of the water (sailing, stopped or under way).
+  // While it is open it has the keys: the boat does not sail and nothing is cast,
   // but the world goes on. When it closes, a new rod or a new hook queues the fisher's short
   // act for it (fisher.js swap, tie, swaptie), played on the first quiet step with the boat
   // stopped; any key, a cast above all, cuts it short as it does every act. Under way the rod
   // lies in the clips and he takes it up when the boat stops, so a rod change needs no act.
   var tackleAct = '';
-  function setupStep(run, toggled) {
+  function setupStep(run) {
     var su = G.ui.setup, inp = G.core.input;
     if (su.isOpen()) {
-      if (run.fsm !== 'sailing' || run.passive.on) su.close();
+      if (run.fsm !== 'sailing') su.close();
       else if (!su.update()) tackleAfter();
       return true;
     }
-    if (toggled || !inp.pressed('setup') || run.fsm !== 'sailing' || run.passive.on) return false;
+    if (!inp.pressed('setup') || run.fsm !== 'sailing') return false;
     su.open();
     return true;
   }
@@ -1449,16 +1502,16 @@ G.scene.sailing = (function () {
   function tackleStep(run, any) {
     if (!tackleAct) return;
     var fs = run.fisher;
-    if (run.fsm !== 'sailing' || run.passive.on) tackleAct = '';
+    if (run.fsm !== 'sailing') tackleAct = '';
     else if (fisherIn.helm || fs.helm) tackleAct = tackleAct === 'swap' ? '' : 'tie';
     else if (fisherIn.mode === 'casts' && !any && !fs.act && !fs.ret) { G.scene.fisher.start(fs, tackleAct); tackleAct = ''; }
   }
 
   // Phase 45: true when a tap at view pixel (gx, gy) is on the dog and he can be petted now
-  // (the boat sitting still between casts, not passive, no panel open). Reads state only.
+  // (the boat sitting still between casts, no panel open). Reads state only.
   function dogTap(gx, gy) {
     var run = G.state.run, b = run && run.boat;
-    if (!b || !loc || G.core.state.sceneName() !== 'sailing' || run.fsm !== 'sailing' || run.passive.on || !b.stopped || G.ui.setup.isOpen()) return false;
+    if (!b || !loc || G.core.state.sceneName() !== 'sailing' || run.fsm !== 'sailing' || !b.stopped || G.ui.setup.isOpen()) return false;
     if (G.ui.menu.current()) return false;
     var sx = Math.round(b.x - run.cam.x), y = loc.waterY - camPy + boat.bob(b);
     var dx = b.facing < 0 ? sx - 16 : sx + 4, dy = y - 14 + boat.shear(b, 10);
@@ -1477,12 +1530,8 @@ G.scene.sailing = (function () {
   function exit() {}
 
   function update(dt) {
-    var run = G.state.run, b = run.boat, save = G.state.save, inp = G.core.input, pv = run.passive;
-    // 12.2: TAB toggles passive in every state; moving or the action key also ends it, and
-    // that key does nothing else this step.
-    var toggled = inp.pressed('passive') || (pv.on && (inp.move() !== 0 || inp.pressed('action')));
-    if (toggled) { if (pv.on) passiveOff(run, true); else passiveOn(run); }
-    var setupOn = setupStep(run, toggled); // Phase 45: before the gear's effects, so a pick counts this step
+    var run = G.state.run, b = run.boat, save = G.state.save, inp = G.core.input;
+    var setupOn = setupStep(run); // Phase 45: before the gear's effects, so a pick counts this step
     G.sim.economy.effects(save, G.data, run.gearFx);
     var hour0 = save.clock;
     G.sim.clock.step(save, null, dt, G.rng, G.data);
@@ -1491,10 +1540,10 @@ G.scene.sailing = (function () {
     G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);
     anomalyStep(run, save, dt);
     owlStep(run, save, hour0, dt);
-    if (!toggled && !pv.on && !setupOn) castStep(run, dt); // a fight passive took over goes on in catchStep
+    if (!setupOn) castStep(run, dt);
     // Audit P1-6: the down arrow pets the dog while the boat sits still between casts. Phase 45:
     // ↓ alone or a tap on him; S (down and setup together) opens the setup panel instead.
-    if (run.fsm === 'sailing' && !pv.on && b.stopped && !setupOn && inp.pressed('down') && !inp.pressed('setup')) dog.pet(run.dog);
+    if (run.fsm === 'sailing' && b.stopped && !setupOn && inp.pressed('down') && !inp.pressed('setup')) dog.pet(run.dog);
     fishStep(run, dt);
     riseStep(run, dt);
     rainAcc += rainK() * 6 * dt; // rings where the drizzle meets the water
@@ -1504,15 +1553,21 @@ G.scene.sailing = (function () {
       fx.ripple(rx, loc.waterY + 1 + G.vrng.next() * 24, 0, 3, 0.5);
       G.gfx.surface.poke(rx, 0.12, 1); // the same drop dents the waterline (Phase 20)
     }
-    passiveStep(run, dt);
+    releaseStep(run, dt);
+    lineStep(run);
+    stormStep(dt); // Phase 55
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
     if (run.fsm === 'card') {
       G.ui.card.tick(dt);
-      var choice = pv.on ? (run.fsmT >= PASSIVE.card ? 'sell' : null) : G.ui.card.update(dt); // passive sells
-      if (choice) { G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing'); }
+      var choice = G.ui.card.update(dt);
+      if (choice) {
+        var got = G.ui.card.info();
+        G.ui.card.commit(choice, save); G.core.state.go(run, 'sailing');
+        if (choice === 'release') releaseStart(run, got.spIdx, got.len, got.w); // Phase 51: he lets it go
+      }
     }
-    var move = run.fsm === 'sailing' && !pv.on && !toggled && !setupOn ? (inp.move() || sailMove(dt)) : 0;
+    var move = run.fsm === 'sailing' && !setupOn ? (inp.move() || sailMove(dt)) : 0;
     run.move = move;
     boat.outboard(b, move, dt); // Phase 26: the motor first; only a running motor pushes the boat
     boat.step(b, move, dt, loc.width);
@@ -1536,9 +1591,8 @@ G.scene.sailing = (function () {
     fx.setFlow(G.scene.underwater.flow(loc, 8)); // bubbles drift with the water
     // 7.6: the dog reads interest and the heavy-fish flag only while the lure is fishing.
     var fishing = FISHING[run.fsm] === 1;
-    run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' || passiveFighting(run) ? 0.5 : 0);
+    run.dogIn.interest = fishing ? G.sim.fish_ai.interestLevel(run.school) : (run.fsm === 'fighting' ? 0.5 : 0);
     run.dogIn.tooHeavyNear = fishing && run.school.ctx.tooHeavyNear;
-    run.dogIn.sleep = pv.on && run.fsm === 'sailing' && !passiveFighting(run); // P2-2: the dog naps while it fishes by itself
     if (run.dogIn.tooHeavyNear) save.flags.heavy[loc.id] = true; // the journal's margin note (D4)
     var cue = dog.cues(run.dog, save, loc, b.x, G.data);
     if (cue && G.core.debug) G.core.debug.log('the dog ' + (run.dog.pose === 'stare' ? 'stares at' : 'barks toward') + ' ' + cue);
@@ -1582,7 +1636,7 @@ G.scene.sailing = (function () {
     // Phase 26: the moving boat makes its wake (the surface's wake layer), every step.
     G.gfx.surface.wake(boat.stern(b), sp * sp, b.vx, dt);
     // The surface's swell roughens in drizzle and in the grey hours' wind.
-    G.gfx.surface.step(dt, 1 + 0.6 * rainK() + 0.35 * greyF(hourNow()));
+    G.gfx.surface.step(dt, 1 + 0.6 * rainK() + 0.35 * greyF(hourNow()) + 0.8 * stormK()); // Phase 55: a storm roughens it
     fx.update(dt);
     G.core.state.tick(run, dt);
   }
@@ -1591,6 +1645,7 @@ G.scene.sailing = (function () {
     var wy = loc.waterY, run = G.state.run, fa = fogMul() / FOG_HEAD, hh = hourNow();
     var lightN = nightF(hh) * 0.9, lightG = greyF(hh) * 0.7;
     drawSky(c);
+    drawStormSky(c); // Phase 55
     for (var i = 0; i < layers.length; i++) {
       var L = layers[i], oxN = Math.round(camPx * L.p * HI), vw = VIEW_W * HI, wh = wy * HI;
       if (L.p === 1) G.scene.life.drawFar(c, camPx, wy - camPy); // Phase 49: the birds further out than the boat, before the landmarks
@@ -1623,8 +1678,9 @@ G.scene.sailing = (function () {
     gearLook.fisher = run.fisher; // Phase 33: P2-2's thermos is one of his idle acts now
     // Phase 31: the line along the rod in the same colour as the line out (drawCast).
     var fight = fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing';
-    gearLook.lineKey = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : run.fight.T) : 'fog_light';
-    gearLook.lineA = fight ? 0.85 : 0.6;
+    var LT = lineType();
+    gearLook.lineKey = fight ? G.ui.hud.tensionKey(fsm === 'landing' ? 0 : run.fight.T) : LT.key;
+    gearLook.lineA = fight ? Math.max(LT.alpha, 0.5) + 0.25 : LT.alpha;
     boat.draw(c, run.boat, Math.round(run.boat.x - run.cam.x), loc.waterY - camPy, fisher !== false, drawDog, gearLook);
   }
 
@@ -1754,6 +1810,7 @@ G.scene.sailing = (function () {
     G.scene.underwater.draw(ctx, loc, camPx, camPy, 1, run.boat.t);
     if (band > 0) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, wl, band, camPx);
     drawWaterline(ctx, wy - camPy + band, cols, wl, band === 0 ? a : 0);
+    drawStormWater(ctx); // Phase 55
     ctx.drawImage(glint, camPx * HI, 0, VIEW_W * HI, 1, 0, wy - camPy, VIEW_W, 1 / HI);
     drawPosts(ctx, wy - camPy);
     G.scene.life.drawSurface(ctx, camPx, camPy); // Phase 49: lily pads, the frog, the striders
@@ -1763,7 +1820,7 @@ G.scene.sailing = (function () {
       var hx = Math.round((run.boat.x - run.cam.x) * HI);
       drawWaterline(ctx, wy - camPy, cols, wl, 0, Math.max(0, hx - 36), Math.min(640, hx + 36), 0.55);
     }
-    drawLift(ctx, run);
+    drawRelease(ctx, run);
     drawMist(ctx);
     drawRain(ctx);
     G.scene.underwater.drawHooked(ctx, loc, camPx, camPy, run.boat.t);
@@ -1776,15 +1833,23 @@ G.scene.sailing = (function () {
 
   return {
     HI: HI, owl: owl, dogTap: dogTap, tackleAct: function () { return tackleAct; }, queueTackle: queueTackle,
-    load: load, tp: tp, enter: enter, exit: exit, setPassive: setPassive, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
+    load: load, tp: tp, enter: enter, exit: exit, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit
     skyColor: skyColor, hourNow: hourNow, skyBrightness: skyBrightness,
     rodPose: function () { return rodPose(G.state.run, [0, 0, 0]); }, // debug: [angle, load, pull] now
-    lift: function () { return plift.t; },
+    // dbg.release(): the last release's state (Phase 51).
+    release: function () { return { t: +rel.t.toFixed(3), sp: rel.sp, flown: rel.flown, inT: +rel.inT.toFixed(3), x: +rel.x.toFixed(1), y: +rel.y.toFixed(1), n: rel.n }; },
     floatY: function (x) { return floatY(x); },
-    lureAt: function () { var r = G.state.run, o = [0, 0]; return r.passive.on && r.passive.pl ? floatPos(r, o) : lurePos(r, o); }, // debug: where the rope's far end is held // Phase 20: the surface's height at world x, as floats sit on it
+    lureAt: function () { return lurePos(G.state.run, [0, 0]); }, // debug: where the rope's far end is held
     rain: function () { return loc ? rainK() : 0; },
+    // Phase 55: the storm. storm() reads it; stormForce(k) holds it at k (null: the clock's);
+    // stormFlash() flashes now; stormTick(dt) steps it (the shop, whose windows show it); flash() 0..1.
+    storm: function () { return { k: +stormK().toFixed(3), flashes: storm.n, heard: storm.heard, next: +storm.next.toFixed(2), flash: +flashF().toFixed(3), bolt: storm.bolt, dist: +storm.dist.toFixed(2), forced: storm.force >= 0 }; },
+    stormForce: function (k) { storm.force = k === null || k === undefined ? -1 : clamp(+k, 0, 1); return storm.force; },
+    stormFlash: function () { if (!loc) return false; flash(); return true; },
+    stormTick: function (dt) { if (loc) stormStep(dt); },
+    flash: function () { return loc ? flashF() : 0; },
     light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
     fogAlpha: function () { return fogMul() / FOG_HEAD; },
     moon: function () { return { x: moonPt[0], y: moonPt[1], a: moonPt[2] }; },
@@ -1811,7 +1876,7 @@ if (G.core.debug) G.core.debug.addLine(function () {
   var b = run.boat;
   return 'loc ' + run.loc + '  cam ' + run.cam.x.toFixed(1) + '  hour ' + sc.hourNow().toFixed(2) +
     '  sky lum ' + sc.skyLum().toFixed(0) + '/' + G.gfx.sprites.CEILING.toFixed(0) + '  fog ' + sc.fogAlpha().toFixed(2) +
-    '  moon ' + (sc.moon().a > 0 ? sc.moon().a.toFixed(2) : '-') + '\n' +
+    '  moon ' + (sc.moon().a > 0 ? sc.moon().a.toFixed(2) : '-') + (sc.storm().k > 0 || sc.storm().flash > 0 ? '  storm ' + sc.storm().k.toFixed(2) + ' flashes ' + sc.storm().flashes + ' next ' + sc.storm().next.toFixed(1) + 's' : '') + '\n' +
     'boat x ' + b.x.toFixed(1) + '  vx ' + b.vx.toFixed(2) + '  stopped ' + (b.stopped ? 'Y' : 'n') +
     '  facing ' + (b.facing > 0 ? 'R' : 'L') + '  dog ' + run.dog.pose +
     '  pitch ' + b.show.toFixed(2) + '°  heave ' + b.heave.toFixed(2) + '  throttle ' + b.throttle.toFixed(2) + '  rpm ' + Math.round(b.rpm) + (b.motor ? '' : ' (off)');
@@ -1851,15 +1916,6 @@ if (G.core.debug) G.core.debug.addLine(function () {
   var bd = G.scene.underwater.body();
   var drift = loc.drift && G.scene.underwater.UNDER[run.fsm] ? '  current ' + bd.flow.toFixed(2) + ' px/s at ' + c.tw.toFixed(1) + ' s  flow x/y ' + G.scene.underwater.flow(loc, 0).toFixed(2) + '/0  lure angle ' + bd.angle + '  flutter ' + bd.flutter : '';
   return 'scenery ' + (loc.scenery || 'none') + (m && m.debugLine ? '  ' + m.debugLine(run) : '') + drift;
-});
-
-if (G.core.debug) G.core.debug.addLine(function () {
-  var pv = G.state.run.passive;
-  if (!pv) return 'passive: -';
-  var pl = pv.ps && pv.ps.plan;
-  return 'passive ' + (pv.on ? 'on' : 'off') + (pv.on && pv.pl ? '  cycle ' + pv.t.toFixed(1) + '/' + pl.total.toFixed(1) + 's (wait ' + pl.wait.toFixed(1) + ') ' +
-    (pl.sp >= 0 ? G.data.fish[pl.sp].id + ' ' + ['empty', 'caught', 'lost'][pl.result] : 'nothing') : '') +
-    '  cycles ' + pv.cycles + (pv.tape ? '  tape ' + pv.tape.entries.length + ' lines +' + pv.tape.coins + 'c' : '') + '  tapes saved ' + G.state.save.tapes.length;
 });
 
 if (G.core.debug) G.core.debug.addLine(function () {

@@ -81,6 +81,31 @@ G.sim.economy = (function () {
     return b;
   }
 
+  // Phase 53: line types (data/gear.js lineTypes), bought once and chosen like the rods.
+  function lineTypeById(id, data) {
+    var t = data.gear.lineTypes;
+    for (var i = 0; i < t.length; i++) if (t[i].id === id) return t[i];
+    return t[0];
+  }
+  function ownsLineType(save, id) { return id === 'mono' || (save.gear.lineTypes || []).indexOf(id) >= 0; }
+  // Buys line type id and spools it on: OK, MAXED (owned), POOR or UNKNOWN.
+  function buyLineType(save, id, data) {
+    var t = lineTypeById(id, data);
+    if (t.id !== id) return UNKNOWN;
+    if (ownsLineType(save, id)) return MAXED;
+    if (save.coins < t.cost) return POOR;
+    save.coins -= t.cost;
+    save.gear.lineTypes.push(id);
+    save.gear.lineType = id;
+    return OK;
+  }
+  // Spools on an owned line type: OK or LOCKED.
+  function useLineType(save, id) {
+    if (!ownsLineType(save, id)) return LOCKED;
+    save.gear.lineType = id;
+    return OK;
+  }
+
   // Fills out (reused object) with everything the equipped gear does.
   function effects(save, data, out) {
     var g = data.gear, s = save.gear, rod = g.rods[s.rod], bait = baitInUse(save, data);
@@ -95,7 +120,9 @@ G.sim.economy = (function () {
     out.rareBoost = bait.rareBoost;
     out.bait = bait.id;
     out.reelSpeed = g.reels[s.reel].speed;
-    out.lineStrength = g.lines[s.line].strength;
+    var lt = lineTypeById(s.lineType, data);                            // Phase 53
+    out.lineStrength = g.lines[s.line].strength * lt.strength;
+    out.lineType = lt.id; out.lineRise = lt.rise; out.lineShake = lt.shake; out.lineHold = lt.hold; out.lineSeen = lt.seen; out.lineFeel = lt.feel;
     out.nightDepth = s.lantern ? g.lantern.nightDepth : g.nightDepth;
     out.depthBands = s.depthFinder ? g.depthFinder.bands : 0;
     return out;
@@ -144,7 +171,8 @@ G.sim.economy = (function () {
     return true;
   }
 
-  // A landed fish into the save. c: {id, len, w, price, hintRefs, windowCatch}; choice 'sell' or 'keep'.
+  // A landed fish into the save. c: {id, len, w, price, hintRefs, windowCatch}; choice 'sell',
+  // 'keep' or (Phase 51) 'release': let go, it still counts in the journal, and earns nothing.
   function recordCatch(save, c, choice) {
     var j = save.journal[c.id];
     if (!j) j = save.journal[c.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: true, phantom: false };
@@ -155,6 +183,7 @@ G.sim.economy = (function () {
     if (c.windowCatch) save.flags.windowCatch[c.windowCatch] = true;
     if (c.bait) { if (!j.took) j.took = []; if (j.took.indexOf(c.bait) < 0) j.took.push(c.bait); } // Phase 43: what it was caught on
     if (choice === 'sell') save.coins += c.price;
+    else if (choice === 'release') j.released = (j.released || 0) + 1;
     else save.kept.push({ id: c.id, len: c.len, w: c.w });
   }
 
@@ -199,6 +228,7 @@ G.sim.economy = (function () {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
     sizeFactor: sizeFactor, sizeQ: sizeQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
     ownsRod: ownsRod, nextLadderRod: nextLadderRod, buyRod: buyRod, useRod: useRod, loseLure: loseLure,
+    lineTypeById: lineTypeById, ownsLineType: ownsLineType, buyLineType: buyLineType, useLineType: useLineType,
     nextItem: nextItem, buy: buy, buyBait: buyBait, useBait: useBait, recordCatch: recordCatch,
     canUnlock: canUnlock, unlock: unlock, restoreCabin: restoreCabin
   };

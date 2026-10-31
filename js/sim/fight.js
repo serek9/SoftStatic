@@ -15,6 +15,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // slackT) H drains; at H = 0 the fish throws the hook: ESCAPE, with `thrown` set. Reeling in
 // a shake keeps the line tight but adds tension; a jump on a tight line spikes it (it can
 // slip). Easing a little, not fully, is the answer, as with a real fish.
+// Phase 53: the line type (gear.lineRise, lineShake, lineHold): a line that does not stretch
+// (braid) builds tension faster and spikes harder in a jump, loses the hook faster on a slack
+// shake, and sets the hook firmer; monofilament is all ones.
 // Pure: no DOM, no Math.random, no Date. Runs in Node through vm.
 G.sim = G.sim || {};
 G.sim.fight = (function () {
@@ -27,7 +30,7 @@ G.sim.fight = (function () {
       active: false, sp: -1, T: 0, D: 0, D0: 0, S: 1, mode: 'pull', modeT: 0, slips: 0, escT: 0,
       result: NONE, slipped: false, t: 0,
       H: 1, shake: 0, shakeT: 0, jump: 0, jumps: 0, thrown: false, // Phase 23
-      strength: 0, speed: 0, fatigue: 0, mass: 1, lineStrength: 1, reelSpeed: 0,
+      strength: 0, speed: 0, fatigue: 0, mass: 1, lineStrength: 1, reelSpeed: 0, rise: 1, shakeK: 1,
       ap: { mode: '', delay: 0, err: 0, prev: 0, shook: false, sdelay: 0 } // auto-player memory
     };
   }
@@ -41,6 +44,8 @@ G.sim.fight = (function () {
     st.T = 0; st.D = st.D0 = k.d0; st.S = 1; st.slips = 0; st.escT = 0; st.result = NONE; st.slipped = false; st.t = 0;
     st.strength = fish.strength; st.speed = fish.speed; st.fatigue = fish.fatigue; st.mass = fish.mass;
     st.lineStrength = gear.lineStrength; st.reelSpeed = gear.reelSpeed;
+    st.rise = gear.lineRise || 1; st.shakeK = gear.lineShake || 1;                   // Phase 53
+    if (gear.lineHold) st.H = Math.min(1, st.H + gear.lineHold);
     // Phase 43: a fish much smaller than the rod is made for is hooked lightly (a stiff rod
     // tears a small mouth): its hold starts at the rod's smallHook.
     if (gear.smallHook !== undefined && fish.mass < data.gear.rodSmall.frac * gear.maxMass) st.H *= gear.smallHook;
@@ -56,7 +61,7 @@ G.sim.fight = (function () {
     st.slipped = false;
     st.t += dt;
     if (st.mode === 'pull') {
-      var rise = (st.strength / st.lineStrength) * k.pullRise;
+      var rise = (st.strength / st.lineStrength) * k.pullRise * st.rise;
       if (input.reel) st.T += rise * dt;
       else { st.T -= rise * k.easeFall * dt; st.D += st.speed * k.run * dt; }
       st.S -= st.fatigue * dt;
@@ -72,15 +77,15 @@ G.sim.fight = (function () {
       if (st.shake > 0) {
         st.shake -= dt;
         if (input.reel) st.T += k.shakeRise * dt;
-        if (st.T < k.slackT) st.H -= k.holdLoss * dt;
+        if (st.T < k.slackT) st.H -= k.holdLoss * st.shakeK * dt;
       } else {
         st.shakeT -= dt;
         if (st.shakeT <= 0) { st.shake = rng.range(k.shakeLen0, k.shakeLen1); st.shakeT = rng.range(k.shakeGap0, k.shakeGap1) / st.speed; }
       }
       if (st.jump > 0) {
         st.jump -= dt;
-        if (st.T > k.jumpHigh) st.T += k.jumpSpike * dt;
-        else if (st.T < k.slackT) st.H -= k.jumpLoss * dt;
+        if (st.T > k.jumpHigh) st.T += k.jumpSpike * st.rise * dt;
+        else if (st.T < k.slackT) st.H -= k.jumpLoss * st.shakeK * dt;
       } else if (st.jumps > 0 && st.D < 0.5 && rng.next() < st.jumps * k.jumpRate * dt) st.jump = k.jumpLen;
     } else { st.shake = 0; st.jump = 0; }
     if (st.H <= 0) { st.H = 0; st.thrown = true; st.result = ESCAPE; st.active = false; return ESCAPE; }

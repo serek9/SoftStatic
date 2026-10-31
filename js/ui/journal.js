@@ -13,14 +13,15 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // even on pages of fish not caught yet, and a page with a new one is marked in the grid.
 // A phantom entry (12.4, from the tape) is a page in your handwriting for a fish you never
 // caught: its picture shows faintly, and it counts for nothing until you really catch it.
-// Phase 17: drawn at 640×360 as an open book. The left page is the selected entry (its
-// picture on a plate, where it lives, how many were caught, the biggest catch, and the notes
-// in handwriting); the right page is the count, the two filters and the grid of species.
+// Phase 17: drawn at 640×360 as an open book. Phase 54: two panels in the shared style
+// (G.ui.panel), like every other menu: the entry on the left (its picture on a plate, where it
+// lives, how many were caught, the biggest catch, and the notes in handwriting), and the
+// count, the two filters and the grid of species on the right.
 G.ui = G.ui || {};
 G.ui.journal = (function () {
-  var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu, A = G.gfx.paint;
-  var COLS = 5, ROWS = 5, CW = 44, CH = 44, GAP = 6, GX = 340, GY = 66;
-  var NOTES_W = 252, NOTES_Y = 212, NOTES_MAX = 10;
+  var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu;
+  var COLS = 5, ROWS = 5, CW = 52, CH = 46, GAP = 6, GX = 322, GY = 46; // Phase 54: the grid in the right panel
+  var NOTES_W = 286, NOTES_MAX = 14;
   var RARITIES = ['all', 'common', 'uncommon', 'rare', 'legendary'];
   var HEAVY_NOTE = 'something heavier circles here';
 
@@ -32,7 +33,6 @@ G.ui.journal = (function () {
   var notes = [];         // the handwritten part of it, wrapped for the page: {s, key}
   var page = { name: '', rarity: '', where: '', count: '', best: '', got: false, ghost: false };
   var title = { loc: '', rar: '', count: '', shown: '' }, selIsNew = false, heavyNote = false;
-  var book = null;
 
   function jitter() {
     var run = G.state.run;
@@ -96,6 +96,7 @@ G.ui.journal = (function () {
       var b = G.sim.economy.baitById(p[1], G.data);
       if (b) return 'Comes to ' + (b.label === false ? 'the jar with no label' : b.name.toLowerCase()) + '.';
     }
+    if (ref === 'line') return 'Shy of the line: it saw mine and turned away. Only fluorocarbon fools it.'; // Phase 53
     if (ref === 'depth:deep') return 'Keeps to the deepest water here.';
     if (ref === 'depth:shallow') return 'Stays near the surface.';
     if (p[0] === 'spot') { var sp0 = spotById(sp, p[1]); if (sp0 && sp0.where) return 'Lives ' + sp0.where + '.'; }
@@ -167,7 +168,7 @@ G.ui.journal = (function () {
     selIsNew = !j.read;
     j.read = true;
     page.name = sp.name; page.got = true;
-    page.count = 'Caught ' + j.caught + (j.caught === 1 ? ' time' : ' times');
+    page.count = 'Caught ' + j.caught + (j.caught === 1 ? ' time' : ' times') + (j.released ? ', ' + j.released + ' let go' : ''); // Phase 51
     var bw = j.bestW < 0.1 ? Math.round(j.bestW * 1000) + ' g' : j.bestW.toFixed(2) + ' kg'; // Phase 44: small fish in grams
     page.best = j.bestLen.toFixed(1) + ' cm  |  ' + bw;
     add(sp.name, 'ink', true); add(sp.rarity, 'wood', false); add(page.count, 'ink', true); add('Best ' + j.bestLen.toFixed(1) + ' cm, ' + bw, 'ink', true);
@@ -211,117 +212,89 @@ G.ui.journal = (function () {
     return true;
   }
 
-  // ---- The book (baked once) --------------------------------------------------------------
-  var PAGE = ['paper_dark', 'paper', 'bone', 'cream'];
-  var LEATHER = ['wood_deep', 'rust_dark', 'rust', 'rust_hi'];
-  function paintBook(c) {
-    var x, y, i, tone = A.tone, px = A.px, box = A.box;
-    A.reset();
-    // The cover, with a stitched edge, seen around the pages.
-    A.area(c, 12, 6, 616, 350, function (x, y) {
-      var e = Math.min(x - 12, 627 - x, y - 6, 355 - y);
-      if (e > 14 && x > 30 && x < 610 && y > 18 && y < 345) return '';
-      return e < 2 ? 'ink' : (e < 5 ? 'rust_dark' : (e < 6 ? 'rust_hi' : 'rust'));
-    });
-    for (x = 22; x < 618; x += 6) { box(c, 'paper_dark', x, 11, 3, 1); box(c, 'paper_dark', x, 350, 3, 1); }
-    // The page stack at the outer edges, then the two pages curving down into the spine.
-    for (i = 0; i < 5; i++) { box(c, i % 2 ? 'paper_dark' : 'paper', 26 + i, 18 + i, 2, 330 - i * 2); box(c, i % 2 ? 'paper_dark' : 'paper', 612 - i, 18 + i, 2, 330 - i * 2); box(c, i % 2 ? 'paper_dark' : 'paper', 30, 344 - i, 580, 1); }
-    A.area(c, 32, 20, 576, 320, function (x, y) {
-      var d = Math.abs(x - 320), v = 1 - (d < 30 ? (30 - d) / 30 * 0.7 : 0) - (y > 333 ? 0.34 : 0);
-      if (x < 38 || x > 602) v -= 0.34;
-      return tone(PAGE, v, x, y);
-    });
-    box(c, 'reed_hi', 319, 20, 2, 320); box(c, 'paper_dark', 318, 20, 1, 320); box(c, 'paper_dark', 321, 20, 1, 320);
-    // A coffee ring on the right page, and the ribbon bookmark out of the bottom.
-    for (y = -26; y <= 26; y++) for (x = -26; x <= 26; x++) { var r = Math.sqrt(x * x + y * y); if (r > 21.5 && r < (x + y > 10 ? 24.5 : 23.2)) px(c, 'paper', 560 + x, 296 + y); }
-    for (y = 0; y < 34; y++) box(c, y > 28 ? 'blood' : 'crimson', 326 + (y > 30 ? (y - 30) >> 1 : 0), 326 + y, 8 - (y > 30 ? (y - 30) : 0), 1);
-    box(c, 'rug_hi', 326, 326, 2, 28);
-    // Printed rules on the left page under the notes (handwriting sits on them).
-    for (y = NOTES_Y + 10; y < 334; y += F.LINE_H) box(c, 'bone', 50, y, 254, 1);
-    // The plate for the picture.
-    for (y = 54; y < 146; y++) for (x = 50; x < 304; x++) {
-      var cut = Math.min(x - 50, 303 - x) + Math.min(y - 54, 145 - y) < 4;
-      if (cut) continue;
-      px(c, x < 52 || y < 56 ? 'reed_hi' : (x > 301 || y > 143 ? 'bone' : 'paper_dark'), x, y);
-    }
-    // The name ribbon.
-    for (y = 26; y < 46; y++) for (x = 70; x < 282; x++) {
-      var notch = (x < 80 && Math.abs(y - 36) < 80 - x - 1) || (x > 271 && Math.abs(y - 36) < x - 271 - 1);
-      if (notch) continue;
-      px(c, y === 26 || y === 45 ? 'reed' : tone(['reed', 'reed_hi', 'paper_dark'], 0.75 - (y - 26) / 40, x, y), x, y);
-    }
-    // The page's headings.
-    F.bold(c, '~ BIGGEST CATCH ~', 177 - (F.measureBold('~ BIGGEST CATCH ~') >> 1), 180, 'rust');
-  }
-  function bakeBook() { if (!book) book = G.gfx.bake.cached('journal:book640', function () { return G.gfx.bake.layer(640, 360, paintBook); }); }
+  // ---- Drawing (Phase 54: the shared panel style) ------------------------------------------
+  // Two panels (G.ui.panel) side by side over the world, nothing dimmed, as every menu since
+  // Phase 46: the entry on the left (the fish's name on its tab, its rarity beside it, the
+  // picture on a dark plate, where it lives, how many, the biggest, then the notes, still in
+  // handwriting that degrades with unease), and on the right the JOURNAL with the count, the
+  // two filters as key caps and the grid of species with its scrollbar. The open book of
+  // Phase 17 is gone; its colours are mapped onto the panel's (INK below).
+  var LP = [8, 8, 300, 344], RP = [316, 8, 316, 344];
+  var PLATE_H = 80;
+  // The book's ink keys, read on night ink: the notes, the plain words, the description, the late blue pen.
+  var INK = { ink: 'bone', wood: 'fog_mid', rust: 'dusk_high', night_blue: 'teal_lit' };
+  var RAR_KEY = { common: 'fog_light', uncommon: 'teal_lit', rare: 'signal_amber', legendary: 'neon_red' };
 
-  // A rounded tile: lighter when the species is known, framed in rust when selected.
+  // A rounded tile: the species' portrait (a silhouette until known), lit when selected.
   function drawCell(ctx, k, x, y) {
     var spIdx = list[k], sp = G.data.fish[spIdx], j = G.state.save.journal[sp.id], got = !!j && j.caught > 0;
     var on = focus === 2 && k === sel, ghost = !got && !!j && j.phantom;
-    ctx.fillStyle = P[on ? 'rust' : 'paper_dark']; ctx.fillRect(x + 2, y, CW - 4, CH); ctx.fillRect(x, y + 2, CW, CH - 4); ctx.fillRect(x + 1, y + 1, CW - 2, CH - 2);
-    ctx.fillStyle = P[got || ghost ? 'bone' : 'reed_hi']; ctx.fillRect(x + 2, y + 2, CW - 4, CH - 4);
-    ctx.fillStyle = P[got || ghost ? 'cream' : 'paper_dark']; ctx.fillRect(x + 3, y + 2, CW - 6, 1);
+    var rim = on ? 'signal_amber' : (got ? 'fog_mid' : 'fog_dark'), fill = on ? 'rust_dark' : 'night_deep';
+    ctx.fillStyle = P[rim]; ctx.fillRect(x + 1, y, CW - 2, CH); ctx.fillRect(x, y + 1, CW, CH - 2);
+    ctx.fillStyle = P[fill]; ctx.fillRect(x + 1, y + 1, CW - 2, CH - 2);
     var img = G.gfx.fishgen.portrait(spIdx, CW - 6, CH - 10, !(got || ghost));
-    ctx.globalAlpha = ghost ? 0.35 : (got ? 1 : 0.4);
+    ctx.globalAlpha = ghost ? 0.35 : (got ? 1 : 0.5);
     ctx.drawImage(img, x + ((CW - img.width) >> 1), y + ((CH - img.height) >> 1));
     ctx.globalAlpha = 1;
-    if (got && !j.read) { ctx.fillStyle = P.crimson; ctx.fillRect(x + CW - 9, y + CH - 9, 5, 5); ctx.fillStyle = P.rug_hi; ctx.fillRect(x + CW - 9, y + CH - 9, 2, 2); }
-    if (j && j.lateNew) F.bold(ctx, '*', x + 4, y + 3, 'night_blue'); // a page that gained a line
+    if (got && !j.read) { ctx.fillStyle = P.neon_red; ctx.fillRect(x + CW - 7, y + CH - 7, 4, 4); }
+    if (j && j.lateNew) F.bold(ctx, '*', x + 3, y + 3, 'teal_lit'); // a page that gained a line
   }
 
-  // A filter as a pill; the focused one is filled dark like a pressed button.
-  function pill(ctx, s, right, y, on) {
-    var w = F.measure(s) + 12, x = right - w;
-    ctx.fillStyle = P[on ? 'wood_dark' : 'paper_dark']; ctx.fillRect(x + 1, y, w - 2, 14); ctx.fillRect(x, y + 1, w, 12);
-    if (on) { ctx.fillStyle = P.wood_mid; ctx.fillRect(x + 1, y + 1, w - 2, 1); }
-    F.drawText(ctx, s, x + 6, y + 2, on ? 'cream' : 'wood_dark');
+  // A filter as a key cap with its arrows; the focused one is lit.
+  function filterKey(ctx, s, x, y, on) {
+    var U = G.ui.panel;
+    return U.key(ctx, s, x, y, on);
   }
 
   function draw(ctx) {
-    var jt = jitter(), i;
-    bakeBook();
-    M.dim(ctx, 0.6);
-    ctx.drawImage(book, 0, 0);
+    var U = G.ui.panel, jt = jitter(), i, x, y;
 
-    // The left page: the entry.
-    F.bold(ctx, page.name || ' ', 176 - (F.measureBold(page.name || ' ') >> 1), 31, 'wood_deep');
+    // The left panel: the entry.
+    x = LP[0]; y = LP[1];
+    U.frame(ctx, x, y, LP[2], LP[3], page.name || ' ', selIsNew ? 'NEW' : (page.rarity || ''), selIsNew ? 'neon_red' : (RAR_KEY[page.rarity] || 'fog_light'));
+    var lx = U.left(x), ty = U.top(y), iw = LP[2] - 2 * U.PAD;
+    ctx.fillStyle = P.night_deep; ctx.fillRect(lx + 1, ty, iw - 2, PLATE_H); ctx.fillRect(lx, ty + 1, iw, PLATE_H - 2);
+    ctx.fillStyle = P.fog_dark; ctx.fillRect(lx + 1, ty + PLATE_H - 1, iw - 2, 1);
     if (list.length) {
-      var img = G.gfx.fishgen.portrait(list[sel], 226, 70, !(page.got || page.ghost));
-      if (page.ghost) ctx.globalAlpha = 0.35; else if (!page.got) ctx.globalAlpha = 0.4;
-      ctx.drawImage(img, 177 - (img.width >> 1), 95 - (img.height >> 1));
+      var img = G.gfx.fishgen.portrait(list[sel], iw - 24, PLATE_H - 10, !(page.got || page.ghost));
+      if (page.ghost) ctx.globalAlpha = 0.35; else if (!page.got) ctx.globalAlpha = 0.5;
+      ctx.drawImage(img, lx + ((iw - img.width) >> 1), ty + ((PLATE_H - img.height) >> 1));
       ctx.globalAlpha = 1;
-      var rw = F.measure(page.rarity) + 12;
-      ctx.fillStyle = P.reed_hi; ctx.fillRect(56, 128, rw, 12); ctx.fillStyle = P.paper_dark; ctx.fillRect(57, 129, rw - 2, 10);
-      F.drawText(ctx, page.rarity, 62, 129, 'wood_deep');
-      if (selIsNew) F.bold(ctx, 'NEW', 296 - F.measureBold('NEW'), 60, 'crimson');
     }
+    var ry = ty + PLATE_H + 6;
     if (page.where) {
-      ctx.fillStyle = P.crimson; ctx.fillRect(53, 151, 7, 7); ctx.fillRect(54, 158, 5, 2); ctx.fillRect(55, 160, 3, 2);
-      ctx.fillStyle = P.cream; ctx.fillRect(55, 153, 3, 3);
-      F.drawText(ctx, page.where, 66, 150, 'wood_deep');
+      ctx.fillStyle = P.neon_red; ctx.fillRect(lx + 1, ry + 1, 5, 5); ctx.fillRect(lx + 2, ry + 6, 3, 1);
+      ctx.fillStyle = P.night_ink; ctx.fillRect(lx + 3, ry + 3, 1, 1);
+      F.drawText(ctx, page.where, lx + 10, ry, 'fog_light');
     }
-    if (page.count) F.drawText(ctx, page.count, 66, 164, 'wood_deep');
+    if (page.count) F.drawText(ctx, page.count, lx + 10, ry + U.ROW, 'bone');
     if (page.best) {
-      ctx.fillStyle = P.rust; ctx.fillRect(52, 198, 12, 4); ctx.fillStyle = P.rust_hi; for (i = 0; i < 6; i++) ctx.fillRect(53 + i * 2, 198, 1, 2);
-      F.drawText(ctx, page.best, 70, 195, 'wood_deep');
-    } else F.drawText(ctx, '-', 70, 195, 'paper_dark');
-    for (i = 0; i < notes.length && i < NOTES_MAX; i++) F.drawText(ctx, notes[i].s, 52, NOTES_Y + i * F.LINE_H, notes[i].key, jt, sel * 31 + i);
+      ctx.fillStyle = P.signal_amber; ctx.fillRect(lx + 1, ry + 2 * U.ROW + 3, 6, 2);
+      F.drawText(ctx, 'Best ' + page.best, lx + 10, ry + 2 * U.ROW, 'signal_amber');
+    }
+    var ny = ry + 3 * U.ROW + 4;
+    ctx.fillStyle = P.fog_dark; ctx.fillRect(lx, ny - 4, iw, 1);
+    for (i = 0; i < notes.length && i < NOTES_MAX; i++) F.drawText(ctx, notes[i].s, lx, ny + i * F.LINE_H, INK[notes[i].key] || notes[i].key, jt, sel * 31 + i);
 
-    // The right page: the count, the filters, the grid and its scrollbar.
-    F.bold(ctx, title.shown, 340, 30, 'rust');
-    pill(ctx, title.loc, 584, 24, focus === 0);
-    pill(ctx, title.rar, 584, 42, focus === 1);
+    // The right panel: the count, the filters, the grid and its scrollbar.
+    x = RP[0]; y = RP[1];
+    U.frame(ctx, x, y, RP[2], RP[3], 'JOURNAL', title.shown, 'bone');
+    var rx = U.left(x), fy = U.top(y);
+    var w0 = filterKey(ctx, title.loc, rx, fy, focus === 0);
+    filterKey(ctx, title.rar, rx + w0 + 6, fy, focus === 1);
     var end = Math.min(list.length, (top + ROWS) * COLS);
     for (i = top * COLS; i < end; i++) {
       var c = i - top * COLS;
       drawCell(ctx, i, GX + (c % COLS) * (CW + GAP), GY + Math.floor(c / COLS) * (CH + GAP));
     }
     var rows = Math.max(ROWS, Math.ceil(list.length / COLS)), trackH = ROWS * (CH + GAP) - GAP, thumb = Math.max(16, Math.round(trackH * ROWS / rows));
-    ctx.fillStyle = P.paper_dark; ctx.fillRect(594, GY, 5, trackH);
-    ctx.fillStyle = P.rust; ctx.fillRect(594, GY + Math.round((trackH - thumb) * (rows > ROWS ? top / (rows - ROWS) : 0)), 5, thumb);
-    if (heavyNote) F.drawText(ctx, HEAVY_NOTE, 342, 316, 'rust', Math.max(jt, 0.2), 47);
-    F.drawText(ctx, 'W/S A/D browse   J close', 342, 330, 'paper_dark');
+    var sx = GX + COLS * (CW + GAP) - GAP + 4;
+    ctx.fillStyle = P.night_deep; ctx.fillRect(sx, GY, 3, trackH);
+    ctx.fillStyle = P.fog_mid; ctx.fillRect(sx, GY + Math.round((trackH - thumb) * (rows > ROWS ? top / (rows - ROWS) : 0)), 3, thumb);
+    if (heavyNote) F.drawText(ctx, HEAVY_NOTE, rx, GY + trackH + 6, 'dusk_high', Math.max(jt, 0.2), 47);
+    var hx = rx, hy = y + RP[3] - U.PAD - U.KEY_H;
+    hx += U.hint(ctx, 'W/S A/D', 'browse', hx, hy);
+    U.hint(ctx, 'J', 'close', hx, hy);
   }
 
   // dbg: draws the current page into a fresh canvas and returns it (handwriting checks).

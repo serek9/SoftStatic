@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 5;
+  var VERSION = 6;
   var PREFIX = 'SS1';
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
@@ -45,6 +45,12 @@ G.core.save = (function () {
       for (var i = 0; i <= (s.gear.rod | 0); i++) r.push(i);
       s.gear.rods = r;
       return s;
+    },
+    // v5 -> v6 (Phase 53): line types. Every line so far was monofilament.
+    5: function (s) {
+      s.gear.lineType = 'mono';
+      s.gear.lineTypes = ['mono'];
+      return s;
     }
   };
 
@@ -54,7 +60,8 @@ G.core.save = (function () {
       coins: 0,
       // Tier index per kind (data/gear.js), equipment owned, and the bait to put on.
       // Phase 43: rods, the rod indices owned (rod is the one in hand); bait may be a lure id.
-      gear: { rod: 0, rods: [0], reel: 0, line: 0, lantern: false, depthFinder: false, bait: 'worm' },
+      // Phase 53: lineType, the line spooled on (data/gear.js lineTypes), and lineTypes, the ones owned.
+      gear: { rod: 0, rods: [0], reel: 0, line: 0, lineType: 'mono', lineTypes: ['mono'], lantern: false, depthFinder: false, bait: 'worm' },
       baits: {},             // bait or lure id -> count left
       journal: {},           // species id -> {caught, bestLen, bestW, hints, seen, phantom}
       kept: [],              // {id, len, w}

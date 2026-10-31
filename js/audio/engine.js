@@ -300,6 +300,8 @@ G.audio.engine = (function () {
       case 'creak': tone('sine', 96, 88, 0.7, 0.02, 0); tone('sine', 192, 180, 0.5, 0.008, 0, 0.05); note('creak'); break;
       // Phase 49: the life above the water. Small splashes: a heron's strike, a bird going
       // under, a frog plopping in, a beaver's tail slap (the loudest, still under a lure's).
+      // Phase 55: thunder, a: how far off (0 near .. 1 far): a low rumble that rises slowly.
+      case 'thunder': thunder(a || 0); note('thunder'); break;
       case 'strike': waterSplash(0.12, x, 'strike'); break;
       case 'dive': waterSplash(0.08, x, 'dive'); break;
       case 'plop': waterSplash(0.05, x, 'plop'); break;
@@ -397,6 +399,25 @@ G.audio.engine = (function () {
     var dst = to || bus.sfx;
     if (pan && ac.createStereoPanner) { var p = ac.createStereoPanner(); p.pan.value = Math.max(-0.6, Math.min(0.6, pan)); p.connect(dst); return p; }
     return dst;
+  }
+
+  // Phase 55: thunder. Low-passed noise that swells over a quarter to three quarters of a
+  // second and rolls away over 3-5 s, with a slow wobble in its filter; nearer, a little
+  // louder and with a soft crack of higher noise on top. On the ambience bus (muffled indoors),
+  // under the master limiter, and never louder than a big splash (no sudden loud sound, §0.14).
+  var lastThunder = { dist: -1, g: 0 };
+  function thunder(dist) {
+    if (voices >= VOICE_MAX) return;
+    var t0 = ac.currentTime, up = 0.25 + 0.5 * dist, dur = 3 + 2 * dist, g = 0.06 * (1 - 0.6 * dist);
+    var s = ac.createBufferSource(), f = ac.createBiquadFilter(), e = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+    s.buffer = noiseBuf; s.loop = true; f.type = 'lowpass'; f.Q.value = 0.9; f.frequency.value = 170 - 80 * dist;
+    lfo.frequency.value = 1.3 + G.vrng.next(); lg.gain.value = 50 - 20 * dist; lfo.connect(lg); lg.connect(f.frequency);
+    e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(g, t0 + up);
+    e.gain.setTargetAtTime(0, t0 + up, dur / 4);
+    s.connect(f); f.connect(e); e.connect(out(0, bus.amb));
+    voices++; s.onended = done; s.start(t0, G.vrng.next() * 1.5); s.stop(t0 + up + dur + 0.1); lfo.start(t0); lfo.stop(t0 + up + dur + 0.1);
+    if (dist < 0.35) hiss('bandpass', 900, 300, 0.8, 0.9, 0.01 * (1 - dist), 0, 0.02);
+    lastThunder.dist = dist; lastThunder.g = g;
   }
 
   // A tone from f0 to f1 over dur seconds with a soft attack (never under 5 ms).
@@ -538,7 +559,7 @@ G.audio.engine = (function () {
     set(bus.sfx.gain, BUS.sfx * (menu === 'pause' ? 0.3 : 1), 0.1);
     set(ambLP.frequency, scene === 'sailing' ? 18000 : 520, 0.3);
 
-    if (menu !== prev.menu) { if (menu && menu !== 'tape') play('page'); prev.menu = menu; }
+    if (menu !== prev.menu) { if (menu) play('page'); prev.menu = menu; }
     if (scene !== prev.scene) { if (prev.scene) play(scene === 'shop' || prev.scene === 'shop' ? 'bell' : 'page'); prev.scene = scene; prev.coins = save.coins; }
     set(amb.fridge.gain, scene === 'shop' ? 0.01 : 0, 0.5);                            // Phase 39: the tank's pump hums in the shop
     if (scene === 'shop' && save.coins < prev.coins) play('buy');
@@ -614,7 +635,7 @@ G.audio.engine = (function () {
     var turns = 0, load = 0, dD = 0;
     if (fsm === 'fighting' || fsm === 'hooked') {
       dD = (F.D - prev.D) / dt;
-      var held = run.passive.on ? dD < -1e-4 : G.core.input.held('action');
+      var held = G.core.input.held('action');
       if (held) { turns = F.mode === 'tired' ? 2.2 : 0.7; load = Math.min(1, 0.4 + F.T); }
     } else if (fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest') {
       if (c.ly < prev.ly - 0.01) { turns = 2.2; load = 0.3 + 0.7 * G.gfx.rope.st.taut; }
@@ -640,12 +661,6 @@ G.audio.engine = (function () {
     set(amb.spool.gain, fly ? Math.min(0.025, spd * 0.00025) : 0, 0.03);
     set(amb.spoolBP.frequency, 700 + Math.min(2500, spd * 9), 0.03);
     prev.lx = c.lx; prev.cly = c.ly;
-
-    // Passive: the float going out and a catch coming in.
-    var pv = run.passive;
-    if (pv.on && pv.pl && !prev.pl) waterSplash(0.15, pv.x, 'float');
-    if (pv.cycles > prev.cycles && pv.note.charAt(0) === '+') { waterSplash(0.45, pv.x, 'catch'); play('coin'); }
-    prev.pl = pv.on && pv.pl; prev.cycles = pv.cycles;
 
     // The Pines' traffic light: its relay clicks as it changes.
     if (loc === 'pines' && run.scen) { if (run.scen.on !== prev.sig) play('relay', panAt(G.data.locations.pines.landmarks[1].x)); prev.sig = run.scen.on; }

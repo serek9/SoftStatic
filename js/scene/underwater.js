@@ -957,7 +957,7 @@ G.scene.underwater = (function () {
     h.q = G.sim.economy.sizeQ(G.rng.next(), G.data); // Phase 44: the size curve
     G.sim.economy.size(sp, h.q, h);
     // gearFx: lineStrength, reelSpeed; Phase 23: the hook hold from how long the bite had waited
-    G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data, G.sim.bite.hold(b.t, run.passive.on, G.data));
+    G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data, G.sim.bite.hold(b.t, G.data));
     f.active = false;
     G.sim.fish_ai.scatter(run.school);
     G.sim.bite.reset(b);
@@ -1026,7 +1026,6 @@ G.scene.underwater = (function () {
     var inp = G.core.input, fsm = run.fsm, F = G.sim.fight;
     if (fsm === 'waiting' || fsm === 'interest') {
       biteIn.reel = inp.held('action');
-      biteIn.auto = run.passive.on; // passive mode hooks by itself (V3.5)
       var biting = run.bite.slot >= 0;
       if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
       else if (!biting && run.bite.slot >= 0) { // audit P1-4: a ring where the line goes in, and a dent (Phase 20)
@@ -1037,7 +1036,7 @@ G.scene.underwater = (function () {
       run.hook.t += dt;
       if (run.hook.t >= HOOKED_BEAT) G.core.state.go(run, 'fighting');
     } else if (fsm === 'fighting') {
-      fightIn.reel = run.passive.on ? F.autoPlayer(run.fight, G.sim.passive.P.skill, G.rng) === 1 : inp.held('action'); // 12.2
+      fightIn.reel = inp.held('action');
       var res = F.step(run.fight, fightIn, dt, G.rng, G.data);
       if (run.fight.slipped) { fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); G.gfx.surface.poke(run.hook.x, 0.5); } // the soft slip sound: audio/engine.js
       if (res === F.WIN) {
@@ -1045,8 +1044,8 @@ G.scene.underwater = (function () {
         G.core.state.go(run, 'landing');
       } else if (res === F.SNAP || res === F.ESCAPE) {
         release(run);
-        // Phase 43: a snapped line takes the lure with it (a thrown hook does not; passive never loses one).
-        if (res === F.SNAP && !run.passive.on && G.sim.economy.loseLure(G.state.save, run.cast.bait, G.data)) {
+        // Phase 43: a snapped line takes the lure with it (a thrown hook does not).
+        if (res === F.SNAP && G.sim.economy.loseLure(G.state.save, run.cast.bait, G.data)) {
           var lb = G.sim.economy.baitById(run.cast.bait, G.data), left = G.state.save.baits[lb.id] || 0;
           G.ui.hud.say('Lost the ' + lb.name + '. ' + (left ? left + ' left.' : 'None left: worms next.'));
           G.core.save.autosave('lure');

@@ -1,7 +1,7 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // Overlays and the pause menu (9.2).
-// An overlay (pause, journal, map, and the tape of 12.4) sits over whatever scene is up. While one is open the
+// An overlay (pause, journal, map, the look picker) sits over whatever scene is up. While one is open the
 // boot loop gives it the input and the scene does not update, so the world waits: no
 // clock, no fish, no fight. P (or Esc on the water) pauses, J opens the journal anywhere,
 // M opens the map from the boat when no line is out. An overlay is
@@ -34,7 +34,7 @@ G.ui.menu = (function () {
 
   // arg: passed to the overlay's open() (Phase 47: the pause list's row; the picker's caller).
   function open(name, arg) {
-    var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, tape: G.ui.tape, look: G.ui.look }[name] || null;
+    var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, look: G.ui.look }[name] || null;
     if (!o) return false;
     cur = o; curName = name;
     o.open(arg);

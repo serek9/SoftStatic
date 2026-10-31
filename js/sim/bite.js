@@ -1,8 +1,8 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // Bite and hook (V3.5). When a fish in the school reaches its `bite` state, a generous
-// window opens (2 s). Reeling (holding action) inside it hooks the fish; in passive mode
-// the hook is automatic. Missing it is fine: the fish may come back once, otherwise it
+// window opens (2 s). Reeling (holding action) inside it hooks the fish (input.auto hooks
+// at once: the balance tool's model). Missing it is fine: the fish may come back once, otherwise it
 // swims off. One bite at a time.
 // Pure: no DOM, no Math.random, no Date. Runs in Node through vm.
 G.sim = G.sim || {};
@@ -49,10 +49,9 @@ G.sim.bite = (function () {
   }
 
   // Phase 23: the hook hold a hook-set gives, from how long the bite had waited (t s):
-  // 1 at once, holdLate at the window's end; passive mode always holdPassive.
-  function hold(t, auto, data) {
+  // 1 at once, holdLate at the window's end. (Phase 52: passive mode and its holdPassive are gone.)
+  function hold(t, data) {
     var k = data.gear.fight;
-    if (auto) return k.holdPassive;
     return 1 - (1 - k.holdLate) * Math.min(1, Math.max(0, t) / B.hookWindow);
   }
 

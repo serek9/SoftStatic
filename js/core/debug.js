@@ -103,6 +103,26 @@ G.core.debug = (function () {
       }
       return true;
     },
+    // dbg.line(id) spools on line type id ('mono', 'fluoro', 'braid'), owning it if needed
+    // (Phase 53); dbg.line() reads the line and what it does.
+    line: function (id) {
+      var save = G.state.save, E = G.sim.economy;
+      if (id !== undefined) {
+        if (E.lineTypeById(id, G.data).id !== id) return 'line types: ' + G.data.gear.lineTypes.map(function (t) { return t.id; }).join(', ');
+        if (!E.ownsLineType(save, id)) save.gear.lineTypes.push(id);
+        E.useLineType(save, id); G.core.save.autosave('line');
+      }
+      var fx = E.effects(save, G.data, {});
+      return { type: fx.lineType, owned: save.gear.lineTypes.slice(), strength: fx.lineStrength, rise: fx.lineRise, shake: fx.lineShake, hold: fx.lineHold, seen: fx.lineSeen, feel: fx.lineFeel, sinkG: G.gfx.rope.K.waterG };
+    },
+    // dbg.storm(k) holds a storm at k (0..1), dbg.storm(null) gives it back to the clock, and
+    // dbg.storm() reads it: k, flashes, thunders heard, the next flash, the flash now (Phase 55).
+    // dbg.flash() flashes lightning now (its thunder follows).
+    storm: function (k) { if (k !== undefined) G.scene.sailing.stormForce(k); return G.scene.sailing.storm(); },
+    flash: function () { return G.scene.sailing.stormFlash(); },
+    // dbg.release(): the last fish let go from the card (Phase 51): its swing's time, whether
+    // it has left his hand, how long since it went in, where it is, and how many so far.
+    release: function () { return G.scene.sailing.release(); },
     // dbg.land() wins the current fight on the next step.
     // (tired, so an un-reeled step cannot push D back up before the win check)
     land: function () { var F = G.state.run.fight; if (!F.active) return false; F.D = 0; F.mode = 'tired'; F.modeT = 9; return true; },
@@ -237,23 +257,8 @@ G.core.debug = (function () {
       if (!G.scene.sailing.forceAnomaly(id)) return 'anomalies: ' + G.data.anomalies.list.map(function (a) { return a.id; }).join(', ');
       return dbg.anomaly();
     },
-    // dbg.passive(true|false) turns passive mode on or off (as TAB does); dbg.passive() reads it.
-    passive: function (on) { return on === undefined ? G.state.run.passive.on : G.scene.sailing.setPassive(on); },
-    // dbg.away(seconds) plays out that much time away now (12.3), as a reload would, and opens the tape.
-    away: function (secs) {
-      var save = G.state.save, now = Date.now();
-      if (G.state.run.fsm !== 'sailing') return 'reel in first';
-      save.lastSeen = now - (secs || 0) * 1000;
-      var tp = G.ui.tape.away(now);
-      return tp ? { caught: tp.caught, lost: tp.lost, coins: tp.coins, lines: tp.entries.length, gap: tp.gap, phantom: tp.phantom } : 'under a minute: nothing to fish';
-    },
-    // dbg.tape(i) returns saved tape i (0 is the newest) as its shown lines.
-    tape: function (i) {
-      var tp = G.state.save.tapes[i || 0];
-      if (!tp) return null;
-      G.ui.tape.show(tp);
-      return G.ui.tape.rows();
-    },
+    // Phase 52: passive mode and time away are gone, and dbg.passive, dbg.away and dbg.tape with them.
+    passive: function () { return 'passive mode was removed in Phase 52'; },
     // dbg.restore() pays for the next cabin stage; returns the level.
     restore: function () { G.sim.economy.restoreCabin(G.state.save, G.data); G.core.save.autosave('purchase'); return G.state.save.cabinLevel; },
     // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).

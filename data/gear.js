@@ -8,7 +8,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 //          smallBoost (× the weight of species of smallMass kg or less), look [palette keys of
 //          the blank], ladder (false: not one of the upgrades the pacing model buys in turn)
 //   reel:  speed (D shrink while reeling a tired fish, V4)
-//   line:  strength (how fast tension builds against a pulling fish, V4)
+//   line:  strength (how fast tension builds against a pulling fish, V4); Phase 53: the tiers
+//          are the line's test (6 lb up to 25 lb), and lineTypes the line itself (below)
 //   bait:  attract (fish turn up sooner) and rareBoost (rare and legendary weights)
 //   lantern: deep fish show in colour at night; depth finder: depth bands on the HUD
 // Costs are tuned with `node tools/balance.js --pacing` against the V8 targets.
@@ -33,11 +34,25 @@ G.data.gear = {
     { id: 'reel_4', name: 'Reel That Hums', cost: 3600, speed: 0.30 }
   ],
   lines: [
-    { id: 'line_0', name: 'Cotton Line', cost: 0, strength: 1.0 },
-    { id: 'line_1', name: 'Nylon Line', cost: 40, strength: 1.25 },
-    { id: 'line_2', name: 'Braided Line', cost: 260, strength: 1.6 },
-    { id: 'line_3', name: 'Wire Leader', cost: 950, strength: 2.0 },
-    { id: 'line_4', name: 'Hair-Fine Line', cost: 3200, strength: 2.6 }
+    { id: 'line_0', name: '6 lb Test', cost: 0, strength: 1.0 },
+    { id: 'line_1', name: '8 lb Test', cost: 40, strength: 1.25 },
+    { id: 'line_2', name: '12 lb Test', cost: 260, strength: 1.6 },
+    { id: 'line_3', name: '17 lb Test', cost: 950, strength: 2.0 },
+    { id: 'line_4', name: '25 lb Test', cost: 3200, strength: 2.6 }
+  ],
+  // Phase 53: what the line is made of, a spool bought once and then chosen (save.gear.lineType,
+  // owned in save.gear.lineTypes), at any test. strength: × the test's strength. rise: × how
+  // fast tension builds while the fish pulls and spikes in a jump (a line that does not
+  // stretch takes every lunge). shake: × the hook hold lost in a slack head shake or jump
+  // (nothing in the line cushions the hook). hold: added to the hook-set's hold (a firm set).
+  // seen: line-shy fish (fish.lineShy) see it and turn away. feel: × how hard a nibble and a
+  // bite nod the rod tip. Presentation: sinkG (px/s² under water: braid floats, fluorocarbon
+  // sinks), belly (the slack a waiting line keeps), key and alpha (how the line is drawn).
+  // Monofilament is the line every number before Phase 53 was tuned with: all ones.
+  lineTypes: [
+    { id: 'mono', name: 'Monofilament', cost: 0, strength: 1, rise: 1, shake: 1, hold: 0, seen: true, feel: 1, sinkG: 3, belly: 1.03, key: 'fog_light', alpha: 0.6 },
+    { id: 'fluoro', name: 'Fluorocarbon', cost: 140, strength: 0.95, rise: 1.06, shake: 1.08, hold: 0.03, seen: false, feel: 1.25, sinkG: 6, belly: 1.025, key: 'fog_light', alpha: 0.28 },
+    { id: 'braid', name: 'Braided Line', cost: 240, strength: 1.35, rise: 1.2, shake: 1.4, hold: 0.08, seen: true, feel: 1.8, sinkG: 1.5, belly: 1.012, key: 'moss_hi', alpha: 0.8 }
   ],
   // cost is per bait and the shop sells `pack` at a time; 0 with unlimited: true never runs
   // out. label false: the shelf item with no label and a strange price (V10.7); it is a real rare bait.
@@ -47,8 +62,7 @@ G.data.gear = {
     { id: 'minnow', name: 'Minnows', cost: 6, pack: 10, attract: 1.4, rareBoost: 1.3 },
     { id: 'unlabelled', name: '', label: false, cost: 47, pack: 1, attract: 1.1, rareBoost: 3.0 }
   ],
-  // Phase 43: lures. Not used up by a cast: one is lost when the line snaps (never in passive
-  // mode), and counted in save.baits like the baits. cost is per lure, sold `pack` at a time.
+  // Phase 43: lures. Not used up by a cast: one is lost when the line snaps, and counted in save.baits like the baits. cost is per lure, sold `pack` at a time.
   // swim: where it fishes (the scene: sink × the bait's sink speed, down to maxDepthM m; 'top'
   // floats; 'dive' dives while reeled). Fish take them by fish.lures.
   lures: [
@@ -69,12 +83,12 @@ G.data.gear = {
     tiredRise: 0.06, release: 0.45, recover: 0.03,
     slipT: 0.6, slipD: 0.1, escape: 3,
     d0: 0.6,
-    // Phase 23 (R2): the hook hold and what works it loose. hold*: H at the hook-set (late,
-    // passive); slackT: below this T the line is slack; holdLoss and jumpLoss: H lost per s in
+    // Phase 23 (R2): the hook hold and what works it loose. holdLate: H at a hook-set at the
+    // bite window's end; slackT: below this T the line is slack; holdLoss and jumpLoss: H lost per s in
     // a shake or a jump on a slack line; shakes last shakeLen0..1 s, every shakeGap0..1 s
     // divided by the fish's speed; shakeRise: extra T per s reeling in one; jumps: chance per s
     // = fish.jumps × jumpRate when D < 0.5, jumpLen s long, a jump above jumpHigh adds jumpSpike T/s.
-    holdLate: 0.7, holdPassive: 0.85, slackT: 0.12, holdLoss: 0.7, jumpLoss: 0.6,
+    holdLate: 0.7, slackT: 0.12, holdLoss: 0.7, jumpLoss: 0.6,
     shakeLen0: 0.4, shakeLen1: 1.0, shakeGap0: 1.2, shakeGap1: 3, shakeRise: 0.25,
     jumpRate: 0.25, jumpLen: 1, jumpHigh: 0.6, jumpSpike: 0.6
   },
@@ -92,8 +106,6 @@ G.data.gear = {
     { name: 'Stove Lit', cost: 400, plaques: 6 },
     { name: 'Rug and Lamp', cost: 900, plaques: 8 },
     { name: 'Restored', cost: 2000, plaques: 10 }
-  ],
-
-  // Passive mode earns this share of active income (D5). The only place it is set.
-  passive: { incomeMult: 0.63 } // Phase 23: was 0.6; the fight change moved passive to 56.8% of active
+  ]
+  // Phase 52: passive mode (and passive.incomeMult, D5) is gone: no income without fishing.
 };
