@@ -233,14 +233,15 @@ G.ui.shop = (function () {
   // clock running back for 3 s or a figure on the far shore in the window for 6 s; at 0.6 or
   // more, half the time, Rusty facing the wall when you come in, until you speak to him.
   // Quiet, short, never in the way (§0.14). G.vrng: presentation only.
-  var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, strange: '', st: 0 };
+  var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, strange: '', st: 0, flash: 0 };
   var odd = { kind: '', t: 0, len: 0, cool: 20, wall: false, seen: { clock: 0, figure: 0, wall: 0 } };
   var ODD_LEN = { clock: 3, figure: 6 };
   function shopUnease() { return G.sim.unease.get(G.state.save, 'fog'); }
   function envStep(dt) {
     var save = G.state.save, sc = G.scene.sailing, L = sc.light(G.sim.clock.wrap(save.clock));
     env.hour = save.clock; env.night = L.night; env.grey = L.grey;
-    env.rain = sc.rain(); env.fog = sc.fogAlpha();
+    sc.stormTick(dt);                                    // Phase 55: the storm goes on outside, its thunder heard in here
+    env.rain = sc.rain(); env.fog = sc.fogAlpha(); env.flash = sc.flash();
     var u = shopUnease();
     if (odd.kind) {
       odd.t += dt;
@@ -495,6 +496,7 @@ G.ui.shop = (function () {
   function draw(ctx) {
     var save = G.state.save, i;
     R.draw(ctx, walk, t, save.clock, rusty, stock, env);
+    if (env.flash > 0) { ctx.globalAlpha = 0.1 * env.flash; ctx.fillStyle = P.fog_light; ctx.fillRect(0, 0, 640, 360); ctx.globalAlpha = 1; } // Phase 55: lightning through the windows
     if (!open) return;
     if (open === 'box' || open === 'choice') {
       // Phase 54: the text box in the shared panel style, Rusty's name on its tab.

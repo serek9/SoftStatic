@@ -115,6 +115,11 @@ G.core.debug = (function () {
       var fx = E.effects(save, G.data, {});
       return { type: fx.lineType, owned: save.gear.lineTypes.slice(), strength: fx.lineStrength, rise: fx.lineRise, shake: fx.lineShake, hold: fx.lineHold, seen: fx.lineSeen, feel: fx.lineFeel, sinkG: G.gfx.rope.K.waterG };
     },
+    // dbg.storm(k) holds a storm at k (0..1), dbg.storm(null) gives it back to the clock, and
+    // dbg.storm() reads it: k, flashes, thunders heard, the next flash, the flash now (Phase 55).
+    // dbg.flash() flashes lightning now (its thunder follows).
+    storm: function (k) { if (k !== undefined) G.scene.sailing.stormForce(k); return G.scene.sailing.storm(); },
+    flash: function () { return G.scene.sailing.stormFlash(); },
     // dbg.release(): the last fish let go from the card (Phase 51): its swing's time, whether
     // it has left his hand, how long since it went in, where it is, and how many so far.
     release: function () { return G.scene.sailing.release(); },

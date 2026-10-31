@@ -46,20 +46,97 @@ G.scene.sailing = (function () {
   var rainAcc = 0;
   function rainK() {
     if (sky.opt && sky.opt.clouds === false) return 0;
-    var save = G.state.save, c = save.clock || 0, hr = Math.floor(c), f = c - hr;
+    var save = G.state.save, c = save.clock || 0, hr = Math.floor(c), f = c - hr, st = stormK();
     var k = clamp((G.sim.unease.get(save, loc.id) - 0.45) / 0.35, 0, 1);
-    if (k <= 0 || (S.hash(loc.seed, hr) & 3) !== 0) return 0;
-    return k * Math.min(1, f * 4, (1 - f) * 4);
+    if (k <= 0 || (S.hash(loc.seed, hr) & 3) !== 0) return st; // Phase 55: a storm brings its own rain
+    return Math.max(st, k * Math.min(1, f * 4, (1 - f) * 4));
+  }
+
+  // ---- Thunderstorms (Phase 55) -------------------------------------------------------
+  // In about one game hour in eleven (a hash of the hour and the place; never in the Red Room,
+  // which has no sky of clouds), a storm builds over the hour's first fifth and passes over its
+  // last fifth: stormK() 0..1. While it is up the sky darkens, the rain is heavy and slants
+  // (rainK takes the larger), the surface roughens, and lightning flashes every 6-18 s (fewer
+  // as it builds and passes, G.vrng): a soft flicker of fog_light over the sky (at most 0.4)
+  // and the water (0.18), so nothing gets brighter than dusk_high (fog_light is darker; §0.9),
+  // half the time with a bolt far off behind the hills; thunder follows 1-4 s later, quieter
+  // and lower the further off, rising slowly (no sudden loud sound, §0.14). The mirror shows
+  // it all (drawAbove draws the backdrop). Presentation only: it reads the clock.
+  var STORM = { every: 11, gapMin: 6, gapMax: 18, flashLen: 0.8, skyA: 0.4, waterA: 0.18, dark: 0.32 };
+  var storm = { force: -1, next: 4, t: -1, bolt: false, bx: 0, seed: 0, thunder: 0, dist: 0, n: 0, heard: 0 };
+  function stormK() {
+    if (storm.force >= 0) return storm.force;
+    if (!loc || (sky.opt && sky.opt.clouds === false)) return 0;
+    var c = G.state.save.clock || 0, hr = Math.floor(c), f = c - hr;
+    if (S.hash(loc.seed, hr * 31 + 7) % STORM.every !== 0) return 0;
+    return Math.min(1, f * 5, (1 - f) * 5);
+  }
+  function flash() {
+    var v = G.vrng;
+    storm.next = STORM.gapMin + (STORM.gapMax - STORM.gapMin) * v.next();
+    storm.t = 0; storm.n++; storm.bolt = v.next() < 0.5; storm.bx = 30 + v.next() * (VIEW_W - 60);
+    storm.seed = (v.next() * 1e9) | 0; storm.dist = v.next(); storm.thunder = 1 + 3 * storm.dist;
+    if (G.core.debug) G.core.debug.log('lightning (' + (storm.dist * 10).toFixed(1) + ' km)');
+  }
+  // One step: the flash fades, the thunder comes, and the next flash counts down with the storm.
+  function stormStep(dt) {
+    var k = stormK();
+    if (storm.t >= 0) { storm.t += dt; if (storm.t >= STORM.flashLen) storm.t = -1; }
+    if (storm.thunder > 0) { storm.thunder -= dt; if (storm.thunder <= 0) { storm.heard++; G.audio.engine.cue('thunder', 0, storm.dist); } }
+    if (k <= 0.05) { if (storm.next < 3) storm.next = 3; return; }
+    storm.next -= dt * k;
+    if (storm.next <= 0) flash();
+  }
+  // How bright the flash is now (0..1): a flicker, a second stronger one, then it fades; the
+  // further off, the dimmer.
+  function flashF() {
+    var t = storm.t;
+    if (t < 0) return 0;
+    var f = t < 0.06 ? 0.7 : (t < 0.12 ? 0.2 : (t < 0.2 ? 1 : Math.exp(-(t - 0.2) * 6)));
+    return f * (1 - 0.5 * storm.dist);
+  }
+  // Over the sky, before the hills: the storm's dark, the flash, and a bolt from the clouds
+  // down behind the far ridge (a jagged line with a branch, from the flash's own seed).
+  function drawStormSky(c) {
+    var k = stormK(), wy = loc.waterY - camPy, f = flashF();
+    if (k <= 0 && f <= 0) return;
+    c.fillStyle = P.night_ink; c.globalAlpha = STORM.dark * k;
+    c.fillRect(0, -camPy, VIEW_W, wy + camPy);
+    if (f > 0) {
+      c.fillStyle = P.fog_light; c.globalAlpha = STORM.skyA * f;
+      c.fillRect(0, -camPy, VIEW_W, wy + camPy);
+      if (storm.bolt && storm.t < 0.35) {
+        var x = storm.bx, y = -camPy + 6, n = 9, dy = (wy - 34 - y) / n, bx = 0, by = 0;
+        c.globalAlpha = Math.min(1, 1.6 * f);
+        for (var i = 0; i < n; i++) {
+          var ny = y + dy, nx = x + ((S.hash(storm.seed, i) % 9) - 4) * 1.5;
+          lineN = 0; line(c, x, y, nx, ny, false);
+          if (i === 3) { bx = nx; by = ny; }
+          x = nx; y = ny;
+        }
+        for (i = 0; i < 3; i++) { var ex = bx + ((S.hash(storm.seed, 40 + i) % 5) + 2) * (storm.seed & 1 ? 1 : -1), ey = by + 6; lineN = 0; line(c, bx, by, ex, ey, false); bx = ex; by = ey; }
+      }
+    }
+    c.globalAlpha = 1;
+  }
+  // Over the water: the flash on its surface.
+  function drawStormWater(c) {
+    var f = flashF();
+    if (f <= 0) return;
+    var wy = loc.waterY - camPy;
+    c.fillStyle = P.fog_light; c.globalAlpha = STORM.waterA * f;
+    c.fillRect(0, wy, VIEW_W, VIEW_H - wy);
+    c.globalAlpha = 1;
   }
   var RAIN_N = 60;
   function drawRain(c) {
     var k = rainK();
     if (k <= 0) return;
-    var t = G.state.run.boat.t, wy = loc.waterY - camPy, n = Math.round(RAIN_N * k);
-    c.fillStyle = P.fog_mid; c.globalAlpha = 0.4;
+    var st = stormK(), t = G.state.run.boat.t, wy = loc.waterY - camPy, n = Math.round(RAIN_N * k * (1 + 1.4 * st)), slant = 0.15 + 0.25 * st; // Phase 55: a storm's rain is heavier and slants
+    c.fillStyle = P.fog_mid; c.globalAlpha = 0.4 + 0.1 * st;
     for (var i = 0; i < n; i++) {
-      var y = ((S.hash(i, 22) % 200) + t * 110) % (wy + 12) - 6;
-      var x = (S.hash(i, 21) % 340) - 10 - Math.round(y * 0.15);
+      var y = ((S.hash(i, 22) % 200) + t * (110 + 60 * st)) % (wy + 12) - 6;
+      var x = (S.hash(i, 21) % 380) - 10 - Math.round(y * slant);
       c.fillRect(x, Math.round(y * HI) / HI, 0.5, 2);
     }
     c.globalAlpha = 1;
@@ -1067,27 +1144,28 @@ G.scene.sailing = (function () {
   }
 
   function drawSky(c) {
-    var wy = loc.waterY, h = hourNow(), t = G.state.run.boat.t, n = nightF(h), d = duskF(h), g = greyF(h);
+    var wy = loc.waterY, h = hourNow(), t = G.state.run.boat.t, n = nightF(h), d = duskF(h), g = greyF(h), st = stormK();
     var sx = Math.round(camPx * SKYP * HI);
     c.drawImage(skyCv, 0, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
     if (sky.glow && d > 0) {
       c.globalAlpha = d * 0.55;
       c.drawImage(sky.glow, Math.round(((sky.opt.glowX || 230) - camPx * SKYP) * HI) / HI - 100, wy - 46 - camPy, 200, 46);
     }
-    if (sky.stars && n > 0) {
-      c.globalAlpha = n * (1 - 0.6 * g);
+    if (sky.stars && n > 0 && st < 1) {
+      c.globalAlpha = n * (1 - 0.6 * g) * (1 - st); // Phase 55: a storm's clouds hide the stars and the moon
       c.drawImage(sky.stars, sx, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
-      c.globalAlpha = n * (0.35 + 0.35 * Math.sin(t * 1.3));
+      c.globalAlpha = n * (0.35 + 0.35 * Math.sin(t * 1.3)) * (1 - st);
       c.drawImage(sky.twinkle, sx, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
     }
     moonAt(h, moonPt);
+    moonPt[2] *= 1 - 0.95 * st;
     if (moonPt[2] > 0) {
       c.globalAlpha = moonPt[2];                           // a faint halo, then the disk
       c.drawImage(sky.halo, moonPt[0] - 12, moonPt[1] - 12, 24.5, 24.5);
       c.drawImage(sky.moon, moonPt[0] - 4, moonPt[1] - 4, 8.5, 8.5);
     }
     if (sky.clouds) {
-      var ox = camPx * CLOUD_P + t * CLOUD_DRIFT, cw = [n * 0.8, g * 0.6, d * 0.85, d * 0.55];
+      var ox = camPx * CLOUD_P + t * CLOUD_DRIFT, cw = [n * 0.8 + st, g * 0.6 + st * 0.8, d * 0.85, d * 0.55];
       for (var i = 0; i < 4; i++) {
         if (cw[i] <= 0.01) continue;
         c.globalAlpha = Math.min(1, cw[i]);
@@ -1477,6 +1555,7 @@ G.scene.sailing = (function () {
     }
     releaseStep(run, dt);
     lineStep(run);
+    stormStep(dt); // Phase 55
     if (scen.update) scen.update(run, dt, loc);
     G.scene.underwater.catchStep(run, dt, loc);
     if (run.fsm === 'card') {
@@ -1557,7 +1636,7 @@ G.scene.sailing = (function () {
     // Phase 26: the moving boat makes its wake (the surface's wake layer), every step.
     G.gfx.surface.wake(boat.stern(b), sp * sp, b.vx, dt);
     // The surface's swell roughens in drizzle and in the grey hours' wind.
-    G.gfx.surface.step(dt, 1 + 0.6 * rainK() + 0.35 * greyF(hourNow()));
+    G.gfx.surface.step(dt, 1 + 0.6 * rainK() + 0.35 * greyF(hourNow()) + 0.8 * stormK()); // Phase 55: a storm roughens it
     fx.update(dt);
     G.core.state.tick(run, dt);
   }
@@ -1566,6 +1645,7 @@ G.scene.sailing = (function () {
     var wy = loc.waterY, run = G.state.run, fa = fogMul() / FOG_HEAD, hh = hourNow();
     var lightN = nightF(hh) * 0.9, lightG = greyF(hh) * 0.7;
     drawSky(c);
+    drawStormSky(c); // Phase 55
     for (var i = 0; i < layers.length; i++) {
       var L = layers[i], oxN = Math.round(camPx * L.p * HI), vw = VIEW_W * HI, wh = wy * HI;
       if (L.p === 1) G.scene.life.drawFar(c, camPx, wy - camPy); // Phase 49: the birds further out than the boat, before the landmarks
@@ -1730,6 +1810,7 @@ G.scene.sailing = (function () {
     G.scene.underwater.draw(ctx, loc, camPx, camPy, 1, run.boat.t);
     if (band > 0) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, wl, band, camPx);
     drawWaterline(ctx, wy - camPy + band, cols, wl, band === 0 ? a : 0);
+    drawStormWater(ctx); // Phase 55
     ctx.drawImage(glint, camPx * HI, 0, VIEW_W * HI, 1, 0, wy - camPy, VIEW_W, 1 / HI);
     drawPosts(ctx, wy - camPy);
     G.scene.life.drawSurface(ctx, camPx, camPy); // Phase 49: lily pads, the frog, the striders
@@ -1762,6 +1843,13 @@ G.scene.sailing = (function () {
     floatY: function (x) { return floatY(x); },
     lureAt: function () { return lurePos(G.state.run, [0, 0]); }, // debug: where the rope's far end is held
     rain: function () { return loc ? rainK() : 0; },
+    // Phase 55: the storm. storm() reads it; stormForce(k) holds it at k (null: the clock's);
+    // stormFlash() flashes now; stormTick(dt) steps it (the shop, whose windows show it); flash() 0..1.
+    storm: function () { return { k: +stormK().toFixed(3), flashes: storm.n, heard: storm.heard, next: +storm.next.toFixed(2), flash: +flashF().toFixed(3), bolt: storm.bolt, dist: +storm.dist.toFixed(2), forced: storm.force >= 0 }; },
+    stormForce: function (k) { storm.force = k === null || k === undefined ? -1 : clamp(+k, 0, 1); return storm.force; },
+    stormFlash: function () { if (!loc) return false; flash(); return true; },
+    stormTick: function (dt) { if (loc) stormStep(dt); },
+    flash: function () { return loc ? flashF() : 0; },
     light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
     fogAlpha: function () { return fogMul() / FOG_HEAD; },
     moon: function () { return { x: moonPt[0], y: moonPt[1], a: moonPt[2] }; },
@@ -1788,7 +1876,7 @@ if (G.core.debug) G.core.debug.addLine(function () {
   var b = run.boat;
   return 'loc ' + run.loc + '  cam ' + run.cam.x.toFixed(1) + '  hour ' + sc.hourNow().toFixed(2) +
     '  sky lum ' + sc.skyLum().toFixed(0) + '/' + G.gfx.sprites.CEILING.toFixed(0) + '  fog ' + sc.fogAlpha().toFixed(2) +
-    '  moon ' + (sc.moon().a > 0 ? sc.moon().a.toFixed(2) : '-') + '\n' +
+    '  moon ' + (sc.moon().a > 0 ? sc.moon().a.toFixed(2) : '-') + (sc.storm().k > 0 || sc.storm().flash > 0 ? '  storm ' + sc.storm().k.toFixed(2) + ' flashes ' + sc.storm().flashes + ' next ' + sc.storm().next.toFixed(1) + 's' : '') + '\n' +
     'boat x ' + b.x.toFixed(1) + '  vx ' + b.vx.toFixed(2) + '  stopped ' + (b.stopped ? 'Y' : 'n') +
     '  facing ' + (b.facing > 0 ? 'R' : 'L') + '  dog ' + run.dog.pose +
     '  pitch ' + b.show.toFixed(2) + '°  heave ' + b.heave.toFixed(2) + '  throttle ' + b.throttle.toFixed(2) + '  rpm ' + Math.round(b.rpm) + (b.motor ? '' : ' (off)');
