@@ -24,7 +24,9 @@ G.audio.engine = (function () {
   // ---- Start-up ------------------------------------------------------------------------
 
   function unlock() {
-    if (ac) { if (ac.state === 'suspended' && !document.hidden) ac.resume(); return; }
+    // 57.4: iOS leaves the context 'interrupted' after a call or the lock screen; any state but
+    // running (and closed) is resumed by the next gesture while the page is shown.
+    if (ac) { if (ac.state !== 'running' && ac.state !== 'closed' && !document.hidden) ac.resume(); return; }
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ac = new AC();
@@ -34,7 +36,8 @@ G.audio.engine = (function () {
   }
 
   function attach() {
-    var evs = ['keydown', 'mousedown', 'pointerdown', 'touchstart'];
+    // 57.4: touchend, pointerup and click too: iOS Safari counts those as a user gesture, not touchstart.
+    var evs = ['keydown', 'mousedown', 'pointerdown', 'touchstart', 'touchend', 'pointerup', 'click'];
     for (var i = 0; i < evs.length; i++) window.addEventListener(evs[i], unlock, true);
     document.addEventListener('visibilitychange', function () {
       if (!ac) return;
@@ -747,6 +750,8 @@ G.audio.engine = (function () {
 
   return {
     step: step, unlock: unlock, BASE: BASE,
+    // 57.5: the context's state for dbg.device(): 'none' before the first gesture.
+    state: function () { return ac ? ac.state : 'none'; },
     // dbg.audio(): the context, the gains and the limiter, and the last events played.
     info: function () {
       if (!ac) return { state: 'none (waiting for the first key or click)' };
