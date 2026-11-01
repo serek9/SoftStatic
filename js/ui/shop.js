@@ -394,6 +394,8 @@ G.ui.shop = (function () {
     if (!coin) coin = G.gfx.bake.layer(8, 8, paintCoin);
     row = 0; col = 0; t = 0;
     walk = R.create(); faced = ''; open = ''; R.bake();
+    G.ui.room.prebake('fisher'); G.ui.room.prebake('dog');                             // Phase 56: so no step bakes a frame
+    for (var rf = 0; rf < 4; rf++) { G.ui.room.sprite('rusty', 'down', rf); G.ui.room.sprite('rusty', 'left', rf); }
     packs.minnow = 0; packs.cricket = 0;
     odd.kind = ''; odd.cool = 20 + 20 * G.vrng.next();
     odd.wall = shopUnease() >= 0.6 && G.vrng.next() < 0.5; // 39.3: he has his back to you
@@ -483,6 +485,7 @@ G.ui.shop = (function () {
     faced = R.facing(walk);
     if (inp.pressed('action') && faced === 'rusty') { from = 'rusty'; talk(); }
     else if (inp.pressed('action') && SHELF_ITEMS[faced]) showItems(SHELF_ITEMS[faced], faced); // Phase 38: a shelf's own items
+    else if (inp.pressed('action') && faced === 'guitar') G.audio.engine.cue('strum', 0, Math.floor(t * 7) % 4); // Phase 56: a chord on the old guitar
   }
 
   // ---- Drawing --------------------------------------------------------------------------

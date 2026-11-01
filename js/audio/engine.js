@@ -298,6 +298,16 @@ G.audio.engine = (function () {
       // Phase 39: the bait shop: a footstep on the boards; the third board from the door hums.
       case 'step': playBuf(pick(KIT.knock), 0.007, 0, 1.5 + 0.2 * G.vrng.next()); note('step'); break;
       case 'creak': tone('sine', 96, 88, 0.7, 0.02, 0); tone('sine', 192, 180, 0.5, 0.008, 0, 0.05); note('creak'); break;
+      // Phase 56: the rooms' instruments, soft and short, a: which chord (0..3) of a lofi
+      // progression in major sevenths. A guitar strummed (plucked triangles, low to high, a
+      // little out of tune), the synth's keys (sine and triangle, a slow attack, a wobble), and
+      // the record: the needle's crackle, then the four chords once over eight seconds.
+      case 'strum': roomChord(a || 0, 'strum', 0); note('strum'); break;
+      case 'keys': roomChord(a || 0, 'keys', 0); note('keys'); break;
+      case 'record':
+        hiss('highpass', 3000, 2500, 0.7, 1.2, 0.006, 0);
+        for (var ch = 0; ch < 4; ch++) roomChord(ch, 'keys', 0.6 + ch * 2);
+        note('record'); break;
       // Phase 49: the life above the water. Small splashes: a heron's strike, a bird going
       // under, a frog plopping in, a beaver's tail slap (the loudest, still under a lure's).
       // Phase 55: thunder, a: how far off (0 near .. 1 far): a low rumble that rises slowly.
@@ -429,6 +439,19 @@ G.audio.engine = (function () {
     o.connect(e); e.connect(out(pan, to));
     voices++; o.onended = done; o.start(t0); o.stop(t0 + dur + 0.05);
     return o;
+  }
+
+  // Phase 56: one chord of the rooms' progression (Cmaj7, Am7, Fmaj7, G6, low to high) on
+  // the guitar ('strum': plucked, 35 ms apart, slightly out of tune) or the keys (together,
+  // a slow attack, a gentle wobble), starting at s seconds from now. Quiet: under the dog.
+  var ROOM_CHORDS = [[48, 52, 55, 59, 64], [45, 52, 55, 60, 64], [41, 48, 52, 57, 64], [43, 47, 52, 55, 59]];
+  function roomChord(n, kind, at) {
+    var c = ROOM_CHORDS[((n | 0) % 4 + 4) % 4];
+    for (var i = 0; i < c.length; i++) {
+      var f = 440 * Math.pow(2, (c[i] - 69) / 12);
+      if (kind === 'strum') { var d = f * (1 + (i % 2 ? 0.004 : -0.003)); tone('triangle', d, d * 0.998, 1.8 - i * 0.15, 0.011, (i - 2) * 0.1, at + i * 0.035); tone('sine', d * 2, d * 2, 0.4, 0.003, 0, at + i * 0.035); }
+      else { tone('sine', f, f * 1.002, 2.2, 0.008, (i - 2) * 0.15, at, null, 0.06); tone('triangle', f * 1.003, f, 1.6, 0.003, 0, at, null, 0.08); }
+    }
   }
 
   // Filtered noise from f0 to f1 over dur seconds.
