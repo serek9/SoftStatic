@@ -297,6 +297,31 @@ G.ui.journal = (function () {
     U.hint(ctx, 'J', 'close', hx, hy);
   }
 
+  // Phase 59.2: a touch on the journal. A filter key turns it (as D does with it focused); a
+  // tile reads its page; the scrollbar's upper or lower half pages the grid up or down; the J
+  // hint closes. The entry panel and anywhere else, nothing.
+  function tap(gx, gy) {
+    var U = G.ui.panel, rx = U.left(RP[0]), fy = U.top(RP[1]), w0 = U.keyW(title.loc), w1 = U.keyW(title.rar), i;
+    if (gy >= fy - 2 && gy < fy + U.KEY_H + 2) {
+      if (gx >= rx && gx < rx + w0) { focus = 0; return 'right'; }
+      if (gx >= rx + w0 + 6 && gx < rx + w0 + 6 + w1) { focus = 1; return 'right'; }
+    }
+    var end = Math.min(list.length, (top + ROWS) * COLS);
+    for (i = top * COLS; i < end; i++) {
+      var c = i - top * COLS, x = GX + (c % COLS) * (CW + GAP), y = GY + Math.floor(c / COLS) * (CH + GAP);
+      if (gx >= x && gx < x + CW && gy >= y && gy < y + CH) { focus = 2; if (i !== sel) select(i); return 'none'; }
+    }
+    var trackH = ROWS * (CH + GAP) - GAP, sx = GX + COLS * (CW + GAP) - GAP + 4;
+    if (list.length && gx >= sx - 4 && gx < sx + 10 && gy >= GY && gy < GY + trackH) {
+      focus = 2;
+      select(gy < GY + trackH / 2 ? Math.max(0, sel - COLS * ROWS) : Math.min(list.length - 1, sel + COLS * ROWS));
+      return 'none';
+    }
+    var hx = rx + U.hintW('W/S A/D', 'browse'), hy = RP[1] + RP[3] - U.PAD - U.KEY_H;
+    if (gy >= hy - 2 && gy < hy + U.KEY_H + 2 && gx >= hx && gx < hx + U.hintW('J', 'close')) return 'back';
+    return 'none';
+  }
+
   // dbg: draws the current page into a fresh canvas and returns it (handwriting checks).
   function render() {
     var cv = G.gfx.bake.canvas(640, 360), ctx = cv.getContext('2d');
@@ -306,7 +331,7 @@ G.ui.journal = (function () {
 
   return {
     native: true,
-    open: open, update: update, draw: draw, render: render, jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close,
+    open: open, update: update, draw: draw, render: render, tap: tap, jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close,
     lastLate: function () { return lastLate; },
     state: function () { return { loc: locs[locIdx], rarity: RARITIES[rarIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
   };

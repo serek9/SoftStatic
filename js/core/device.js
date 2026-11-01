@@ -21,6 +21,24 @@ G.core.device = (function () {
 
   function touch() { return coarse || touchSeen; }
 
+  // 60.1: the phone's frame budget. Once a second, in touch mode with the page shown and the
+  // game drawing (not another tab's idle notice), a frame rate under SLOW_FPS two seconds
+  // running raises the level by one (to MAX_LEVEL); it never falls back within a visit, so
+  // the picture does not flicker between levels. A PC stays at 0 whatever its frame rate.
+  // dbg.budget(n) holds a level (null gives it back).
+  var SLOW_FPS = 50, MAX_LEVEL = 2, level = 0, slow = 0, held = -1, raised = [];
+  function apply() { var w = G.gfx && G.gfx.water; if (w && w.setBudget) w.setBudget(held >= 0 ? held : level); }
+  function budgetTick() {
+    if (held >= 0 || !touch() || document.hidden || (G.core.save && G.core.save.lost())) { slow = 0; return; }
+    var fps = G.core.loop ? G.core.loop.stats.fps : 60;
+    slow = fps > 0 && fps < SLOW_FPS ? slow + 1 : 0;
+    if (slow >= 2 && level < MAX_LEVEL) { level++; slow = 0; raised.push(fps); apply(); if (G.core.debug) G.core.debug.log('phone budget ' + level + ' at ' + fps + ' fps'); }
+  }
+  function budget(n) {
+    if (n !== undefined) { held = n === null ? -1 : Math.max(0, Math.min(MAX_LEVEL, n | 0)); apply(); }
+    return { level: held >= 0 ? held : level, held: held >= 0, raisedAt: raised.slice() };
+  }
+
   // The safe-area insets, read from a fixed probe whose padding is env(safe-area-inset-*).
   function insets(out) {
     if (!probe) {
@@ -68,6 +86,8 @@ G.core.device = (function () {
   // allows them. Asked once per load: leaving full screen afterwards is the player's choice.
   function askFullscreen() {
     if (info.fsAsked || !touch() || info.standalone) return;
+    var st = G.state && G.state.save && G.state.save.settings;
+    if (st && st.fullscreen === false) { info.fsAsked = 1; info.fsResult = 'off in the pause list'; return; } // 59.3
     var el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
     info.fsAsked = 1;
     if (!req || document.fullscreenElement || document.webkitFullscreenElement) { info.fsResult = req ? 'already' : 'unsupported'; return; }
@@ -82,6 +102,59 @@ G.core.device = (function () {
       if (p && p.then) p.then(function () { info.fsResult = 'on'; lock(); }, function () { info.fsResult = 'refused'; });
       else lock();
     } catch (e) { info.fsResult = 'refused'; }
+  }
+
+  // 59.3: the pause list's Full screen row. Offered in touch mode where the browser has an
+  // element full screen (not an iPhone's Safari, not from the home screen).
+  function canFullscreen() {
+    var el = document.documentElement;
+    return touch() && !info.standalone && !!(el.requestFullscreen || el.webkitRequestFullscreen);
+  }
+  function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  // Called from the step after a tap (Chrome's transient activation still holds then).
+  function setFullscreen(on) {
+    try {
+      if (on && !isFullscreen()) { info.fsAsked = 0; askFullscreen(); }
+      else if (!on && isFullscreen()) { var ex = document.exitFullscreen || document.webkitExitFullscreen; if (ex) { var p = ex.call(document); if (p && p.catch) p.catch(function () {}); } }
+    } catch (e) {}
+  }
+
+  // 60.2: the home-screen icon, painted from palette keys on a 32×32 grid and scaled up whole:
+  // a dusk sky (nothing above dusk_high), a moon, the pines, the water with the moon's path,
+  // and the boat with the fisher and the dog. Given to the page as its icon and the iOS
+  // home-screen icon (a data URL). TODO(P60.2): the manifest has no icon: Chrome wants a
+  // same-origin file to install from, and the project has no image files (§0.2).
+  var ICON = [
+    // [key, x, y, w, h]
+    ['night_blue', 0, 0, 32, 6], ['dusk_violet', 0, 6, 32, 5], ['dusk_plum', 0, 11, 32, 3], ['dusk_rose', 0, 14, 32, 2], ['dusk_amber', 0, 16, 32, 3],
+    ['dusk_high', 22, 4, 3, 5], ['dusk_high', 21, 5, 5, 3],                                  // the moon
+    ['pine_dark', 0, 15, 2, 5], ['pine_dark', 2, 13, 2, 7], ['pine_dark', 4, 16, 3, 4], ['pine_dark', 7, 14, 2, 6], ['pine_dark', 9, 17, 3, 3],
+    ['pine_dark', 25, 16, 2, 4], ['pine_dark', 27, 13, 2, 7], ['pine_dark', 29, 15, 3, 5], ['pine_dark', 12, 18, 13, 2],
+    ['water_dark', 0, 20, 32, 12], ['water_hi', 0, 20, 32, 1],
+    ['dusk_amber', 21, 22, 5, 1], ['dusk_amber', 22, 24, 3, 1], ['dusk_amber', 21, 26, 4, 1], ['dusk_amber', 22, 28, 3, 1], // its path on the water
+    ['wood_dark', 9, 19, 12, 2], ['wood', 10, 19, 10, 1],                                    // the boat
+    ['coat', 12, 16, 2, 3], ['flesh', 12, 15, 2, 1], ['cap', 12, 14, 3, 1],                  // the fisher
+    ['dog', 16, 17, 3, 2], ['dog_hi', 18, 16, 2, 1],                                         // the dog
+    ['stone', 14, 11, 1, 6]                                                                  // the rod
+  ];
+  function paintIcon(px) {
+    var P = G.gfx.sprites.PALETTE, s = Math.max(1, Math.floor(px / 32)), cv = document.createElement('canvas');
+    cv.width = cv.height = 32 * s;
+    var c = cv.getContext('2d');
+    for (var i = 0; i < ICON.length; i++) { var r = ICON[i]; c.fillStyle = P[r[0]]; c.fillRect(r[1] * s, r[2] * s, r[3] * s, r[4] * s); }
+    return cv;
+  }
+  var iconURL = '';
+  function setIcons() {
+    try {
+      iconURL = paintIcon(192).toDataURL('image/png');
+      var rels = ['icon', 'apple-touch-icon'];
+      for (var i = 0; i < rels.length; i++) {
+        var l = document.querySelector('link[rel="' + rels[i] + '"]') || document.createElement('link');
+        l.rel = rels[i]; l.href = iconURL; if (rels[i] === 'icon') l.type = 'image/png';
+        if (!l.parentNode) document.head.appendChild(l);
+      }
+    } catch (e) { iconURL = ''; }
   }
 
   function attach(cv, w, h) {
@@ -100,13 +173,15 @@ G.core.device = (function () {
     if (window.visualViewport) window.visualViewport.addEventListener('resize', refit);
     document.addEventListener('fullscreenchange', refit);
     document.addEventListener('webkitfullscreenchange', refit);
+    setInterval(budgetTick, 1000); // 60.1
+    setIcons();                    // 60.2
     fit();
   }
 
   // 57.3: the portrait notice, over the running game (input still goes through), in the
-  // bitmap font at NOTICE_S× in the 640×360 view. Drawing only.
-  function drawNotice(ctx) {
-    if (!info.portrait || !G.ui || !G.ui.panel) return;
+  // bitmap font at NOTICE_S× in the 640×360 view. Drawing only. force: drawn anyway (the gallery).
+  function drawNotice(ctx, force) {
+    if ((!info.portrait && !force) || !G.ui || !G.ui.panel) return;
     var F = G.gfx.sprites.fine, Pn = G.ui.panel, s = NOTICE_S;
     // No title tab: the body starts TAB rows down, and the two lines sit evenly inside it.
     var m = Pn.PAD + 2, w = Math.max(F.measureBold(NOTICE_A), F.measure(NOTICE_B)) + 2 * m + 2, h = Pn.TAB + 2 * m + 2 * F.LINE_H + 3;
@@ -127,12 +202,15 @@ G.core.device = (function () {
       touch: info.touch, coarse: info.coarse, portrait: info.portrait, fullscreen: info.fullscreen, standalone: info.standalone,
       viewport: [info.vw, info.vh], dpr: info.dpr, insets: info.insets.slice(),
       scale: +info.scale.toFixed(3), whole: info.whole, css: [+info.cssW.toFixed(1), +info.cssH.toFixed(1)], at: [+info.left.toFixed(1), +info.top.toFixed(1)],
-      fill: +info.fill.toFixed(3), fsAsked: info.fsAsked, fsResult: info.fsResult, lock: info.lock, fits: info.fits, audio: info.audio
+      fill: +info.fill.toFixed(3), fsAsked: info.fsAsked, fsResult: info.fsResult, lock: info.lock, fits: info.fits, audio: info.audio, budget: held >= 0 ? held : level,
+      // Phase 58: the touch layout's mode and the action button's word
+      layout: G.core.input.layout().mode, word: G.ui && G.ui.hud ? G.ui.hud.word() : ''
     };
   }
 
   return {
     attach: attach, fit: fit, touch: touch, drawNotice: drawNotice, report: report,
+    canFullscreen: canFullscreen, isFullscreen: isFullscreen, setFullscreen: setFullscreen, budget: budget, paintIcon: paintIcon, iconURL: function () { return iconURL; },
     portrait: function () { return info.portrait; },
     scale: function () { return info.scale; },
     info: info
@@ -143,5 +221,5 @@ if (G.core.debug) G.core.debug.addLine(function () {
   var d = G.core.device.info;
   return 'device ' + (d.touch ? 'touch' : 'pc') + (d.portrait ? ' portrait' : '') + '  ' + d.vw + 'x' + d.vh + ' @' + d.dpr +
     '  scale ' + d.scale.toFixed(2) + (d.whole ? '' : ' (fractional)') + '  fill ' + Math.round(d.fill * 100) + '%' +
-    (d.fsAsked ? '  fullscreen ' + d.fsResult : '') + (d.fullscreen ? ' (on)' : '');
+    (d.fsAsked ? '  fullscreen ' + d.fsResult : '') + (d.fullscreen ? ' (on)' : '') + '  budget ' + G.core.device.budget().level;
 });

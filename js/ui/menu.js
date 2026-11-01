@@ -63,9 +63,20 @@ G.ui.menu = (function () {
   // ---- Pause menu ------------------------------------------------------------------------
 
   // Phase 47: 'Fisher & dog' opens the picker (G.ui.look), which comes back here on close.
-  var ITEMS = ['Resume', 'Volume', 'Sound', 'Dog barks', 'Fisher & dog', 'Export save', 'Import save'];
+  // Phase 59.3: 'Full screen' joins the list in touch mode where the browser has it (not on
+  // an iPhone, not from the home screen); the panel grows a row for it (built on open).
+  var BASE_ITEMS = ['Resume', 'Volume', 'Sound', 'Dog barks', 'Fisher & dog', 'Export save', 'Import save'];
+  var FS_ITEMS = ['Resume', 'Volume', 'Sound', 'Dog barks', 'Full screen', 'Fisher & dog', 'Export save', 'Import save'];
+  var ITEMS = BASE_ITEMS;
   // Phase 46: the panel's bounds (at the right edge), where the values and the message sit.
   var PRECT = G.ui.panel.place(176, 140, 'right', [0, 0, 176, 140]), VAL_X = 110, MSG_Y = 103;
+  function layoutPause() {
+    var fs = G.core.device && G.core.device.canFullscreen();
+    ITEMS = fs ? FS_ITEMS : BASE_ITEMS;
+    var extra = (ITEMS.length - BASE_ITEMS.length) * G.ui.panel.ROW;
+    G.ui.panel.place(176, 140 + extra, 'right', PRECT); PRECT[2] = 176; PRECT[3] = 140 + extra; MSG_Y = 103 + extra;
+  }
+  function fullscreen() { var D = G.core.device; G.state.save.settings.fullscreen = !D.isFullscreen(); D.setFullscreen(G.state.save.settings.fullscreen); dirty = true; }
   var sel = 0, msg = '', msgLines = [], msgKey = 'fog_light', dirty = false, lastExport = '';
 
   // Volume as tenths so the shown bar and the stored value always agree.
@@ -119,7 +130,7 @@ G.ui.menu = (function () {
   }
 
   var pause = {
-    open: function (at) { sel = Math.max(0, ITEMS.indexOf(at)); say(''); dirty = false; },
+    open: function (at) { layoutPause(); sel = Math.max(0, ITEMS.indexOf(at)); say(''); dirty = false; },
     update: function () {
       var inp = G.core.input, st = G.state.save.settings;
       if (inp.pressed('pause') || inp.pressed('back')) { pause.close(); return false; }
@@ -128,16 +139,34 @@ G.ui.menu = (function () {
       if (ITEMS[sel] === 'Volume' && lr) volume(lr);
       if (ITEMS[sel] === 'Sound' && lr) { st.mute = !st.mute; dirty = true; }
       if (ITEMS[sel] === 'Dog barks' && lr) { st.dogBark = !st.dogBark; dirty = true; }
+      if (ITEMS[sel] === 'Full screen' && lr) fullscreen();
       if (!inp.pressed('action')) return true;
       switch (ITEMS[sel]) {
         case 'Resume': pause.close(); return false;
         case 'Sound': st.mute = !st.mute; dirty = true; break;
         case 'Dog barks': st.dogBark = !st.dogBark; dirty = true; break; // Phase 42
+        case 'Full screen': fullscreen(); break; // Phase 59.3
         case 'Fisher & dog': pause.close(); open('look', 'pause'); return true; // Phase 47: the picker is the overlay now
         case 'Export save': exportSave(); break;
         case 'Import save': askImport(); break;
       }
       return true;
+    },
+    // Phase 59.2: a touch on the list (input.zone). The row rule: a tap on a row selects it,
+    // a tap on the selected row does it; on the selected Volume row, a tap on the ticks left
+    // or right of the level turns it down or up. Anywhere else, nothing.
+    tap: function (gx, gy) {
+      var U = G.ui.panel, X = PRECT[0], Y = PRECT[1], W = PRECT[2];
+      if (!U.inside(PRECT, gx, gy)) return 'none';
+      var i = Math.floor((gy - (U.top(Y) - 2)) / U.ROW);
+      if (i < 0 || i >= ITEMS.length || gx < X + 3 || gx >= X + W - 3) return 'none';
+      if (i !== sel) { sel = i; say(''); return 'none'; }
+      if (ITEMS[i] === 'Volume') {
+        if (gx < X + VAL_X - 4) return 'none';
+        var level = G.state.save.settings.mute ? 0 : Math.round(G.state.save.settings.volume * 10);
+        return gx < X + VAL_X + level * 5 - 1 ? 'left' : 'right';
+      }
+      return 'action';
     },
     // The audio engine (js/audio/engine.js) reads save.settings.volume and mute every step.
     close: function () { if (dirty) G.core.save.autosave('settings'); dirty = false; },
@@ -158,6 +187,7 @@ G.ui.menu = (function () {
           }
         } else if (ITEMS[i] === 'Sound') F.drawText(ctx, st.mute ? 'off' : 'on', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Dog barks') F.drawText(ctx, st.dogBark === false ? 'off' : 'on', X + VAL_X, y, key);
+        else if (ITEMS[i] === 'Full screen') F.drawText(ctx, G.core.device.isFullscreen() ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Fisher & dog') F.drawText(ctx, '>', X + W - U.PAD - 6, y, key);
       }
       for (i = 0; i < msgLines.length && i < 2; i++) F.drawText(ctx, msgLines[i], U.left(X), Y + MSG_Y + i * U.ROW, msgKey);
@@ -171,6 +201,9 @@ G.ui.menu = (function () {
   return {
     open: open, update: update, draw: draw, mapAllowed: mapAllowed,
     isOpen: function () { return cur !== null; },
+    // Phase 59.2: a touch on the open overlay: what to press (see input.overlayTap); '' to
+    // leave it to the zones (an overlay with no tap of its own).
+    tap: function (gx, gy) { return cur && cur.tap ? cur.tap(gx, gy) : ''; },
     native: function () { return !!(cur && cur.native); },
     current: function () { return curName; },
     exportSave: exportSave, importSave: importSave, rect: function () { return PRECT; },

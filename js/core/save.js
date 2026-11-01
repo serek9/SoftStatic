@@ -80,7 +80,7 @@ G.core.save = (function () {
       // gained a late hint (10.5).
       flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 },
       tapes: [],
-      settings: { volume: 0.8, mute: false, dogBark: true }, // dogBark: Phase 42
+      settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone)
       look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)
       rng: null              // G.rng state, restored on load unless ?seed is given
     };

@@ -99,10 +99,28 @@ G.ui.look = (function () {
     U.hint(ctx, 'ESC', 'done', hx, hy);
   }
 
+  // Phase 59.2: a touch on the picker. A cell's left or right third turns its look (and makes
+  // it the row), its middle only picks the row; the ESC hint is done. Anywhere else, nothing.
+  function tap(gx, gy) {
+    var U = G.ui.panel, x0 = U.left(R[0]), y0 = U.top(R[1]), cw = (W - 2 * U.PAD - GAP) >> 1, y1 = y0 + U.ROW + PREV + 4 + F.LINE_H + 2;
+    for (var i = 0; i < 2; i++) {
+      var cx = x0 + i * (cw + GAP);
+      if (gx >= cx && gx < cx + cw && gy >= y0 - 2 && gy < y1) {
+        row = i;
+        if (gx < cx + cw / 3) return 'left';
+        if (gx >= cx + 2 * cw / 3) return 'right';
+        return 'none';
+      }
+    }
+    var hy = R[1] + H - U.PAD - U.KEY_H, hx = U.left(R[0]) + U.hintW('W/S', 'choose') + U.hintW('A/D', 'turn');
+    if (gy >= hy - 2 && gy < hy + U.KEY_H + 2 && gx >= hx && gx < hx + U.hintW('ESC', 'done')) return 'back';
+    return 'none';
+  }
+
   // Checks and dbg: what is chosen, the last bake's ms, how many bakes, the panel's bounds.
   function info() {
     return { row: row, from: from, fisher: now('fisher').id, dog: now('dog').id, bakeMs: +bakeMs.toFixed(2), bakes: bakes, rect: R.slice() };
   }
 
-  return { native: true, open: open, update: update, draw: draw, set: set, info: info, rect: function () { return R; } };
+  return { native: true, open: open, update: update, draw: draw, set: set, info: info, tap: tap, rect: function () { return R; } };
 })();

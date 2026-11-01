@@ -1509,6 +1509,22 @@ G.scene.sailing = (function () {
 
   // Phase 45: true when a tap at view pixel (gx, gy) is on the dog and he can be petted now
   // (the boat sitting still between casts, no panel open). Reads state only.
+  // Phase 58.3: the word on the touch action button, from the state (read only, no strings built).
+  var CARD_WORD = { sell: 'SELL', keep: 'KEEP', release: 'RELEASE' };
+  function actionWord() {
+    var run = G.state.run;
+    if (!run) return '';
+    if (G.ui.card.isOpen()) return CARD_WORD[G.ui.card.choice()] || '';
+    if (G.ui.setup.isOpen()) return 'PICK';
+    switch (run.fsm) {
+      case 'sailing': return run.boat.stopped ? 'CAST' : '';
+      case 'charging': return 'CAST';
+      case 'sinking': case 'waiting': case 'interest': return run.bite.slot >= 0 ? 'HOOK' : 'REEL';
+      case 'hooked': case 'fighting': return 'REEL';
+    }
+    return '';
+  }
+
   function dogTap(gx, gy) {
     var run = G.state.run, b = run && run.boat;
     if (!b || !loc || G.core.state.sceneName() !== 'sailing' || run.fsm !== 'sailing' || !b.stopped || G.ui.setup.isOpen()) return false;
@@ -1832,7 +1848,7 @@ G.scene.sailing = (function () {
   }
 
   return {
-    HI: HI, owl: owl, dogTap: dogTap, tackleAct: function () { return tackleAct; }, queueTackle: queueTackle,
+    HI: HI, owl: owl, dogTap: dogTap, actionWord: actionWord, tackleAct: function () { return tackleAct; }, queueTackle: queueTackle,
     load: load, tp: tp, enter: enter, exit: exit, update: update, draw: draw, forceAnomaly: forceAnomaly, anomalyAlpha: anomalyAlpha,
     CAST: CAST, landingX: landingX, forceCast: forceCast,
     setRodMax: function (kg) { rodMaxOverride = kg || 0; return kg; }, // debug: 0 restores the rod's own limit

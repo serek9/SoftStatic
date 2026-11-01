@@ -124,7 +124,9 @@ G.ui.hud = (function () {
     if (G.scene.underwater.UNDER[run.fsm]) {
       if (run.gearFx.depthBands && run.uw.alpha >= 1) drawBands(ctx, run, waterY, run.gearFx.depthBands);
       s = depthText(Math.max(0, run.cast.ly - waterY));
-      label(ctx, s, 632 - F.measure(s), Y, 'fog_light');
+      // Phase 58: in touch mode the depth goes under the top-right row of buttons
+      var dy = G.core.device.touch() ? Math.max(Y, G.core.input.layout().rowBottom + 4) : Y;
+      label(ctx, s, 632 - F.measure(s), dy, 'fog_light');
     }
     V.begin(ctx, false);
   }
@@ -134,6 +136,7 @@ G.ui.hud = (function () {
   function drawButtons(ctx) {
     var I = G.core.input;
     if (G.core.compact || still || !I.showButtons()) return;
+    if (G.core.device.touch()) { drawTouch(ctx); return; }
     var B = I.BUTTONS, P = S.PALETTE;
     V.begin(ctx, true);
     for (var i = 0; i < B.length; i++) {
@@ -146,10 +149,97 @@ G.ui.hud = (function () {
     V.begin(ctx, false);
   }
 
+  // ---- Phase 58: the touch layout (PLAN_MOBILE.md 58.1-58.4) --------------------------------
+
+  // A key-like box: ink at 0.7 with a 1 px rim (amber while held), as the old buttons.
+  function keyBox(ctx, x, y, w, h, on) {
+    var P = S.PALETTE;
+    ctx.save(); ctx.globalAlpha *= 0.7; ctx.fillStyle = P.ink; ctx.fillRect(x + 1, y, w - 2, h); ctx.fillRect(x, y + 1, w, h - 2); ctx.restore();
+    ctx.fillStyle = P[on ? 'signal_amber' : 'fog_dark'];
+    ctx.fillRect(x + 1, y, w - 2, 1); ctx.fillRect(x + 1, y + h - 1, w - 2, 1); ctx.fillRect(x, y + 1, 1, h - 2); ctx.fillRect(x + w - 1, y + 1, 1, h - 2);
+  }
+
+  // An arrow in the middle of a pad key, pointing at dir ('left', 'right', 'up', 'down'), as rows of pixels.
+  function arrow(ctx, r, dir, key) {
+    var n = Math.max(3, Math.round(r.w * 0.18)), cx = r.x + (r.w >> 1), cy = r.y + (r.h >> 1), i;
+    ctx.fillStyle = S.PALETTE[key];
+    for (i = 0; i < n; i++) {
+      var len = 2 * i + 1;
+      if (dir === 'left') ctx.fillRect(cx - (n >> 1) + i, cy - i, 1, len);
+      else if (dir === 'right') ctx.fillRect(cx + (n >> 1) - i, cy - i, 1, len);
+      else if (dir === 'up') ctx.fillRect(cx - i, cy - (n >> 1) + i, len, 1);
+      else ctx.fillRect(cx - i, cy + (n >> 1) - i, len, 1);
+    }
+  }
+
+  // The round action button, baked for its size, up and held (rebaked only when the size changes).
+  var roundD = 0, roundUp = null, roundOn = null;
+  function roundImg(d, on) {
+    if (d !== roundD) {
+      roundD = d;
+      var paint = function (rim, fill) {
+        return G.gfx.bake.layer(d, d, function (c) {
+          var P = S.PALETTE, rr = d / 2;
+          for (var y = 0; y < d; y++) {
+            var dy = y + 0.5 - rr, hw = Math.sqrt(Math.max(0, rr * rr - dy * dy)), x0 = Math.round(rr - hw), w = d - 2 * x0;
+            if (w <= 0) continue;
+            c.fillStyle = P[rim]; c.fillRect(x0, y, w, 1);
+            var hi = Math.sqrt(Math.max(0, (rr - 1) * (rr - 1) - dy * dy)), x1 = Math.round(rr - hi), w1 = d - 2 * x1;
+            if (w1 > 0 && y > 0 && y < d - 1) { c.fillStyle = P[fill]; c.fillRect(x1, y, w1, 1); }
+          }
+        });
+      };
+      roundUp = paint('fog_mid', 'ink'); roundOn = paint('signal_amber', 'rust_dark');
+    }
+    return on ? roundOn : roundUp;
+  }
+
+  // 58.3: what the action button does now, from the scene's state (read only, constant strings).
+  function word() {
+    var sc = G.core.state.sceneName();
+    if (sc === 'sailing') return G.scene.sailing.actionWord();
+    if (sc === 'shop') return G.ui.shop.word();
+    if (sc === 'cabin') return G.ui.cabin.word();
+    return '';
+  }
+
+  function drawTouch(ctx) {
+    var I = G.core.input, L = I.layout(), i;
+    if (!L.mode) return;
+    V.begin(ctx, true);
+    // on the boat the controls fade with the HUD's idle fade (P1-7), never below 0.35
+    var a = L.mode === 'boat' ? 0.35 + 0.65 * alpha() : 1;
+    ctx.globalAlpha = a;
+    for (i = 0; i < L.buttons.length; i++) {
+      var b = L.buttons[i];
+      if (!b.on) continue;
+      var on = I.held(b.act);
+      keyBox(ctx, b.x, b.y, b.w, b.h, on);
+      F.drawText(ctx, b.label, b.x + ((b.w - F.measure(b.label)) >> 1), b.y + ((b.h - F.FONT_H) >> 1), on ? 'signal_amber' : 'fog_light');
+    }
+    for (i = 0; i < L.pad.length; i++) {
+      var p = L.pad[i];
+      if (!p.on) continue;
+      var held = I.held(p.act);
+      keyBox(ctx, p.x, p.y, p.w, p.h, held);
+      arrow(ctx, p, p.act, held ? 'signal_amber' : 'fog_light');
+    }
+    if (L.act.on) {
+      var r = L.act, w = word(), down = I.held('action');
+      ctx.globalAlpha = a * (w ? 0.85 : 0.4);
+      ctx.drawImage(roundImg(r.w, down), r.x, r.y);
+      if (w) F.bold(ctx, w, r.x + ((r.w - F.measureBold(w)) >> 1), r.y + ((r.h - F.FONT_H) >> 1), down ? 'signal_amber' : 'bone');
+    }
+    ctx.globalAlpha = 1;
+    V.begin(ctx, false);
+  }
+
   // What the HUD shows right now (dbg checks compare these against the save).
   function shown() {
     return { clock: clockStr, coins: coinStr, bait: baitStr, depth: G.scene.underwater.UNDER[G.state.run.fsm] ? depthStr : '' };
   }
 
-  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, alpha: alpha, drawButtons: drawButtons, isStill: function () { return still; }, draw: draw, shown: shown };
+  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, alpha: alpha, drawButtons: drawButtons, word: word,
+    // Phase 60.2: the touch layout's pieces for the gallery's touch page.
+    touchParts: { keyBox: keyBox, arrow: arrow, round: roundImg }, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

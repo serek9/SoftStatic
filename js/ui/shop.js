@@ -488,6 +488,44 @@ G.ui.shop = (function () {
     else if (inp.pressed('action') && faced === 'guitar') G.audio.engine.cue('strum', 0, Math.floor(t * 7) % 4); // Phase 56: a chord on the old guitar
   }
 
+  // Phase 59.2: a touch while a box or window is open. Rusty's box: a tap on it is Space (the
+  // rest of the page, the next page, then the choice). Buy, Talk, Leave and the item window's
+  // rows by the row rule (a tap selects, a tap on the selected row chooses or buys); the item
+  // panel's SPACE hint chooses and its ESC hint goes back. Anywhere else, nothing.
+  function tap(gx, gy) {
+    var U = G.ui.panel, i;
+    if (open === 'box') return gx >= BOX.x && gx < BOX.x + BOX.w && gy >= BOX.y - U.TAB && gy < BOX.y + BOX.h ? 'action' : 'none';
+    if (open === 'choice') {
+      for (i = 0; i < CHOICES.length; i++) {
+        var cy = CH.y + 8 + i * 22;
+        if (gx >= CH.x && gx < CH.x + CH.w && gy >= cy - 4 && gy < cy + 14) {
+          if (i !== choice) { choice = i; return 'none'; }
+          return 'action';
+        }
+      }
+      return 'none';
+    }
+    if (open === 'items') {
+      var rows = LIST.rows, top = Math.max(0, Math.min(sel - rows + 2, list.length - rows));
+      for (i = top; i < list.length && i < top + rows; i++) {
+        var ry = U.top(LIST.y) + (i - top) * LIST.rowH;
+        if (gx >= LIST.x && gx < LIST.x + LIST.w && gy >= ry - 1 && gy < ry - 1 + LIST.rowH) {
+          if (i !== sel) { sel = i; row = list[i][0]; col = list[i][1]; describe(); say(''); return 'none'; }
+          return 'action';
+        }
+      }
+      var hx = U.left(ITEM.x), hy = ITEM.y + ITEM.h - U.PAD - U.KEY_H;
+      if (gy >= hy - 2 && gy < hy + U.KEY_H + 2) {
+        var w = U.hintW('SPACE', 'choose');
+        if (gx >= hx && gx < hx + w) return 'action';
+        hx += w + U.hintW('W/S', 'move');
+        if (gx >= hx && gx < hx + U.hintW('ESC', 'back')) return 'back';
+      }
+      return 'none';
+    }
+    return '';
+  }
+
   // ---- Drawing --------------------------------------------------------------------------
   function lines(ctx, ls, x, y, max, key) { for (var i = 0; i < ls.length && i < max; i++) F.drawText(ctx, ls[i], x, y + i * F.LINE_H, key); }
   // A small arrow: down (more to read) or right (the choice).
@@ -556,6 +594,10 @@ G.ui.shop = (function () {
     native: true,
     enter: enter, exit: exit, update: update, draw: draw, pickLine: pickLine, spoken: spoken,
     line: function () { return line_; },
+    // Phase 58: a text box or window is open over the room (the touch pad hides), and the word
+    // on the touch action button for what he faces.
+    busy: function () { return open !== ''; }, tap: tap,
+    word: function () { return open !== '' || !walk ? '' : faced === 'rusty' ? 'TALK' : SHELF_ITEMS[faced] ? 'LOOK' : faced === 'guitar' ? 'PLAY' : ''; },
     // Tests: choose an item (shelf r, item c) in the window, as if the cursor were on it, and buy.
     select: function (r, c) { row = r; col = c; describe(); return txt.name.join(' '); },
     act: function () { act(); return txt.msg.join(' '); },
