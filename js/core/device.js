@@ -127,7 +127,9 @@ G.core.device = (function () {
       touch: info.touch, coarse: info.coarse, portrait: info.portrait, fullscreen: info.fullscreen, standalone: info.standalone,
       viewport: [info.vw, info.vh], dpr: info.dpr, insets: info.insets.slice(),
       scale: +info.scale.toFixed(3), whole: info.whole, css: [+info.cssW.toFixed(1), +info.cssH.toFixed(1)], at: [+info.left.toFixed(1), +info.top.toFixed(1)],
-      fill: +info.fill.toFixed(3), fsAsked: info.fsAsked, fsResult: info.fsResult, lock: info.lock, fits: info.fits, audio: info.audio
+      fill: +info.fill.toFixed(3), fsAsked: info.fsAsked, fsResult: info.fsResult, lock: info.lock, fits: info.fits, audio: info.audio,
+      // Phase 58: the touch layout's mode and the action button's word
+      layout: G.core.input.layout().mode, word: G.ui && G.ui.hud ? G.ui.hud.word() : ''
     };
   }
 

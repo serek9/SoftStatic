@@ -65,8 +65,77 @@ G.core.input = (function () {
   ];
   var touched = false, mouseNear = false;
 
+  // Phase 58 (PLAN_MOBILE.md): the touch layout, in touch mode only (G.core.device.touch()); a
+  // mouse-only PC keeps BUTTONS above. Sizes in game px from the CSS px a game px takes now,
+  // so a thumb gets the same size on every phone: buttons BTN_CSS, the boat's pad PAD_CSS, the
+  // rooms' four-way pad ROOM_CSS, the round action button ACT_CSS (Apple and Google ask 44-48).
+  // What shows depends on where you are: on the boat with nothing open, J M S P in a row at the
+  // top right, the steering pad at the bottom left and the action button at the bottom right;
+  // in a room walking, the four-way pad, the action button and ESC; anywhere else (a menu, the
+  // card, the setup panel, a room's text box) only ESC, and taps go to the zones and the
+  // panels as before. layout() fills these preallocated records; hit() and the HUD read them.
+  var BTN_CSS = 44, PAD_CSS = 52, ROOM_CSS = 44, ACT_CSS = 64, EDGE = 8, GAP = 6;
+  function rec(act, label) { return { act: act, label: label, x: 0, y: 0, w: 0, h: 0, on: false }; }
+  var TB = [rec('journal', 'J'), rec('map', 'M'), rec('setup', 'S'), rec('pause', 'P'), rec('back', 'ESC')];
+  var PAD = [rec('left', '<'), rec('right', '>'), rec('up', '^'), rec('down', 'v')];
+  var ACT = rec('action', '');
+  var LAY = { mode: '', bs: 0, ps: 0, ad: 0, rowBottom: 0, buttons: TB, pad: PAD, act: ACT };
+
+  function size(css, lo, hi) {
+    var sc = G.core.device ? G.core.device.scale() : 1;
+    return Math.max(lo, Math.min(hi, Math.ceil(css / (sc > 0 ? sc : 1))));
+  }
+  function put(r, on, x, y, w, h) { r.on = on; r.x = x; r.y = y; r.w = w; r.h = h; }
+
+  // Where you are, for the layout: 'boat' (the boat, nothing open), 'room' (walking a room),
+  // 'menu' (anything open over a scene) or '' (no touch layout: the gallery, compact).
+  function where() {
+    var sc = G.core.state.sceneName && G.core.state.sceneName(), U = G.ui || {};
+    if (G.core.compact || (sc !== 'sailing' && sc !== 'shop' && sc !== 'cabin')) return '';
+    if (U.menu && U.menu.current()) return 'menu';
+    if (sc === 'sailing') return (U.card && U.card.isOpen()) || (U.setup && U.setup.isOpen()) ? 'menu' : 'boat';
+    var room = sc === 'shop' ? U.shop : U.cabin;
+    return room && room.busy && room.busy() ? 'menu' : 'room';
+  }
+
+  function layout() {
+    var mode = where(), i;
+    var bs = size(BTN_CSS, 28, 64), ps = size(mode === 'room' ? ROOM_CSS : PAD_CSS, 28, 72), ad = size(ACT_CSS, 40, 88);
+    LAY.mode = mode; LAY.bs = bs; LAY.ps = ps; LAY.ad = ad;
+    // the top-right row: J M S P on the boat, else ESC alone at the corner
+    var x = 640 - EDGE;
+    for (i = TB.length - 1; i >= 0; i--) {
+      var b = TB[i], on = mode === 'boat' ? b.act !== 'back' : (mode !== '' && b.act === 'back');
+      if (on) { x -= bs; put(b, true, x, EDGE, bs, bs); x -= GAP; } else b.on = false;
+    }
+    LAY.rowBottom = mode === '' ? 0 : EDGE + bs;
+    // the pad: two arrows on the boat, a cross of four in a room
+    var y0 = 360 - EDGE - ps;
+    if (mode === 'boat') {
+      put(PAD[0], true, EDGE, y0, ps, ps); put(PAD[1], true, EDGE + ps + GAP, y0, ps, ps);
+      PAD[2].on = PAD[3].on = false;
+    } else if (mode === 'room') {
+      var cx = EDGE + ps, top = 360 - EDGE - 3 * ps;
+      put(PAD[2], true, cx, top, ps, ps); put(PAD[3], true, cx, top + 2 * ps, ps, ps);
+      put(PAD[0], true, EDGE, top + ps, ps, ps); put(PAD[1], true, cx + ps, top + ps, ps, ps);
+    } else for (i = 0; i < PAD.length; i++) PAD[i].on = false;
+    if (mode === 'boat' || mode === 'room') put(ACT, true, 640 - EDGE - ad, 360 - EDGE - ad, ad, ad); else ACT.on = false;
+    return LAY;
+  }
+
+  function inRect(r, gx, gy, slack) { return r.on && gx >= r.x - slack && gx < r.x + r.w + slack && gy >= r.y - slack && gy < r.y + r.h + slack; }
+  function inRound(r, gx, gy) { var h = r.w / 2 + 3, dx = gx - r.x - r.w / 2, dy = gy - r.y - r.h / 2; return r.on && dx * dx + dy * dy <= h * h; }
+
   function hit(gx, gy) {
-    for (var i = 0; i < BUTTONS.length; i++) {
+    var i;
+    if (G.core.device && G.core.device.touch()) {
+      layout();
+      for (i = 0; i < TB.length; i++) if (inRect(TB[i], gx, gy, 2)) return TB[i].act;
+      for (i = 0; i < PAD.length; i++) if (inRect(PAD[i], gx, gy, 0)) return PAD[i].act;
+      if (inRound(ACT, gx, gy)) return 'action';
+      return '';
+    }
+    for (i = 0; i < BUTTONS.length; i++) {
       var b = BUTTONS[i];
       if (gx >= b.x && gx < b.x + b.w && gy >= b.y && gy < b.y + b.h) return b.act;
     }
@@ -121,7 +190,7 @@ G.core.input = (function () {
     canvas.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
       gamePt(canvas, e.clientX, e.clientY, pt);
-      press('mouse0', (mouseNear || touched) && hit(pt[0], pt[1]) || (setupTap(pt[0], pt[1]) || (dogTap(pt[0], pt[1]) ? 'down' : (cardTap(pt[0], pt[1]), 'action')))); // a shown button, the setup panel, the dog, else the cast (or the card's key)
+      press('mouse0', (mouseNear || touched || G.core.device.touch()) && hit(pt[0], pt[1]) || (setupTap(pt[0], pt[1]) || (dogTap(pt[0], pt[1]) ? 'down' : (cardTap(pt[0], pt[1]), 'action')))); // a shown button, the setup panel, the dog, else the cast (or the card's key)
     });
     canvas.addEventListener('mousemove', function (e) { gamePt(canvas, e.clientX, e.clientY, pt); mouseNear = pt[1] >= 300 && pt[0] >= 420; });
     canvas.style.touchAction = 'none';
@@ -173,8 +242,10 @@ G.core.input = (function () {
     released: function (name) { return acts[name].released; },
     // The `move` action as an axis: -1 left, 0 none or both, 1 right.
     BUTTONS: BUTTONS, zone: zone, hit: hit,
-    // The buttons show once a touch has been seen, or while the mouse is near them.
-    showButtons: function () { return touched || mouseNear; },
+    // Phase 58: the touch layout (touch mode), refreshed for where you are now.
+    layout: layout,
+    // The buttons show once a touch has been seen, in touch mode, or while the mouse is near them.
+    showButtons: function () { return touched || mouseNear || !!(G.core.device && G.core.device.touch()); },
     // Tests: a touch at game pixel (gx, gy), down or up (id tells touches apart).
     touch: function (id, gx, gy, isDown) { touched = true; if (isDown) press('touch' + id, zone(gx, gy)); else release('touch' + id); },
     // True when any action is held or was pressed this step (the HUD's idle fade, P1-7).

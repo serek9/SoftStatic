@@ -516,11 +516,20 @@ G.ui.cabin = (function () {
     U.hint(ctx, 'ESC', 'leave', kx, ky);
   }
   var bp = [];
+  var WORD = { bench: 'FIX', mirror: 'LOOK', plaques: 'READ', guitar: 'PLAY', keys: 'PLAY', records: 'PLAY', tv: 'TV', stove: 'WARM', chair: 'SIT', bed: 'REST' }; // Phase 58
   var HINT = { bench: 'restore', mirror: 'fisher & dog', plaques: 'look', guitar: 'play', keys: 'play', records: 'play', tv: 'switch', stove: 'warm up', chair: 'sit', bed: 'rest' };
 
   return {
     native: true,
     enter: enter, exit: exit, update: update, draw: draw, restore: restore, use: use,
+    // Phase 58: a panel is open over the room (the touch pad hides), and the touch action
+    // button's word for what he faces (the hint's 'look' where it would say look).
+    busy: function () { return open !== ''; },
+    word: function () {
+      if (open !== '' || !walk || !faced) return '';
+      if ((level < 3 && (faced === 'tv' || faced === 'keys' || faced === 'records')) || (level < 2 && faced === 'chair')) return 'LOOK';
+      return WORD[faced] || 'USE';
+    },
     // dbg: what is on the wall now; where he is and what he faces.
     state: function () { return { level: level, mounted: mounted.length, turned: turned.filter(Boolean).length, facing: turned.slice(), stored: stored, at: walk ? [walk.c, walk.r, walk.face] : null, faced: faced, open: open, tv: tvOn, record: recordT >= 0, blocked: WK.blocked().length }; },
     walkPath: function (path) { if (!walk) return 'not in the cabin'; var nb = WK.walkPath(walk, path || ''); faced = WK.facing(walk); return { c: walk.c, r: walk.r, face: walk.face, faced: faced, blocked: nb }; }

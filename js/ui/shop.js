@@ -556,6 +556,10 @@ G.ui.shop = (function () {
     native: true,
     enter: enter, exit: exit, update: update, draw: draw, pickLine: pickLine, spoken: spoken,
     line: function () { return line_; },
+    // Phase 58: a text box or window is open over the room (the touch pad hides), and the word
+    // on the touch action button for what he faces.
+    busy: function () { return open !== ''; },
+    word: function () { return open !== '' || !walk ? '' : faced === 'rusty' ? 'TALK' : SHELF_ITEMS[faced] ? 'LOOK' : faced === 'guitar' ? 'PLAY' : ''; },
     // Tests: choose an item (shelf r, item c) in the window, as if the cursor were on it, and buy.
     select: function (r, c) { row = r; col = c; describe(); return txt.name.join(' '); },
     act: function () { act(); return txt.msg.join(' '); },
