@@ -64,13 +64,19 @@ G.data.gear = {
   ],
   // Phase 43: lures. Not used up by a cast: one is lost when the line snaps, and counted in save.baits like the baits. cost is per lure, sold `pack` at a time.
   // swim: where it fishes (the scene: sink × the bait's sink speed, down to maxDepthM m; 'top'
-  // floats; 'dive' dives while reeled). Fish take them by fish.lures.
+  // floats; 'dive' dives while reeled; Phase 65: 'float' hangs a bait under a float, 'flutter'
+  // falls fluttering). Fish take them by fish.lures, or (carries) as the bait they carry.
   lures: [
     { id: 'spinner', name: 'Brass Spinner', cost: 18, pack: 2, attract: 1.3, rareBoost: 1.1, swim: 'mid', sink: 0.6, maxDepthM: 7 },
     { id: 'plug', name: 'Minnow Plug', cost: 26, pack: 1, attract: 1.35, rareBoost: 1.2, swim: 'dive', sink: 0, maxDepthM: 4 },
     { id: 'grub', name: 'Soft Grub', cost: 6, pack: 4, attract: 1.25, rareBoost: 1.0, swim: 'bed', sink: 1, maxDepthM: 99 },
     { id: 'popper', name: 'Cup Popper', cost: 22, pack: 1, attract: 1.25, rareBoost: 1.15, swim: 'top', sink: 0, maxDepthM: 0 },
-    { id: 'jig', name: 'Feather Jig', cost: 14, pack: 2, attract: 1.3, rareBoost: 1.25, swim: 'lift', sink: 1.8, maxDepthM: 99 }
+    { id: 'jig', name: 'Feather Jig', cost: 14, pack: 2, attract: 1.3, rareBoost: 1.25, swim: 'lift', sink: 1.8, maxDepthM: 99 },
+    // Phase 65: a red-and-white float with a hook and a worm hung under it at maxDepthM ('float':
+    // the float lies on the surface, the bait at its depth; carries: the fish take it as that
+    // bait), and a casting spoon ('flutter': it falls fast and flutters, and wobbles low).
+    { id: 'bobber', name: 'Bobber Rig', cost: 6, pack: 2, attract: 1.2, rareBoost: 1.0, swim: 'float', sink: 1, maxDepthM: 6, carries: 'worm' },
+    { id: 'spoon', name: 'Casting Spoon', cost: 16, pack: 2, attract: 1.3, rareBoost: 1.1, swim: 'flutter', sink: 1.4, maxDepthM: 99 }
   ],
   lantern: { id: 'lantern', name: 'Storm Lantern', cost: 250, nightDepth: 999 },     // px: no night silhouettes
   depthFinder: { id: 'depth_finder', name: 'Depth Finder', cost: 180, bands: 4 },  // m between bands on the HUD

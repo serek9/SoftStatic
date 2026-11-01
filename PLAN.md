@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-01, after Phase 64 (rooms that are lived in, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-01, after Phase 65 (lures that move like lures, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -448,6 +448,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 62 The older known issues | Done | `Phase 62: The older known issues` | Asked for by the user on 2026-11-01 ("find issues that are not solved and solve them please"); no GitHub issues were open, so the open items of 8.4 that code can settle. Head shakes knock a lightly loaded rod only a little (#28, a new `--rod` check); the journal's grid pictures are baked one a frame from boot, so its first opening is no long frame (#24); the three unused old sprites are gone (#25). Presentation and checks only: 8.3 #329–332 |
 | 63 The dog to scale | Done | `Phase 63: The dog to scale (task 63.1)` | Asked for by the user on 2026-11-01 with four more improvements, planned in [PLAN_PLACES.md](PLAN_PLACES.md) (Phases 63–67). The walk-in rooms' dog is painted at its breed's real height beside the fisher through a scaled grid (`G.gfx.pix.scaled`), `size` per dog in `data/looks.js`. Presentation only: 8.3 #333–334 |
 | 64 Rooms that are lived in | Done | `Phase 64: Rooms that are lived in (tasks 64.1-64.3)` | The cabin: a lava lamp on a side table by the chair, a late-90s grey console on the floor before the TV with its pad on a cable (the TV boots it, then plays a jittering low-polygon fishing game), a box fan turning, an old fridge with magnets; the shop: a lava lamp on the gear shelf, an orange cat asleep on the freezer, a lit drinks cooler, moths at the lamps; both: reflections on the varnished boards and in the window glass, glare on the CRTs. `dbg.roomLife()`. Presentation only: 8.3 #335–337 |
+| 65 Lures that move like lures | Done | `Phase 65: Lures that move like lures (tasks 65.1-65.3)` | The retrieve draws the lure along the line toward the rod tip with the reel's inertia, each lure with its own action, and a paused sinking lure swings back on a tight line; two new lures, the Bobber Rig (a red-and-white float with a worm hung under it, dipping on a bite) and the Casting Spoon; the cast flies with air drag and splashes by weight. Changes the simulation's data (two lures, `spoon` in 19 species' lures, a rig taken as its bait); replay hash unchanged. 8.3 #338–341 |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -916,6 +917,11 @@ These are interpretations and additions made while building, where the spec abov
 336. **The cabin's new tiles:** the fan (5,1), the fridge (9,1), the side table (6,4) and the console (7,3) block at every stage (a crate, a dead fridge, a crate or a box of cables stand there before the stage that brings them), so the walk is the same at every stage as 8.3 #296 asked. Space: the fan and the lava lamp switch, the fridge has two lines, the console is the TV's. The shop's freezer (the cat) and the new cooler (10,5) get a line each in Rusty's box (`from = 'thing'` closes it instead of going on to Buy, Talk, Leave).
 337. **Reflections:** `K.reflect` lays a stretched, stepped streak (2 px rows, fading as the square of the distance, narrowing to 45%) on the boards under a lit thing, before the standing things are drawn, so they cover it; the lamps' pools in the night mask are clear, so it reads at night. Under the cabin's bench lantern, floor lamp, stove, lava lamp and the TV when on; under the shop's floor lamp and cooler. `K.glassLamps` puts two warm smudges low in each window at night, `K.glare` a curved glint on each CRT.
 
+338. **The retrieve (Phase 65.1):** reeling used to move the lure across at 30 px/s and up at 22 px/s whatever its depth. Now `c.rv` (the reel's speed) spins up at 7/s and runs down at 4/s, and the lure moves at it along the line toward the bent rod tip (`boat.rodTip`), so deep and close it climbs steeply and far out it runs nearly level; at the surface far out it skitters, and it lifts out only within 14 px of home. On top: the spinner rises 0.3 px/s per px/s (the blade), the plug dives to a running depth of its maxDepthM × speed/30 and floats up when paused, the jig hops 2.2 times a second and drops, the grub runs at 55% of the line's rise, the spoon at 70%. Paused (`RV.still` 0.6 px/s), a sinking lure falls back: for 1.6 s on a tight line it swings in a pendulum round the tip (the line's length held), then straight down to its own depth; a live bait swings and then hangs, as before. `dbg.lureBody()` adds retrieve, swing and depthM.
+339. **The bobber and the spoon (65.2):** `swim: 'float'` with `carries: 'worm'`: the float lies on the surface and the worm sinks to maxDepthM under it; the line ends at the float (`lurePos`), a dotted leader runs down to the worm, the float bobs on a nibble and is pulled under on a bite (`underwater.drawFloat`). Fish take a rig as the bait it carries (`fish_ai.interest` via `carries`); the validator checks a rig carries an unlimited bait and that every water has a cane-rod fish that takes each lure. Tuned with `--tackle`: at 2.5 m the bobber earned 33% of worms in the Pines, at 4.5 m 43%; at 6 m (a slip bobber) and attract 1.2 it earns 57–151%. The spoon (`'flutter'`, sink 1.4) is in every species' lures that has the spinner, at the spinner's weight. Both sold at the lure case with their own icons.
+340. **The cast (65.3):** the flight's horizontal path is eased by 1 − e^(−1.7u) (normalised to land on x1, the drag scaled down for short casts) while the height stays a parabola in time, so the lure leaves fast, tops out early and drops steeply; flights are a little longer (0.5 s + d/240) and higher (12 + 0.22 d px). The splash is × a weight per hook (`SPLASH`: the float 1, a cricket 0.35). Landing x is unchanged (`landingX`).
+341. **The replay:** the Node session only reads a lure's depth (min of the water's and maxDepthM) and fish.lures, so the hash stays `1966984761`; `--tackle` gains the bobber and spoon rows.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1089,9 +1095,11 @@ Phase 63 checks: `--validate` OK (the dogs' size checked); `--replay 12345` stil
 
 Phase 64 checks: `--validate` OK; `--replay 12345` still `1966984761` (presentation only). Headless Chromium (scratchpad script, 0 page errors): the restored cabin at 22:00 with the TV on (booting, then the game) and at 12:00; the shop at 23:00 and 12:00; `dbg.roomLife()` {room: cabin, level 4, live 2, tv booting, fan off (switched), lava on} and {room: shop, live 2}.
 
+Phase 65 checks: `--validate` OK; `--replay 12345` still `1966984761`; `--saves` PASS; `--tackle` PASS with the bobber (848, 2343, 1563, 4125 net coins an hour) and the spoon (1880, 2331, 3293, 4136), every other row as before. Headless Chromium (scratchpad script, 0 page errors): a spoon cast, sunk to 13 m, reeled (it climbs ~15 px/s while coming in ~21 px/s), paused (it swings back toward the boat while sinking), reeled out; a bobber rig at its depth under the float.
+
 ### 8.6 Next task
 
-**Phase 65** (PLAN_PLACES.md): lures that move like lures.
+**Phase 66** (PLAN_PLACES.md): the chart.
 
 ---
 

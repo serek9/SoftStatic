@@ -29,8 +29,11 @@ G.scene.sailing = (function () {
     minD: 20,        // px beyond the rod reach at zero charge (full charge: the rod's castMax)
     reach: 12,       // px from the boat centre to where the cast distance starts
     flick: 0.12,     // s the rod takes to whip forward before the lure leaves
-    flickAngle: 20, restAngle: 50, waitAngle: 40, backAngle: 70
+    flickAngle: 20, restAngle: 50, waitAngle: 40, backAngle: 70,
+    drag: 1.7        // Phase 65: the air's drag on the lure in flight (0: the old even parabola)
   };
+  // Phase 65: how big a splash each hook makes as it lands (× the distance's).
+  var SPLASH = { worm: 0.45, cricket: 0.35, minnow: 0.6, unlabelled: 0.5, spinner: 0.6, plug: 0.75, grub: 0.5, popper: 0.85, jig: 0.65, bobber: 1, spoon: 0.8 };
   var tip = [0, 0], pose = [0, 0, 0];
 
   // ---- Life (audit P2-1, P2-2) --------------------------------------------------------
@@ -516,8 +519,12 @@ G.scene.sailing = (function () {
     if (G.core.debug) G.core.debug.log('cast #' + c.n + ' charge ' + c.charge.toFixed(2) + ' -> x ' + c.x1 + ' seed ' + c.seed);
   }
 
-  // The lure rides the rod tip during the flick, then flies a parabola from the tip that
-  // ends exactly on (x1, waterY): x is linear in u and the arc term is zero at u = 1.
+  // The lure rides the rod tip during the flick, then flies from the tip to land exactly on
+  // (x1, waterY). Phase 65: with air drag. Horizontally it leaves fast and slows (x eases by
+  // 1 - e^(-drag u), normalised so it still ends on x1), while it rises and falls on a
+  // parabola in time, so the arc's top comes early and the fall at the end is steep, as a
+  // lure's does; the angler feathers the spool on a long cast. The splash follows the weight
+  // of what is on the line (SPLASH: a float plops, a cricket barely marks the water).
   function flight(run, dt) {
     var c = run.cast, wy = loc.waterY;
     c.t += dt;
@@ -526,16 +533,17 @@ G.scene.sailing = (function () {
       boat.rodTip(run.boat, run.boat.x, wy, tip); // the bent tip as the flick ends (Phase 31)
       c.x0 = tip[0]; c.y0 = tip[1];
       if (dg.on) { c.x0 = tip[0] + dg.ox; c.y0 = tip[1] + dg.oy; } // Phase 34: from where the lure hangs
-      c.T = 0.45 + Math.abs(c.x1 - c.x0) / 260;
-      c.h = 10 + c.dist * 0.18;
+      c.T = 0.5 + Math.abs(c.x1 - c.x0) / 240;
+      c.h = 12 + c.dist * 0.22;
       c.flying = true;
     }
-    var u = Math.min(1, (c.t - CAST.flick) / c.T);
-    c.lx = c.x0 + (c.x1 - c.x0) * u;
+    var u = Math.min(1, (c.t - CAST.flick) / c.T), dr = CAST.drag * Math.min(1, c.dist / 60);
+    var sx = dr > 0.01 ? (1 - Math.exp(-dr * u)) / (1 - Math.exp(-dr)) : u;
+    c.lx = c.x0 + (c.x1 - c.x0) * sx;
     c.ly = c.y0 + (wy - c.y0) * u - 4 * c.h * u * (1 - u);
     if (u >= 1) {
       c.lx = c.x1; c.ly = wy;
-      fx.splash(c.x1, wy, Math.min(1, c.dist / 100));
+      fx.splash(c.x1, wy, Math.min(1, (0.3 + c.dist / 140) * (SPLASH[run.gearFx.bait] || 0.6)));
       c.tw = 0;
       G.sim.clock.latch(c.latched, G.state.save.clock, G.data.windows);
       G.sim.unease.castBoost(run.anom, run.spots, c.x1, G.data, c.boost); // casting at a delta or a spot counts now
@@ -792,6 +800,10 @@ G.scene.sailing = (function () {
     }
     if (fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') return G.scene.underwater.mouth(loc, 0, 0, out);
     var lx = c.x1, ly = c.ly;
+    if (isFloat(run) && (fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest')) { // Phase 65: the line ends at the float
+      out[0] = c.x1 + Math.round(Math.sin(b.t * 1.3) * 1.5); out[1] = Math.round(floatY(c.x1) * HI) / HI;
+      return out;
+    }
     if (c.ly - loc.waterY < 1.5) ly = Math.min(ly, Math.round(floatY(c.x1) * HI) / HI);  // just in, the lure rides the surface
     if (fsm !== 'sinking') lx += Math.round(Math.sin(b.t * 1.3) * 1.5);                   // the lure sways once it stops
     if (run.bite.slot >= 0) ly += 2 + Math.round(Math.sin(run.bite.t * 18));             // bite cue: the line dips
@@ -901,8 +913,14 @@ G.scene.sailing = (function () {
     if (end) { lx = end[0]; ly = end[1]; }
     else if (ropeLure) { lx = rope.x[rope.N - 1] - camPx; ly = rope.y[rope.N - 1] - camPy; }
     else return;
+    if (end && isFloat(run)) {                                                          // Phase 65: the float, its leader and the worm
+      var hx = c.x1 - camPx + (fsm !== 'sinking' ? Math.round(Math.sin(b.t * 1.1) * 1) : 0), hy = c.ly - camPy;
+      G.scene.underwater.drawFloat(ctx, lx, ly, hx, hy, run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85, run.bite.slot >= 0 ? Math.min(1, 0.4 + run.bite.t * 3) : 0, b.t);
+      return;
+    }
     G.scene.underwater.drawLure(ctx, c.bait || run.gearFx.bait, lx, ly); // Phase 22: the bait's own body
   }
+  function isFloat(run) { return run.gearFx.swim === 'float' && (run.cast.bait || run.gearFx.bait) === run.gearFx.bait; }
 
   // The rope as a polyline: solid in the air, dotted and fainter under the surface (R3), a
   // standing wave of vib px when it is pulled taut, and a lit pixel on segments turned to the

@@ -155,9 +155,15 @@ G.sim.fish_ai = (function () {
   // fish.lures (not listed: 0).
   var TAKE_W = [W.baitOther, 1, W.baitLiked]; // the species weight by interest
   function interest(sp, bait, lure) {
-    if (lure) return (sp.lures && sp.lures[bait]) || 0;
+    if (lure) { var cr = carries(bait); return cr ? interest(sp, cr, false) : (sp.lures && sp.lures[bait]) || 0; } // Phase 65: a float rig is taken as its bait
     if (!sp.baitLikes.length) return 1;
     return sp.baitLikes.indexOf(bait) >= 0 ? 2 : 0;
+  }
+  // Phase 65: the bait a rig carries ('' for a lure fish take by fish.lures).
+  function carries(id) {
+    var l = G.data.gear.lures || [];
+    for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i].carries || '';
+    return '';
   }
   function baitOk(sp, bait, lure) { return interest(sp, bait, lure) > 0; }
 

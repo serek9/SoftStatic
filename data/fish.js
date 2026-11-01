@@ -28,7 +28,7 @@ G.data.fish = [
     id: 'gloam_perch', name: 'Gloam Perch', rarity: 'common', locations: ['fog'],
     habitat: { depthMin: 1, depthMax: 10 }, speed: 1.4, strength: 0.6, fatigue: 0.12, mass: 0.35,
     lengthCm: [14, 26], weightKg: [0.15, 0.5], awareness: 46, caution: 0.35,
-    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 7, lures: { spinner: 2, grub: 1, popper: 1 },
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 7, lures: { spinner: 2, grub: 1, popper: 1, spoon: 2 },
     desc: 'It had a human tooth. The others were normal.', hintRefs: [],
     look: { base: 'perch', wrongness: 1, parts: ['human_mouth'], palette: 'olive', seed: 101 }
   },
@@ -52,7 +52,7 @@ G.data.fish = [
     id: 'lamp_shiner', name: 'Lamp Shiner', rarity: 'common', locations: ['fog'],
     habitat: { depthMin: 1, depthMax: 8 }, speed: 1.6, strength: 0.4, fatigue: 0.16, mass: 0.15,
     lengthCm: [8, 15], weightKg: [0.08, 0.25], awareness: 50, caution: 0.3,
-    baitLikes: ['cricket', 'worm'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 6, lures: { spinner: 1, popper: 1 },
+    baitLikes: ['cricket', 'worm'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 6, lures: { spinner: 1, popper: 1, spoon: 1 },
     desc: 'It comes up after dark, as if something up here were lit for it.', hintRefs: ['hour:night'],
     look: { base: 'perch', wrongness: 1, parts: ['static'], palette: 'pale', seed: 113 }
   },
@@ -69,7 +69,7 @@ G.data.fish = [
     id: 'hollow_pike', name: 'Hollow Pike', rarity: 'uncommon', locations: ['fog'],
     habitat: { depthMin: 4, depthMax: 16 }, speed: 2.2, strength: 1.6, fatigue: 0.08, mass: 2.8, jumps: 0.6,
     lengthCm: [55, 95], weightKg: [1.6, 4.0], awareness: 70, caution: 0.6,
-    baitLikes: ['minnow', 'worm'], timeLikes: [22, 23, 0, 1, 2, 3, 4], windows: [], uneaseMin: 0.6, price: 60, lures: { spinner: 2, plug: 2, popper: 1 },
+    baitLikes: ['minnow', 'worm'], timeLikes: [22, 23, 0, 1, 2, 3, 4], windows: [], uneaseMin: 0.6, price: 60, lures: { spinner: 2, plug: 2, popper: 1, spoon: 2 },
     desc: 'It only comes once you have waited. It knows you waited.', hintRefs: ['unease'],
     look: { base: 'pike', wrongness: 3, parts: ['vertebrae', 'human_eyes', 'static'], palette: 'silver', seed: 404 }
   },
@@ -105,7 +105,7 @@ G.data.fish = [
     id: 'snag_trout', name: 'Snag Trout', rarity: 'common', locations: ['creek'],
     habitat: { depthMin: 2, depthMax: 8 }, speed: 1.5, strength: 0.7, fatigue: 0.12, mass: 0.5,
     lengthCm: [22, 36], weightKg: [0.3, 0.8], awareness: 44, caution: 0.4,
-    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 11, lures: { spinner: 2, popper: 1, grub: 1, jig: 1, plug: 1 },
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 11, lures: { spinner: 2, popper: 1, grub: 1, jig: 1, plug: 1, spoon: 2 },
     desc: 'Holds in the slack water behind drowned branches. Bark grows on one fin.', hintRefs: ['depth:shallow'],
     look: { base: 'trout', wrongness: 1, parts: ['wood_grain'], palette: 'olive', seed: 121 }
   },
@@ -121,7 +121,7 @@ G.data.fish = [
     id: 'blackwater_chub', name: 'Blackwater Chub', rarity: 'common', locations: ['creek'],
     habitat: { depthMin: 4, depthMax: 12 }, speed: 1.0, strength: 0.8, fatigue: 0.1, mass: 0.9,
     lengthCm: [25, 40], weightKg: [0.5, 1.3], awareness: 40, caution: 0.45,
-    baitLikes: ['worm'], timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], windows: [], uneaseMin: 0, price: 12, lures: { grub: 1, spinner: 1, plug: 1, popper: 1, jig: 1 },
+    baitLikes: ['worm'], timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], windows: [], uneaseMin: 0, price: 12, lures: { grub: 1, spinner: 1, plug: 1, popper: 1, jig: 1, spoon: 1 },
     desc: 'Raw along one flank, as if it had been opened and closed again. Fatter by daylight.', hintRefs: ['hour:grey'],
     look: { base: 'carp', wrongness: 1, parts: ['muscle'], palette: 'ink', seed: 123 }
   },
@@ -137,7 +137,7 @@ G.data.fish = [
     id: 'zipper_pike', name: 'Zipped Pike', rarity: 'uncommon', locations: ['creek'],
     habitat: { depthMin: 6, depthMax: 14 }, speed: 2.0, strength: 1.5, fatigue: 0.08, mass: 3.2, jumps: 0.6,
     lengthCm: [60, 90], weightKg: [2.0, 4.5], awareness: 62, caution: 0.55,
-    baitLikes: ['minnow'], timeLikes: [], windows: [], uneaseMin: 0, price: 30, lures: { plug: 2, spinner: 1 },
+    baitLikes: ['minnow'], timeLikes: [], windows: [], uneaseMin: 0, price: 30, lures: { plug: 2, spinner: 1, spoon: 1 },
     desc: 'The zipper runs from gill to tail. It was closed when I caught it. Minnows, only minnows.', hintRefs: ['bait:minnow'],
     look: { base: 'pike', wrongness: 2, parts: ['zipper', 'human_mouth'], palette: 'silver', seed: 125 }
   },
@@ -161,7 +161,7 @@ G.data.fish = [
     id: 'ash_trout', name: 'Ash Trout', rarity: 'rare', locations: ['creek'],
     habitat: { depthMin: 4, depthMax: 12 }, speed: 1.8, strength: 1.3, fatigue: 0.08, mass: 1.6, jumps: 0.4,
     lengthCm: [40, 65], weightKg: [1.0, 2.4], awareness: 66, caution: 0.6,
-    baitLikes: ['minnow', 'worm'], timeLikes: [1, 2, 3, 4], windows: [], uneaseMin: 0.4, lineShy: true, price: 85, lures: { spinner: 1, popper: 2, plug: 1, grub: 1, jig: 1 },
+    baitLikes: ['minnow', 'worm'], timeLikes: [1, 2, 3, 4], windows: [], uneaseMin: 0.4, lineShy: true, price: 85, lures: { spinner: 1, popper: 2, plug: 1, grub: 1, jig: 1, spoon: 1 },
     desc: 'Two tails, and it swims with both. It comes after one in the morning, once the creek has gone quiet around you.', hintRefs: ['unease', 'hour:night'],
     look: { base: 'trout', wrongness: 2, parts: ['owl_eyes', 'second_tail'], palette: 'ink', seed: 128 }
   },
@@ -179,7 +179,7 @@ G.data.fish = [
     id: 'diner_perch', name: 'Diner Perch', rarity: 'common', locations: ['pines'],
     habitat: { depthMin: 1, depthMax: 8 }, speed: 1.4, strength: 0.6, fatigue: 0.12, mass: 0.4,
     lengthCm: [15, 28], weightKg: [0.2, 0.6], awareness: 46, caution: 0.35,
-    baitLikes: ['worm', 'cricket'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 23, lures: { spinner: 2, grub: 1, plug: 1 },
+    baitLikes: ['worm', 'cricket'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 23, lures: { spinner: 2, grub: 1, plug: 1, spoon: 2 },
     desc: 'Smells of coffee, black and too strong. It bites while the diner is open: all night.', hintRefs: ['hour:night'],
     look: { base: 'perch', wrongness: 1, parts: ['coffee_drip'], palette: 'bronze', seed: 131 }
   },
@@ -195,7 +195,7 @@ G.data.fish = [
     id: 'amber_shiner', name: 'Amber Shiner', rarity: 'common', locations: ['pines'],
     habitat: { depthMin: 1, depthMax: 6 }, speed: 1.8, strength: 0.4, fatigue: 0.16, mass: 0.2,
     lengthCm: [9, 16], weightKg: [0.1, 0.3], awareness: 50, caution: 0.3,
-    baitLikes: ['cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 20, lures: { popper: 1, spinner: 1 },
+    baitLikes: ['cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 20, lures: { popper: 1, spinner: 1, spoon: 1 },
     desc: 'It flickers like the signal over the road. Crickets bring it up.', hintRefs: ['bait:cricket'],
     look: { base: 'trout', wrongness: 1, parts: ['static'], palette: 'bronze', seed: 133 }
   },
@@ -219,7 +219,7 @@ G.data.fish = [
     id: 'lot_gar', name: 'Parking Lot Gar', rarity: 'uncommon', locations: ['pines'],
     habitat: { depthMin: 8, depthMax: 20 }, speed: 1.6, strength: 1.6, fatigue: 0.07, mass: 3.8,
     lengthCm: [70, 110], weightKg: [2.4, 5.2], awareness: 56, caution: 0.55,
-    baitLikes: ['minnow', 'worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 48, lures: { plug: 1, spinner: 1 },
+    baitLikes: ['minnow', 'worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 48, lures: { plug: 1, spinner: 1, spoon: 1 },
     desc: 'Very still, deep down, like a car waiting under the lamps for someone who never comes.', hintRefs: ['depth:deep'],
     look: { base: 'gar', wrongness: 2, parts: ['mannequin', 'zipper'], palette: 'silver', seed: 136 }
   },
@@ -227,7 +227,7 @@ G.data.fish = [
     id: 'signal_pike', name: 'Signal Pike', rarity: 'uncommon', locations: ['pines'],
     habitat: { depthMin: 10, depthMax: 22 }, speed: 2.1, strength: 1.7, fatigue: 0.08, mass: 4.2, jumps: 0.6,
     lengthCm: [70, 105], weightKg: [2.8, 5.6], awareness: 64, caution: 0.6,
-    baitLikes: ['minnow'], timeLikes: [], windows: [], uneaseMin: 0, price: 50, lures: { plug: 2, spinner: 2, jig: 1 },
+    baitLikes: ['minnow'], timeLikes: [], windows: [], uneaseMin: 0, price: 50, lures: { plug: 2, spinner: 2, jig: 1, spoon: 2 },
     desc: 'It strikes on the yellow. Bring minnows, and watch the light: when it hurries, so does the pike.', hintRefs: ['bait:minnow'],
     look: { base: 'pike', wrongness: 2, parts: ['owl_eyes', 'static'], palette: 'olive', seed: 137 }
   },
@@ -254,7 +254,7 @@ G.data.fish = [
     id: 'velvet_perch', name: 'Velvet Perch', rarity: 'common', locations: ['red'],
     habitat: { depthMin: 1, depthMax: 8 }, speed: 1.3, strength: 0.7, fatigue: 0.11, mass: 0.5,
     lengthCm: [16, 28], weightKg: [0.25, 0.7], awareness: 44, caution: 0.35,
-    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 30, lures: { spinner: 1, grub: 1 },
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 30, lures: { spinner: 1, grub: 1, spoon: 1 },
     desc: 'Soft as the curtains, and it keeps near the top. Seams at every joint, like a doll\'s.', hintRefs: ['depth:shallow'],
     look: { base: 'perch', wrongness: 1, parts: ['mannequin'], palette: 'koi', seed: 141 }
   },
@@ -278,7 +278,7 @@ G.data.fish = [
     id: 'backwards_trout', name: 'Backwards Trout', rarity: 'common', locations: ['red'],
     habitat: { depthMin: 1, depthMax: 10 }, speed: 1.6, strength: 0.6, fatigue: 0.13, mass: 0.6,
     lengthCm: [20, 34], weightKg: [0.3, 0.9], awareness: 50, caution: 0.35,
-    baitLikes: ['cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 30, lures: { popper: 2, spinner: 1 },
+    baitLikes: ['cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 30, lures: { popper: 2, spinner: 1, spoon: 1 },
     desc: 'It has a face on its tail and swims toward it. Crickets.', hintRefs: ['bait:cricket'],
     look: { base: 'trout', wrongness: 1, parts: ['tail_face'], palette: 'pale', seed: 144 }
   },
@@ -302,7 +302,7 @@ G.data.fish = [
     id: 'pour_gar', name: 'Pour Gar', rarity: 'uncommon', locations: ['red'],
     habitat: { depthMin: 6, depthMax: 16 }, speed: 1.7, strength: 1.4, fatigue: 0.07, mass: 3.0,
     lengthCm: [60, 95], weightKg: [1.8, 4.2], awareness: 58, caution: 0.55,
-    baitLikes: ['minnow', 'worm'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 72, lures: { plug: 2, spinner: 1 },
+    baitLikes: ['minnow', 'worm'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 72, lures: { plug: 2, spinner: 1, spoon: 1 },
     desc: 'It leaves a dark line in the water, like something poured slowly. Only at night.', hintRefs: ['hour:night'],
     look: { base: 'gar', wrongness: 2, parts: ['coffee_drip', 'zipper'], palette: 'ink', seed: 147 }
   },
@@ -332,7 +332,7 @@ G.data.fish = [
     id: 'dim_fry', name: 'Dim Fry', rarity: 'common', locations: ['fog'],
     habitat: { depthMin: 0.5, depthMax: 3.5 }, speed: 1.8, strength: 0.2, fatigue: 0.3, mass: 0.01,
     lengthCm: [3, 6], weightKg: [0.005, 0.02], awareness: 54, caution: 0.25,
-    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 4, lures: { spinner: 1, grub: 1 },
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 4, lures: { spinner: 1, grub: 1, spoon: 1 },
     desc: 'A cloud of them just under the boat. Each one blinks out for a moment, like a bad channel.', hintRefs: ['depth:shallow'],
     look: { base: 'perch', wrongness: 1, parts: ['static'], palette: 'pale', seed: 501 }
   },
@@ -348,7 +348,7 @@ G.data.fish = [
     id: 'wick_minnow', name: 'Wick Minnow', rarity: 'common', locations: ['fog'],
     habitat: { depthMin: 1, depthMax: 4.5 }, speed: 1.9, strength: 0.25, fatigue: 0.26, mass: 0.025,
     lengthCm: [5, 9], weightKg: [0.01, 0.05], awareness: 56, caution: 0.3,
-    baitLikes: ['cricket', 'worm'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 6, lures: { popper: 1, spinner: 1 },
+    baitLikes: ['cricket', 'worm'], timeLikes: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], windows: [], uneaseMin: 0, price: 6, lures: { popper: 1, spinner: 1, spoon: 1 },
     desc: 'It comes up after dark toward any light at all, even a match.', hintRefs: ['hour:night'],
     look: { base: 'trout', wrongness: 1, parts: ['human_eyes'], palette: 'pale', seed: 503 }
   },
@@ -364,7 +364,7 @@ G.data.fish = [
     id: 'penny_dace', name: 'Penny Dace', rarity: 'common', locations: ['creek'],
     habitat: { depthMin: 0.5, depthMax: 3.5 }, speed: 1.9, strength: 0.3, fatigue: 0.25, mass: 0.03,
     lengthCm: [5, 10], weightKg: [0.01, 0.06], awareness: 52, caution: 0.3,
-    baitLikes: ['cricket', 'worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 6, lures: { spinner: 1, popper: 1 },
+    baitLikes: ['cricket', 'worm'], timeLikes: [], windows: [], uneaseMin: 0, price: 6, lures: { spinner: 1, popper: 1, spoon: 1 },
     desc: 'Flat and bright as a coin. They hold in the shallow run where the water is quick.', hintRefs: ['depth:shallow'],
     look: { base: 'trout', wrongness: 1, parts: ['mannequin'], palette: 'silver', seed: 505 }
   },
@@ -372,7 +372,7 @@ G.data.fish = [
     id: 'napkin_bluegill', name: 'Napkin Bluegill', rarity: 'common', locations: ['pines'],
     habitat: { depthMin: 1, depthMax: 4.5 }, speed: 1.6, strength: 0.3, fatigue: 0.25, mass: 0.035,
     lengthCm: [5, 10], weightKg: [0.015, 0.06], awareness: 50, caution: 0.3,
-    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 6, lures: { grub: 1, popper: 1, spinner: 1 },
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 6, lures: { grub: 1, popper: 1, spinner: 1, spoon: 1 },
     desc: 'Small enough to fold into a napkin. It took whatever I offered it.', hintRefs: [],
     look: { base: 'carp', wrongness: 1, parts: ['zipper'], palette: 'olive', seed: 506 }
   },
@@ -396,7 +396,7 @@ G.data.fish = [
     id: 'curtain_fry', name: 'Curtain Fry', rarity: 'common', locations: ['red'],
     habitat: { depthMin: 0.5, depthMax: 4 }, speed: 1.8, strength: 0.2, fatigue: 0.3, mass: 0.01,
     lengthCm: [3, 7], weightKg: [0.005, 0.02], awareness: 52, caution: 0.25,
-    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 5, lures: { grub: 1, spinner: 1 },
+    baitLikes: ['worm', 'cricket'], timeLikes: [], windows: [], uneaseMin: 0, price: 5, lures: { grub: 1, spinner: 1, spoon: 1 },
     desc: 'Red as the curtains. They gather in the shallows where the floor meets the water.', hintRefs: ['depth:shallow'],
     look: { base: 'perch', wrongness: 1, parts: ['static'], palette: 'koi', seed: 509 }
   },
