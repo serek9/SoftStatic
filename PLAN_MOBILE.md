@@ -1,7 +1,7 @@
 # SoftStatic: Playing on a Phone, Phases 57–60
 
 **Date:** 2026-11-01. **Repo state:** Phases 1–56 done (PLAN.md §8.1), `main` at `338eaba`.
-**Status:** Asked for by the user on 2026-11-01 ("before making any more things or improvements, the game should be playable either from a pc like now or with a phone, make a plan to adapt it and start it"). Phase 57 was started the same day and is done; Phase 58 was started by the user the same day ("continue with phase 58") and is done; Phases 59–60 wait for the user's go-ahead.
+**Status:** Asked for by the user on 2026-11-01 ("before making any more things or improvements, the game should be playable either from a pc like now or with a phone, make a plan to adapt it and start it"). Phase 57 was started the same day and is done; Phase 58 was started by the user the same day ("continue with phase 58") and is done; Phase 59 was started the same day ("Start Phase 59") and is done; Phase 60 waits for the user's go-ahead.
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like PLAN_TACKLE.md, this file adds phases after the approved spec and does not edit §0–§7 or Appendix V. Decisions go in §8.3.
 
 **The rule for every phase:** the PC game does not change. Keyboard and mouse play exactly as they do now, the picture on a desktop is scaled exactly as now, and `js/sim` and `data/` are untouched, so the replay hash and every Node check stay as they are in 8.5. Phone support is added next to them, switched on by a touch screen.
@@ -61,6 +61,40 @@ Nothing in the game needs a keyboard.
 | 60.1 | **A phone's frame.** The night frame (reflection, life, drizzle, an anomaly) and the under-water frame measured under Chromium's 4× and 6× CPU throttle. If a frame is over 16 ms, the touch-mode budget drops the costliest presentation-only extras (the reflection's row shifts every other frame, fewer far shoals), never anything the sim reads. | `js/core/device.js`, the scenes as measured | 60 fps (or the budget's choice reported) at 4×; the PC frame unchanged |
 | 60.2 | **A gallery page** `touch`: the pad, the button with each word, the buttons, the portrait notice; and a home-screen icon painted from palette keys at boot and handed to the manifest as a data URL, if the browsers take one (otherwise a `TODO`). | `js/core/debug.js`, `js/core/device.js` | The page shows every touch sprite |
 | 60.3 | **How to play on a phone** in HANDOFF.md: serving on the local network (`--bind 0.0.0.0`) and opening the address on the phone, adding it to the home screen; every check as in 8.5; the PC game played through once by keyboard and once by mouse to show it is as before. | `HANDOFF.md`, PLAN.md §8 | Every check PASS; the PC check's numbers equal 8.5's |
+
+## 2b. The key table (59.1)
+Every key the game reads, from the code (`inp.pressed`/`held` in `js/scene/sailing.js`, `js/scene/underwater.js`, `js/ui/*`), and its touch after Phase 59. "ESC" is the on-screen ESC key; "row rule" is 59.2's: a tap on a row selects it, a tap on the selected row chooses it.
+
+| Where | Key | What it does | Touch |
+|---|---|---|---|
+| Boat | A/D, ←/→ | move the boat | the pad's arrows (58.2); the screen's left and right edges |
+| Boat | Space, Enter | cast (hold, let go), reel (hold), set the hook, pop the popper | the round button (58.2); a tap in the middle |
+| Boat | S | the setup panel | S key (58.1) |
+| Boat | ↓ | pet the dog | a tap on the dog (Phase 45) |
+| Boat | J / M / P | journal / map / pause | J / M / P keys |
+| Boat | Esc | pause | P key |
+| Boat | H | hide the HUD for a still picture | a long press on P (0.6 s); again on the same corner to bring it back (59.3) |
+| Catch card | A/D, Space | choose SELL, KEEP, RELEASE | a tap on its key (Phase 46) |
+| Setup panel | W/S, A/D, Space, Esc/S | move, pick, close | a tap on a row picks; off the panel closes (Phase 45); ESC |
+| Pause list | W/S, Space | choose a row, do it | row rule |
+| Pause list | A/D | volume down/up, sound and barks on/off | on the selected Volume row a tap left or right of the level; Sound, Dog barks and Full screen by the row rule |
+| Pause list | P, Esc | close | ESC |
+| Fisher & dog | W/S, A/D | the row, turn its look | a tap on a cell's left or right part turns it (and picks the row) |
+| Fisher & dog | Space, Esc, P | done | ESC, or its ESC hint |
+| Map | W/S/A/D, Space | choose a stop, go | row rule on the stops; the card's SPACE hint goes |
+| Map | M, Esc | close | ESC, or the card's M hint |
+| Journal | A/D, W/S | the filters, the grid | a tap on a filter key turns it; a tap on a tile reads it; a tap on the scrollbar pages |
+| Journal | J, Esc | close | ESC, or its J hint |
+| Shop, cabin walking | arrows / WASD | walk | the four-way pad (58.4) |
+| Shop, cabin walking | Space | talk, use | the round button (58.4) |
+| Shop, cabin walking | Esc, M | leave | ESC |
+| Shop text box | Space, Esc | the next page, close | a tap on the box; ESC |
+| Shop Buy/Talk/Leave | W/S, Space, Esc | choose | row rule; ESC |
+| Shop item window | W/S, Space, Esc | choose, buy, back | row rule; its SPACE and ESC hints; ESC |
+| Cabin message | Space, Esc | close | a tap on the box; ESC |
+| Cabin ledger | Space, Esc | pay, not now | its SPACE hint pays (nowhere else on the box, so a stray tap spends nothing); its ESC hint or ESC |
+| Another tab owns the save | any key, click | take it back | a tap (57.4) |
+| `?gallery` (debug) | A/D | pages | the screen's edges |
 
 ## 3. What this plan does not do
 - No change to the simulation, the economy, the fish or the save's version.

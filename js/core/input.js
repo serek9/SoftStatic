@@ -8,7 +8,9 @@ G.core.input = (function () {
   // Phase 45: setup opens the tackle panel on the boat. S presses it and down together, so S
   // still moves down every menu and walks the shop; on the boat only ↓ alone (or a tap on the
   // dog) pets him.
-  var NAMES = ['left', 'right', 'action', 'pause', 'journal', 'map', 'up', 'down', 'back', 'still', 'setup'];
+  // Phase 59: 'none' is what a touch on a panel presses when it only moved the panel's cursor
+  // (59.2's row rule: the first tap selects): it is held like any action and nothing reads it.
+  var NAMES = ['left', 'right', 'action', 'pause', 'journal', 'map', 'up', 'down', 'back', 'still', 'setup', 'none'];
   var KEYS = {
     KeyA: 'left', ArrowLeft: 'left',
     KeyD: 'right', ArrowRight: 'right',
@@ -152,6 +154,17 @@ G.core.input = (function () {
 
   // Phase 45: a tap on the setup panel: its row ('action'), or off it ('setup' closes it).
   function setupTap(gx, gy) { var u = G.ui && G.ui.setup; return u ? u.tap(gx, gy) : ''; }
+  // Phase 59.2: a tap on an open overlay (pause, map, picker, journal) or a room's box or
+  // window. Each answers what to press: 'action' (choose), a direction, 'back', 'none' (it only
+  // moved its cursor, or the tap missed it), or '' when it has nothing open to tap.
+  function overlayTap(gx, gy) {
+    var U = G.ui || {}, sc = G.core.state.sceneName && G.core.state.sceneName();
+    if (U.menu && U.menu.current()) return U.menu.tap(gx, gy);
+    if (sc === 'shop' && U.shop && U.shop.busy()) return U.shop.tap(gx, gy);
+    if (sc === 'cabin' && U.cabin && U.cabin.busy()) return U.cabin.tap(gx, gy);
+    return '';
+  }
+
   // Phase 45: a tap on the dog in the boat pets him (down), when the scene says he can be petted.
   function dogTap(gx, gy) { var s = G.scene && G.scene.sailing; return !!(s && s.dogTap && s.dogTap(gx, gy)); }
 
@@ -162,11 +175,43 @@ G.core.input = (function () {
     if (cardTap(gx, gy)) return 'action';
     var st = setupTap(gx, gy);
     if (st) return st;
+    var ot = overlayTap(gx, gy);
+    if (ot) return ot;
     if (dogTap(gx, gy)) return 'down';
     if (gx < 128) return 'left';
     if (gx >= 512) return 'right';
     if (inMenu()) { if (gy < 108) return 'up'; if (gy >= 252) return 'down'; }
     return 'action';
+  }
+
+  // Phase 59.3: a long press on P (LONG s) is H, the still picture; a shorter touch is P, sent
+  // when it lifts. While the still picture is up nothing is drawn, but P's corner still takes
+  // the long press that brings the HUD back. One pending press at a time; a timer, not a step,
+  // so the long press fires while the finger is still down.
+  var LONG = 0.6, pend = { id: -1, fired: false, timer: 0 };
+  function stillOn() { return !!(G.ui && G.ui.hud && G.ui.hud.isStill()); }
+  function pCorner(gx, gy) {
+    if (!G.core.device || !G.core.device.touch()) return false;
+    layout();
+    var p = TB[3];
+    if (stillOn()) return p.w > 0 && gx >= p.x - 2 && gx < p.x + p.w + 2 && gy >= p.y - 2 && gy < p.y + p.h + 2;
+    return inRect(p, gx, gy, 2);
+  }
+  function touchDown(id, gx, gy) {
+    touched = true;
+    if (pend.id < 0 && pCorner(gx, gy)) {
+      pend.id = id; pend.fired = false;
+      pend.timer = setTimeout(function () { if (pend.id === id) { pend.fired = true; press('touch' + id, 'still'); } }, LONG * 1000);
+      return;
+    }
+    press('touch' + id, zone(gx, gy));
+  }
+  function touchUp(id) {
+    if (pend.id === id) {
+      clearTimeout(pend.timer); pend.id = -1;
+      if (!pend.fired) { press('touch' + id, 'pause'); }                        // a short touch: P, pressed and let go this step
+    }
+    release('touch' + id);
   }
 
   function gamePt(canvas, cx, cy, out) {
@@ -200,12 +245,12 @@ G.core.input = (function () {
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         gamePt(canvas, t.clientX, t.clientY, pt);
-        press('touch' + t.identifier, zone(pt[0], pt[1]));
+        touchDown(t.identifier, pt[0], pt[1]);
       }
     }, { passive: false });
     var lift = function (e) {
       e.preventDefault();
-      for (var i = 0; i < e.changedTouches.length; i++) release('touch' + e.changedTouches[i].identifier);
+      for (var i = 0; i < e.changedTouches.length; i++) touchUp(e.changedTouches[i].identifier);
     };
     canvas.addEventListener('touchend', lift, { passive: false });
     canvas.addEventListener('touchcancel', lift, { passive: false });
@@ -247,7 +292,7 @@ G.core.input = (function () {
     // The buttons show once a touch has been seen, in touch mode, or while the mouse is near them.
     showButtons: function () { return touched || mouseNear || !!(G.core.device && G.core.device.touch()); },
     // Tests: a touch at game pixel (gx, gy), down or up (id tells touches apart).
-    touch: function (id, gx, gy, isDown) { touched = true; if (isDown) press('touch' + id, zone(gx, gy)); else release('touch' + id); },
+    touch: function (id, gx, gy, isDown) { touched = true; if (isDown) touchDown(id, gx, gy); else touchUp(id); },
     // True when any action is held or was pressed this step (the HUD's idle fade, P1-7).
     any: function () { for (var k in acts) if (acts[k].held || acts[k].pressed) return true; return false; },
     move: function () { return (acts.right.held ? 1 : 0) - (acts.left.held ? 1 : 0); }

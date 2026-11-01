@@ -225,8 +225,31 @@ G.ui.map = (function () {
     if (phase === 'out') M.dim(ctx, t / FADE);
   }
 
+  // Phase 59.2: a touch on the map. A stop (its mark or its name) by the row rule: the first
+  // tap selects it, a tap on the selected stop goes; the card's SPACE hint goes too, its M
+  // hint closes. Anywhere else (and while travelling), nothing.
+  function tap(gx, gy) {
+    if (phase !== 'map') return 'none';
+    var U = G.ui.panel, i;
+    for (i = 0; i < STOPS.length; i++) {
+      var s = STOPS[i], lx = s.x - (nameW[i] >> 1), ly = s.y + (s.ry || 8) + 6;
+      var onMark = Math.abs(gx - s.x) <= 10 && Math.abs(gy - s.y) <= 11;
+      var onName = gx >= lx - 4 && gx < lx + nameW[i] + 4 && gy >= ly - 2 && gy < ly + 11;
+      if (onMark || onName) {
+        if (i !== sel) { sel = i; describe(); return 'none'; }
+        return 'action';
+      }
+    }
+    var hx = U.left(CARD[0]), hy = CARD[1] + CARD[3] - U.PAD - U.KEY_H;
+    if (gy >= hy - 2 && gy < hy + U.KEY_H + 2) {
+      if (info.hint) { var w = U.hintW('SPACE', info.hint); if (gx >= hx && gx < hx + w) return 'action'; hx += w; }
+      if (gx >= hx && gx < hx + U.hintW('M', 'close')) return 'back';
+    }
+    return 'none';
+  }
+
   return {
-    native: true, CARD: CARD,
+    native: true, CARD: CARD, tap: tap,
     open: open, update: update, draw: draw, STOPS: STOPS, verdict: verdict, stocked: stocked,
     // dbg: travel to a stop id through the same path as the menu (fade included).
     travel: function (id) {

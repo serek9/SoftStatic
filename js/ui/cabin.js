@@ -525,6 +525,18 @@ G.ui.cabin = (function () {
     // Phase 58: a panel is open over the room (the touch pad hides), and the touch action
     // button's word for what he faces (the hint's 'look' where it would say look).
     busy: function () { return open !== ''; },
+    // Phase 59.2: a touch with the box open. A message: a tap on the box is Space (ok). The
+    // ledger: only its SPACE hint pays and its ESC hint is not now, so a stray tap spends nothing.
+    tap: function (gx, gy) {
+      var U = G.ui.panel, onBox = gx >= BOX.x && gx < BOX.x + BOX.w && gy >= BOX.y - U.TAB && gy < BOX.y + BOX.h;
+      if (!open) return '';
+      if (open !== 'restore') return onBox ? 'action' : 'none';
+      var hx = BOX.x + 14, hy = BOX.y + BOX.h - U.PAD - U.KEY_H, w = U.hintW('SPACE', 'pay');
+      if (gy < hy - 2 || gy >= hy + U.KEY_H + 2) return 'none';
+      if (gx >= hx && gx < hx + w) return 'action';
+      if (gx >= hx + w && gx < hx + w + U.hintW('ESC', 'not now')) return 'back';
+      return 'none';
+    },
     word: function () {
       if (open !== '' || !walk || !faced) return '';
       if ((level < 3 && (faced === 'tv' || faced === 'keys' || faced === 'records')) || (level < 2 && faced === 'chair')) return 'LOOK';

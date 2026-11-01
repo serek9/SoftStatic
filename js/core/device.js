@@ -68,6 +68,8 @@ G.core.device = (function () {
   // allows them. Asked once per load: leaving full screen afterwards is the player's choice.
   function askFullscreen() {
     if (info.fsAsked || !touch() || info.standalone) return;
+    var st = G.state && G.state.save && G.state.save.settings;
+    if (st && st.fullscreen === false) { info.fsAsked = 1; info.fsResult = 'off in the pause list'; return; } // 59.3
     var el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
     info.fsAsked = 1;
     if (!req || document.fullscreenElement || document.webkitFullscreenElement) { info.fsResult = req ? 'already' : 'unsupported'; return; }
@@ -82,6 +84,21 @@ G.core.device = (function () {
       if (p && p.then) p.then(function () { info.fsResult = 'on'; lock(); }, function () { info.fsResult = 'refused'; });
       else lock();
     } catch (e) { info.fsResult = 'refused'; }
+  }
+
+  // 59.3: the pause list's Full screen row. Offered in touch mode where the browser has an
+  // element full screen (not an iPhone's Safari, not from the home screen).
+  function canFullscreen() {
+    var el = document.documentElement;
+    return touch() && !info.standalone && !!(el.requestFullscreen || el.webkitRequestFullscreen);
+  }
+  function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  // Called from the step after a tap (Chrome's transient activation still holds then).
+  function setFullscreen(on) {
+    try {
+      if (on && !isFullscreen()) { info.fsAsked = 0; askFullscreen(); }
+      else if (!on && isFullscreen()) { var ex = document.exitFullscreen || document.webkitExitFullscreen; if (ex) { var p = ex.call(document); if (p && p.catch) p.catch(function () {}); } }
+    } catch (e) {}
   }
 
   function attach(cv, w, h) {
@@ -135,6 +152,7 @@ G.core.device = (function () {
 
   return {
     attach: attach, fit: fit, touch: touch, drawNotice: drawNotice, report: report,
+    canFullscreen: canFullscreen, isFullscreen: isFullscreen, setFullscreen: setFullscreen,
     portrait: function () { return info.portrait; },
     scale: function () { return info.scale; },
     info: info
