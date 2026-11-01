@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-01, after Phase 63 (the dog to scale, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-01, after Phase 64 (rooms that are lived in, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -447,6 +447,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 61 The phone plan's known issues | Done | `Phase 61: The phone plan's known issues` | Asked for by the user on 2026-11-01 ("solve the known issues please"), after the four open items of 8.4 the phone plan left. The panels' hints name touches on a phone (#36); icon files for the manifest from a tool, so Chrome installs it (#37); `--rod`'s cost check measured the game, not Node's sandbox (#35); and one found on the way: the on-screen ESC covered open panels (#38). #34, playing on a real phone, is the user's. Presentation and checks only: 8.3 #324–328 |
 | 62 The older known issues | Done | `Phase 62: The older known issues` | Asked for by the user on 2026-11-01 ("find issues that are not solved and solve them please"); no GitHub issues were open, so the open items of 8.4 that code can settle. Head shakes knock a lightly loaded rod only a little (#28, a new `--rod` check); the journal's grid pictures are baked one a frame from boot, so its first opening is no long frame (#24); the three unused old sprites are gone (#25). Presentation and checks only: 8.3 #329–332 |
 | 63 The dog to scale | Done | `Phase 63: The dog to scale (task 63.1)` | Asked for by the user on 2026-11-01 with four more improvements, planned in [PLAN_PLACES.md](PLAN_PLACES.md) (Phases 63–67). The walk-in rooms' dog is painted at its breed's real height beside the fisher through a scaled grid (`G.gfx.pix.scaled`), `size` per dog in `data/looks.js`. Presentation only: 8.3 #333–334 |
+| 64 Rooms that are lived in | Done | `Phase 64: Rooms that are lived in (tasks 64.1-64.3)` | The cabin: a lava lamp on a side table by the chair, a late-90s grey console on the floor before the TV with its pad on a cable (the TV boots it, then plays a jittering low-polygon fishing game), a box fan turning, an old fridge with magnets; the shop: a lava lamp on the gear shelf, an orange cat asleep on the freezer, a lit drinks cooler, moths at the lamps; both: reflections on the varnished boards and in the window glass, glare on the CRTs. `dbg.roomLife()`. Presentation only: 8.3 #335–337 |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -911,6 +912,10 @@ These are interpretations and additions made while building, where the spec abov
 333. **The ask (Phases 63–67, 2026-11-01):** the dog in the shop smaller, in real proportion; the cabin and the shop alive (a lava lamp, a PlayStation, more details, reflections); lures that move as real ones on the retrieve, more lures (a red-and-white bobber with bait under it), a more real cast; a more detailed map with better navigation; the pier at one side of the lake, from which the cabin and the shop are reached. Planned in PLAN_PLACES.md, one phase for each.
 334. **The dog to scale (Phase 63):** the rooms' dog was 40×32 beside a 32×48 fisher, two thirds of his height. Shrinking the baked sprite would lose single pixels (eyes, nose) and blur the outline, so the same painter runs through `G.gfx.pix.scaled(g, s)`, a view of a smaller grid that maps every shape's coordinates and radii by s (radii floored at about half a pixel so legs stay whole) and hands pattern callbacks the painter's own coordinates. `size` in `data/looks.js` (golden 0.70, husky 0.68, St. Bernard 0.80, poodle 0.66; validated 0.55–0.85): the golden's back now stands 15 px against his 46. `room.anchor(kind, dir, lk)` and the shadow follow it; the boat's side-view dog (js/scene/dog.js) was already in proportion and is unchanged.
 
+335. **What makes a room lived in (Phase 64):** the user named a lava lamp, a PlayStation, more details and reflections. New parts in `js/ui/room_kit.js`: `lavaLamp` (drawn live: three wax blobs on 19, 26 and 33 s loops in a tapered glass, a pink glow at night; off, the wax sits in a cold pool), `console90s` and `pad90s` (a grey console of the late 90s: disc lid, open and reset, a power light, a memory card; named generically, no brand), `console90sScreen` (1 s of the tube warming, a four-colour diamond logo growing, then a fishing game in polygons that jitter at 8 Hz), `boxFan`/`fanBlades`, `fridge`, `cooler`/`coolerInside` (a flicker once in 46 s), `cat` (three baked frames: breathing, a tail twitch every 11 s, an ear every 17 s). Props gain an optional `live(ctx, x, y, t, env)` drawn right after their image in the feet order, so a figure in front of a table still covers its lamp.
+336. **The cabin's new tiles:** the fan (5,1), the fridge (9,1), the side table (6,4) and the console (7,3) block at every stage (a crate, a dead fridge, a crate or a box of cables stand there before the stage that brings them), so the walk is the same at every stage as 8.3 #296 asked. Space: the fan and the lava lamp switch, the fridge has two lines, the console is the TV's. The shop's freezer (the cat) and the new cooler (10,5) get a line each in Rusty's box (`from = 'thing'` closes it instead of going on to Buy, Talk, Leave).
+337. **Reflections:** `K.reflect` lays a stretched, stepped streak (2 px rows, fading as the square of the distance, narrowing to 45%) on the boards under a lit thing, before the standing things are drawn, so they cover it; the lamps' pools in the night mask are clear, so it reads at night. Under the cabin's bench lantern, floor lamp, stove, lava lamp and the TV when on; under the shop's floor lamp and cooler. `K.glassLamps` puts two warm smudges low in each window at night, `K.glare` a curved glint on each CRT.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1082,9 +1087,11 @@ Phase 26 checks: `--validate` (and `--strict`) OK, `--replay 12345` still `20388
 
 Phase 63 checks: `--validate` OK (the dogs' size checked); `--replay 12345` still `1966984761` (presentation only). Headless Chromium (scratchpad script, 0 page errors): the shop with the golden and with the St. Bernard, each at the fisher's hip.
 
+Phase 64 checks: `--validate` OK; `--replay 12345` still `1966984761` (presentation only). Headless Chromium (scratchpad script, 0 page errors): the restored cabin at 22:00 with the TV on (booting, then the game) and at 12:00; the shop at 23:00 and 12:00; `dbg.roomLife()` {room: cabin, level 4, live 2, tv booting, fan off (switched), lava on} and {room: shop, live 2}.
+
 ### 8.6 Next task
 
-**Phase 64** (PLAN_PLACES.md): rooms that are lived in.
+**Phase 65** (PLAN_PLACES.md): lures that move like lures.
 
 ---
 

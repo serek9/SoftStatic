@@ -383,6 +383,16 @@ G.ui.shop = (function () {
     crimson = line_.kind === 'reverse';
     page = 0; typed = 0; open = 'box';
   }
+  // Phase 64: a line about a thing in the room (the cooler, the cat), in the same box.
+  var REMARKS = { cooler: ['Pop, root beer, and one bottle with no label at the back. The compressor knocks twice and settles.', 'The cooler hums a note just under hearing.'],
+    cat: ['The cat is asleep on the freezer. It has been asleep on the freezer since you can remember.', 'One ear turns toward you. The rest of the cat does not.'] };
+  function remark(id) {
+    var r = REMARKS[id], ls = F.wrap(r[remarkN++ % r.length], BOX.w - 32);
+    pages.length = 0;
+    for (var k = 0; k < ls.length; k += 2) pages.push(ls.slice(k, k + 2));
+    crimson = false; page = 0; typed = 0; open = 'box'; from = 'thing';
+  }
+  var remarkN = 0;
   function pageLen() { var n = 0, p = pages[page]; for (var i = 0; i < p.length; i++) n += p[i].length; return n; }
 
   // The item window over the room, for every shelf (Rusty's Buy) or one shelf (Phase 38).
@@ -453,6 +463,7 @@ G.ui.shop = (function () {
       if (inp.pressed('action')) {
         if (typed < pageLen()) typed = pageLen();                                    // Space finishes the page
         else if (++page < pages.length) typed = 0;
+        else if (from === 'thing') open = '';                                           // Phase 64: a remark on a thing in the room
         else { open = 'choice'; choice = 0; }
       }
     } else if (open === 'choice') {
@@ -488,6 +499,7 @@ G.ui.shop = (function () {
     if (walk.exit) { G.core.state.change('sailing'); return; }
     faced = R.facing(walk);
     if (inp.pressed('action') && faced === 'rusty') { from = 'rusty'; talk(); }
+    else if (inp.pressed('action') && REMARKS[faced]) remark(faced);
     else if (inp.pressed('action') && SHELF_ITEMS[faced]) showItems(SHELF_ITEMS[faced], faced); // Phase 38: a shelf's own items
     else if (inp.pressed('action') && faced === 'guitar') G.audio.engine.cue('strum', 0, Math.floor(t * 7) % 4); // Phase 56: a chord on the old guitar
   }
@@ -602,7 +614,7 @@ G.ui.shop = (function () {
     // on the touch action button for what he faces.
     busy: function () { return open !== ''; }, tap: tap,
     rects: function () { return open === 'box' ? R_BOX : open === 'choice' ? R_CHOICE : open === 'items' ? R_ITEMS : R_NONE; },
-    word: function () { return open !== '' || !walk ? '' : faced === 'rusty' ? 'TALK' : SHELF_ITEMS[faced] ? 'LOOK' : faced === 'guitar' ? 'PLAY' : ''; },
+    word: function () { return open !== '' || !walk ? '' : faced === 'rusty' ? 'TALK' : SHELF_ITEMS[faced] ? 'LOOK' : faced === 'guitar' ? 'PLAY' : REMARKS[faced] ? 'LOOK' : ''; },
     // Tests: choose an item (shelf r, item c) in the window, as if the cursor were on it, and buy.
     select: function (r, c) { row = r; col = c; describe(); return txt.name.join(' '); },
     act: function () { act(); return txt.msg.join(' '); },
