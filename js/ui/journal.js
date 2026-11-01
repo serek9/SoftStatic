@@ -322,6 +322,17 @@ G.ui.journal = (function () {
     return 'none';
   }
 
+  // 8.4 #24: bakes the grid's pictures ahead of the journal's first opening, n a call (index.html
+  // asks for one a frame from boot), so the opening is not one long frame: every species' tile,
+  // as a silhouette and in colour. The entry's plate shows one picture and bakes it when shown.
+  // True once all are baked.
+  var warmK = 0;
+  function warm(n) {
+    var total = G.data.fish.length * 2;
+    for (; n > 0 && warmK < total; n--, warmK++) G.gfx.fishgen.portrait(warmK >> 1, CW - 6, CH - 10, (warmK & 1) === 1);
+    return warmK >= total;
+  }
+
   // dbg: draws the current page into a fresh canvas and returns it (handwriting checks).
   function render() {
     var cv = G.gfx.bake.canvas(640, 360), ctx = cv.getContext('2d');
@@ -331,7 +342,7 @@ G.ui.journal = (function () {
 
   return {
     native: true,
-    open: open, update: update, draw: draw, render: render, tap: tap,
+    open: open, update: update, draw: draw, render: render, tap: tap, warm: warm,
     rects: function () { return J_RECTS; }, // 8.4 #38: what the ESC key keeps off jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close,
     lastLate: function () { return lastLate; },
     state: function () { return { loc: locs[locIdx], rarity: RARITIES[rarIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }

@@ -149,11 +149,7 @@ G.scene.sailing = (function () {
   };
   var tinyCv = {};
   function tinyArt(k) { return tinyCv[k] || (tinyCv[k] = B.layer(TINY[k][0], TINY[k][1], function (c) { A.reset(); TINY[k][2](c); A.reset(); })); }
-  // 10.4: the owl that calls at a clock window's cue. Its eyes are open in frame 1.
-  S.def('owl', { o: 'stone', d: 'stone_dark', e: 'signal_amber', k: 'ink' }, [
-    ['o...o', 'ooooo', 'okook', 'ooooo', 'odddo', '.ddd.', '.k.k.'],
-    ['o...o', 'ooooo', 'oeooe', 'ooooo', 'odddo', '.ddd.', '.k.k.']
-  ]);
+  // 10.4: the owl that calls at a clock window's cue (painted since Phase 18).
   var OWL = { show: 7, cry: 1.5, ring: 2.5, fade: 1 }; // s on screen, cry at, rings last, fade in/out
   var ANOM_FADE = 2;                                   // s an anomaly takes to fade in or out
 
@@ -1056,9 +1052,6 @@ G.scene.sailing = (function () {
   // parts off (the Red Room is indoors) and place the moon and the glow (sky pixels).
   var SKYP = 0.03, CLOUD_P = 0.08, CLOUD_W = 640, CLOUD_DRIFT = 1.6;
   var sky = { stars: null, twinkle: null, glow: null, clouds: null, halo: null, opt: null };
-  S.def('moon', { m: 'fog_light', c: 'fog_mid' }, [
-    '..mmm..', '.mmmmm.', 'mmcmmmm', 'mmmmcmm', 'mcmmmmm', '.mmmcm.', '..mmm..'
-  ]);
 
   function bakeSky() {
     var o = sky.opt = loc.sky || {}, wy = loc.waterY * HI, id = loc.id;
