@@ -34,7 +34,6 @@ G.ui.hud = (function () {
   // 1 while the HUD shows, falling to 0 as it fades.
   function alpha() { return idle < IDLE ? 1 : Math.max(0, 1 - (idle - IDLE) / FADE); }
 
-  S.def('hud_coin', { a: 'signal_amber', h: 'lamp_glow', d: 'rust_hi' }, ['.aa.', 'ahad', 'aaad', '.dd.']);
   // The coin at 640×360: brass, lit on the top left, a stamped centre (8×8).
   var coin = null;
   function coinImg() {

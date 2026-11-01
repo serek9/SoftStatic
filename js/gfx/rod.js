@@ -36,7 +36,11 @@ G.gfx.rod = (function () {
     // Phase 44: a fish's load against the rod. A fish under ref × the rod's maxMass loads it by
     // (mass / (ref × maxMass))^exp, never under min: a fry barely bends the long rod and
     // bends the wand well. Heavier fish load it fully, as before.
-    small: { ref: 0.15, exp: 0.6, min: 0.08 }
+    small: { ref: 0.15, exp: 0.6, min: 0.08 },
+    // 8.4 #28: a head shake reaches the blank through the line, so its kick scales with the
+    // load the blank holds, in full from kickLoad up: on a slack or lightly loaded rod it is a
+    // knock, not a swing through straight.
+    kickLoad: 0.5
   };
   function fishLoad(kg, maxMass) {
     var S = K.small, r = maxMass > 0 ? kg / (S.ref * maxMass) : 1;
@@ -172,11 +176,12 @@ G.gfx.rod = (function () {
   function reset() { for (var i = 0; i < N; i++) { d[i] = 0; v[i] = 0; q[i] = 0; } st.load = 0; st.init = false; st.hv = 0; st.al = 0; place(st.a, d, jx, jy); }
 
   // An impulse on the drawn shape (rad/s at the tip, less toward the butt), the way the line
-  // pulls it now (a head shake knocking the tip toward the fish).
+  // pulls it now (a head shake knocking the tip toward the fish), as much as the load lets it.
   function kick(amount) {
     var sg = 0;
     for (var i = RIGID; i < N; i++) sg += q[i];
     sg = sg < 0 ? -1 : 1;
+    amount *= Math.min(1, Math.max(0, st.load) / K.kickLoad);
     for (i = RIGID; i < N; i++) v[i] += sg * amount * (i - RIGID + 1) / (N - RIGID);
   }
 

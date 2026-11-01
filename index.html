@@ -145,6 +145,7 @@
   }
 
   // An open overlay (pause, journal, map, look picker) takes the step and the scene waits (9.2).
+  var warmed = false;
   G.core.loop.start({
     update: function (dt) { if (!G.ui.menu.update(dt)) G.core.state.update(dt); G.audio.engine.step(dt); },
     // Each part draws in its own space (G.core.view): the scene, the overlay, the buttons.
@@ -153,6 +154,7 @@
       V.begin(ctx, G.ui.menu.native()); G.ui.menu.draw(ctx);
       V.begin(ctx, false); G.ui.hud.drawButtons(ctx);
       V.begin(ctx, true); G.core.device.drawNotice(ctx); // 57.3: portrait on a phone
+      if (!warmed) warmed = G.ui.journal.warm(1); // 8.4 #24: the journal's pictures, one a frame, off screen
     },
     idle: idle,
     // ?compact: halve the full picture onto the page canvas (smoothed, so 1 px lines survive).

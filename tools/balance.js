@@ -801,6 +801,21 @@ function rodCheck() {
   }
   add('the cast: the tip trails 3+ px on the stroke, whips 2+ px past and rebounds, one curve', castOk, castGot.join('  '));
 
+  // 8.4 #28: head shakes (sailing.js's kick, its largest, every 0.12 s for 3 s) knock a lightly
+  // loaded blank only a little and never through straight; a loaded one as before.
+  const shakes = (load, t) => {
+    fresh(); settle(58, load, 50, t); const b0 = R.st.bendDeg; let lo = b0, hi = b0;
+    for (let i = 0; i < 180; i++) { if (i % 7 === 0) R.kick(5); step(58, load, 50, t); lo = Math.min(lo, R.st.bendDeg); hi = Math.max(hi, R.st.bendDeg); }
+    return { swing: Math.max(Math.abs(hi - b0), Math.abs(lo - b0)), cross: Math.sign(lo) !== Math.sign(hi) };
+  };
+  let shakeOk = true; const shakeGot = [];
+  for (const t of [0, TIERS - 1]) {
+    const light = shakes(0.05, t), full = shakes(0.8, t);
+    if (light.swing > 6 || light.cross || full.swing < 20) shakeOk = false;
+    shakeGot.push(t + ': ' + light.swing.toFixed(1) + '° light' + (light.cross ? ' (through straight)' : '') + ', ' + full.swing.toFixed(1) + '° loaded');
+  }
+  add('head shakes: a light load swings the tip under 6° and never through straight, load 0.8 still 20°+', shakeOk, shakeGot.join('  '));
+
   // Cost and NaN.
   let nan = false; for (let i = 0; i < 20000; i++) { R.solve(20 + (i * 37) % 80, ((i * 13) % 17) / 12, Math.sin(i * 0.3), Math.cos(i * 0.7), i % 2 ? 1 : -1, i % TIERS, DT); if (!isFinite(R.jx[N]) || !isFinite(R.jy[N])) nan = true; }
   // The cost: the best of 7 batches of 2000 solves (8.4 #35), so a batch that also timed the
