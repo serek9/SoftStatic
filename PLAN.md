@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-01, after Phase 65 (lures that move like lures, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-01, after Phase 66 (the chart, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -449,6 +449,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 63 The dog to scale | Done | `Phase 63: The dog to scale (task 63.1)` | Asked for by the user on 2026-11-01 with four more improvements, planned in [PLAN_PLACES.md](PLAN_PLACES.md) (Phases 63–67). The walk-in rooms' dog is painted at its breed's real height beside the fisher through a scaled grid (`G.gfx.pix.scaled`), `size` per dog in `data/looks.js`. Presentation only: 8.3 #333–334 |
 | 64 Rooms that are lived in | Done | `Phase 64: Rooms that are lived in (tasks 64.1-64.3)` | The cabin: a lava lamp on a side table by the chair, a late-90s grey console on the floor before the TV with its pad on a cable (the TV boots it, then plays a jittering low-polygon fishing game), a box fan turning, an old fridge with magnets; the shop: a lava lamp on the gear shelf, an orange cat asleep on the freezer, a lit drinks cooler, moths at the lamps; both: reflections on the varnished boards and in the window glass, glare on the CRTs. `dbg.roomLife()`. Presentation only: 8.3 #335–337 |
 | 65 Lures that move like lures | Done | `Phase 65: Lures that move like lures (tasks 65.1-65.3)` | The retrieve draws the lure along the line toward the rod tip with the reel's inertia, each lure with its own action, and a paused sinking lure swings back on a tight line; two new lures, the Bobber Rig (a red-and-white float with a worm hung under it, dipping on a bite) and the Casting Spoon; the cast flies with air drag and splashes by weight. Changes the simulation's data (two lures, `spoon` in 19 species' lures, a rig taken as its bait); replay hash unchanged. 8.3 #338–341 |
+| 66 The chart | Done | `Phase 66: The chart (tasks 66.1-66.2)` | The map gains relief (hachures, a contour round each lake and a depth contour in it), each lake's deepest sounding, rivers between the waters, the shore road with its bridge, the pier on Fogbound's west shore with the shop and the cabin up their paths, a legend, a scale bar and a ticked border; the arrows go to the nearest stop that way, the brackets slide to it, and the card says how far it is. `dbg.mapNav()`. Presentation only: 8.3 #342–343 |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -922,6 +923,9 @@ These are interpretations and additions made while building, where the spec abov
 340. **The cast (65.3):** the flight's horizontal path is eased by 1 − e^(−1.7u) (normalised to land on x1, the drag scaled down for short casts) while the height stays a parabola in time, so the lure leaves fast, tops out early and drops steeply; flights are a little longer (0.5 s + d/240) and higher (12 + 0.22 d px). The splash is × a weight per hook (`SPLASH`: the float 1, a cricket 0.35). Landing x is unchanged (`landingX`).
 341. **The replay:** the Node session only reads a lure's depth (min of the water's and maxDepthM) and fish.lures, so the hash stays `1966984761`; `--tackle` gains the bobber and spoon rows.
 
+342. **The chart's detail (Phase 66.1):** baked once in `paintChart` with the rest: hachures under every peak, a dotted contour 9 px outside each lake and a depth contour at 42% of its radii, the deepest sounding in metres (maxDepth × 0.25) beside each lake's mark, rivers (`RIVERS`: creek to Fogbound, creek to the Pines, the Red Room to the creek, the Pines' outflow) as winding 2 px lines, the shore road (`ROAD`) dashed with a bridge where the outflow crosses it, the pier and the dotted paths to the shop and the cabin (moved to Fogbound's west shore for Phase 67), a legend (by water, river, road, deepest) and a 2 km scale bar (`KM` 0.022 km a chart px), and a border ticked every 16 px. Trees keep off the legend and the shore houses; the dotted route now joins only waters.
+343. **Navigation (66.2):** the arrows used to step through the list in order (up and left back, down and right on). Now `toward(from, ax, ay)` picks the stop ahead along the arrow within about 60° (across ≤ 1.75 × along), the nearest by along + 2 × across; none that way, nothing moves. The amber brackets ease to the chosen stop (14/s). The card adds the distance from the water you are on ("2.9 km from here") and each water's deepest. `dbg.mapNav()` walks the four arrows from every stop: every stop reaches every other, and no press lands on a stop behind it.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1097,9 +1101,11 @@ Phase 64 checks: `--validate` OK; `--replay 12345` still `1966984761` (presentat
 
 Phase 65 checks: `--validate` OK; `--replay 12345` still `1966984761`; `--saves` PASS; `--tackle` PASS with the bobber (848, 2343, 1563, 4125 net coins an hour) and the spoon (1880, 2331, 3293, 4136), every other row as before. Headless Chromium (scratchpad script, 0 page errors): a spoon cast, sunk to 13 m, reeled (it climbs ~15 px/s while coming in ~21 px/s), paused (it swings back toward the boat while sinking), reeled out; a bobber rig at its depth under the float.
 
+Phase 66 checks: `--validate` OK; `--replay 12345` still `1966984761` (presentation only). `dbg.mapNav()` {stops 6, reachAll true, wrongWay [], ok true}. Headless Chromium (scratchpad script, 0 page errors): the chart opened from the boat.
+
 ### 8.6 Next task
 
-**Phase 66** (PLAN_PLACES.md): the chart.
+**Phase 67** (PLAN_PLACES.md): the pier at the edge.
 
 ---
 
