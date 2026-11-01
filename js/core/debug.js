@@ -573,18 +573,19 @@ G.core.debug = (function () {
         }
       } else if (name === 'shop') {
         // Phase 40: the bait shop's room as baked, and its sprites: the fisher and the dog in
-        // each facing and frame, Rusty's frames (down, side, his back).
+        // each facing and frame, Rusty's frames (down, side, his back). Phase 56: the room with
+        // its back wall (384×300) and the larger sprites (G.ui.room: 32×48, the dog 40×32 from the side).
         var SR = G.ui.shopRoom, DS = ['down', 'up', 'right', 'left'];
-        ctx.drawImage(SR.bake(), 8, 40);
-        F.drawText(ctx, 'room (baked)', 8, 26, 'fog_mid');
-        F.drawText(ctx, 'fisher', 404, 26, 'fog_mid'); F.drawText(ctx, 'dog', 516, 26, 'fog_mid');
+        ctx.drawImage(SR.bake(), 4, 26);
+        F.drawText(ctx, 'room (baked)', 4, 18, 'fog_mid');
+        F.drawText(ctx, 'fisher', 394, 18, 'fog_mid'); F.drawText(ctx, 'dog', 500, 18, 'fog_mid');
         for (var di = 0; di < 4; di++) for (var fr2 = 0; fr2 < 3; fr2++) {
-          ctx.drawImage(SR.sprite('fisher', DS[di], fr2), 404 + fr2 * 34, 40 + di * 34);
-          ctx.drawImage(SR.sprite('dog', DS[di], [0, 1, 3][fr2]), 516 + fr2 * 34, 40 + di * 34);
+          ctx.drawImage(SR.sprite('fisher', DS[di], fr2), 394 + fr2 * 34, 26 + di * 48);
+          ctx.drawImage(SR.sprite('dog', DS[di], [0, 1, 3][fr2]), 500 + fr2 * 46, 30 + di * 40);
         }
-        F.drawText(ctx, 'rusty', 404, 186, 'fog_mid');
-        for (fr2 = 0; fr2 < 4; fr2++) { ctx.drawImage(SR.sprite('rusty', 'down', fr2), 404 + fr2 * 34, 200); ctx.drawImage(SR.sprite('rusty', 'right', fr2), 404 + fr2 * 34, 236); }
-        ctx.drawImage(SR.sprite('rusty', 'up', 0), 540, 200);
+        F.drawText(ctx, 'rusty', 394, 222, 'fog_mid');
+        for (fr2 = 0; fr2 < 4; fr2++) { ctx.drawImage(SR.sprite('rusty', 'down', fr2), 394 + fr2 * 34, 228); ctx.drawImage(SR.sprite('rusty', 'right', fr2), 394 + fr2 * 34, 278); }
+        ctx.drawImage(SR.sprite('rusty', 'up', 0), 534, 228);
       } else if (name === 'panel') {
         // Phase 46: the small panel (G.ui.panel) at three sizes over a strip of sky and water,
         // as it sits over the world: a row chosen, key caps, key hints, an aside.
@@ -643,9 +644,9 @@ G.core.debug = (function () {
         // Phase 47: the shop room's sprites for every look: each facing, standing and walking (the dog sitting too).
         var SRl = G.ui.shopRoom, DS2 = ['down', 'up', 'right', 'left'], KL = [['fisher', G.data.looks.fishers, [0, 1, 2]], ['dog', G.data.looks.dogs, [0, 1, 3]]];
         for (var kk = 0; kk < 2; kk++) for (var li2 = 0; li2 < 4; li2++) {
-          var yy0 = 20 + (kk * 4 + li2) * 42, rec = KL[kk][1][li2];
-          F.drawText(ctx, rec.name, 8, yy0 + 12, 'fog_light');
-          for (var d2 = 0; d2 < 4; d2++) for (var f2 = 0; f2 < 3; f2++) ctx.drawImage(SRl.sprite(KL[kk][0], DS2[d2], KL[kk][2][f2], rec), 100 + (d2 * 3 + f2) * 36, yy0);
+          var yy0 = kk ? 20 + 4 * 46 + li2 * 34 : 20 + li2 * 46, rec = KL[kk][1][li2];               // Phase 56: rows as tall as the sprites
+          F.drawText(ctx, rec.name, 8, yy0 + 14, 'fog_light');
+          for (var d2 = 0; d2 < 4; d2++) for (var f2 = 0; f2 < 3; f2++) ctx.drawImage(SRl.sprite(KL[kk][0], DS2[d2], KL[kk][2][f2], rec), 84 + (d2 * 3 + f2) * (kk ? 46 : 34) - (kk && d2 > 1 ? 0 : 0), yy0 - (kk ? 0 : 2));
         }
       } else if (name === 'baits') {
         // Phase 22: each bait's body in every heading (both flutter phases), drawn ×3 on water.

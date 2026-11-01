@@ -1,17 +1,23 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
-// The bait shop as a room (Phase 36, PLAN_SHOP.md): a little log room seen from above at a
+// The bait shop as a room (Phase 36, PLAN_SHOP.md): a little room seen from above at a
 // three-quarter angle, floating in black in the middle of the 640×360 view, as a building is
-// in a retro Pokémon game, painted natively in the lake's keys under the pixel-art rules
-// (8.3 #84: flat keys, no dithering, light that steps). The fisher walks it tile by tile
-// (a tap turns, a hold walks), the dog follows a tile behind, and what he faces is what Space
-// talks to. This file is the room, its sprites and the walk; js/ui/shop.js is the scene.
-// Visual and input only: no randomness, nothing saved.
+// in a retro Pokémon game. The fisher walks it tile by tile (a tap turns, a hold walks), the
+// dog follows a tile behind, and what he faces is what Space talks to. This file is the room;
+// js/ui/room.js has the walk and the people, js/ui/room_kit.js the parts, js/ui/shop.js the scene.
+// Phase 56: repainted at the lakes' density, lofi and worn: a tall back wall of 70s panelling
+// under a beam strung with bulbs, two windows onto the lake (a dim BAIT neon in one), a wall
+// trophy, a fish chart, a pegboard of lure packets, a clock and a calendar; the rack, the jar
+// shelf, the lure case and the gear shelf; a guitar on its amp; behind Rusty a back counter
+// with a coffee maker, a boombox and a small CRT showing a fishing show; the counter a prop
+// he stands behind, with the till stuck at 3:33, a banker's lamp, a bell and an ashtray; a
+// bait station of cooler, cricket cage and aerated tank; a chest freezer, a tall plant, a 70s
+// rug, a worn path to the counter. Visual and input only: no randomness, nothing saved.
 G.ui = G.ui || {};
 G.ui.shopRoom = (function () {
-  var A = G.gfx.paint, P = G.gfx.sprites.PALETTE;
-  var T = 32, COLS = 12, ROWS = 8, W = COLS * T, H = ROWS * T, OX = (640 - W) >> 1, OY = (360 - H) >> 1;
-  var STEP = 0.2, TURN = 0.09; // s a step takes; s a direction must be held after a turn before he walks
+  var A = G.gfx.paint, P = G.gfx.sprites.PALETTE, K = G.ui.roomKit, R = G.ui.room, X = G.gfx.pix, tone = X.tone;
+  var T = 32, COLS = 12, ROWS = 8, W = COLS * T, H = ROWS * T, OX = (640 - W) >> 1, OY = (360 - H) >> 1, TOP = 44, RH = H + TOP;
+  var STEP = R.STEP;
 
   // The map: w wall face (the north wall, seen), W a window in it, s side or south wall (its
   // top seen), d the door, m the mat, r the rug, . the floor.
@@ -26,7 +32,7 @@ G.ui.shopRoom = (function () {
     'ssssssdsssss'
   ];
   // Objects: their tiles (c, r, w, h), whether they block, and what Space does facing them.
-  // `talk` is the scene's: 'rusty' (the counter), or a shelf (Phase 38).
+  // `talk` is the scene's: 'rusty' (the counter), a shelf (Phase 38), 'guitar' (Phase 56).
   var OBJECTS = [
     { id: 'rack', c: 1, r: 1, w: 2, h: 1, block: true, talk: 'rack' },        // rods, reels and lines
     { id: 'jar', c: 3, r: 1, w: 1, h: 1, block: true, talk: 'jar' },          // the low shelf and the unlabelled jar
@@ -38,542 +44,400 @@ G.ui.shopRoom = (function () {
     { id: 'behind2', c: 9, r: 2, w: 2, h: 1, block: true, talk: '' },
     { id: 'worms', c: 1, r: 3, w: 1, h: 1, block: true, talk: 'worms' },
     { id: 'crickets', c: 1, r: 4, w: 1, h: 1, block: true, talk: 'crickets' },
-    { id: 'tank', c: 1, r: 5, w: 1, h: 1, block: true, talk: 'tank' }
+    { id: 'tank', c: 1, r: 5, w: 1, h: 1, block: true, talk: 'tank' },
+    // Phase 56: the room's things in its corners and between the shelves.
+    { id: 'fern', c: 5, r: 1, w: 1, h: 1, block: true, talk: '' },
+    { id: 'guitar', c: 7, r: 1, w: 1, h: 1, block: true, talk: 'guitar' },
+    { id: 'freezer', c: 1, r: 6, w: 1, h: 1, block: true, talk: '' },
+    { id: 'palm', c: 10, r: 6, w: 1, h: 1, block: true, talk: '' },
+    { id: 'lamp', c: 3, r: 4, w: 1, h: 1, block: true, talk: '' }
   ];
   var DOOR = [6, 7], MAT = [6, 6], RUSTY = [9, 2], CLOCK = 7;
-  var DIRS = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] };
+  var WK = R.walker(MAP, OBJECTS, MAT);
 
-  var blocked = [], talkAt = [];
-  (function () {
-    for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
-      var ch = MAP[r][c];
-      blocked[r * COLS + c] = !(ch === '.' || ch === 'r' || ch === 'm');
-      talkAt[r * COLS + c] = '';
-    }
-    for (var i = 0; i < OBJECTS.length; i++) {
-      var o = OBJECTS[i];
-      for (var y = o.r; y < o.r + o.h; y++) for (var x = o.c; x < o.c + o.w; x++) {
-        if (o.block) blocked[y * COLS + x] = true;
-        talkAt[y * COLS + x] = o.talk;
-      }
-    }
-  })();
-  function isBlocked(c, r) { return c < 0 || r < 0 || c >= COLS || r >= ROWS || blocked[r * COLS + c]; }
+  // Room pixels: tile (c, r) has its top left at (c*T, TOP + r*T); the room is drawn at
+  // (OX, OY - TOP), so the back wall rises above row 0 into the dark.
+  function tx(c) { return c * T; }
+  function ty(r) { return TOP + r * T; }
+  var LAMP = [3 * T + 16, ty(4) + 4];                       // the floor lamp by the rug
+  var DESK = [8 * T + 16, ty(2.3)];                         // the banker's lamp on the counter
+  var WINS = [[3, 2], [9, 2]];                              // the windows: first column, width in tiles
+  function glassRect(i) { var c = WINS[i][0]; return [tx(c) + 5, 11, WINS[i][1] * T - 10, TOP - 4]; }
+
+  // The baked light: the lamp's warmth, the desk lamp, a little from the windows.
+  function light(x, y) {
+    var d = Math.hypot((x - LAMP[0]) / 150, (y - LAMP[1]) / 105), e = Math.hypot((x - DESK[0]) / 70, (y - DESK[1]) / 55);
+    var L = 0.38 + Math.max(0, 1 - d) * 0.45 + Math.max(0, 1 - e) * 0.25;
+    for (var i = 0; i < WINS.length; i++) { var g = glassRect(i), w = Math.hypot((x - g[0] - g[2] / 2) / 60, (y - 40) / 50); L += Math.max(0, 1 - w) * 0.12; }
+    return Math.min(1, L);
+  }
+  // The worn path from the door to the counter, lighter boards.
+  function wear(x, y) {
+    var px = x - (6 * T + 16), py = y - ty(5);
+    var a = Math.abs(px - py * -0.3) < 20 && y > ty(3) ? 0.08 : 0;
+    var b = Math.abs(y - ty(4.5)) < 14 && x > 6 * T && x < 10 * T ? 0.06 : 0;
+    return a + b;
+  }
 
   // ---- Painting ---------------------------------------------------------------------------
-  var px = A.px, box = A.box;
-  function hash(a, b) { var h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+  var box = A.box, px = A.px;
+  var BRASS = ['rust', 'leaf_gold', 'brass_hi'], WOODK = K.WOOD;
+  function img(c, im, x, y) { c.drawImage(im, Math.round(x), Math.round(y)); A.reset(); }
 
-  // Floor: planks running across, 8 px wide, a dark seam under each; now and then a lighter
-  // board; a joint per board, staggered, with one nail beside it. Quiet, as a floor should be.
-  function floorTile(c, x0, y0, tc, tr) {
-    for (var row = 0; row < 4; row++) {
-      var y = y0 + row * 8, light = hash(tr * 4 + row, (tc / 3) | 0) < 0.22;
-      box(c, light ? 'wood_mid' : 'wood', x0, y, T, 7);
-      box(c, 'wood_dark', x0, y + 7, T, 1);
-      if (hash(tc * 4 + row, tr) < 0.45) {
-        var j = Math.floor(hash(tc * 4 + row, tr + 9) * 24) + 4;
-        box(c, 'wood_dark', x0 + j, y, 1, 7); px(c, 'wood_deep', x0 + j + 2, y + 3);
-      }
-    }
-  }
-
-  // The north wall's face: a dark top (the wall's thickness), then logs, 8 px each.
-  function wallFace(c, x0, y0) {
-    box(c, 'ink', x0, y0, T, 3); box(c, 'wood_deep', x0, y0 + 3, T, 3);
-    for (var i = 0; i < 3; i++) {
-      var y = y0 + 6 + i * 8 + (i === 2 ? 2 : 0), h = i === 2 ? 6 : 8;
-      box(c, 'wood_dark', x0, y, T, h); box(c, 'wood', x0, y + 1, T, h - 3); box(c, 'wood_mid', x0, y + 1, T, 1); box(c, 'wood_deep', x0, y + h - 1, T, 1);
-    }
-    box(c, 'ink', x0, y0 + T - 2, T, 2);                                            // the shadow at its foot
-  }
-
-  // A window in the wall face: its frame and sill; the glass is painted live (the hour).
-  function windowTile(c, x0, y0, left) {
-    wallFace(c, x0, y0);
-    var gx = x0 + (left ? 6 : 0), gw = T - 6;
-    box(c, 'wood_deep', gx - 1, y0 + 6, gw + 1, 22);
-    box(c, 'wood_hi', gx, y0 + 7, gw, 1);
-    box(c, 'wood_mid', gx, y0 + 26, gw, 2);                                         // the sill
-  }
-
-  // Side and south walls: their tops, dark, lit along the edge toward the room.
-  function wallTop(c, x0, y0, tc, tr) {
-    box(c, 'wood_deep', x0, y0, T, T);
-    box(c, 'ink', x0 + (tc === 0 ? 0 : T - 4), y0, 4, T);
-    if (tc === 0) box(c, 'wood_dark', x0 + T - 3, y0, 3, T);
-    else if (tc === COLS - 1) box(c, 'wood_dark', x0, y0, 3, T);
-    if (tr === ROWS - 1) { box(c, 'wood_dark', x0, y0, T, 3); box(c, 'ink', x0, y0 + T - 4, T, 4); }
-  }
-
-  function doorTile(c, x0, y0) {
-    box(c, 'wood_deep', x0, y0, T, T);
-    box(c, 'wood_dark', x0 + 3, y0, T - 6, T - 6);                                  // the threshold
-    box(c, 'night_deep', x0 + 3, y0 + T - 8, T - 6, 8);                              // the night outside
-    box(c, 'fog_dark', x0 + 5, y0 + T - 6, T - 10, 2);
-  }
-
-  function matTile(c, x0, y0, tc, tr) {
-    floorTile(c, x0, y0, tc, tr);
-    box(c, 'rust_dark', x0 + 3, y0 + 6, T - 6, T - 10);
-    for (var y = 0; y < T - 14; y += 3) box(c, 'rust', x0 + 5, y0 + 8 + y, T - 10, 1);
-  }
-
-  function rugTile(c, x0, y0, tc, tr) {
-    floorTile(c, x0, y0, tc, tr);
-    var l = MAP[tr][tc - 1] !== 'r', rr = MAP[tr][tc + 1] !== 'r', t = MAP[tr - 1][tc] !== 'r', b = MAP[tr + 1][tc] !== 'r';
-    var ax = x0 + (l ? 4 : 0), ay = y0 + (t ? 4 : 0), aw = T - (l ? 4 : 0) - (rr ? 4 : 0), ah = T - (t ? 4 : 0) - (b ? 4 : 0);
-    box(c, 'moss_dark', ax, ay, aw, ah);
-    box(c, 'moss', ax + (l ? 3 : 0), ay + (t ? 3 : 0), aw - (l ? 3 : 0) - (rr ? 3 : 0), ah - (t ? 3 : 0) - (b ? 3 : 0));
-    for (var y = ay + (t ? 6 : 2); y < ay + ah - 2; y += 6) box(c, 'reed', ax + (l ? 6 : 0), y, aw - (l ? 6 : 0) - (rr ? 6 : 0), 1);
-  }
-
-  // Objects, painted over the floor and up into the wall where they stand against it.
-  function paintRack(c, x0, y0) {                                                    // a rod rack against the wall
-    box(c, 'wood_deep', x0 + 2, y0 - 18, 60, 26); box(c, 'wood_dark', x0 + 3, y0 - 17, 58, 24);
-    box(c, 'wood_mid', x0 + 2, y0 + 8, 60, 3); box(c, 'wood_dark', x0 + 2, y0 + 11, 60, 14); box(c, 'wood_deep', x0 + 2, y0 + 25, 60, 2);
-    for (var i = 0; i < 5; i++) box(c, 'wood_deep', x0 + 8 + i * 10, y0 + 10, 4, 2);   // the slots the rods stand in (drawn live, 38.2; five since 43)
-    box(c, 'stone_dark', x0 + 8, y0 - 15, 48, 2);                                    // the bar they lean on
-  }
-  function paintJarShelf(c, x0, y0) {                                                // a low shelf under the window
-    box(c, 'wood_deep', x0 + 2, y0 + 6, 28, 20); box(c, 'wood_mid', x0 + 2, y0 + 6, 28, 3); box(c, 'wood_dark', x0 + 3, y0 + 9, 26, 15);
-    box(c, 'ink', x0 + 6, y0 - 2, 10, 10); box(c, 'teal_dark', x0 + 7, y0 - 1, 8, 8); box(c, 'teal', x0 + 8, y0, 4, 6); box(c, 'stone', x0 + 7, y0 - 2, 8, 2); // the jar
-    box(c, 'ink', x0 + 19, y0 + 1, 8, 7); box(c, 'paper_dark', x0 + 20, y0 + 2, 6, 5);                                // a tin
-  }
-  // Phase 43: a glass-topped lure case on short legs: rows of lures in their trays.
-  function paintCase(c, x0, y0) {
-    box(c, 'wood_deep', x0 + 3, y0 + 4, 26, 20); box(c, 'wood_mid', x0 + 3, y0 + 4, 26, 2); box(c, 'wood_dark', x0 + 4, y0 + 18, 24, 6);
-    box(c, 'ink', x0 + 5, y0 + 6, 22, 12); box(c, 'water_dark', x0 + 6, y0 + 7, 20, 10);
-    var dots = ['brass_hi', 'rust_hi', 'moss_hi', 'signal_amber', 'flame'];
-    for (var i = 0; i < 5; i++) { box(c, dots[i], x0 + 7 + i * 4, y0 + 9, 2, 1); box(c, dots[(i + 2) % 5], x0 + 8 + i * 4, y0 + 13, 2, 1); }
-    box(c, 'fog_light', x0 + 7, y0 + 7, 6, 1);                                       // the glass's glint
-    box(c, 'wood_deep', x0 + 5, y0 + 24, 2, 3); box(c, 'wood_deep', x0 + 25, y0 + 24, 2, 3);
-  }
-  function paintGearShelf(c, x0, y0) {                                               // a tall shelf between the windows
-    box(c, 'wood_deep', x0 + 1, y0 - 22, 30, 48); box(c, 'wood_dark', x0 + 3, y0 - 20, 26, 44);
-    for (var i = 0; i < 3; i++) box(c, 'wood_mid', x0 + 3, y0 - 8 + i * 12, 26, 2);
-    // The lantern and the finder are drawn live (38.2: they leave the shelf when bought).
-  }
-  function paintCounter(c) {                                                         // an L: down by Rusty's left, then along
-    var x0 = 8 * T, y0 = 2 * T;
-    box(c, 'wood_deep', x0 + 4, y0 - 4, 24, 2 * T); box(c, 'wood_mid', x0 + 6, y0 - 2, 20, 2 * T - 14); box(c, 'wood_hi', x0 + 6, y0 - 2, 20, 2);
-    var x1 = x0, y1 = 3 * T;
-    box(c, 'wood_deep', x1 + 4, y1 - 4, 3 * T - 6, 26); box(c, 'wood_mid', x1 + 6, y1 - 2, 3 * T - 10, 12); box(c, 'wood_hi', x1 + 6, y1 - 2, 3 * T - 10, 2);
-    box(c, 'wood_dark', x1 + 4, y1 + 10, 3 * T - 6, 14);                                                              // its front
-    for (var i = 1; i < 6; i++) box(c, 'wood_deep', x1 + 4 + i * 15, y1 + 11, 1, 12);
-    box(c, 'ink', x1 + 4, y1 + 22, 3 * T - 6, 3);
-    box(c, 'stone_dark', x0 + 2 * T + 6, y1 - 1, 12, 8); box(c, 'stone', x0 + 2 * T + 7, y1, 10, 3);                  // the till
-  }
-  function paintBox(c, x0, y0, kind) {                                               // the bait by the west wall
-    if (kind === 'worms') { box(c, 'wood_deep', x0 + 4, y0 + 4, 24, 22); box(c, 'wood', x0 + 6, y0 + 6, 20, 16); box(c, 'rock_dark', x0 + 8, y0 + 8, 16, 12); box(c, 'flesh', x0 + 11, y0 + 11, 5, 1); box(c, 'flesh', x0 + 15, y0 + 15, 6, 1); }
-    if (kind === 'crickets') { box(c, 'wood_deep', x0 + 4, y0 + 4, 24, 22); box(c, 'reed', x0 + 6, y0 + 6, 20, 16); } // its mesh and crickets are live
-    if (kind === 'tank') { box(c, 'ink', x0 + 3, y0 + 2, 26, 26); box(c, 'water_dark', x0 + 5, y0 + 4, 22, 20); box(c, 'water_mid', x0 + 5, y0 + 4, 22, 3); box(c, 'stone_hi', x0 + 5, y0 + 24, 22, 2); }
-  }
-
-  function paintRoom(c) {
+  function paintBase(c) {
     A.reset();
-    for (var r = 0; r < ROWS; r++) for (var cc = 0; cc < COLS; cc++) {
-      var ch = MAP[r][cc], x = cc * T, y = r * T;
-      if (ch === 'w') wallFace(c, x, y);
-      else if (ch === 'W') windowTile(c, x, y, MAP[r][cc - 1] !== 'W');
-      else if (ch === 's') wallTop(c, x, y, cc, r);
-      else if (ch === 'd') doorTile(c, x, y);
-      else if (ch === 'm') matTile(c, x, y, cc, r);
-      else if (ch === 'r') rugTile(c, x, y, cc, r);
-      else floorTile(c, x, y, cc, r);
-    }
-    box(c, 'ink', CLOCK * T + 10, 8, 12, 12); box(c, 'paper', CLOCK * T + 11, 9, 10, 10); box(c, 'paper_dark', CLOCK * T + 11, 17, 10, 2); // the clock (its hands are live)
-    paintRack(c, T, T); paintJarShelf(c, 3 * T, T); paintCase(c, 4 * T, T); paintGearShelf(c, 6 * T, T); paintCounter(c);
-    paintBox(c, T, 3 * T, 'worms'); paintBox(c, T, 4 * T, 'crickets'); paintBox(c, T, 5 * T, 'tank');
+    K.panelWall(c, T, W - 2 * T, TOP, light);
+    K.floor(c, T, ty(1), W - 2 * T, H - 2 * T, light, { wear: wear });
+    K.wallTops(c, W, RH, TOP, T, DOOR[0]);
+    // The rug and the mat.
+    K.rug(c, 4 * T + 2, ty(4) + 4, 3 * T - 4, 2 * T - 10, 'bands');
+    A.area(c, tx(6) + 3, ty(6) + 6, T - 6, T - 9, function (x, y) { return (y - ty(6)) % 3 === 0 ? 'reed' : ((x + y) % 4 ? 'rust' : 'rust_dark'); });
+    box(c, 'outline', tx(6) + 3, ty(6) + T - 3, T - 6, 1);
+    // Cobwebs in the top corners; a loose board.
+    for (var w = 0; w < 2; w++) { var cx = w ? W - T - 1 : T, dir = w ? -1 : 1; for (var k = 0; k < 4; k++) A.line(c, 'fog_mid', cx, 7, cx + dir * (22 - k * 5), 7 + k * 5); for (k = 1; k < 3; k++) A.line(c, 'fog_dark', cx + dir * k * 7, 7, cx, 7 + k * 7); }
+    box(c, 'panel_deep', tx(3) + 4, ty(6) + 15, 30, 1); box(c, 'panel_hi', tx(3) + 4, ty(6) + 8, 30, 1);
+    // The string lights' cable along the beam.
+    cable = K.lightCable(c, T + 4, W - T - 4, 7, 46, 5);
+    wallThings(c);
+    shelves(c);
+    behindCounter(c);
+    baitStation(c);
     A.reset();
   }
+  var cable = [];
 
-  // ---- Sprites ------------------------------------------------------------------------------
-  // The fisher from above: the jacket, the hat, the trousers; four facings, a standing frame
-  // and two walking frames (the legs and arms swing). 32×32, feet at the bottom. Phase 47: in
-  // the look's keys (data/looks.js), the hat in its shape, a beard and a check shirt if it has them.
-  function paintFisher(c, dir, fr, L) {
-    var sw = fr === 1 ? 1 : (fr === 2 ? -1 : 0), side = dir === 'side', T0 = L.trousers, K = L.coat, H = L.hatKeys, SK = L.skin;
-    var COAT = ['ink', K[0], K[1], K[2]];
-    // Legs and boots.
-    if (side) { box(c, T0, 13 + sw * 2, 24, 3, 6); box(c, T0, 17 - sw * 2, 24, 3, 6); box(c, 'ink', 13 + sw * 2, 29, 4, 2); box(c, 'ink', 17 - sw * 2, 29, 4, 2); }
-    else { box(c, T0, 12, 24 - Math.max(0, sw), 3, 6); box(c, T0, 17, 24 - Math.max(0, -sw), 3, 6); box(c, 'ink', 12, 29 - Math.max(0, sw), 3, 2); box(c, 'ink', 17, 29 - Math.max(0, -sw), 3, 2); }
-    // The jacket and arms.
-    A.blob(c, 16, 19, side ? 5.5 : 7, 6.5, COAT, { bias: 0.05 });
-    if (L.check) for (var y = 13; y < 26; y++) for (var x = 9; x < 24; x++) {
-      if (y !== 16 && y !== 20 && y !== 24 && x !== 13 && x !== 19) continue;
-      var nx = (x - 16) / (side ? 5.5 : 7), ny = (y - 19) / 6.5;
-      if (nx * nx + ny * ny < 0.75) px(c, L.check, x, y);
-    }
-    if (side) { A.limb(c, 16, 15, 16 + sw * 3, 23, 1.6, COAT, 0.1); A.blob(c, 16 + sw * 3, 23.5, 1.3, 1.3, SK); }
-    else { box(c, K[0], 8, 16 + sw, 3, 8); box(c, K[0], 21, 16 - sw, 3, 8); A.blob(c, 9.5, 24.5 + sw, 1.4, 1.3, SK); A.blob(c, 22.5, 24.5 - sw, 1.4, 1.3, SK); }
-    if (dir === 'down') box(c, K[2], 12, 14, 8, 1);
-    // The head, a beard, the hat.
-    A.blob(c, 16, 10, 5, 5, SK, { bias: 0.1 });
-    if (L.beard && dir === 'down') A.blob(c, 16, 13.5, 3.5, 2.2, L.beard, { bias: 0.1 });
-    if (L.beard && side) A.blob(c, 19, 13, 2.5, 2, L.beard, { bias: 0.1 });
-    TOP_HATS[L.hat](c, dir, H, L);
-  }
-  // Phase 47: each hat from above, facing down (the face below it), up (the back of the head)
-  // or to the side (the face to the right); the eyes and hair as the face shows them.
-  function eyes(c, dir, L) {
-    if (dir === 'down') { px(c, 'ink', 14, 11); px(c, 'ink', 18, 11); if (!L.beard) box(c, L.skin[1], 14, 14, 4, 1); }
-    else if (dir === 'up') box(c, L.hair, 12, 13, 8, 2);                                 // hair under the hat
-    else { px(c, 'ink', 19, 11); box(c, L.hair, 11, 9, 2, 4); if (!L.beard) px(c, L.skin[1], 20, 13); }
-  }
-  var TOP_HATS = {
-    cap: function (c, dir, H, L) {
-      if (dir === 'down') {
-        A.blob(c, 16, 6.5, 5.5, 3.5, H, { bias: 0.1 });
-        box(c, H[0], 10, 8, 12, 2);                                                       // the brim over his eyes
-      } else if (dir === 'up') A.blob(c, 16, 8.5, 5.5, 5, H, { bias: 0.1 });
-      else {
-        A.blob(c, 15, 7, 5, 4, H, { bias: 0.1 });
-        box(c, H[0], 17, 9, 6, 2);                                                        // the brim, forward
-      }
-      eyes(c, dir, L);
-    },
-    knit: function (c, dir, H, L) {
-      if (dir === 'down') { A.blob(c, 16, 7, 5.5, 4, H, { bias: 0.1 }); box(c, H[0], 10, 9, 12, 2); }
-      else if (dir === 'up') A.blob(c, 16, 8.5, 5.5, 5, H, { bias: 0.1 });
-      else { A.blob(c, 15, 7, 5, 4, H, { bias: 0.1 }); box(c, H[0], 10, 9, 11, 2); }
-      A.blob(c, dir === 'side' ? 14 : 16, dir === 'up' ? 6 : 3.5, 1.6, 1.4, H, { bias: 0.2 }); // the bobble
-      eyes(c, dir, L);
-    },
-    bucket: function (c, dir, H, L) {
-      if (dir === 'side') { box(c, H[0], 9, 9, 15, 2); A.blob(c, 15, 6.5, 4.5, 3.5, H, { bias: 0.1 }); }
-      else { A.blob(c, 16, dir === 'up' ? 9 : 8, 7.5, dir === 'up' ? 5 : 3.2, H, { bias: 0 }); A.blob(c, 16, dir === 'up' ? 8 : 6, 4.5, 3, H, { bias: 0.15 }); }
-      eyes(c, dir, L);
-    },
-    lamp: function (c, dir, H, L) {
-      if (dir === 'down') { A.blob(c, 16, 7, 5.5, 4, H, { bias: 0.1 }); box(c, H[0], 10, 9, 12, 2); box(c, 'ink', 15, 8, 3, 2); px(c, 'lamp_glow', 16, 9); }
-      else if (dir === 'up') { A.blob(c, 16, 8.5, 5.5, 5, H, { bias: 0.1 }); box(c, 'ink', 11, 10, 10, 1); }       // the strap round the back
-      else { A.blob(c, 15, 7, 5, 4, H, { bias: 0.1 }); box(c, H[0], 10, 9, 11, 2); box(c, 'ink', 19, 7, 2, 3); px(c, 'lamp_glow', 20, 8); }
-      eyes(c, dir, L);
-    }
-  };
-
-  // The dog from above, nearly a tile long: four facings, standing, a walking frame and
-  // sitting. Phase 47: the breed's coat, ears, tail and bulk (data/looks.js).
-  function paintDog(c, dir, fr, B) {
-    var sit = fr === 3, sw = fr === 1 ? 1 : 0, DOGK = B.coat, D0 = B.coat[0], D1 = B.paleLegs ? B.muzzle[1] : B.coat[1], E = B.ear[1], M = B.muzzle[2], k = B.bulk;
-    if (dir === 'side') {
-      if (!sit) {
-        box(c, D0, 6 + sw * 2, 22, 3, 8); box(c, D0, 19 - sw * 2, 22, 3, 8);   // the far legs
-        A.blob(c, 13, 19, 10 * k, 5.5 * k, DOGK, { bias: 0.1 });
-        box(c, D1, 8 - sw, 23, 3, 7); box(c, D1, 17 + sw, 23, 3, 7);                     // the near legs
-        sideTail(c, B, 1, 16 - sw);                                                     // the tail
-        A.blob(c, 25, 14, 5, 4.5, DOGK, { bias: 0.15 }); box(c, M, 27, 16, 4, 3); px(c, 'ink', 31, 16); px(c, 'ink', 26, 12);
-        if (B.curly) topCurls(c, B, 13, 19, 8, 4);
-        if (B.face) box(c, B.chest, 25, 9, 3, 2);                                       // the brow's blaze or mask
-        sideEar(c, B, 22, 12);                                                         // the ear
-      } else {
-        A.blob(c, 13, 22, 7 * k, 6.5 * k, DOGK, { bias: 0.1 }); box(c, D1, 17, 23, 3, 7); sitTail(c, B);
-        A.blob(c, 20, 12, 5, 4.5, DOGK, { bias: 0.15 }); box(c, M, 22, 14, 4, 3); px(c, 'ink', 26, 14); px(c, 'ink', 21, 10);
-        sideEar(c, B, 17, 10);
-      }
-    } else {
-      var down = dir === 'down';
-      if (!sit) { box(c, D0, 9, 11 + sw * 2, 3, 6); box(c, D0, 20, 11 - sw * 2, 3, 6); box(c, D0, 9, 23 - sw * 2, 3, 6); box(c, D0, 20, 23 + sw * 2, 3, 6); }
-      A.blob(c, 16, sit ? 21 : 18, 6.5 * k, (sit ? 7 : 10) * k, DOGK, { bias: 0.1 });
-      if (B.curly) topCurls(c, B, 16, sit ? 21 : 18, 4, sit ? 5 : 7);
-      var hy = down ? (sit ? 15 : 27) : (sit ? 13 : 7);
-      A.blob(c, 16, hy, 5, 4.5, DOGK, { bias: 0.15 });
-      if (down && B.face === 'blaze') { box(c, B.chest, 15, hy - 4, 2, 4); box(c, B.muzzle[1], 14, hy + 1, 4, 3); }
-      if (down && B.face === 'mask') { box(c, B.chest, 13, hy + 1, 6, 3); px(c, B.chest, 13, hy - 2); px(c, B.chest, 18, hy - 2); }
-      if (B.ears === 'prick') { box(c, E, 11, hy - 5, 2, 4); box(c, E, 19, hy - 5, 2, 4); } // the ears
-      else if (B.ears === 'heavy') { box(c, E, 9, hy - 2, 4, 6); box(c, E, 19, hy - 2, 4, 6); }
-      else if (B.ears === 'pom') { A.blob(c, 10.5, hy + 1, 2, 3, B.ear, { bias: 0.15 }); A.blob(c, 21.5, hy + 1, 2, 3, B.ear, { bias: 0.15 }); A.blob(c, 16, hy - 3, 2.6, 1.8, DOGK, { bias: 0.2 }); }
-      else { box(c, E, 10, hy - 2, 3, 5); box(c, E, 19, hy - 2, 3, 5); }
-      if (down) { px(c, 'ink', 14, hy); px(c, 'ink', 18, hy); box(c, 'ink', 15, hy + 3, 2, 1); }
-      else if (!sit) backTail(c, B);                                                  // the tail
-    }
-  }
-  // A curled coat: little rings of the coat's light and dark keys over the body.
-  function topCurls(c, B, cx, cy, rx, ry) {
-    for (var y = -ry; y <= ry; y += 3) for (var x = -rx + ((y / 3) & 1) * 2; x <= rx; x += 4) px(c, B.coat[0], cx + x, cy + y);
-  }
-  function sideEar(c, B, x, y) {
-    var E = B.ear[1];
-    if (B.ears === 'prick') box(c, E, x + 1, y - 3, 2, 4);
-    else if (B.ears === 'heavy') box(c, E, x - 1, y, 4, 7);
-    else if (B.ears === 'pom') A.blob(c, x + 1.5, y + 3, 2.2, 3.2, B.ear, { bias: 0.15 });
-    else box(c, E, x, y, 3, 6);
-  }
-  function sideTail(c, B, x, y) {
-    if (B.tail === 'curl') A.blob(c, x + 4, y - 2, 2.6, 2.2, B.coat, { bias: 0.2 });
-    else if (B.tail === 'low') box(c, B.coat[0], x, y + 3, 4, 3);
-    else if (B.tail === 'pom') { box(c, B.coat[0], x + 2, y + 1, 2, 1); A.blob(c, x + 1, y + 1, 2, 2, B.coat, { bias: 0.15 }); }
-    else box(c, B.coat[0], x, y, 4, 3);
-  }
-  function sitTail(c, B) {
-    if (B.tail === 'pom') A.blob(c, 7, 28, 2, 2, B.coat, { bias: 0.15 });
-    else if (B.tail === 'curl') A.blob(c, 8, 20, 2.6, 2.2, B.coat, { bias: 0.2 });
-    else box(c, B.coat[0], 6, 27, 6, 3);
-  }
-  function backTail(c, B) {
-    if (B.tail === 'curl') A.blob(c, 16, 26, 2.6, 2.2, B.coat, { bias: 0.25 });
-    else if (B.tail === 'pom') { box(c, B.coat[0], 15, 28, 2, 2); A.blob(c, 16, 30, 2, 1.6, B.coat, { bias: 0.15 }); }
-    else box(c, B.coat[0], 15, 28, 2, B.tail === 'low' ? 3 : 4);
-  }
-
-  // Rusty from above (Phase 37), old, worn down to the game's mood: a pale canvas jacket, a
-  // white beard, a paper-coloured cap. Facing down or left (toward whoever is at his counter);
-  // frames 0 standing, 1 blinking, 2 a sip from his cup, 3 reading the paper.
-  var CANV = ['reed', 'reed_hi', 'paper_dark', 'paper'], RSKIN = ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi'], BEARD = ['stone_hi', 'birch', 'bone'];
-  var RCAP = ['reed', 'paper_dark', 'paper', 'bone'];
-  function paintRusty(c, dir, fr) {
-    var side = dir === 'side';
-    if (dir === 'up') {                                                                // his back (39.3: facing the wall)
-      A.blob(c, 16, 22, 8.5, 7, CANV, { bias: 0.05 });
-      A.blob(c, 16, 11, 5, 5, RSKIN, { bias: 0.1 }); box(c, 'stone_hi', 12, 13, 8, 3);
-      A.blob(c, 16, 9, 5.5, 4.5, RCAP, { bias: 0.1 });
-      return;
-    }
-    A.blob(c, 16, 22, side ? 6.5 : 8.5, 7, CANV, { bias: 0.05 });
-    box(c, 'reed', 15, 17, 2, 10);                                                     // the jacket's opening
-    if (fr === 3) { box(c, 'ink', 7, 22, 18, 9); box(c, 'paper', 8, 23, 16, 7); box(c, 'paper_dark', 8, 25, 16, 1); box(c, 'paper_dark', 8, 27, 10, 1); } // the paper
-    else if (fr === 2) { A.limb(c, side ? 18 : 21, 20, side ? 20 : 19, 14, 1.8, CANV, 0.1); box(c, 'ink', side ? 19 : 17, 10, 5, 5); box(c, 'cream', side ? 20 : 18, 11, 3, 3); } // the cup up
-    else { A.blob(c, side ? 20 : 9, 27, 1.6, 1.4, RSKIN); if (!side) A.blob(c, 23, 27, 1.6, 1.4, RSKIN); }
-    var hy = fr === 3 ? 12 : 11;
-    A.blob(c, side ? 15 : 16, hy, 5, 5, RSKIN, { bias: 0.1 });
-    if (side) {
-      A.blob(c, 19, hy + 3, 3, 3, BEARD, { bias: 0.2 });
-      A.blob(c, 14, hy - 4, 5, 3.5, RCAP, { bias: 0.1 }); box(c, 'reed', 17, hy - 2, 5, 2);
-      if (fr !== 1 && fr !== 3) px(c, 'ink', 18, hy);
-      box(c, 'stone_hi', 10, hy - 2, 2, 4);
-    } else {
-      A.blob(c, 16, hy + 3.5, 4, 3, BEARD, { bias: 0.2 });
-      A.blob(c, 16, hy - 4, 5.5, 3.5, RCAP, { bias: 0.1 }); box(c, 'reed', 10, hy - 2, 12, 2);
-      if (fr === 3) { /* reading: the cap's brim hides his eyes */ }
-      else if (fr === 1) { box(c, 'skin_shadow', 13, hy, 2, 1); box(c, 'skin_shadow', 17, hy, 2, 1); }
-      else { px(c, 'ink', 14, hy); px(c, 'ink', 18, hy); }
+  // The back wall: windows, the trophy, the chart, the clock and calendar, the pegboard.
+  function wallThings(c) {
+    var i;
+    for (i = 0; i < WINS.length; i++) { var g = glassRect(i); K.windowFrame(c, g[0], g[1], g[2], g[3]); }
+    // The trophy over the rack: a perch on an oval plaque, a brass plate.
+    A.blob(c, tx(2), 26, 26, 11, ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit'], { bias: 0.1 });
+    var fi = 0; for (i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === 'gloam_perch') fi = i;
+    var fp = G.gfx.fishgen.portrait(fi, 40, 14, false); img(c, fp, tx(2) - (fp.width >> 1), 26 - (fp.height >> 1));
+    A.slab(c, tx(2) - 7, 33, 14, 3, BRASS);
+    // A fish chart beside the window, its corner torn and curling.
+    A.slab(c, tx(5) + 4, 12, 24, 30, ['paper_dark', 'paper_dark', 'paper', 'bone', 'cream']);
+    for (i = 0; i < 4; i++) { var fy = 17 + i * 6; A.blob(c, tx(5) + 13, fy, 6, 1.6, ['moss_dark', 'moss', 'moss_hi'], {}); box(c, 'stone', tx(5) + 21, fy, 4, 1); px(c, 'moss_dark', tx(5) + 7, fy); }
+    box(c, 'brick', tx(5) + 6, 13, 16, 2);
+    A.area(c, tx(5) + 22, 36, 6, 6, function (x, y) { return x - (tx(5) + 22) > 41 - y ? 'paper_dark' : ''; });
+    px(c, 'stone_hi', tx(5) + 15, 12);
+    // The clock (its hands are live) and a calendar on the wrong month.
+    A.blob(c, tx(CLOCK) + 16, 20, 8, 8, ['outline', 'wood_dark', 'wood_mid', 'wood_hi'], { bias: 0.1 });
+    A.blob(c, tx(CLOCK) + 16, 20, 6, 6, ['paper_dark', 'paper', 'bone', 'cream'], { rim: 0 });
+    for (i = 0; i < 12; i++) px(c, i % 3 ? 'stone_hi' : 'outline', Math.round(tx(CLOCK) + 16 + Math.sin(i / 6 * Math.PI) * 5), Math.round(20 - Math.cos(i / 6 * Math.PI) * 5));
+    A.slab(c, tx(CLOCK) + 8, 31, 16, 14, ['paper_dark', 'paper_dark', 'paper', 'bone', 'ivory']);
+    A.area(c, tx(CLOCK) + 9, 32, 14, 6, function (x, y) { return y < 37 ? (x > tx(CLOCK) + 14 && y < 35 ? 'crt_hi' : 'crt') : 'pink'; });
+    for (i = 0; i < 9; i++) px(c, i === 6 ? 'neon_red' : 'stone_hi', tx(CLOCK) + 10 + (i % 5) * 3, 39 + ((i / 5) | 0) * 3);
+    // The pegboard behind the counter: holes, and hanging packets in faded colours.
+    A.area(c, tx(8) + 2, 10, T - 4, 34, function (x, y) { return (x % 4 === 1 && y % 4 === 1) ? 'panel_deep' : ((x + y) % 7 ? 'panel_mid' : 'panel_hi'); });
+    A.slab(c, tx(8) + 1, 9, T - 2, 36, ['outline', 'panel_deep', 'panel_mid', 'panel_hi']);
+    A.area(c, tx(8) + 3, 11, T - 6, 32, function (x, y) { return (x % 4 === 1 && y % 4 === 1) ? 'panel_deep' : 'panel_mid'; });
+    var PK = ['orange', 'mustard', 'lav', 'crt_hi', 'pink', 'olive_hi', 'brick_hi', 'paper'];
+    for (i = 0; i < 8; i++) {
+      var kx = tx(8) + 4 + (i % 4) * 6, ky = 13 + ((i / 4) | 0) * 15, k = PK[i];
+      if (i === 5) { px(c, 'stone_hi', kx + 2, ky); continue; }                         // an empty hook
+      px(c, 'stone_hi', kx + 2, ky); A.slab(c, kx, ky + 1, 5, 11, ['outline', G.gfx.sprites.shift(k, -1), k, G.gfx.sprites.shift(k, 1)]);
+      box(c, 'ivory', kx + 1, ky + 3, 3, 3); px(c, i % 2 ? 'rust_hi' : 'brass_hi', kx + 2, ky + 4);
     }
   }
 
-  // lk (Phase 47): the look's id or record for the fisher or the dog; save.look's without it.
-  var art = {};
-  function sprite(kind, dir, fr, lk) {
-    var L = kind === 'rusty' ? null : (typeof lk === 'object' && lk ? lk : G.data.lookOf(kind === 'dog' ? G.data.looks.dogs : G.data.looks.fishers,
-      lk || (G.state.save && G.state.save.look ? G.state.save.look[kind] : '')));
-    var flip = dir === 'left', d = dir === 'left' || dir === 'right' ? 'side' : dir, key = kind + (L ? L.id : '') + d + fr + (flip ? '<' : '');
-    if (art[key]) return art[key];
-    if (flip) return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, L), 'x'));
-    return (art[key] = G.gfx.bake.layer(32, 32, function (c) { A.reset(); (kind === 'dog' ? paintDog : (kind === 'rusty' ? paintRusty : paintFisher))(c, d, fr, L); A.reset(); }));
-  }
-  // Phase 47: paints a look's fisher or dog in every facing and frame. Returns the ms it took.
-  function prebake(kind, lk) {
-    var t0 = typeof performance !== 'undefined' ? performance.now() : 0, DS = ['down', 'up', 'right', 'left'];
-    for (var i = 0; i < 4; i++) for (var f = 0; f < 4; f++) sprite(kind, DS[i], f, lk);
-    return typeof performance !== 'undefined' ? performance.now() - t0 : 0;
-  }
-
-  // ---- The walk ---------------------------------------------------------------------------
-  // st: {c, r (the tile he stands on or leaves), tc, tr (the tile he steps to), t (0..1 of
-  // the step), face, turnT (s held since a turn), moving, dog: {c, r, tc, tr, face, sit}}.
-  function create() {
-    return { c: MAT[0], r: MAT[1], tc: MAT[0], tr: MAT[1], t: 1, face: 'up', turnT: 0, turned: false, moving: false, steps: 0,
-      dog: { c: MAT[0] - 1, r: MAT[1], tc: MAT[0] - 1, tr: MAT[1], face: 'up', sit: true }, exit: false };
-  }
-
-  // dir: the direction held this step ('' none), tapped: a direction pressed this step (unused:
-  // a press of a new direction turns him, and he walks once it has been held for TURN s).
-  // Returns nothing; sets st.exit when he walks down off the mat through the door.
-  function step(st, dt, dir, tapped) {
-    var dg = st.dog;
-    if (st.moving) {
-      st.t += dt / STEP;
-      if (st.t >= 1) { st.t = 1; st.moving = false; st.c = st.tc; st.r = st.tr; dg.c = dg.tc; dg.r = dg.tr; }
+  // The rack, the jar shelf, the lure case, the fern, the gear shelf, the guitar on its amp.
+  function shelves(c) {
+    var x0 = tx(1), y0 = ty(1), i;
+    // The rack: a rail on the wall the rods lean on, a slotted base (the rods are live).
+    A.slab(c, x0 + 4, y0 - 26, 56, 4, WOODK); for (i = 0; i < 5; i++) box(c, 'outline', x0 + 9 + i * 10, y0 - 25, 3, 2);
+    A.slab(c, x0 + 2, y0 + 6, 60, 18, ['outline', 'wood_dark', 'wood', 'wood_mid', 'wood_hi']);
+    box(c, 'wood_deep', x0 + 3, y0 + 12, 58, 11);
+    for (i = 0; i < 5; i++) { box(c, 'outline', x0 + 8 + i * 10, y0 + 8, 4, 3); }
+    A.slab(c, x0 + 44, y0 + 14, 14, 8, ['outline', 'chrome_dark', 'chrome', 'chrome_hi']); A.blob(c, x0 + 51, y0 + 18, 3, 3, ['outline', 'water_mid', 'water_hi', 'water_foam'], {}); // a line spool
+    A.slab(c, x0 + 6, y0 + 14, 12, 8, ['outline', 'olive_dark', 'olive', 'olive_hi']); box(c, 'ivory', x0 + 9, y0 + 16, 6, 2);   // a box of hooks
+    // The jar shelf under the window: jars with peeled labels, the unlabelled one, a tin.
+    var jx = tx(3), jy = ty(1);
+    A.slab(c, jx + 2, jy + 4, 28, 20, ['outline', 'wood_dark', 'wood', 'wood_mid', 'wood_hi']); box(c, 'wood_deep', jx + 4, jy + 14, 24, 8); box(c, 'wood_dark', jx + 15, jy + 14, 1, 8);
+    for (i = 0; i < 3; i++) {
+      var gx = jx + 4 + i * 8, unl = i === 1, k = unl ? ['outline', 'teal_dark', 'teal', 'teal_lit'] : ['outline', 'mustard_dark', 'mustard', 'mustard_hi'];
+      A.slab(c, gx, jy - 6, 7, 10, k); box(c, 'chrome', gx, jy - 7, 7, 2);
+      if (!unl) { box(c, 'paper', gx + 1, jy - 2, 5, 3); box(c, 'outline', gx + 2, jy - 1, 1, 1); px(c, 'outline', gx + 4, jy - 1); }
+      else px(c, 'neon_teal', gx + 3, jy - 3);
     }
-    if (st.moving) return;
-    if (!dir) { st.turnT = 0; st.turned = false; dg.sit = true; dg.face = faceTo(dg, st.c, st.r) || dg.face; return; }
-    if (dir !== st.face) { st.face = dir; st.turnT = 0; st.turned = true; return; }     // a new direction turns him on the spot
-    st.turnT += dt;
-    if (st.turned && st.turnT < TURN) return;                                            // held a moment more, he walks
-    st.turned = false;
-    var nc = st.c + DIRS[dir][0], nr = st.r + DIRS[dir][1];
-    if (st.c === MAT[0] && st.r === MAT[1] && dir === 'down') { st.exit = true; return; } // out through the door
-    if (isBlocked(nc, nr)) return;
-    // The dog takes the tile he leaves (unless it is already beside him and he walks onto it).
-    var dc = st.c, dr = st.r;
-    if (dg.c === nc && dg.r === nr) { dc = st.c; dr = st.r; }
-    dg.tc = dc; dg.tr = dr; dg.face = faceTo(dg, dc, dr) || dg.face; dg.sit = false;
-    st.tc = nc; st.tr = nr; st.t = 0; st.moving = true; st.steps++;
-  }
-  function faceTo(o, c, r) {
-    var dx = c - o.c, dy = r - o.r;
-    if (!dx && !dy) return '';
-    return Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-  }
-
-  // What Space talks to: the object on the tile he faces ('' nothing).
-  function facing(st) {
-    if (st.moving) return '';
-    var c = st.c + DIRS[st.face][0], r = st.r + DIRS[st.face][1];
-    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return '';
-    return talkAt[r * COLS + c];
+    // The lure case: glass over trays of little lures on short legs.
+    var lx = tx(4), ly = ty(1);
+    A.slab(c, lx + 2, ly + 2, 28, 18, ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit']);
+    box(c, 'outline', lx + 4, ly + 4, 24, 12); box(c, 'water_dark', lx + 5, ly + 5, 22, 10);
+    var LK = ['brass_hi', 'orange_hi', 'olive_lit', 'signal_amber', 'pink_hi', 'crt_glow', 'flame', 'ivory'];
+    for (i = 0; i < 12; i++) { var ux = lx + 6 + (i % 6) * 4, uy = ly + 6 + ((i / 6) | 0) * 5; box(c, LK[i % 8], ux, uy, 2, 1); px(c, 'chrome_hi', ux + 2, uy + 1); }
+    A.line(c, 'fog_light', lx + 6, ly + 5, lx + 11, ly + 5); A.line(c, 'fog_mid', lx + 20, ly + 14, lx + 26, ly + 9);
+    box(c, 'wood_deep', lx + 4, ly + 20, 3, 6); box(c, 'wood_deep', lx + 25, ly + 20, 3, 6);
+    // The fern on a stool, and a landing net leaning by it.
+    A.slab(c, tx(5) + 8, ty(1) + 14, 16, 5, WOODK); box(c, 'wood_dark', tx(5) + 10, ty(1) + 19, 2, 9); box(c, 'wood_dark', tx(5) + 20, ty(1) + 19, 2, 9);
+    img(c, K.plant('fern', ['brick_dark', 'brick', 'brick_hi', 'orange_hi']), tx(5) + 2, ty(1) - 16);
+    A.line(c, 'wood_mid', tx(5) + 28, ty(1) + 26, tx(5) + 30, ty(1) - 14);
+    A.blob(c, tx(5) + 30, ty(1) - 20, 5, 6, ['outline', 'stone_dark', 'stone'], { rim: 0 });
+    for (i = 0; i < 4; i++) A.line(c, 'stone_hi', tx(5) + 26 + i * 3, ty(1) - 25, tx(5) + 26 + i * 2, ty(1) - 15);
+    // The gear shelf: a tall unit against the wall, three shelves; boxes and a coil of rope.
+    var sx = tx(6), sy = ty(1);
+    A.slab(c, sx + 1, sy - 30, 30, 56, ['outline', 'wood_dark', 'wood', 'wood_mid', 'wood_hi']); box(c, 'wood_deep', sx + 3, sy - 28, 26, 52);
+    for (i = 0; i < 3; i++) A.slab(c, sx + 3, sy - 14 + i * 14, 26, 3, ['outline', 'wood_mid', 'wood_hi', 'wood_lit']);
+    A.slab(c, sx + 4, sy - 8, 9, 6, ['outline', 'orange_dark', 'orange', 'orange_hi']); A.slab(c, sx + 14, sy - 6, 7, 4, ['outline', 'olive_dark', 'olive', 'olive_hi']);
+    A.blob(c, sx + 9, sy + 20, 6, 3, ['outline', 'reed', 'reed_hi', 'paper_dark'], {}); A.blob(c, sx + 9, sy + 20, 2, 1, 'outline', {});
+    A.slab(c, sx + 18, sy + 16, 9, 8, ['outline', 'brick_dark', 'brick', 'brick_hi']); box(c, 'ivory', sx + 20, sy + 18, 5, 2);
+    // A guitar leaning on its amp, under the clock.
+    img(c, K.amp(), tx(7) + 3, ty(1) + 4);
+    img(c, K.guitar('sun'), tx(7) + 15, ty(1) - 18);
   }
 
-  // ---- Drawing ----------------------------------------------------------------------------
-  var room = null, bakeMs = 0;
+  // Behind the counter: a back counter with the coffee maker, the boombox and its tapes, the
+  // CRT (its screen live), a stack of cans.
+  var tvRect = null;
+  function behindCounter(c) {
+    var bx = tx(8), by = ty(1), i;
+    A.slab(c, bx + 1, by - 4, 3 * T - 3, 24, ['outline', 'wood_dark', 'wood', 'wood_mid', 'wood_hi']);
+    box(c, 'wood_deep', bx + 3, by + 6, 3 * T - 7, 12); for (i = 1; i < 6; i++) box(c, 'outline', bx + 3 + i * 15, by + 6, 1, 12);
+    box(c, 'panel_lit', bx + 1, by - 4, 3 * T - 3, 1);
+    // The coffee maker and its pot.
+    A.slab(c, bx + 4, by - 20, 12, 16, ['outline', 'vinyl', 'vinyl_hi', 'chrome_dark']); box(c, 'outline', bx + 6, by - 12, 8, 7);
+    A.blob(c, bx + 10, by - 8, 4, 3, ['outline', 'rust_dark', 'rust', 'rust_hi'], {}); px(c, 'neon_red', bx + 13, by - 18);
+    // The boombox and the tapes.
+    img(c, K.boombox(), bx + 18, by - 16);
+    for (i = 0; i < 4; i++) { A.slab(c, bx + 18 + i * 6, by - 1, 5, 3, ['outline', ['lav_dark', 'orange_dark', 'olive_dark', 'brick_dark'][i], ['lav', 'orange', 'olive', 'brick'][i], 'ivory']); }
+    // The CRT and a stack of empty cans beside it.
+    var tv = K.crt(false);
+    img(c, tv.img, tx(10) - 2, by - 32);
+    tvRect = [tx(10) - 2 + tv.sx, by - 32 + tv.sy, tv.sw, tv.sh];
+    var g = X.grid(14, 16); for (i = 0; i < 3; i++) K.can(g, 1 + i * 4, 10, ['brick_hi', 'olive_hi', 'crt_hi'][i]); K.can(g, 3, 4, 'mustard_hi'); K.can(g, 7, 4, 'brick_hi'); K.can(g, 5, -1, 'olive_hi'); g.outline('outline'); g.paint(c, tx(10) + 18, by - 18);
+  }
+
+  // The bait station against the west wall: the worm cooler, the cricket cage, the tank.
+  function baitStation(c) {
+    var x0 = tx(1), y = ty(3);
+    // The cooler, lid ajar, cups of worms in dark earth.
+    A.slab(c, x0 + 3, y + 6, 26, 20, ['outline', 'paper_dark', 'paper', 'bone', 'ivory']); box(c, 'crt_hi', x0 + 3, y + 18, 26, 3);
+    A.slab(c, x0 + 2, y - 2, 28, 9, ['outline', 'paper_dark', 'bone', 'ivory', 'cream']);
+    for (var i = 0; i < 3; i++) { A.blob(c, x0 + 8 + i * 8, y + 2, 3, 2, ['outline', 'wood_deep', 'wood_dark'], {}); A.line(c, 'flesh', x0 + 6 + i * 8, y + 2, x0 + 10 + i * 8, y + 1); }
+    box(c, 'brick', x0 + 6, y + 10, 10, 4); box(c, 'ivory', x0 + 7, y + 11, 8, 1);
+    // The cricket cage: a mesh box on a crate (its crickets are live).
+    y = ty(4);
+    A.slab(c, x0 + 4, y + 16, 24, 12, WOODK);
+    A.slab(c, x0 + 3, y - 2, 26, 19, ['outline', 'reed_dark', 'reed', 'reed_hi']);
+    box(c, 'reed_dark', x0 + 5, y, 22, 15);
+    // The minnow tank on its stand: water, gravel, a weed, the pump (bubbles are live).
+    y = ty(5);
+    A.slab(c, x0 + 3, y + 18, 26, 10, ['outline', 'chrome_dark', 'chrome', 'chrome_hi']);
+    box(c, 'outline', x0 + 3, y - 4, 26, 23); box(c, 'water_dark', x0 + 4, y - 3, 24, 21); box(c, 'water_mid', x0 + 4, y - 3, 24, 3);
+    A.area(c, x0 + 4, y + 14, 24, 4, function (x, yy) { return (x + yy) % 3 ? 'stone' : 'stone_hi'; });
+    A.line(c, 'leaf_hi', x0 + 7, y + 14, x0 + 6, y + 4); A.line(c, 'leaf', x0 + 8, y + 14, x0 + 10, y + 6);
+    box(c, 'vinyl', x0 + 24, y - 6, 4, 4); A.line(c, 'outline', x0 + 26, y - 2, x0 + 26, y + 12);
+    box(c, 'fog_light', x0 + 5, y - 2, 6, 1);
+  }
+
+  // Props drawn in order of their feet with the people: the counter, the freezer, the palm.
+  function paintCounter(c) {
+    // An L: the leg down Rusty's left (col 8, rows 2-3), then along row 3 to the wall. Top
+    // surface first, then the front face. In the prop's own pixels: x from tx(8), y from ty(2) - 14.
+    var x0 = 2, y0 = 0, legW = T - 4, longW = 3 * T - 4, topY = T - 2, frontY = 2 * T - 2;
+    var TOPK = ['wood_dark', 'wood', 'wood_mid', 'wood_hi', 'wood_lit'];
+    A.area(c, x0, y0, legW, frontY, function (x, y) { return x === x0 || y === y0 ? 'outline' : tone(TOPK, 0.62 - (x - x0) / legW * 0.2 + (((y + 1) % 6) === 0 ? -0.18 : 0)); });
+    A.area(c, x0, topY, longW, frontY - topY, function (x, y) { return y === topY && x > x0 + legW - 1 ? 'outline' : tone(TOPK, 0.55 + (((y - topY) % 6) === 0 ? 0.12 : 0) - (x - x0) / longW * 0.1); });
+    box(c, 'outline', x0 + longW - 1, topY, 1, frontY - topY);
+    // The leg's top is a glass display: velvet trays of lures and spoons, the glass's glints.
+    var gx = x0 + 3, gy = 34, gw = legW - 6, gh = 22;
+    box(c, 'outline', gx - 1, gy - 1, gw + 2, gh + 2);
+    A.area(c, gx, gy, gw, gh, function (x, y) { return ((y - gy) % 9 === 8) ? 'chrome_dark' : ((x + y) % 5 ? 'blood' : 'rust_dark'); });
+    var DK = ['brass_hi', 'chrome_lit', 'orange_hi', 'olive_lit', 'pink_hi', 'signal_amber', 'crt_glow'];
+    for (var j = 0; j < 12; j++) { var dx = gx + 2 + (j % 3) * 7, dy = gy + 2 + ((j / 3) | 0) * 9; if (dy + 4 > gy + gh) break; box(c, DK[j % DK.length], dx, dy, 3, 2); A.px(c, 'chrome', dx + 3, dy + 2); A.px(c, 'outline', dx + 1, dy + 3); }
+    A.line(c, 'fog_light', gx + 1, gy + 1, gx + 6, gy + 1); A.line(c, 'fog_mid', gx + gw - 8, gy + gh - 2, gx + gw - 2, gy + gh - 7);
+    // The front face: tongue-and-groove, a kick plate, a sticker.
+    A.area(c, x0, frontY, longW, 16, function (x, y) { var e = y - frontY; return e === 0 ? 'panel_lit' : (e > 12 ? (e === 15 ? 'outline' : 'chrome_dark') : ((x - x0) % 6 === 0 ? 'panel_deep' : tone(K.PANEL, 0.5 - e * 0.02))); });
+    box(c, 'outline', x0, frontY, 1, 16); box(c, 'outline', x0 + longW - 1, frontY, 1, 16);
+    A.slab(c, x0 + 40, frontY + 3, 10, 7, ['outline', 'teal', 'teal_hi', 'teal_lit']); box(c, 'ivory', x0 + 42, frontY + 5, 6, 1);
+    // What stands on it: the till (its display stuck), a bell, an ashtray, a newspaper, a jar.
+    var g = X.grid(longW + 4, frontY + 4);
+    g.slab(66, topY - 10, 22, 14, ['outline', 'chrome_dark', 'chrome', 'chrome_hi', 'chrome_lit']);
+    g.rect('outline', 69, topY - 8, 13, 4); for (var i = 0; i < 3; i++) g.set('signal_amber', 71 + i * 3 + (i > 0 ? 1 : 0), topY - 7);
+    for (i = 0; i < 8; i++) g.set(i % 3 ? 'chrome_lit' : 'ivory', 69 + (i % 4) * 3, topY - 2 + ((i / 4) | 0) * 2);
+    g.ell(48, topY + 6, 3, 2, ['rust', 'leaf_gold', 'brass_hi'], {}); g.set('brass_hi', 48, topY + 3);
+    g.ell(36, topY + 8, 4, 2, ['outline', 'stone_dark', 'stone', 'stone_hi'], {}); g.rect('ivory', 37, topY + 7, 3, 1); g.set('orange_hi', 40, topY + 7);
+    g.slab(52, topY + 8, 12, 7, ['paper_dark', 'paper_dark', 'paper', 'bone']); g.rect('stone_hi', 54, topY + 10, 8, 1); g.rect('stone_hi', 54, topY + 12, 6, 1);
+    g.slab(8, T - 10, 9, 10, ['outline', 'pink_dark', 'pink', 'pink_hi']); g.rect('chrome', 8, T - 12, 9, 2);    // a jar of sweets on the leg
+    for (i = 0; i < 4; i++) g.set(['mustard_lit', 'crt_glow', 'orange_lit', 'olive_lit'][i], 10 + (i % 2) * 3, T - 8 + ((i / 2) | 0) * 3);
+    g.outline('outline'); g.paint(c, 0, 0);
+    img(c, K.bankerLamp(), 7, 12);
+  }
+  function paintFreezer(c) {
+    A.slab(c, 1, 8, 30, 22, ['outline', 'paper_dark', 'paper', 'bone', 'ivory']);
+    A.slab(c, 0, 0, 32, 10, ['outline', 'paper_dark', 'bone', 'ivory', 'cream']);
+    box(c, 'chrome_hi', 12, 9, 8, 2); box(c, 'outline', 12, 11, 8, 1);
+    box(c, 'brick', 4, 15, 14, 6); A.area(c, 5, 16, 12, 4, function (x, y) { return y === 17 && x % 2 ? 'ivory' : ''; });
+    box(c, 'reed', 22, 24, 6, 4); px(c, 'neon_red', 28, 13);
+  }
+
+  // ---- Baking ------------------------------------------------------------------------------
+  var base = null, front = null, props = null, bakeMs = 0;
   function bake() {
-    if (!room) {
+    if (!base) {
       var t0 = typeof performance !== 'undefined' ? performance.now() : 0;
-      room = G.gfx.bake.cached('shop:room38', function () { return G.gfx.bake.layer(W, H, paintRoom); });
+      base = G.gfx.bake.cached('shop:room56', function () { return G.gfx.bake.layer(W, RH, paintBase); });
+      front = G.gfx.bake.cached('shop:front56', function () {
+        return G.gfx.bake.layer(W, RH, function (c) {
+          for (var i = 0; i < WINS.length; i++) { var g = glassRect(i); K.windowFront(c, g[0], g[1], g[2], g[3], true); }
+          // A plant on each sill, a trailing pothos over the first.
+          c.drawImage(K.plant('snake', ['mustard_dark', 'mustard', 'mustard_hi', 'mustard_lit']), glassRect(0)[0] + 2, TOP - 22);
+          c.drawImage(K.plant('trail'), glassRect(1)[0] + glassRect(1)[2] - 26, TOP - 22);
+          A.reset();
+        });
+      });
+      props = [
+        { img: G.gfx.bake.cached('shop:counter56', function () { return G.gfx.bake.layer(3 * T, 2 * T + 18, paintCounter); }), x: tx(8), y: ty(2) - 14, foot: ty(4) },
+        { img: G.gfx.bake.cached('shop:freezer56', function () { return G.gfx.bake.layer(32, 31, paintFreezer); }), x: tx(1), y: ty(6) - 2, foot: ty(7) - 1 },
+        { img: G.gfx.bake.cached('shop:lamp56', function () { return K.floorLamp(); }), x: tx(3) + 9, y: ty(5) - 56, foot: ty(5) - 2 },
+        { img: G.gfx.bake.cached('shop:palm56', function () { return K.plant('monstera', ['orange_dark', 'orange', 'orange_hi', 'orange_lit']); }), x: tx(10) + 2, y: ty(7) - 42, foot: ty(7) - 1 }
+      ];
       if (t0) bakeMs = performance.now() - t0;
     }
-    return room;
+    return base;
   }
-  function blockedList() { var o = []; for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) if (isBlocked(c, r)) o.push([c, r]); return o; }
 
-  // What the shelves hold (Phase 38): the rods not yet his on the rack (tiers above his own),
-  // the lantern and the finder unless bought, and the minnows and crickets left this visit.
-  // Phase 43: every rod not yet his stands on the rack, in its blank's colour (five slots).
+  // What the shelves hold (Phase 38): every rod not yet his on the rack (Phase 43), the
+  // lantern and the finder unless bought, the minnows and crickets left this visit.
   var shown = { rods: 0, lantern: false, finder: false, minnows: 0, crickets: 0 };
-  function drawStock(ctx, stock, t) {
-    var x0 = OX + T, y0 = OY + T, i, n = 0, rods = G.data.gear.rods;
+  function drawStock(ctx, stock, t, ox, oy) {
+    var x0 = ox + tx(1), y0 = oy + ty(1), i, n = 0, rods = G.data.gear.rods;
     for (i = 1; i < rods.length; i++) {
       if (stock.rods && stock.rods.indexOf(i) >= 0) continue;
       var x = x0 + 9 + (i - 1) * 10;
-      ctx.fillStyle = P.ink; ctx.fillRect(x, y0 - 16, 2, 28);
-      ctx.fillStyle = P[rods[i].look[0]]; ctx.fillRect(x, y0 - 16, 1, 28);
-      ctx.fillStyle = P.wood_lit; ctx.fillRect(x - 1, y0 + 4, 3, 6);
-      ctx.fillStyle = P.stone_dark; ctx.fillRect(x + 2, y0 + 1, 1, 2);
+      ctx.fillStyle = P.outline; ctx.fillRect(x, y0 - 30, 3, 41);
+      ctx.fillStyle = P[rods[i].look[0]]; ctx.fillRect(x + 1, y0 - 30, 1, 41);
+      for (var gi = 0; gi < 3; gi++) { ctx.fillStyle = P.chrome_hi; ctx.fillRect(x, y0 - 26 + gi * 9, 1, 1); }
+      ctx.fillStyle = P.wood_lit; ctx.fillRect(x, y0 + 2, 3, 8); ctx.fillStyle = P.wood_mid; ctx.fillRect(x + 2, y0 + 2, 1, 8);
+      ctx.fillStyle = P.chrome; ctx.fillRect(x + 2, y0 - 2, 3, 3); ctx.fillStyle = P.chrome_lit; ctx.fillRect(x + 2, y0 - 2, 1, 1);
       n++;
     }
     shown.rods = n;
-    var gx = OX + 6 * T, gy = OY + T;
+    var gx = ox + tx(6), gy = oy + ty(1);
     shown.lantern = !stock.lantern; shown.finder = !stock.finder;
-    if (shown.lantern) { ctx.fillStyle = P.stone_dark; ctx.fillRect(gx + 8, gy - 18, 8, 10); ctx.fillStyle = P.lamp_glow; ctx.fillRect(gx + 10, gy - 16, 4, 5); }
-    if (shown.finder) { ctx.fillStyle = P.ink; ctx.fillRect(gx + 18, gy - 4, 9, 8); ctx.fillStyle = P.teal_dark; ctx.fillRect(gx + 19, gy - 3, 7, 5); ctx.fillStyle = P.neon_teal; ctx.fillRect(gx + 21, gy - 1, 1, 1); }
-    // Minnows in the tank, swimming to and fro; crickets in the crate, now and then a hop.
-    var tx = OX + T + 6, ty = OY + 5 * T + 8;
-    shown.minnows = stock.minnows;
-    ctx.fillStyle = P.water_hi;
-    for (i = 0; i < stock.minnows; i++) {
-      var ph = t * (0.35 + i * 0.07) + i * 1.7, u = (Math.sin(ph) + 1) / 2;
-      ctx.fillRect(tx + Math.round(u * 15), ty + (i * 5) % 14, 3, 1);
+    if (shown.lantern) {
+      ctx.fillStyle = P.outline; ctx.fillRect(gx + 7, gy - 27, 10, 13); ctx.fillStyle = P.rust; ctx.fillRect(gx + 8, gy - 26, 8, 2); ctx.fillRect(gx + 8, gy - 17, 8, 2);
+      ctx.fillStyle = P.lamp_glow; ctx.fillRect(gx + 9, gy - 24, 6, 7); ctx.fillStyle = P.flame; ctx.fillRect(gx + 11, gy - 21, 2, 3);
     }
-    var cx = OX + T + 6, cy = OY + 4 * T + 6;
+    if (shown.finder) { ctx.fillStyle = P.outline; ctx.fillRect(gx + 17, gy - 11, 11, 9); ctx.fillStyle = P.chrome_dark; ctx.fillRect(gx + 18, gy - 10, 9, 7); ctx.fillStyle = P.teal_dark; ctx.fillRect(gx + 19, gy - 9, 7, 4); ctx.fillStyle = P.neon_teal; ctx.fillRect(gx + 20, gy - 7, 1, 1); ctx.fillRect(gx + 23, gy - 6, 1, 1); }
+    // Minnows in the tank, crickets in the cage now and then hopping.
+    var mx = ox + tx(1) + 5, my = oy + ty(5) - 1;
+    shown.minnows = stock.minnows;
+    for (i = 0; i < stock.minnows; i++) {
+      var ph = t * (0.35 + i * 0.07) + i * 1.7, u = (Math.sin(ph) + 1) / 2, dir = Math.cos(ph) > 0;
+      ctx.fillStyle = P.water_foam; ctx.fillRect(mx + Math.round(u * 18), my + (i * 5) % 13, 3, 1);
+      ctx.fillStyle = P.chrome_lit; ctx.fillRect(mx + Math.round(u * 18) + (dir ? 2 : 0), my + (i * 5) % 13, 1, 1);
+    }
+    var cx = ox + tx(1) + 6, cy = oy + ty(4) + 1;
     shown.crickets = stock.crickets;
     for (i = 0; i < stock.crickets; i++) {
-      var hop = (t * 0.6 + i * 0.37) % 1 < 0.06 ? 1 : 0;
-      ctx.fillStyle = P.ink; ctx.fillRect(cx + 2 + (i * 7) % 16, cy + 3 + ((i * 5) % 11) - hop, 2, 1);
+      var hop = (t * 0.6 + i * 0.37) % 1 < 0.06 ? 2 : 0;
+      ctx.fillStyle = P.outline; ctx.fillRect(cx + 1 + (i * 7) % 18, cy + 4 + ((i * 5) % 9) - hop, 2, 1); ctx.fillStyle = P.wood; ctx.fillRect(cx + 3 + (i * 7) % 18, cy + 3 + ((i * 5) % 9) - hop, 1, 1);
     }
-    ctx.fillStyle = P.reed_dark;
-    for (i = 0; i < 4; i++) ctx.fillRect(cx + 1 + i * 5, cy + 1, 1, 14);                // the crate's slats over them
+    ctx.fillStyle = P.reed_hi;                                                          // the cage's mesh over them
+    for (i = 0; i < 6; i++) ctx.fillRect(cx - 1 + i * 4, cy - 1, 1, 15);
+    for (i = 0; i < 4; i++) ctx.fillRect(cx - 1, cy - 1 + i * 4, 22, 1);
   }
 
   // ---- Light, life and the strange (Phase 39) -------------------------------------------
-  // The windows show the lake at the hour: the sky in the lake's own keys (sailing.skyColor,
-  // five bands, rebaked when the hour moves by 0.05), the far shore, the water, the fog over it
-  // and drizzle on the glass. The room's light: at night the room darkens but for the lamp's
-  // stepped pools (a mask baked once), by day a flat grey. Dust in the lamplight, bubbles in
-  // the tank, steam from Rusty's cup. env: {hour, night, grey, rain, fog, strange, st} where
-  // strange is '' or 'clock' | 'figure' and st its time 0..1.
-  var FIGURE_WIN = 10, LAMP = [5.5 * T + 16, 3.4 * T], skyKey = -1, skyCss = ['', '', '', '', ''], skyOut = [0, 0, 0], mask = null;
-  function refreshSky(hour) {
-    var k = Math.floor(hour * 20);
-    if (k === skyKey) return;
-    skyKey = k;
-    for (var i = 0; i < 5; i++) { G.scene.sailing.skyColor(hour, i / 5 * 0.9, skyOut); skyCss[i] = 'rgb(' + skyOut[0] + ',' + skyOut[1] + ',' + skyOut[2] + ')'; }
+  // env: {hour, night, grey, rain, fog, flash, strange, st}: the windows show the lake at the
+  // hour; at night the room darkens but for the lamps' stepped pools.
+  var FIGURE_WIN = 10, mask = null;
+  function clearAt(x, y) {
+    for (var i = 0; i < WINS.length; i++) { var g = glassRect(i); if (x >= g[0] && x < g[0] + g[2] && y >= g[1] && y < g[1] + g[3]) return true; }
+    return tvRect && x >= tvRect[0] && x < tvRect[0] + tvRect[2] && y >= tvRect[1] && y < tvRect[1] + tvRect[3];
   }
-  function bakeMask() {
-    return G.gfx.bake.layer(W, H, function (c) {
-      c.fillStyle = P.ink;
-      for (var y = 0; y < H; y += 2) for (var x = 0; x < W; x += 2) {
-        if (y >= 8 && y < 26 && MAP[0][(x / T) | 0] === 'W') continue;                 // the glass keeps the dusk outside
-        var dx = (x - LAMP[0]) / 1.15, dy = y - LAMP[1], d = Math.sqrt(dx * dx + dy * dy);
-        var a = d < 46 ? 0 : (d < 78 ? 0.18 : (d < 118 ? 0.34 : 0.5));                // four steps, 2 px cells
-        if (!a) continue;
-        c.globalAlpha = a; c.fillRect(x, y, 2, 2);
-      }
-      c.globalAlpha = 1;
-    });
-  }
-  function drawWindows(ctx, env, t) {
-    refreshSky(env.hour);
-    for (var c = 0; c < COLS; c++) {
-      if (MAP[0][c] !== 'W') continue;
-      var left = MAP[0][c - 1] !== 'W', gx = OX + c * T + (left ? 6 : 0), gw = T - 6, y0 = OY + 8;
-      for (var i = 0; i < 5; i++) { ctx.fillStyle = skyCss[i]; ctx.fillRect(gx, y0 + i * 2, gw, 2); }
-      ctx.fillStyle = P.mount_far; ctx.fillRect(gx, y0 + 10, gw, 2);                     // the far shore
-      ctx.fillStyle = P.pine_dark; ctx.fillRect(gx, y0 + 11, gw, 1);
-      ctx.fillStyle = P.water_deep; ctx.fillRect(gx, y0 + 12, gw, 6);                     // the water
-      ctx.fillStyle = skyCss[4]; ctx.globalAlpha = 0.35; ctx.fillRect(gx, y0 + 13, gw, 1); ctx.globalAlpha = 1;
-      if (env.strange === 'figure' && c === FIGURE_WIN) {                                 // 39.3: someone on the far shore, in one window
-        ctx.globalAlpha = Math.min(1, Math.min(env.st, 1 - env.st) * 4) * 0.9; ctx.fillStyle = P.fog_mid; // pale: a dark one is lost against the night
-        ctx.fillRect(gx + 12, y0 + 4, 2, 2); ctx.fillRect(gx + 11, y0 + 6, 4, 6); ctx.fillRect(gx + 11, y0 + 12, 1, 1); ctx.fillRect(gx + 14, y0 + 12, 1, 1);
-        ctx.globalAlpha = 1;
-      }
-      if (env.fog > 0) { ctx.globalAlpha = Math.min(0.6, env.fog * 0.5); ctx.fillStyle = P.fog_mid; ctx.fillRect(gx, y0 + 8, gw, 8); ctx.globalAlpha = 1; }
-      if (env.rain > 0.05) {                                                             // drizzle on the glass
-        ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.5;
-        var n = Math.round(env.rain * 6);
-        for (i = 0; i < n; i++) { var u = (t * (0.7 + i * 0.13) + i * 0.29) % 1; ctx.fillRect(gx + (i * 7 + 3) % gw, y0 + Math.floor(u * 16), 1, 2); }
-        ctx.globalAlpha = 1;
-      }
-      ctx.fillStyle = P.wood_deep; ctx.fillRect(left ? gx + gw - 1 : gx, y0, 1, 18); ctx.fillRect(gx, y0 + 8, gw, 1); // the mullions
+  function drawLive(ctx, env, t, rusty, ox, oy) {
+    var i;
+    for (i = 0; i < WINS.length; i++) {
+      var g = glassRect(i), fig = env.strange === 'figure' && WINS[i][0] + WINS[i][1] - 1 === FIGURE_WIN ? Math.min(1, Math.min(env.st, 1 - env.st) * 4) : 0;
+      K.glass(ctx, ox + g[0], oy + g[1], g[2], g[3], env, t, fig);
     }
-  }
-  // The clock at the game hour (the minute hand to the quarter and finer); 39.3 runs it back.
-  function drawClock(ctx, env) {
-    var cx = OX + CLOCK * T + 16, cy = OY + 14, back = env.strange === 'clock' ? env.st * 4 * Math.PI : 0;
-    var ha = (((env.hour % 12) + 12) % 12) / 12 * 2 * Math.PI, ma = (env.hour % 1) * 2 * Math.PI - back, i;
-    ctx.fillStyle = P.ink;
+    ctx.drawImage(front, ox, oy);
+    // The BAIT neon in the first window: pink tubes, a flicker every 17 s.
+    var g0 = glassRect(0), nx = ox + g0[0] + 8, ny = oy + g0[1] + 6, on = (t % 17) > 0.35 || ((t * 20) | 0) % 2;
+    neon(ctx, 'BAIT', nx, ny, on, env.night);
+    // The clock's hands at the game hour (39.3 runs them back).
+    var cx = ox + tx(CLOCK) + 16, cy = oy + 20, back = env.strange === 'clock' ? env.st * 4 * Math.PI : 0;
+    var ha = (((env.hour % 12) + 12) % 12) / 12 * 2 * Math.PI, ma = (env.hour % 1) * 2 * Math.PI - back;
+    ctx.fillStyle = P.outline;
     for (i = 1; i <= 4; i++) ctx.fillRect(Math.round(cx + Math.sin(ma) * i), Math.round(cy - Math.cos(ma) * i), 1, 1);
-    for (i = 1; i <= 2; i++) ctx.fillRect(Math.round(cx + Math.sin(ha) * i), Math.round(cy - Math.cos(ha) * i), 1, 1);
+    for (i = 1; i <= 3; i++) ctx.fillRect(Math.round(cx + Math.sin(ha) * i * 0.8), Math.round(cy - Math.cos(ha) * i * 0.8), 1, 1);
+    ctx.fillStyle = P.neon_red; ctx.fillRect(cx, cy, 1, 1);
+    // The CRT behind the counter, a fishing show on it.
+    if (tvRect) K.screen(ctx, ox + tvRect[0], oy + tvRect[1], tvRect[2], tvRect[3], t, 1);
   }
-  function drawLight(ctx, env, t, rusty) {
+  // A word in neon tubes (the font's own pixels, doubled, outlined): lit or dark.
+  function neon(ctx, s, x, y, on, night) {
+    var F = G.gfx.sprites;
+    if (on && night > 0.2) { ctx.globalAlpha = 0.18 * night; ctx.fillStyle = P.neon_pink; ctx.fillRect(x - 3, y - 3, F.measure(s) + 6, 11); ctx.globalAlpha = 1; }
+    F.drawText(ctx, s, x, y, on ? 'neon_pink_hi' : 'pink_dark');
+    F.drawText(ctx, s, x + 1, y, on ? 'neon_pink' : 'pink_dark');
+  }
+  function drawLight(ctx, env, t, rusty, ox, oy) {
+    var i;
     if (env.night > 0.02) {
-      if (!mask) mask = bakeMask();
-      ctx.globalAlpha = env.night; ctx.drawImage(mask, OX, OY); ctx.globalAlpha = 1;
-      // Dust drifting in the lamplight.
-      ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.45 * env.night;
-      for (var i = 0; i < 9; i++) {
-        var a = t * (0.05 + i * 0.011) + i * 2.1, r = 10 + (i * 7) % 30;
-        ctx.fillRect(Math.round(OX + LAMP[0] + Math.cos(a) * r * 1.1), Math.round(OY + LAMP[1] + Math.sin(a * 1.3) * r * 0.8), 1, 1);
+      if (!mask) mask = K.nightMask(W, RH, [{ x: LAMP[0], y: LAMP[1], r: 118 }, { x: DESK[0], y: DESK[1] - 6, r: 52 }, { x: tvRect ? tvRect[0] + 8 : 0, y: tvRect ? tvRect[1] + 18 : 0, r: 34 }], clearAt);
+      ctx.globalAlpha = env.night; ctx.drawImage(mask, ox, oy); ctx.globalAlpha = 1;
+      ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.45 * env.night;                 // dust in the lamplight
+      for (i = 0; i < 11; i++) {
+        var a = t * (0.05 + i * 0.011) + i * 2.1, r = 10 + (i * 7) % 34;
+        ctx.fillRect(Math.round(ox + LAMP[0] + 24 + Math.cos(a) * r * 1.1), Math.round(oy + LAMP[1] - 20 + Math.sin(a * 1.3) * r * 0.8), 1, 1);
       }
       ctx.globalAlpha = 1;
-    } else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(OX, OY + 28, W, H - 28); ctx.globalAlpha = 1; } // below the glass and the clock
-    // The lamp, hung over the rug: its shade and the bulb's glow (lit at night).
-    var lx = OX + LAMP[0], ly = OY + LAMP[1] - 30;
-    ctx.fillStyle = P.stone_dark; ctx.fillRect(lx, OY, 1, ly - OY); ctx.fillRect(lx - 5, ly, 11, 3);
-    ctx.fillStyle = env.night > 0.3 ? P.lamp_glow : P.stone; ctx.fillRect(lx - 2, ly + 3, 5, 2);
-    // The tank's bubbles; steam from Rusty's cup on the counter.
+    } else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + T, oy + TOP + 2, W - 2 * T, RH - TOP - 2); ctx.globalAlpha = 1; }
+    K.bulbs(ctx, bulbPts(ox, oy), t, env.night);
+    // The floor lamp's shade, lit at night.
+    if (env.night > 0.3) K.glow(ctx, ox + LAMP[0], oy + LAMP[1] - 22, 15, 'lamp_glow', 0.06 * env.night);
+    // The tank's bubbles; steam from Rusty's cup; smoke from the ashtray.
     ctx.fillStyle = P.water_foam;
-    for (i = 0; i < 3; i++) { var u = (t * 0.5 + i / 3) % 1; ctx.fillRect(OX + T + 22 - i * 4, OY + 5 * T + 22 - Math.floor(u * 16), 1, 1); }
-    var cx = OX + 9 * T + 22, cy = OY + 3 * T - 2;
+    for (i = 0; i < 4; i++) { var u = (t * 0.5 + i / 4) % 1; ctx.fillRect(ox + tx(1) + 26 - (i % 2), oy + ty(5) + 11 - Math.floor(u * 15), 1, 1); }
+    var cupX = ox + tx(9) + 22, cupY = oy + ty(3) - 4;
     if (!rusty || rusty.fr !== 2) {
-      ctx.fillStyle = P.ink; ctx.fillRect(cx - 1, cy - 1, 5, 4); ctx.fillStyle = P.cream; ctx.fillRect(cx, cy, 3, 2);
+      ctx.fillStyle = P.outline; ctx.fillRect(cupX - 1, cupY - 1, 6, 6); ctx.fillStyle = P.cream; ctx.fillRect(cupX, cupY, 4, 4); ctx.fillStyle = P.paper_dark; ctx.fillRect(cupX + 3, cupY + 1, 1, 3);
       ctx.fillStyle = P.fog_light;
-      for (i = 0; i < 3; i++) { var v = (t * 0.6 + i / 3) % 1; ctx.globalAlpha = 0.5 * (1 - v); ctx.fillRect(cx + 1 + Math.round(Math.sin(v * 6 + i)), cy - 2 - Math.floor(v * 9), 1, 1); }
+      for (i = 0; i < 3; i++) { var v = (t * 0.6 + i / 3) % 1; ctx.globalAlpha = 0.5 * (1 - v); ctx.fillRect(cupX + 2 + Math.round(Math.sin(v * 6 + i)), cupY - 2 - Math.floor(v * 10), 1, 1); }
       ctx.globalAlpha = 1;
     }
+    ctx.fillStyle = P.stone_hi;
+    for (i = 0; i < 3; i++) { var s = (t * 0.25 + i / 3) % 1; ctx.globalAlpha = 0.4 * (1 - s); ctx.fillRect(ox + tx(8) + 42 + Math.round(Math.sin(s * 5 + i * 2) * 2), oy + ty(3) + 2 - Math.floor(s * 18), 1, 1); }
+    ctx.globalAlpha = 1;
   }
+  var bp = [];
+  function bulbPts(ox, oy) { if (bp.length !== cable.length) { bp.length = 0; for (var i = 0; i < cable.length; i++) bp.push([0, 0]); } for (i = 0; i < cable.length; i++) { bp[i][0] = ox + cable[i][0]; bp[i][1] = oy + cable[i][1]; } return bp; }
 
-  // Draws the room, the glass, Rusty behind his counter, the dog and the fisher, the one
-  // further down the room in front. rusty: {face, fr} (Phase 37); stock: what the shelves hold
-  // (38); env: the hour, the light and the strange (39).
+  // Draws the room, the glass, Rusty behind his counter, the props, the dog and the fisher in
+  // order of their feet. rusty: {face, fr} (Phase 37); stock: what the shelves hold (38); env:
+  // the hour, the light and the strange (39).
+  var order = [];
   function draw(ctx, st, t, hour, rusty, stock, env) {
+    var ox = OX, oy = OY - TOP, i;
     ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
-    ctx.drawImage(bake(), OX, OY);
-    if (env) { drawWindows(ctx, env, t); drawClock(ctx, env); }
-    if (stock) drawStock(ctx, stock, t);
-    if (rusty) ctx.drawImage(sprite('rusty', rusty.face, rusty.fr), OX + RUSTY[0] * T, OY + RUSTY[1] * T - 6);
-    // The dog and the fisher, the one further down the room in front.
-    var dg = st.dog, u = st.moving ? st.t : 1;
-    var fx = OX + (st.c + (st.tc - st.c) * u) * T, fy = OY + (st.r + (st.tr - st.r) * u) * T - 6;
-    var dx = OX + (dg.c + (dg.tc - dg.c) * u) * T, dy = OY + (dg.r + (dg.tr - dg.r) * u) * T - 2;
-    var ffr = st.moving ? (st.steps & 1 ? 1 : 2) * (u > 0.25 && u < 0.75 ? 1 : 0) : 0;
-    var dfr = dg.sit ? 3 : (st.moving && u > 0.25 && u < 0.75 ? 1 : 0);
-    var fimg = sprite('fisher', st.face, ffr), dimg = sprite('dog', dg.face, dfr);
-    if (dy > fy + 6) { ctx.drawImage(fimg, Math.round(fx), Math.round(fy)); ctx.drawImage(dimg, Math.round(dx), Math.round(dy)); }
-    else { ctx.drawImage(dimg, Math.round(dx), Math.round(dy)); ctx.drawImage(fimg, Math.round(fx), Math.round(fy)); }
-    if (env) drawLight(ctx, env, t, rusty);
+    ctx.drawImage(bake(), ox, oy);
+    if (env) drawLive(ctx, env, t, rusty, ox, oy);
+    else ctx.drawImage(front, ox, oy);
+    if (stock) drawStock(ctx, stock, t, ox, oy);
+    // Everything that stands, in order of its feet.
+    var f = R.walkers(st, T, ox, oy - 0 + TOP), fr = R.frames(st);
+    order.length = 0;
+    for (i = 0; i < props.length; i++) order.push(props[i].foot, i);
+    if (rusty) order.push(ty(3) - 2, 100);
+    order.push(f[3] - oy, 101, f[1] - oy + 0.5, 102);
+    for (var pass = 0; pass < order.length / 2; pass++) {                              // a small sort, no allocation
+      var bi = -1, by = 1e9;
+      for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
+      var id = order[bi + 1]; order[bi] = 1e9 + 1;
+      if (id < 100) ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y);
+      else if (id === 100) R.drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 16, oy + ty(3) - 2);
+      else if (id === 101) R.drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
+      else R.drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
+    }
+    if (env) drawLight(ctx, env, t, rusty, ox, oy);
   }
 
-  return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,
-    create: create, step: step, facing: facing, isBlocked: isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: prebake,
-    bakeMs: function () { return bakeMs; }, blocked: blockedList, shown: function () { return shown; } };
+  function sprite(kind, dir, fr, lk) { return R.sprite(kind, dir, fr, lk); }
+
+  return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, TOP: TOP, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,
+    create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: R.prebake,
+    bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; } };
 })();

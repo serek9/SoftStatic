@@ -40,8 +40,31 @@ G.gfx.sprites = (function () {
     // Phase 47 (looks): a yellow oilskin, a faded denim, a darker skin ramp.
     slicker_dark: '#5a4a1c', slicker: '#8a7228', slicker_hi: '#b09a40',
     denim_dark: '#1c2433', denim: '#2c3a50', denim_hi: '#45597a',
-    umber_deep: '#2e1c18', umber_dark: '#4a2e24', umber: '#6e4634', umber_hi: '#8e6048'
+    umber_deep: '#2e1c18', umber_dark: '#4a2e24', umber: '#6e4634', umber_hi: '#8e6048',
+    // Phase 56 (the shop and the cabin, lofi): 70s panelling, mustard, burnt orange, olive,
+    // dusty pink, lavender, a CRT's blue, chrome, brick, a guitar's sunburst, plant greens,
+    // vinyl, and a dim pink neon. Interior keys only (INTERIOR below): shift() never picks
+    // them, so the fish portraits and every earlier sprite keep their colours.
+    panel_deep: '#2a1a10', panel: '#583822', panel_mid: '#72502e', panel_hi: '#8e663c', panel_lit: '#b08350',
+    mustard_dark: '#5e4a16', mustard: '#94782a', mustard_hi: '#bc9c40', mustard_lit: '#d8bc68',
+    orange_dark: '#62290f', orange: '#9c4a1c', orange_hi: '#c46e30', orange_lit: '#de9850',
+    olive_dark: '#2a3016', olive: '#465024', olive_hi: '#68723a', olive_lit: '#8e9656',
+    pink_dark: '#5e343c', pink: '#94606a', pink_hi: '#c08c8a', pink_lit: '#dcb4a8',
+    lav_dark: '#332c46', lav: '#56507a', lav_hi: '#7e78a0', lav_lit: '#a8a2c2',
+    crt_dark: '#0e1e28', crt: '#1c4252', crt_hi: '#367c8c', crt_glow: '#82c4c4',
+    chrome_dark: '#353840', chrome: '#626874', chrome_hi: '#9aa0aa', chrome_lit: '#cdd1d6',
+    brick_dark: '#3a1a14', brick: '#683024', brick_hi: '#8c4a36',
+    leaf_deep: '#14281a', leaf_dark: '#1e3c24', leaf: '#2e5a32', leaf_hi: '#4c7c42', leaf_lit: '#76a456',
+    sun_dark: '#32100a', sun: '#702614', sun_hi: '#ac521c', sun_lit: '#d89a40',
+    vinyl: '#121016', vinyl_hi: '#3a3642', neon_pink: '#d0507e', neon_pink_hi: '#f0a0b8',
+    ivory: '#efe6cc', denim_lit: '#6880a4', outline: '#120e0c'
   };
+  // Phase 56: the interior keys above, which shift() leaves out.
+  var INTERIOR = {};
+  ('panel_deep panel panel_mid panel_hi panel_lit mustard_dark mustard mustard_hi mustard_lit orange_dark orange orange_hi orange_lit ' +
+   'olive_dark olive olive_hi olive_lit pink_dark pink pink_hi pink_lit lav_dark lav lav_hi lav_lit crt_dark crt crt_hi crt_glow ' +
+   'chrome_dark chrome chrome_hi chrome_lit brick_dark brick brick_hi leaf_deep leaf_dark leaf leaf_hi leaf_lit sun_dark sun sun_hi sun_lit ' +
+   'vinyl vinyl_hi neon_pink neon_pink_hi ivory denim_lit outline').split(' ').forEach(function (k) { INTERIOR[k] = true; });
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.
   var CEILING_KEY = 'dusk_high';
@@ -73,7 +96,7 @@ G.gfx.sprites = (function () {
     if (shifted[id] !== undefined) return shifted[id];
     var c = RGB[key], L = lum(key), m = (c[0] + c[1] + c[2]) / 3, best = key, bd = 1e9;
     for (var k in PALETTE) {
-      if (k === key || k === 'black') continue;
+      if (k === key || k === 'black' || INTERIOR[k]) continue;
       var dl = (lum(k) - L) * dir;
       if (dl < 8 || dl > 80) continue;
       var q = RGB[k], qm = (q[0] + q[1] + q[2]) / 3;
