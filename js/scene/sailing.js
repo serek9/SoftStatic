@@ -209,6 +209,19 @@ G.scene.sailing = (function () {
       A.slab(ctx, x1 - 18, deck - 37, 7, 5, RUSTY); A.box(ctx, 'fog_dark', x1 - 17, deck - 33, 5, 2);
       return [x0, x1];
     },
+    // Phase 67: the signpost at the pier's shore end: a leaning post with two boards pointing
+    // up the path, BAIT SHOP and CABIN, and a lantern hook.
+    sign: function (ctx, x, wy, rng) {
+      var deck = wy - 14, FN = G.gfx.sprites.fine, y0 = deck - 40;
+      A.slab(ctx, x - 2, y0, 4, wy - y0 + 2, WOOD); A.box(ctx, 'wood_lit', x - 2, y0, 1, wy - y0);
+      var B = ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit'];
+      A.slab(ctx, x - 26, y0 + 2, 44, 11, B); A.box(ctx, 'outline', x + 18, y0 + 4, 3, 7); A.px(ctx, 'wood_mid', x + 18, y0 + 7);
+      A.slab(ctx, x - 20, y0 + 15, 38, 11, B); A.box(ctx, 'outline', x + 18, y0 + 17, 3, 7); A.px(ctx, 'wood_mid', x + 18, y0 + 20);
+      FN.drawText(ctx, 'BAIT SHOP', x - 23, y0 + 4, 'paper_dark');
+      FN.drawText(ctx, 'CABIN', x - 14, y0 + 17, 'paper_dark');
+      A.reset();
+      return [x - 26, x + 21];
+    },
     // A rusted channel buoy: a float at the waterline, a lattice cage, a dead lamp, a bell.
     marker: function (ctx, x, wy, rng) {
       var y, i;
@@ -1527,6 +1540,7 @@ G.scene.sailing = (function () {
     if (!run) return '';
     if (G.ui.card.isOpen()) return CARD_WORD[G.ui.card.choice()] || '';
     if (G.ui.setup.isOpen()) return 'PICK';
+    if (G.ui.dock.isOpen()) return 'GO';
     switch (run.fsm) {
       case 'sailing': return run.boat.stopped ? 'CAST' : '';
       case 'charging': return 'CAST';
@@ -1567,10 +1581,11 @@ G.scene.sailing = (function () {
     G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);
     anomalyStep(run, save, dt);
     owlStep(run, save, hour0, dt);
-    if (!setupOn) castStep(run, dt);
+    var dockOn = !setupOn && G.ui.dock.step(run, loc, dt);                 // Phase 67: at the pier
+    if (!setupOn && !dockOn) castStep(run, dt);
     // Audit P1-6: the down arrow pets the dog while the boat sits still between casts. Phase 45:
     // ↓ alone or a tap on him; S (down and setup together) opens the setup panel instead.
-    if (run.fsm === 'sailing' && b.stopped && !setupOn && inp.pressed('down') && !inp.pressed('setup')) dog.pet(run.dog);
+    if (run.fsm === 'sailing' && b.stopped && !setupOn && !dockOn && inp.pressed('down') && !inp.pressed('setup')) dog.pet(run.dog);
     fishStep(run, dt);
     riseStep(run, dt);
     rainAcc += rainK() * 6 * dt; // rings where the drizzle meets the water
@@ -1594,7 +1609,7 @@ G.scene.sailing = (function () {
         if (choice === 'release') releaseStart(run, got.spIdx, got.len, got.w); // Phase 51: he lets it go
       }
     }
-    var move = run.fsm === 'sailing' && !setupOn ? (inp.move() || sailMove(dt)) : 0;
+    var move = run.fsm === 'sailing' && !setupOn && !(dockOn && !G.ui.dock.isOpen()) ? (inp.move() || sailMove(dt)) : 0; // Phase 67: steering off closes the pier's panel
     run.move = move;
     boat.outboard(b, move, dt); // Phase 26: the motor first; only a running motor pushes the boat
     boat.step(b, move, dt, loc.width);
@@ -1855,6 +1870,7 @@ G.scene.sailing = (function () {
     drawDangle(ctx); // Phase 34
     G.ui.hud.draw(ctx, run, wy);
     G.ui.setup.draw(ctx); // Phase 45
+    G.ui.dock.draw(ctx);  // Phase 67
     G.ui.card.draw(ctx);
   }
 

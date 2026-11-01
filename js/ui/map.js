@@ -253,7 +253,15 @@ G.ui.map = (function () {
     if (dest.kind === 'loc') {
       G.scene.sailing.load(dest.id);
       G.core.save.autosave('travel');
-    } else G.core.state.change(dest.kind);
+    } else {
+      // Phase 67: the shop and the cabin are up the path from Fogbound's pier, so the trip
+      // ends with the boat tied up there, and that is where he comes back to.
+      if (G.state.run.loc !== 'fog') G.scene.sailing.load('fog');
+      G.scene.sailing.tp(G.data.locations.fog.dock.x + 30);
+      G.ui.dock.disarm();
+      G.core.save.autosave('travel');
+      G.core.state.change(dest.kind);
+    }
     lastMs = performance.now() - t0;
     lastDest = dest.id;
   }

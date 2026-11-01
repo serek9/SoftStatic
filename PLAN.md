@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-01, after Phase 66 (the chart, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-01, after Phase 67 (the pier at the edge, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -450,6 +450,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 64 Rooms that are lived in | Done | `Phase 64: Rooms that are lived in (tasks 64.1-64.3)` | The cabin: a lava lamp on a side table by the chair, a late-90s grey console on the floor before the TV with its pad on a cable (the TV boots it, then plays a jittering low-polygon fishing game), a box fan turning, an old fridge with magnets; the shop: a lava lamp on the gear shelf, an orange cat asleep on the freezer, a lit drinks cooler, moths at the lamps; both: reflections on the varnished boards and in the window glass, glare on the CRTs. `dbg.roomLife()`. Presentation only: 8.3 #335–337 |
 | 65 Lures that move like lures | Done | `Phase 65: Lures that move like lures (tasks 65.1-65.3)` | The retrieve draws the lure along the line toward the rod tip with the reel's inertia, each lure with its own action, and a paused sinking lure swings back on a tight line; two new lures, the Bobber Rig (a red-and-white float with a worm hung under it, dipping on a bite) and the Casting Spoon; the cast flies with air drag and splashes by weight. Changes the simulation's data (two lures, `spoon` in 19 species' lures, a rig taken as its bait); replay hash unchanged. 8.3 #338–341 |
 | 66 The chart | Done | `Phase 66: The chart (tasks 66.1-66.2)` | The map gains relief (hachures, a contour round each lake and a depth contour in it), each lake's deepest sounding, rivers between the waters, the shore road with its bridge, the pier on Fogbound's west shore with the shop and the cabin up their paths, a legend, a scale bar and a ticked border; the arrows go to the nearest stop that way, the brackets slide to it, and the card says how far it is. `dbg.mapNav()`. Presentation only: 8.3 #342–343 |
+| 67 The pier at the edge | Done | `Phase 67: The pier at the edge (tasks 67.1-67.2)` | Fogbound's pier stands at the lake's west end (x 96) with a signpost (BAIT SHOP, CABIN); the boat starts beside it. Stop beside the pier with the line in and THE PIER panel asks: Bait Shop, The Cabin, or Stay on the water (once each arrival; W/↑ or a tap on its hint again); leaving either brings him back to the boat at the pier. The map's trips to them also go by the pier. `js/ui/dock.js`, `dbg.dock()`. 8.3 #344–346 |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -926,6 +927,10 @@ These are interpretations and additions made while building, where the spec abov
 342. **The chart's detail (Phase 66.1):** baked once in `paintChart` with the rest: hachures under every peak, a dotted contour 9 px outside each lake and a depth contour at 42% of its radii, the deepest sounding in metres (maxDepth × 0.25) beside each lake's mark, rivers (`RIVERS`: creek to Fogbound, creek to the Pines, the Red Room to the creek, the Pines' outflow) as winding 2 px lines, the shore road (`ROAD`) dashed with a bridge where the outflow crosses it, the pier and the dotted paths to the shop and the cabin (moved to Fogbound's west shore for Phase 67), a legend (by water, river, road, deepest) and a 2 km scale bar (`KM` 0.022 km a chart px), and a border ticked every 16 px. Trees keep off the legend and the shore houses; the dotted route now joins only waters.
 343. **Navigation (66.2):** the arrows used to step through the list in order (up and left back, down and right on). Now `toward(from, ax, ay)` picks the stop ahead along the arrow within about 60° (across ≤ 1.75 × along), the nearest by along + 2 × across; none that way, nothing moves. The amber brackets ease to the chosen stop (14/s). The card adds the distance from the water you are on ("2.9 km from here") and each water's deepest. `dbg.mapNav()` walks the four arrows from every stop: every stop reaches every other, and no press lands on a stop behind it.
 
+344. **Where the pier is (Phase 67.1):** `data/loc_fog.js`: the pier landmark from x 300 to 96 (it paints ±34 world px, so 62–130, by the west edge), a new `sign` landmark at 50 (a post with two boards painted in the fine font; the water mirrors them), the `pier_shade` spot with it (96, r 36), the kingfisher's pier perch to 127, the boat's start to 150, and `dock: {x: 96, reach: 60}`. The Pines keeps its copy of the pier where it was (11.4). The Node session does not model where spots are, so the replay hash and pacing are unchanged.
+345. **Docking (67.2):** `G.ui.dock` (js/ui/dock.js) steps from the sailing scene after the setup panel: with the boat within reach of `dock.x`, stopped, the line in, it opens THE PIER panel once per arrival (`armed` is set when the boat leaves the reach, so not at boot and not on coming back out of a room) and W/↑ opens it again; ↑/↓ move, Space goes, Esc (which no longer opens the pause list while it is open) or Stay closes, steering away closes it. Choosing a place autosaves, fades 0.35 s and changes the scene; the shop and the cabin already return to the boat where it was, which is now the pier. The touch layout counts it as a menu (ESC key, taps by the row rule; a tap on its "the pier" hint opens it); the action button says GO. It never blocks the world: the clock, the boat and the steering go on.
+346. **The map's trips:** choosing the Bait Shop or the Cabin on the map now loads Fogbound if needed and ties the boat up at the pier (x 126, the panel disarmed) before the scene changes, so coming back out you are at the pier, where the chart now draws them.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1103,9 +1108,11 @@ Phase 65 checks: `--validate` OK; `--replay 12345` still `1966984761`; `--saves`
 
 Phase 66 checks: `--validate` OK; `--replay 12345` still `1966984761` (presentation only). `dbg.mapNav()` {stops 6, reachAll true, wrongWay [], ok true}. Headless Chromium (scratchpad script, 0 page errors): the chart opened from the boat.
 
+Phase 67 checks: `--validate` OK; `--replay 12345` still `1966984761`; `--pacing` (6.0 catches, 45.1 min, 345.6 min), `--passive`, `--saves`, `--fight`, `--rod` (16) and `--tackle` PASS; `node tools/icon.js --check` PASS. Headless Chromium (scratchpad script, 0 page errors): at boot `dbg.dock()` {at true, open false}; ↑ opens THE PIER; sailing to 400 closes it and re-arms; back at 110 it opens by itself; ↓ Space walks him into the cabin; Esc brings him back to the boat at the pier; the map's Bait Shop trip ends in the shop with the boat at Fogbound's pier.
+
 ### 8.6 Next task
 
-**Phase 67** (PLAN_PLACES.md): the pier at the edge.
+**None planned.** PLAN_PLACES.md (Phases 63–67) is complete. Still open as before: #34 (play it on a real phone) and the watches of 8.4. What comes next is the user's to choose.
 
 ---
 

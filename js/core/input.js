@@ -95,7 +95,7 @@ G.core.input = (function () {
     var sc = G.core.state.sceneName && G.core.state.sceneName(), U = G.ui || {};
     if (G.core.compact || (sc !== 'sailing' && sc !== 'shop' && sc !== 'cabin')) return '';
     if (U.menu && U.menu.current()) return 'menu';
-    if (sc === 'sailing') return (U.card && U.card.isOpen()) || (U.setup && U.setup.isOpen()) ? 'menu' : 'boat';
+    if (sc === 'sailing') return (U.card && U.card.isOpen()) || (U.setup && U.setup.isOpen()) || (U.dock && U.dock.isOpen()) ? 'menu' : 'boat';
     var room = sc === 'shop' ? U.shop : U.cabin;
     return room && room.busy && room.busy() ? 'menu' : 'room';
   }
@@ -113,7 +113,7 @@ G.core.input = (function () {
     else if (cur === 'look') OPEN.push(U.look.rect());
     else if (cur === 'map') addAll(U.map.rects());
     else if (cur === 'journal') addAll(U.journal.rects());
-    if (sc === 'sailing') { if (U.card && U.card.isOpen()) OPEN.push(U.card.rect()); if (U.setup && U.setup.isOpen()) OPEN.push(U.setup.rect()); OPEN.push(HUD_CORNER); }
+    if (sc === 'sailing') { if (U.card && U.card.isOpen()) OPEN.push(U.card.rect()); if (U.setup && U.setup.isOpen()) OPEN.push(U.setup.rect()); if (U.dock && U.dock.isOpen()) addAll(U.dock.rects()); OPEN.push(HUD_CORNER); }
     else if (sc === 'shop' && U.shop.rects) addAll(U.shop.rects());
     else if (sc === 'cabin' && U.cabin.rects) addAll(U.cabin.rects());
     return OPEN;
@@ -196,6 +196,7 @@ G.core.input = (function () {
     if (U.menu && U.menu.current()) return U.menu.tap(gx, gy);
     if (sc === 'shop' && U.shop && U.shop.busy()) return U.shop.tap(gx, gy);
     if (sc === 'cabin' && U.cabin && U.cabin.busy()) return U.cabin.tap(gx, gy);
+    if (sc === 'sailing' && U.dock) return U.dock.tap(gx, gy); // Phase 67: the pier's panel, or its hint
     return '';
   }
 

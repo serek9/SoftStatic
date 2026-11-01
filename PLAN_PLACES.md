@@ -1,7 +1,7 @@
 # SoftStatic: Places, Lures and the Pier, Phases 63–67
 
 **Date:** 2026-11-01. **Repo state:** Phases 1–62 done (PLAN.md §8.1).
-**Status:** Asked for by the user on 2026-11-01, as five improvements:
+**Status:** Asked for by the user on 2026-11-01, as five improvements; Phases 63–67 built the same day. **The plan is complete.** The ask:
 
 > · the dog besides the main character in the tackle shop looks big, make it smaller more proportion like real.
 > · make the cabin and the shop feel alive like it is an actual place, maybe a lavalamp, a play station 1, more details, reflections...

@@ -29,7 +29,10 @@ G.data.locations.fog = {
   waterY: 112,
   maxDepth: 96,
   seed: 4021,
-  start: 180,
+  start: 150,
+  // Phase 67: the pier at the west end, under the shore with the bait shop and the cabin. A
+  // boat within reach px of x can tie up there (js/ui/dock.js).
+  dock: { x: 96, reach: 60 },
   // Phase 20: the surface's swell, in the 640×360 view's pixels: amp is the largest height,
   // waves are [wavelength px, speed px/s, share of amp]; mirror scales how much it shivers
   // the reflection. Fogbound is low and slow.
@@ -76,7 +79,7 @@ G.data.locations.fog = {
     above: {
       ducks: { p: 0.9, x: [330, 960], young: 4, hours: [[5, 21]] },
       heron: { x: [1060, 1170], hours: [[4.5, 10], [16, 22]] },
-      kingfisher: { perches: [{ x: 985, y: 25 }, { x: 331, y: 26 }, { x: 560, y: 25 }], hours: [[6, 18.5]] },
+      kingfisher: { perches: [{ x: 985, y: 25 }, { x: 127, y: 26 }, { x: 560, y: 25 }], hours: [[6, 18.5]] },
       loon: { p: 0.85, x: [200, 880], hours: [[0, 24]], call: [[4.5, 6.5], [18, 21.5]] },
       dragonflies: { n: 5, x: [[20, 200], [1000, 1180]], hours: [[9, 17.5]] },
       frog: { hours: [[7, 2]] },
@@ -88,7 +91,8 @@ G.data.locations.fog = {
 
   // On the water at the boat's distance (parallax 1): x is where the landmark is centred.
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 300, seed: 3301 }, // the same pier stands in The Pines (11.4)
+    { id: 'pier', kind: 'pier', x: 96, seed: 3301 }, // the same pier stands in The Pines (11.4); Phase 67: at the west end
+    { id: 'sign', kind: 'sign', x: 50 },              // Phase 67: the signpost at its shore end
     { id: 'marker_a', kind: 'marker', x: 560 },
     { id: 'wreck', kind: 'wreck', x: 770 },
     { id: 'marker_b', kind: 'marker', x: 985 }
@@ -106,7 +110,7 @@ G.data.locations.fog = {
   // within r px. kind 'hidden': the dog stares at it once (10.3). kind 'legendary': the dog
   // barks toward it while a legendary species lives here.
   spots: [
-    { id: 'pier_shade', kind: 'open', x: 300, r: 36 },
+    { id: 'pier_shade', kind: 'open', x: 96, r: 36 },
     { id: 'channel', kind: 'open', x: 560, r: 40 },
     { id: 'wreck_hollow', kind: 'open', x: 770, r: 30 },
     { id: 'cold_hole', kind: 'legendary', x: 880, r: 22, legend: 4, where: 'over the cold hole, past the wreck' },
