@@ -239,5 +239,7 @@ G.ui.hud = (function () {
     return { clock: clockStr, coins: coinStr, bait: baitStr, depth: G.scene.underwater.UNDER[G.state.run.fsm] ? depthStr : '' };
   }
 
-  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, alpha: alpha, drawButtons: drawButtons, word: word, isStill: function () { return still; }, draw: draw, shown: shown };
+  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, alpha: alpha, drawButtons: drawButtons, word: word,
+    // Phase 60.2: the touch layout's pieces for the gallery's touch page.
+    touchParts: { keyBox: keyBox, arrow: arrow, round: roundImg }, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

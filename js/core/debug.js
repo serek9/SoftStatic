@@ -387,6 +387,9 @@ G.core.debug = (function () {
     // dbg.device() (Phase 57): touch mode, the viewport, the fit and how much of the screen it
     // fills, the safe insets, portrait, full screen (asked once, its result) and the audio's state.
     device: function () { return G.core.device.report(); },
+    // dbg.budget(n) holds the phone's frame budget at n (0 full, 1, 2; Phase 60.1), dbg.budget(null)
+    // gives it back to the frame rate, dbg.budget() reads it.
+    budget: function (n) { return G.core.device.budget(n); },
     // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
     poke: function (x, s) {
       var b = G.state.run.boat;
@@ -415,6 +418,7 @@ G.core.debug = (function () {
       }
       pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop', 'panel', 'fishers', 'dogs', 'looks top'); // small: Phase 44; panel: Phase 46; looks: Phase 47
       pages.push('tackle', 'setup', 'life under', 'bed', 'life above', 'shore'); // Phase 50.1
+      pages.push('touch', 'notice'); // Phase 60.2: the phone's controls; the portrait notice and the icon
       page = 0; t = 0;
     }
 
@@ -758,6 +762,39 @@ G.core.debug = (function () {
           ctx.drawImage(G.scene.underwater.galleryBed(LIDS[bl]), 0, yb);
           F.drawText(ctx, lc.name + ': mussels ' + T0.mussel + (T0.caddis ? ', caddis' : '') + ', roots ' + T0.roots + ', tree ' + T0.tree + ', litter ' + (T0.litter.join(' ') || '-') + ', ribbon ' + T0.ribbon + ', fern ' + T0.fern + ', lilies ' + T0.lily + ', algae ' + T0.algae, 8, yb + 82 - 12, 'fog_light');
         }
+      } else if (name === 'touch') {
+        // Phase 60.2: the touch layout's pieces at the sizes for this screen (input.layout()):
+        // the keys, the boat's pad and the rooms' cross (up and held), the round button with
+        // every word it says (up, then held), and with none.
+        var TP = G.ui.hud.touchParts, LY = G.core.input.layout(), bs = LY.bs, ps = LY.ps, ad = LY.ad, k, gx0;
+        ctx.fillStyle = P.dusk_violet; ctx.fillRect(0, 18, 640, 170);
+        ctx.fillStyle = P.water_mid; ctx.fillRect(0, 188, 640, 172);
+        var KEYS = ['J', 'M', 'S', 'P', 'ESC'];
+        for (k = 0; k < KEYS.length; k++) {
+          gx0 = 8 + k * (bs + 6);
+          TP.keyBox(ctx, gx0, 26, bs, bs, k === 3);
+          F.drawText(ctx, KEYS[k], gx0 + ((bs - F.measure(KEYS[k])) >> 1), 26 + ((bs - F.FONT_H) >> 1), k === 3 ? 'signal_amber' : 'fog_light');
+        }
+        var pad = { x: 0, y: 0, w: ps, h: ps }, DIRS = ['left', 'right', 'up', 'down'];
+        for (k = 0; k < 4; k++) {
+          pad.x = 8 + k * (ps + 6); pad.y = 34 + bs;
+          TP.keyBox(ctx, pad.x, pad.y, ps, ps, k === 1); TP.arrow(ctx, pad, DIRS[k], k === 1 ? 'signal_amber' : 'fog_light');
+        }
+        var WORDS = ['CAST', 'REEL', 'HOOK', 'SELL', 'KEEP', 'RELEASE', 'PICK', 'TALK', 'LOOK', 'PLAY', 'FIX', 'READ', 'TV', 'WARM', 'SIT', 'REST', 'USE', ''];
+        for (k = 0; k < WORDS.length; k++) {
+          var on = k === 2, col = k % 9, rw = Math.floor(k / 9), bx = 8 + col * (ad + 8), by = 196 + rw * (ad + 10);
+          ctx.globalAlpha = WORDS[k] ? 0.85 : 0.4; ctx.drawImage(TP.round(ad, on), bx, by); ctx.globalAlpha = 1;
+          if (WORDS[k]) F.bold(ctx, WORDS[k], bx + ((ad - F.measureBold(WORDS[k])) >> 1), by + ((ad - F.FONT_H) >> 1), on ? 'signal_amber' : 'bone');
+        }
+        F.drawText(ctx, 'keys ' + bs + ' px, pad ' + ps + ', button ' + ad + ' at ' + G.core.device.scale().toFixed(2) + ' CSS px a game px; held: P, the right arrow, HOOK', 8, 344, 'fog_light');
+      } else if (name === 'notice') {
+        // Phase 60.2: the portrait notice as a phone held upright sees it, and the home-screen icon.
+        ctx.fillStyle = P.dusk_violet; ctx.fillRect(0, 18, 640, 170);
+        ctx.fillStyle = P.water_mid; ctx.fillRect(0, 188, 640, 172);
+        ctx.fillStyle = P.night_ink; ctx.fillRect(6, 24, 100, 100);                        // its edge, on this page's sky
+        ctx.drawImage(G.gfx.bake.cached('gallery:icon', function () { return G.core.device.paintIcon(96); }), 8, 26);
+        F.drawText(ctx, 'the icon (32 x 32 in palette keys, 3x)', 112, 30, 'fog_light');
+        G.core.device.drawNotice(ctx, true);
       } else if (name === 'shore') {
         // Phase 50.1: the shore's things, the trees and the Red Room's floor, painted as the
         // layers paint them (baked once here, layer px = the game's view px).

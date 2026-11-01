@@ -13,7 +13,14 @@ G.gfx.water = (function () {
   var VIEW_W = 320, PAD = 2, ALPHA = 0.5, HI = 2, H1 = 1 / 2; // Phase 15: a clearer mirror (was 0.35)
   var buf = null, bctx = null, shade = null, bufH = 0;
   var deltaDrawer = null;
-  var stats = { ms: 0 };
+  var stats = { ms: 0, rebuilt: 0, frames: 0 };
+  // Phase 60.1: the phone's budget (G.core.device sets it; on a PC it stays 0). Level 1 draws
+  // the scene into the mirror buffer every other frame and keeps the last one between (the
+  // rows still shift every frame, so the water moves as before); level 2 every third frame,
+  // and the rows are copied two view px at a time (half the copies). A render cache only:
+  // nothing the simulation reads.
+  var every = 1, step = 1, tick = 0;
+  function setBudget(level) { every = level >= 2 ? 3 : (level >= 1 ? 2 : 1); step = level >= 2 ? 2 : 1; }
 
   function setup(h) {
     var B = G.gfx.bake, P = G.gfx.sprites.PALETTE;
@@ -128,15 +135,21 @@ G.gfx.water = (function () {
   // camX (Phase 20): the camera's world x, where the surface is read.
   function draw(ctx, waterY, viewH, t, drawAbove, light, band, camX) {
     var t0 = performance.now(), h = viewH - waterY, rows = band === undefined ? h : Math.min(h, band);
-    if (h !== bufH) setup(h);
+    var fresh = h !== bufH;
+    if (fresh) setup(h);
 
-    // Mirror about the waterline: screen row waterY - 1 lands on buffer row 0.
-    bctx.setTransform(1, 0, 0, 1, 0, 0);
-    bctx.clearRect(0, 0, (VIEW_W + PAD * 2) * HI, h * HI);
-    bctx.setTransform(HI, 0, 0, -HI, PAD * HI, waterY * HI);
-    drawAbove(bctx);
-    if (deltaDrawer) deltaDrawer(bctx);
-    bctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Mirror about the waterline: screen row waterY - 1 lands on buffer row 0. On a phone's
+    // budget (60.1) only every `every`-th frame; between, the last buffer is shown again.
+    stats.frames++;
+    if (fresh || every === 1 || (tick++ % every) === 0) {
+      bctx.setTransform(1, 0, 0, 1, 0, 0);
+      bctx.clearRect(0, 0, (VIEW_W + PAD * 2) * HI, h * HI);
+      bctx.setTransform(HI, 0, 0, -HI, PAD * HI, waterY * HI);
+      drawAbove(bctx);
+      if (deltaDrawer) deltaDrawer(bctx);
+      bctx.setTransform(1, 0, 0, 1, 0, 0);
+      stats.rebuilt++;
+    }
 
     ctx.fillStyle = G.gfx.sprites.PALETTE.water_dark;
     ctx.fillRect(0, waterY, VIEW_W, rows);
@@ -144,14 +157,15 @@ G.gfx.water = (function () {
     // Row by row in the view's pixels; each row of 1/HI world px shifts (see chunkShifts).
     camX = camX || 0;
     var dyn = chunkShifts(camX);
-    for (var r = 0; r < rows * HI; r++) {
-      var dx = rowBase(r, h, t);
-      if (!dyn) { ctx.drawImage(buf, PAD * HI - dx, r, VIEW_W * HI, 1, 0, waterY + r * H1, VIEW_W, H1); continue; }
+    var nr = rows * HI;
+    for (var r = 0; r < nr; r += step) {
+      var dx = rowBase(r, h, t), rh = r + step > nr ? nr - r : step; // rh rows of the buffer in one copy (60.1)
+      if (!dyn) { ctx.drawImage(buf, PAD * HI - dx, r, VIEW_W * HI, rh, 0, waterY + r * H1, VIEW_W, rh * H1); continue; }
       var wr = 1 - 0.4 * r / (h * HI), c0 = 0, s0 = dx + Math.round(chunkF[0] * wr);
       for (var c = 1; c <= NCH; c++) {
         var s = c < NCH ? dx + Math.round(chunkF[c] * wr) : 1e9;
         if (s === s0) continue;
-        ctx.drawImage(buf, PAD * HI - s0 + c0 * CH, r, (c - c0) * CH, 1, c0 * CH * H1, waterY + r * H1, (c - c0) * CH * H1, H1);
+        ctx.drawImage(buf, PAD * HI - s0 + c0 * CH, r, (c - c0) * CH, rh, c0 * CH * H1, waterY + r * H1, (c - c0) * CH * H1, rh * H1);
         c0 = c; s0 = s;
       }
     }
@@ -196,7 +210,8 @@ G.gfx.water = (function () {
     ctx.globalAlpha = 1;
   }
 
-  return { ALPHA: ALPHA, draw: draw, setDeltas: setDeltas, drawDelta: drawDelta, stats: stats, rowShift: rowShift };
+  return { ALPHA: ALPHA, draw: draw, setDeltas: setDeltas, drawDelta: drawDelta, stats: stats, rowShift: rowShift, setBudget: setBudget,
+    budget: function () { return { every: every, step: step }; } };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {

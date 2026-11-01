@@ -1,7 +1,7 @@
 # SoftStatic: Playing on a Phone, Phases 57–60
 
 **Date:** 2026-11-01. **Repo state:** Phases 1–56 done (PLAN.md §8.1), `main` at `338eaba`.
-**Status:** Asked for by the user on 2026-11-01 ("before making any more things or improvements, the game should be playable either from a pc like now or with a phone, make a plan to adapt it and start it"). Phase 57 was started the same day and is done; Phase 58 was started by the user the same day ("continue with phase 58") and is done; Phase 59 was started the same day ("Start Phase 59") and is done; Phase 60 waits for the user's go-ahead.
+**Status:** Asked for by the user on 2026-11-01 ("before making any more things or improvements, the game should be playable either from a pc like now or with a phone, make a plan to adapt it and start it"). Phase 57 was started the same day and is done; Phase 58 was started by the user the same day ("continue with phase 58") and is done; Phase 59 was started the same day ("Start Phase 59") and is done; Phase 60 was started the same day ("Start phase 60") and is done. **The plan is complete.**
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like PLAN_TACKLE.md, this file adds phases after the approved spec and does not edit §0–§7 or Appendix V. Decisions go in §8.3.
 
 **The rule for every phase:** the PC game does not change. Keyboard and mouse play exactly as they do now, the picture on a desktop is scaled exactly as now, and `js/sim` and `data/` are untouched, so the replay hash and every Node check stay as they are in 8.5. Phone support is added next to them, switched on by a touch screen.
