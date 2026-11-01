@@ -2,13 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- Phase 57.2: played from the home screen without the browser's bars. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SoftStatic">
+<meta name="theme-color" content="#000000">
 <title>SoftStatic</title>
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  /* Phase 57.2: no zoom, overscroll, selection, callout or tap highlight on a phone. */
+  html, body {
+    touch-action: none; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  /* G.core.device places and sizes the canvas (Phase 57.1). */
   #game {
-    position: absolute; left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
+    position: absolute; left: 0; top: 0;
     image-rendering: crisp-edges;
     image-rendering: pixelated;
   }
@@ -23,6 +37,7 @@
 <script src="js/core/rng.js"></script>
 <script src="js/core/state.js"></script>
 <script src="js/core/input.js"></script>
+<script src="js/core/device.js"></script>
 <script src="js/core/save.js"></script>
 <script src="js/core/loop.js"></script>
 <!-- data -->
@@ -91,19 +106,9 @@
   var vctx = canvas.getContext('2d', { alpha: false });
   var ctx = G.core.compact ? G.gfx.bake.canvas(V.W, V.H).getContext('2d') : vctx;
 
-  // Largest whole-number scale that fits, measured in device pixels so every game
-  // pixel maps to the same number of screen pixels. Below 1× it falls back to a
-  // fractional fit (still nearest-neighbour, never smoothed).
-  function fit() {
-    var dpr = window.devicePixelRatio || 1;
-    var fitScale = Math.min(window.innerWidth * dpr / W, window.innerHeight * dpr / H);
-    var scale = fitScale >= 1 ? Math.floor(fitScale) : fitScale;
-    canvas.style.width = (W * scale / dpr) + 'px';
-    canvas.style.height = (H * scale / dpr) + 'px';
-    vctx.imageSmoothingEnabled = false;
-  }
-  window.addEventListener('resize', fit);
-  fit();
+  // The fit (Phase 57.1, G.core.device): on a PC the largest whole-number scale that fits,
+  // in device pixels, as before; on a phone the picture fills the safe area.
+  G.core.device.attach(canvas, W, H);
 
   G.core.save.claim(); // this tab owns the save now (12.5)
   G.state.save = G.core.save.load();
@@ -126,9 +131,10 @@
   // Another tab owns the save (12.5): this one waits, and a click or key brings it back here.
   function reclaim() { if (G.core.save.lost()) { G.core.save.claim(); location.reload(); } }
   canvas.addEventListener('mousedown', reclaim);
+  canvas.addEventListener('touchend', reclaim); // 57.4: a touch never sends mousedown here (input.js cancels it)
   window.addEventListener('keydown', reclaim);
   function idle(c) {
-    var F = G.gfx.sprites.fine, A = 'Fishing in another tab.', B = 'Click to fish here.';
+    var F = G.gfx.sprites.fine, A = 'Fishing in another tab.', B = G.core.device.touch() ? 'Tap to fish here.' : 'Click to fish here.';
     V.begin(c, true);
     G.ui.menu.dim(c, 0.75);
     F.bold(c, A, 320 - (F.measureBold(A) >> 1), 156, 'fog_light');
@@ -143,6 +149,7 @@
       V.begin(ctx, G.core.state.native()); G.core.state.draw(ctx);
       V.begin(ctx, G.ui.menu.native()); G.ui.menu.draw(ctx);
       V.begin(ctx, false); G.ui.hud.drawButtons(ctx);
+      V.begin(ctx, true); G.core.device.drawNotice(ctx); // 57.3: portrait on a phone
     },
     idle: idle,
     // ?compact: halve the full picture onto the page canvas (smoothed, so 1 px lines survive).

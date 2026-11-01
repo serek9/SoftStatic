@@ -384,6 +384,9 @@ G.core.debug = (function () {
       if (!G.scene.fisher.start(fs, name)) { console.log('acts: ' + Object.keys(G.scene.fisher.ACTS).join(', ')); return false; }
       return true;
     },
+    // dbg.device() (Phase 57): touch mode, the viewport, the fit and how much of the screen it
+    // fills, the safe insets, portrait, full screen (asked once, its result) and the audio's state.
+    device: function () { return G.core.device.report(); },
     // dbg.poke(x, s) disturbs the surface at world x (default: 40 px ahead of the boat) with strength s (default 1).
     poke: function (x, s) {
       var b = G.state.run.boat;
