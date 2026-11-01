@@ -100,6 +100,38 @@ G.core.input = (function () {
     return room && room.busy && room.busy() ? 'menu' : 'room';
   }
 
+  // 8.4 #38: ESC alone (anything open) goes to the first corner that covers none of the open
+  // panels (top right, bottom right, top left, bottom left; top left is the HUD's on the
+  // water), and is not shown when every corner is covered (the map, the journal): their own
+  // ESC hint is tapped instead (Phase 59). Each overlay's rects() are preallocated.
+  var OPEN = [], HUD_CORNER = [0, 0, 200, 40];
+  function addAll(l) { for (var k = 0; k < l.length; k++) OPEN.push(l[k]); }
+  function openRects() {
+    var U = G.ui || {}, sc = G.core.state.sceneName && G.core.state.sceneName(), cur = U.menu && U.menu.current();
+    OPEN.length = 0;
+    if (cur === 'pause') OPEN.push(U.menu.rect());
+    else if (cur === 'look') OPEN.push(U.look.rect());
+    else if (cur === 'map') addAll(U.map.rects());
+    else if (cur === 'journal') addAll(U.journal.rects());
+    if (sc === 'sailing') { if (U.card && U.card.isOpen()) OPEN.push(U.card.rect()); if (U.setup && U.setup.isOpen()) OPEN.push(U.setup.rect()); OPEN.push(HUD_CORNER); }
+    else if (sc === 'shop' && U.shop.rects) addAll(U.shop.rects());
+    else if (sc === 'cabin' && U.cabin.rects) addAll(U.cabin.rects());
+    return OPEN;
+  }
+  function clear(x, y, s, rs) {
+    for (var k = 0; k < rs.length; k++) { var r = rs[k]; if (x < r[0] + r[2] && r[0] < x + s && y < r[1] + r[3] && r[1] < y + s) return false; }
+    return true;
+  }
+  var CORNERS = [[1, 0], [1, 1], [0, 0], [0, 1]];
+  function placeEsc(b, s) {
+    var rs = openRects();
+    for (var k = 0; k < CORNERS.length; k++) {
+      var x = CORNERS[k][0] ? 640 - EDGE - s : EDGE, y = CORNERS[k][1] ? 360 - EDGE - s : EDGE;
+      if (clear(x, y, s, rs)) { put(b, true, x, y, s, s); return; }
+    }
+    b.on = false;
+  }
+
   function layout() {
     var mode = where(), i;
     var bs = size(BTN_CSS, 28, 64), ps = size(mode === 'room' ? ROOM_CSS : PAD_CSS, 28, 72), ad = size(ACT_CSS, 40, 88);
@@ -110,7 +142,9 @@ G.core.input = (function () {
       var b = TB[i], on = mode === 'boat' ? b.act !== 'back' : (mode !== '' && b.act === 'back');
       if (on) { x -= bs; put(b, true, x, EDGE, bs, bs); x -= GAP; } else b.on = false;
     }
-    LAY.rowBottom = mode === '' ? 0 : EDGE + bs;
+    if (mode === 'menu') placeEsc(TB[4], bs);
+    // the depth readout (top right, under water) goes under the row, or under ESC in that corner
+    LAY.rowBottom = mode === 'boat' || (mode === 'menu' && TB[4].on && TB[4].y === EDGE && TB[4].x > 320) ? EDGE + bs : 0;
     // the pad: two arrows on the boat, a cross of four in a room
     var y0 = 360 - EDGE - ps;
     if (mode === 'boat') {

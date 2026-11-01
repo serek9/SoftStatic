@@ -121,9 +121,9 @@ G.core.device = (function () {
 
   // 60.2: the home-screen icon, painted from palette keys on a 32×32 grid and scaled up whole:
   // a dusk sky (nothing above dusk_high), a moon, the pines, the water with the moon's path,
-  // and the boat with the fisher and the dog. Given to the page as its icon and the iOS
-  // home-screen icon (a data URL). TODO(P60.2): the manifest has no icon: Chrome wants a
-  // same-origin file to install from, and the project has no image files (§0.2).
+  // and the boat with the fisher and the dog. The gallery's notice page paints it here;
+  // `node tools/icon.js` writes the same grid as icon-192.png and icon-512.png for the
+  // manifest and the page's icon links (8.4 #37: Chrome installs only from an image file).
   var ICON = [
     // [key, x, y, w, h]
     ['night_blue', 0, 0, 32, 6], ['dusk_violet', 0, 6, 32, 5], ['dusk_plum', 0, 11, 32, 3], ['dusk_rose', 0, 14, 32, 2], ['dusk_amber', 0, 16, 32, 3],
@@ -144,18 +144,6 @@ G.core.device = (function () {
     for (var i = 0; i < ICON.length; i++) { var r = ICON[i]; c.fillStyle = P[r[0]]; c.fillRect(r[1] * s, r[2] * s, r[3] * s, r[4] * s); }
     return cv;
   }
-  var iconURL = '';
-  function setIcons() {
-    try {
-      iconURL = paintIcon(192).toDataURL('image/png');
-      var rels = ['icon', 'apple-touch-icon'];
-      for (var i = 0; i < rels.length; i++) {
-        var l = document.querySelector('link[rel="' + rels[i] + '"]') || document.createElement('link');
-        l.rel = rels[i]; l.href = iconURL; if (rels[i] === 'icon') l.type = 'image/png';
-        if (!l.parentNode) document.head.appendChild(l);
-      }
-    } catch (e) { iconURL = ''; }
-  }
 
   function attach(cv, w, h) {
     canvas = cv; W = w; H = h;
@@ -174,7 +162,6 @@ G.core.device = (function () {
     document.addEventListener('fullscreenchange', refit);
     document.addEventListener('webkitfullscreenchange', refit);
     setInterval(budgetTick, 1000); // 60.1
-    setIcons();                    // 60.2
     fit();
   }
 
@@ -210,7 +197,7 @@ G.core.device = (function () {
 
   return {
     attach: attach, fit: fit, touch: touch, drawNotice: drawNotice, report: report,
-    canFullscreen: canFullscreen, isFullscreen: isFullscreen, setFullscreen: setFullscreen, budget: budget, paintIcon: paintIcon, iconURL: function () { return iconURL; },
+    canFullscreen: canFullscreen, isFullscreen: isFullscreen, setFullscreen: setFullscreen, budget: budget, paintIcon: paintIcon, ICON: ICON,
     portrait: function () { return info.portrait; },
     scale: function () { return info.scale; },
     info: info

@@ -69,13 +69,27 @@ G.ui.panel = (function () {
   }
   function keyW(label) { return F.measure(label) + 6; }
 
+  // 8.4 #36: on a phone (touch mode) a hint names what you touch, not a keyboard key: SPACE
+  // is TAP (a row, the box, the hint itself), the arrow-key hints are left out (rows are
+  // tapped instead), and J, M and S as "close" are the on-screen ESC. Constant strings; ''
+  // drops the hint. hint() and hintW() both read it, so the panels' taps (Phase 59) that
+  // measure hints by hintW() land where the hints are drawn.
+  var TOUCH_KEYS = { 'SPACE': 'TAP', 'W/S': '', 'A/D': '', 'W/S A/D': 'TAP', 'J': 'ESC', 'M': 'ESC', 'S': 'ESC' };
+  function shown(label) {
+    if (!G.core.device || !G.core.device.touch()) return label;
+    var t = TOUCH_KEYS[label];
+    return t === undefined ? label : t;
+  }
+
   // A key hint: the key's cap, then what it does. Returns the width used (with a gap after).
   function hint(ctx, label, does, x, y) {
+    label = shown(label);
+    if (!label) return 0;
     var w = key(ctx, label, x, y, false);
     F.drawText(ctx, does, x + w + 3, y + 2, 'fog_mid');
     return w + 3 + F.measure(does) + 8;
   }
-  function hintW(label, does) { return keyW(label) + 3 + F.measure(does) + 8; }
+  function hintW(label, does) { label = shown(label); return label ? keyW(label) + 3 + F.measure(does) + 8 : 0; }
 
   // The bar under a chosen row of a list (y is the text's top).
   function row(ctx, x, y, w) {
@@ -88,6 +102,7 @@ G.ui.panel = (function () {
 
   return {
     TAB: TAB, PAD: PAD, ROW: ROW, KEY_H: KEY_H, MARGIN: MARGIN, MAX_W: MAX_W, MAX_H: MAX_H,
-    place: place, frame: frame, asideX: asideX, top: top, left: left, key: key, keyW: keyW, hint: hint, hintW: hintW, row: row, inside: inside
+    place: place, frame: frame, asideX: asideX, top: top, left: left, key: key, keyW: keyW, hint: hint, hintW: hintW, row: row, inside: inside,
+    shown: shown // 8.4 #36: the label a hint shows now ('' when it is left out)
   };
 })();

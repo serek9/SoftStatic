@@ -15,7 +15,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.ui = G.ui || {};
 G.ui.map = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, M = G.ui.menu, E = G.sim.economy, F = S.fine, A = G.gfx.paint;
-  var FX = 8, FY = 8, FW = 624, FH = 344;                               // the panel (Phase 54)
+  var FX = 8, FY = 8, FW = 624, FH = 344;
+  var MAP_RECTS = [[FX, FY, FW, FH]];                               // the panel (Phase 54)
   var CX = 16, CY = 16 + 6, CW = 608, CH = 322, FADE = 0.35;           // the chart inside it
 
   // Where each stop sits on the chart (presentation only), in map order.
@@ -250,6 +251,8 @@ G.ui.map = (function () {
 
   return {
     native: true, CARD: CARD, tap: tap,
+    // The on-screen ESC key keeps off what is open (8.4 #38): the chart's panel.
+    rects: function () { return MAP_RECTS; },
     open: open, update: update, draw: draw, STOPS: STOPS, verdict: verdict, stocked: stocked,
     // dbg: travel to a stop id through the same path as the menu (fade included).
     travel: function (id) {
