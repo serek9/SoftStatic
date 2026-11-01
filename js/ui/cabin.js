@@ -315,6 +315,7 @@ G.ui.cabin = (function () {
   var open = '', lines = [], tvOn = false, recordT = -1, chordN = 0;
   var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, strange: '', st: 0, flash: 0 };
   var BOX = { x: 24, y: 296, w: 592, h: 56 }, HEAD = { x: 120, y: 316, w: 400, h: 40 };
+  var R_BOX = [[BOX.x, BOX.y - 13, BOX.w, BOX.h + 13]], R_HEAD = [[HEAD.x, HEAD.y - 13, HEAD.w, HEAD.h]]; // 8.4 #38
 
   function bakeRoom() {
     var lv = G.state.save.cabinLevel, st = G.data.gear.cabin[lv];
@@ -525,6 +526,7 @@ G.ui.cabin = (function () {
     // Phase 58: a panel is open over the room (the touch pad hides), and the touch action
     // button's word for what he faces (the hint's 'look' where it would say look).
     busy: function () { return open !== ''; },
+    rects: function () { return open ? R_BOX : R_HEAD; }, // 8.4 #38: what the ESC key keeps off
     // Phase 59.2: a touch with the box open. A message: a tap on the box is Space (ok). The
     // ledger: only its SPACE hint pays and its ESC hint is not now, so a stray tap spends nothing.
     tap: function (gx, gy) {

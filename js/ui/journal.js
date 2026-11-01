@@ -219,7 +219,7 @@ G.ui.journal = (function () {
   // handwriting that degrades with unease), and on the right the JOURNAL with the count, the
   // two filters as key caps and the grid of species with its scrollbar. The open book of
   // Phase 17 is gone; its colours are mapped onto the panel's (INK below).
-  var LP = [8, 8, 300, 344], RP = [316, 8, 316, 344];
+  var LP = [8, 8, 300, 344], RP = [316, 8, 316, 344], J_RECTS = [LP, RP];
   var PLATE_H = 80;
   // The book's ink keys, read on night ink: the notes, the plain words, the description, the late blue pen.
   var INK = { ink: 'bone', wood: 'fog_mid', rust: 'dusk_high', night_blue: 'teal_lit' };
@@ -331,7 +331,8 @@ G.ui.journal = (function () {
 
   return {
     native: true,
-    open: open, update: update, draw: draw, render: render, tap: tap, jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close,
+    open: open, update: update, draw: draw, render: render, tap: tap,
+    rects: function () { return J_RECTS; }, // 8.4 #38: what the ESC key keeps off jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close,
     lastLate: function () { return lastLate; },
     state: function () { return { loc: locs[locIdx], rarity: RARITIES[rarIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
   };

@@ -219,6 +219,10 @@ G.ui.shop = (function () {
   // Phase 46: the item window's two panels at the top right (the list, the chosen item), and
   // the list's title for each shelf.
   var LIST = { x: 392, y: 8, w: 240, h: 140, rowH: 16, rows: 6 }, ITEM = { x: 392, y: 154, w: 240, h: 98 };
+  // 8.4 #38: the panels open now, for the on-screen ESC key to keep off (with their tabs).
+  var BOX_R = [BOX.x, BOX.y - 13, BOX.w, BOX.h + 13], CH_R = [CH.x, CH.y - 13, CH.w, CH.h - 1];
+  var LIST_R = [LIST.x, LIST.y, LIST.w, LIST.h], ITEM_R = [ITEM.x, ITEM.y, ITEM.w, ITEM.h];
+  var R_NONE = [], R_BOX = [BOX_R], R_CHOICE = [BOX_R, CH_R], R_ITEMS = [LIST_R, ITEM_R];
   var TITLES = { rusty: 'BUY', rack: 'THE RACK', gear: 'GEAR', worms: 'WORMS', crickets: 'CRICKETS', tank: 'THE TANK', jar: 'THE JAR', lures: 'LURES' };
   var rusty = { face: 'down', fr: 3 };
   // Phase 38: the shelves he can face, and their items ([shelf, item] in SHELVES); what they
@@ -597,6 +601,7 @@ G.ui.shop = (function () {
     // Phase 58: a text box or window is open over the room (the touch pad hides), and the word
     // on the touch action button for what he faces.
     busy: function () { return open !== ''; }, tap: tap,
+    rects: function () { return open === 'box' ? R_BOX : open === 'choice' ? R_CHOICE : open === 'items' ? R_ITEMS : R_NONE; },
     word: function () { return open !== '' || !walk ? '' : faced === 'rusty' ? 'TALK' : SHELF_ITEMS[faced] ? 'LOOK' : faced === 'guitar' ? 'PLAY' : ''; },
     // Tests: choose an item (shelf r, item c) in the window, as if the cursor were on it, and buy.
     select: function (r, c) { row = r; col = c; describe(); return txt.name.join(' '); },
