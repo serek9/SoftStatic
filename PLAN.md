@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-01, after Phase 61 (the phone plan's known issues: asked for by the user on 2026-11-01). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-01, after Phase 63 (the dog to scale, PLAN_PLACES.md). **Repository:** github.com/serek9/SoftStatic, branch `main`. Machine setup and how to move a save between computers: [HANDOFF.md](HANDOFF.md). Working rules for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -446,6 +446,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 | 60 Fitting it in | Done | `Phase 60: Fitting it in (tasks 60.1-60.3)` | Started by the user on 2026-11-01 ("Start phase 60"). A phone's frame measured under 4× and 6× CPU throttle: the reflection is most of the lake's draw, so a phone that runs under 50 fps for two seconds draws the mirror less often (two levels, never on a PC); `touch` and `notice` gallery pages; a home-screen icon painted in palette keys; HANDOFF.md says how to play on a phone; the PC played through by keyboard and by mouse. Presentation only: 8.3 #319–323. **The phone plan is complete** |
 | 61 The phone plan's known issues | Done | `Phase 61: The phone plan's known issues` | Asked for by the user on 2026-11-01 ("solve the known issues please"), after the four open items of 8.4 the phone plan left. The panels' hints name touches on a phone (#36); icon files for the manifest from a tool, so Chrome installs it (#37); `--rod`'s cost check measured the game, not Node's sandbox (#35); and one found on the way: the on-screen ESC covered open panels (#38). #34, playing on a real phone, is the user's. Presentation and checks only: 8.3 #324–328 |
 | 62 The older known issues | Done | `Phase 62: The older known issues` | Asked for by the user on 2026-11-01 ("find issues that are not solved and solve them please"); no GitHub issues were open, so the open items of 8.4 that code can settle. Head shakes knock a lightly loaded rod only a little (#28, a new `--rod` check); the journal's grid pictures are baked one a frame from boot, so its first opening is no long frame (#24); the three unused old sprites are gone (#25). Presentation and checks only: 8.3 #329–332 |
+| 63 The dog to scale | Done | `Phase 63: The dog to scale (task 63.1)` | Asked for by the user on 2026-11-01 with four more improvements, planned in [PLAN_PLACES.md](PLAN_PLACES.md) (Phases 63–67). The walk-in rooms' dog is painted at its breed's real height beside the fisher through a scaled grid (`G.gfx.pix.scaled`), `size` per dog in `data/looks.js`. Presentation only: 8.3 #333–334 |
 
 
 Every task in Phases 1–12 met its "Done when" check from §4. Each check was run and its output reported in the conversation that built it.
@@ -907,6 +908,9 @@ These are interpretations and additions made while building, where the spec abov
 331. **The journal's first opening (#24):** since Phase 54 the book is gone and the opening cost 37–51 ms in headless Chromium (the grid's portraits; 8.4 said ~90 ms for the book). `journal.warm(n)` bakes n of the grid's portraits (every species, silhouette and colour: 92), and index.html's draw asks for one a frame until it returns true, into `fishgen`'s own cache, off screen (no game state, no `G.vrng`). Each call measured 0.8–1.1 ms median, at most 4.9–5.9 ms, for the first ~1.3 s after boot; the first opening then cost 5.7–13.9 ms. The entry's plate picture (one at a time, up to 15 ms each to bake) is still baked when it is first shown, as before; warming all 92 of them would have cost a frame or two each at boot.
 332. **The old sprites (#25):** the `owl`, `moon` and `hud_coin` sprite definitions (Phase 10, replaced by painted art in Phase 18) are removed from `sailing.js` and `hud.js`; nothing drew them but the gallery's sprite list.
 
+333. **The ask (Phases 63–67, 2026-11-01):** the dog in the shop smaller, in real proportion; the cabin and the shop alive (a lava lamp, a PlayStation, more details, reflections); lures that move as real ones on the retrieve, more lures (a red-and-white bobber with bait under it), a more real cast; a more detailed map with better navigation; the pier at one side of the lake, from which the cabin and the shop are reached. Planned in PLAN_PLACES.md, one phase for each.
+334. **The dog to scale (Phase 63):** the rooms' dog was 40×32 beside a 32×48 fisher, two thirds of his height. Shrinking the baked sprite would lose single pixels (eyes, nose) and blur the outline, so the same painter runs through `G.gfx.pix.scaled(g, s)`, a view of a smaller grid that maps every shape's coordinates and radii by s (radii floored at about half a pixel so legs stay whole) and hands pattern callbacks the painter's own coordinates. `size` in `data/looks.js` (golden 0.70, husky 0.68, St. Bernard 0.80, poodle 0.66; validated 0.55–0.85): the golden's back now stands 15 px against his 46. `room.anchor(kind, dir, lk)` and the shadow follow it; the boat's side-view dog (js/scene/dog.js) was already in proportion and is unchanged.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1076,9 +1080,11 @@ Phase 27 checks: `--validate` (and `--strict`) OK, `--replay 12345` still `20388
 
 Phase 26 checks: `--validate` (and `--strict`) OK, `--replay 12345` still `2038881623`, `--pacing`, `--passive`, `--fight` and `--saves` all PASS as in the table (presentation only). Node: the lake drift over 200 seeds as in 8.3 #135; the surface's ripple checks unchanged (energy below 5% at 2.17 s, centre speed 38.4 against 40, 10 minutes of pokes without NaN), and with the wake driven 0.046 ms a step. Headless Chromium (`?debug&seed=7`): the wake on flat water and the motor timings as in 8.3 #133–134; Phase 24's checks re-run: the pitch spring peaks at 3.68° (2–4) and settles under 0.2° from 2.13 s, the motor runs 0.40 s after the first move, throttle and rpm times as before, off after a 10 s rest and back 0.42 s after moving, the line's anchor 0.000 px from the rod tip, `fx` dropped 0; Phases 20–22 re-run: unchanged (the Fogbound cast that drifted 2.9 px in Phase 22's check now drifts 4.3), 60 fps (draw 3.02 / worst 4.3 ms at night just after sailing, the wake breaking the mirror; 2.04 / 3.2 with an anomaly and drizzle; 0.38 / 1.0 under water). Screenshots of the boat running and stopping with its wake on the water. No console errors.
 
+Phase 63 checks: `--validate` OK (the dogs' size checked); `--replay 12345` still `1966984761` (presentation only). Headless Chromium (scratchpad script, 0 page errors): the shop with the golden and with the St. Bernard, each at the fisher's hip.
+
 ### 8.6 Next task
 
-**None planned.** Phase 62 solved the older known issues code could settle (8.4 #24, #25, #28). Still open: #34, play it on a real phone (HANDOFF.md step 7); the watches and accepted items of 8.4 (#6, #7, #9, #10, #18, #20, #21, #26, #29–#32) are as they were. What comes next is the user's to choose.
+**Phase 64** (PLAN_PLACES.md): rooms that are lived in.
 
 ---
 

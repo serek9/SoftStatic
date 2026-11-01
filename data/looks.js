@@ -10,7 +10,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // 'prick', 'heavy', 'pom'), tail ('feather', 'curl', 'low', 'pom'), face ('', 'mask': pale
 // under the eyes, 'blaze': a pale stripe up the brow and dark round the eyes), paleLegs (the
 // legs in the muzzle's keys), curly (a curled coat), bulk (the body's size against the golden
-// dog's) and bark (the woof's playback rate). Names are placeholders.
+// dog's), size (Phase 63: its height in the walk-in rooms against the 40×32 poses, so it
+// stands to the fisher as a real dog of its breed stands to a man) and bark (the woof's playback rate). Names are placeholders.
 // The first of each is the default and what an unknown id falls back to.
 G.data = G.data || {};
 G.data.looks = {
@@ -26,13 +27,13 @@ G.data.looks = {
   ],
   dogs: [
     { id: 'golden', name: 'Golden', coat: ['dog_dark', 'dog', 'dog_hi'], ear: ['ink', 'dog_dark', 'dog'], chest: 'dog_hi', muzzle: ['dog_dark', 'dog', 'dog_hi'],
-      ears: 'drop', tail: 'feather', face: '', paleLegs: false, curly: false, bulk: 1, bark: 1 },
+      ears: 'drop', tail: 'feather', face: '', paleLegs: false, curly: false, bulk: 1, size: 0.7, bark: 1 },
     { id: 'husky', name: 'Husky', coat: ['stone_dark', 'stone', 'stone_hi'], ear: ['ink', 'stone_dark', 'stone'], chest: 'bone', muzzle: ['stone_hi', 'hair_lit', 'bone'],
-      ears: 'prick', tail: 'curl', face: 'mask', paleLegs: true, curly: false, bulk: 1, bark: 1.15 },
+      ears: 'prick', tail: 'curl', face: 'mask', paleLegs: true, curly: false, bulk: 1, size: 0.68, bark: 1.15 },
     { id: 'saint', name: 'St. Bernard', coat: ['rust_dark', 'rust', 'rust_hi'], ear: ['ink', 'rust_dark', 'rust'], chest: 'bone', muzzle: ['paper_dark', 'paper', 'bone'],
-      ears: 'heavy', tail: 'low', face: 'blaze', paleLegs: true, curly: false, bulk: 1.12, bark: 0.78 },
+      ears: 'heavy', tail: 'low', face: 'blaze', paleLegs: true, curly: false, bulk: 1.12, size: 0.8, bark: 0.78 },
     { id: 'poodle', name: 'Poodle', coat: ['paper_dark', 'paper', 'cream'], ear: ['reed_hi', 'paper_dark', 'paper'], chest: 'cream', muzzle: ['paper_dark', 'paper', 'cream'],
-      ears: 'pom', tail: 'pom', face: '', paleLegs: false, curly: true, bulk: 0.92, bark: 1.3 }
+      ears: 'pom', tail: 'pom', face: '', paleLegs: false, curly: true, bulk: 0.92, size: 0.66, bark: 1.3 }
   ],
   HATS: ['cap', 'knit', 'bucket', 'lamp'],
   EARS: ['drop', 'prick', 'heavy', 'pom'],
@@ -79,6 +80,7 @@ G.data.validateLooks = function (L, palette) {
     if (['', 'mask', 'blaze'].indexOf(d.face) < 0) errs.push(who + ': face ' + d.face);
     if (typeof d.paleLegs !== 'boolean' || typeof d.curly !== 'boolean') errs.push(who + ': paleLegs and curly are true or false');
     if (!(d.bulk >= 0.85 && d.bulk <= 1.15)) errs.push(who + ': bulk 0.85..1.15 (the poses fit their box)');
+    if (!(d.size >= 0.55 && d.size <= 0.85)) errs.push(who + ': size 0.55..0.85 (a dog in the rooms is at most a man\'s hip high)');
     if (!(d.bark >= 0.6 && d.bark <= 1.5)) errs.push(who + ': bark 0.6..1.5');
   });
   return errs;

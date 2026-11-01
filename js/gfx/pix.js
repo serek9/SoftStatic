@@ -133,5 +133,49 @@ G.gfx.pix = (function () {
   // How many pixels are painted (checks).
   P.count = function () { var n = 0; for (var i = 0; i < this.k.length; i++) if (this.k[i]) n++; return n; };
 
-  return { grid: function (w, h) { return new Grid(w, h); }, tone: tone };
+  // Phase 63: a view of grid g that paints in another grid's coordinates, scaled by s about the
+  // top left. A painter written for one size (the walking dog, 40×32) paints into a smaller grid
+  // (the dog at its real height beside the fisher) shape by shape: ellipses, capsules and
+  // polygons are rasterised at the new size, not shrunk as pixels, so the outline, the eye and
+  // the nose stay whole. Pattern callbacks (fill, over, poly) get the painter's own coordinates.
+  function Scaled(g, s) { this.g = g; this.s = s; this.w = Math.round(g.w / s); this.h = Math.round(g.h / s); }
+  var Q = Scaled.prototype;
+  function src(v, s) { return Math.floor((v + 0.5) / s); }
+  Q.at = function (x, y) { return this.g.at(Math.round(x * this.s), Math.round(y * this.s)); };
+  Q.set = function (key, x, y) { this.g.set(key, x * this.s, y * this.s); return this; };
+  Q.clear = function (x, y) { this.g.clear(x * this.s, y * this.s); return this; };
+  Q.rect = function (key, x, y, w, h) {
+    var s = this.s, x0 = Math.round(x * s), y0 = Math.round(y * s);
+    this.g.rect(key, x0, y0, Math.max(1, Math.round((x + w) * s) - x0), Math.max(1, Math.round((y + h) * s) - y0)); return this;
+  };
+  Q.fill = function (x0, y0, w, h, fn) {
+    var s = this.s, g = this.g, a = Math.floor(x0 * s), b = Math.floor(y0 * s), a1 = Math.ceil((x0 + w) * s), b1 = Math.ceil((y0 + h) * s);
+    for (var y = b; y < b1; y++) for (var x = a; x < a1; x++) {
+      var sx = src(x, s), sy = src(y, s);
+      if (sx < x0 || sy < y0 || sx >= x0 + w || sy >= y0 + h) continue;
+      var k = fn(sx, sy, g.at(x, y)); if (k) g.set(k, x, y);
+    }
+    return this;
+  };
+  Q.over = function (x0, y0, w, h, fn) { return this.fill(x0, y0, w, h, function (x, y, cur) { return cur ? fn(x, y, cur) : ''; }); };
+  Q.ell = function (cx, cy, rx, ry, keys, o) { var s = this.s; this.g.ell(cx * s, cy * s, Math.max(0.6, rx * s), Math.max(0.6, ry * s), keys, o); return this; };
+  Q.cap = function (x0, y0, x1, y1, r, keys, bias) { var s = this.s; this.g.cap(x0 * s, y0 * s, x1 * s, y1 * s, Math.max(0.55, r * s), keys, bias); return this; };
+  Q.line = function (key, x0, y0, x1, y1) { var s = this.s; this.g.line(key, x0 * s, y0 * s, x1 * s, y1 * s); return this; };
+  Q.poly = function (pts, fill) {
+    var s = this.s, sp = [], i;
+    for (i = 0; i < pts.length; i++) sp.push([pts[i][0] * s, pts[i][1] * s]);
+    this.g.poly(sp, typeof fill === 'string' ? fill : function (x, y) { return fill(src(x, s), src(y, s)); }); return this;
+  };
+  Q.slab = function (x, y, w, h, keys) {
+    var s = this.s, x0 = Math.round(x * s), y0 = Math.round(y * s);
+    this.g.slab(x0, y0, Math.max(2, Math.round((x + w) * s) - x0), Math.max(2, Math.round((y + h) * s) - y0), keys); return this;
+  };
+  Q.outline = function (key, diag) { this.g.outline(key, diag); return this; };
+  Q.recolor = function (map) { this.g.recolor(map); return this; };
+  Q.flip = function () { this.g.flip(); return this; };
+  Q.count = function () { return this.g.count(); };
+  Q.canvas = function () { return this.g.canvas(); };
+  Q.paint = function (ctx, ox, oy) { this.g.paint(ctx, ox, oy); return this; };
+
+  return { grid: function (w, h) { return new Grid(w, h); }, scaled: function (g, s) { return new Scaled(g, s); }, tone: tone };
 })();
