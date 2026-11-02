@@ -61,7 +61,8 @@ function validateLooks(G, err) {
     keysIn({ ramp: L.ramp, fin: L.fin, iris: L.head && L.head.iris, rim: L.head && L.head.rim, teeth: (L.head && L.head.teeth) || [], // teeth, lead, speck, halo: Phase 71
       tail: L.tail && [L.tail.ramp || [], L.tail.tip || [], L.tail.lead || [], L.tail.speck ? L.tail.speck.key : []],
       zones: (L.zones || []).map(z => z.ramp), fins: (L.fins || []).map(f => [f.ramp || [], f.mottle || [], f.spot ? f.spot[4] : [], (f.lead || []).filter(x => typeof x === 'string'), f.speck ? f.speck.key : []]),
-      marks: (L.marks || []).map(m => [m.key || [], m.halo || []]) }, 'keys', id);
+      marks: (L.marks || []).map(m => [m.key || [], m.halo || [], m.rim || []]), // rim: Phase 72
+      barbels: ((L.head && L.head.barbels) || []).map(b => [b.key || [], b.tip || []]) }, 'keys', id); // Phase 72
     try {
       const g = FG.paintFit(id, L, 1e4, 1e4), wh = FG.cropSize(g), w = wh[0], h = wh[1];
       sizes.push(id + ' ' + w + 'x' + h);
@@ -76,7 +77,9 @@ function validateLooks(G, err) {
       });
     } catch (e) { err('fishlook ' + id + ': does not paint: ' + e.message); }
   }
-  looksInfo = 'fish looks: ' + Object.keys(looks).length + ' painted (' + sizes.join(', ') + '), ' + (d.fish.length - Object.keys(looks).length) + ' placeholder';
+  const placeholders = FG.fishLooks().placeholder; // Phase 72: none may remain
+  if (placeholders.length) err('fishlooks: ' + placeholders.length + ' species still a placeholder: ' + placeholders.join(', '));
+  looksInfo = 'fish looks: ' + Object.keys(looks).length + ' painted (' + sizes.join(', ') + '), ' + placeholders.length + ' placeholder';
 }
 
 const BANNED = /\b(window|document|Math\.random|Date|performance|requestAnimationFrame|localStorage)\b/;
@@ -97,12 +100,11 @@ function validate(G, opts) {
   }
 
   // Fish schema, cross-references, depth <= maxDepth (V5).
-  const ref = { locations: d.locations, bases: G.gfx.fishgen.BASE_NAMES };
+  const ref = { locations: d.locations, looks: d.fishLooks };
   d.validateFish(d.fish, ref).forEach(e => err('fish ' + e));
   G.sim.clock.validateWindows(d.windows).forEach(e => err('window ' + e));
   if (d.anomalies) d.validateAnomalies(d.anomalies, { locations: d.locations }).forEach(e => err('anomaly ' + e));
   else err('anomalies: data/anomalies.js is not loaded');
-  d.fish.forEach(f => { try { G.gfx.fishgen.generate(f.look); } catch (e) { err('fish ' + f.id + ': look does not generate: ' + e.message); } });
   validateLooks(G, err);
 
   const g = d.gear;
