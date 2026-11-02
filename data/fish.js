@@ -168,7 +168,7 @@ G.data.fish = [
     id: 'rainbow_trout', name: 'Rainbow Trout', latin: 'Oncorhynchus mykiss', family: 'trout & salmon', locations: ['creek'],
     habitat: { depthMin: 1, depthMax: 8 }, speed: 2, strength: 1.1, fatigue: 0.09, mass: 0.9, jumps: 0.8,
     lengthCm: [25, 60], weightKg: [0.2, 4], awareness: 56, caution: 0.45, price: 30,
-    baitLikes: ['worm', 'cricket'], lureTypes: { blade: 2, spinner: 1, spoon: 1, crank: 1, wacky: 1, topwater: 1 }, timeLikes: [], // any hour
+    baitLikes: ['worm', 'cricket'], lureTypes: { blade: 2, spinner: 1, spoon: 1, crank: 1, wacky: 1, topwater: 1, dropshot: 1 }, timeLikes: [], // any hour
     look: { base: 'trout', wrongness: 0, parts: [], palette: 'pale', seed: 1017 } // placeholder until Phases 70-72
   },
   {
@@ -196,7 +196,7 @@ G.data.fish = [
     id: 'dolly_varden', name: 'Dolly Varden', latin: 'Salvelinus malma', family: 'trout & salmon', locations: ['creek'],
     habitat: { depthMin: 1, depthMax: 10 }, speed: 1.7, strength: 1.1, fatigue: 0.09, mass: 1, jumps: 0.2,
     lengthCm: [25, 60], weightKg: [0.2, 4], awareness: 56, caution: 0.45, price: 33,
-    baitLikes: ['worm', 'minnow'], lureTypes: { spinner: 2, spoon: 1, jighead: 1, blade: 1 }, timeLikes: [], // any hour
+    baitLikes: ['worm', 'minnow'], lureTypes: { spinner: 2, spoon: 1, jighead: 1, blade: 1, dropshot: 1 }, timeLikes: [], // any hour
     look: { base: 'trout', wrongness: 0, parts: [], palette: 'olive', seed: 1021 } // placeholder until Phases 70-72
   },
   {

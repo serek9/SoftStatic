@@ -146,6 +146,7 @@ G.sim.economy = (function () {
     out.smallHook = rod.smallHook; out.smallBoost = rod.smallBoost; out.smallMass = g.rodSmall.mass;
     out.lure = isLure(bait.id, data);
     out.swim = out.lure ? bait.swim : ''; out.sink = out.lure ? bait.sink : 1; out.maxDepthM = out.lure ? bait.maxDepthM : 99;
+    out.vary = out.lure && bait.vary ? bait.vary : ''; out.dropM = out.lure && bait.dropM ? bait.dropM : 0; // Phase 69: rattle or kick; a dropshot's hook over its weight
     out.topDepthM = g.topDepthM;
     out.attract = rod.attract * bait.attract;
     out.bait = bait.id;

@@ -23,13 +23,18 @@ G.ui.shop = (function () {
     [{ kind: 'lantern', icon: 'lantern' }, { kind: 'depthFinder', icon: 'finder' }],
     [{ kind: 'bait', id: 'worm', icon: 'worm' }, { kind: 'bait', id: 'cricket', icon: 'cricket' },
      { kind: 'bait', id: 'minnow', icon: 'minnow' }, { kind: 'bait', id: 'unlabelled', icon: 'jar' }],
-    [{ kind: 'bait', id: 'spinner', icon: 'spinner' }, { kind: 'bait', id: 'plug', icon: 'plug' }, { kind: 'bait', id: 'grub', icon: 'grub' },
-     { kind: 'bait', id: 'popper', icon: 'popper' }, { kind: 'bait', id: 'jig', icon: 'jig' },
-     { kind: 'bait', id: 'bobber', icon: 'bobber' }, { kind: 'bait', id: 'spoon', icon: 'spoon' }] // Phase 65
+    [] // Phase 69: the case holds data/gear.js's 23 lures, filled below
   ];
-  var SWIM_SAYS = { mid: 'Spins in mid water as you reel.', dive: 'Floats, and dives when reeled.', bed: 'Sinks to the bottom and hops.',
+  (function () {
+    var l = G.data.gear.lures;
+    for (var i = 0; i < l.length; i++) SHELVES[3].push({ kind: 'bait', id: l[i].id, icon: l[i].look.base, swap: l[i].look.swap }); // its placeholder icon until Phase 73
+  })();
+  var SWIM_SAYS = { mid: 'Spins in mid water as you reel.', dive: 'Floats, and dives when reeled.',
     top: 'Stays on top. Tap to make it pop.', lift: 'Sinks fast; jig it up and down.',
-    float: 'A worm hung under a float. Watch the float: it dips when they take.', flutter: 'Falls fluttering and flashing; wobbles low as you reel.' };
+    float: 'A worm hung under a float. Watch the float: it dips when they take.', flutter: 'Falls fluttering and flashing; wobbles low as you reel.',
+    dropshot: 'A weight on the bottom, a worm hanging over it. Twitch it in place.', wacky: 'A worm hooked in the middle. Sinks slow and level, both ends wiggling.',
+    glide: 'Swings side to side in wide slow glides as you reel.', rattle: 'A thin blade. Lift it sharp and it shivers; let it drop.',
+    kick: 'A soft fish with a paddle tail that kicks as you reel.' };
   // Phase 53: what Rusty says of each kind of line.
   var LINE_SAYS = {
     mono: 'Stretches, so it forgives a lunge. Fish can see it.',
@@ -191,9 +196,10 @@ G.ui.shop = (function () {
   var iconCache = {}, coin = null;
   // The coin beside the balance: brass, a lit edge, a stamped centre (8×8).
   function paintCoin(c) { A.reset(); blob(c, 4, 4, 3.6, 3.6, BRASS, { bias: 0.1, rim: 0 }); box(c, 'rust', 3, 3, 2, 2); px(c, 'brass_hi', 2, 2); }
-  function icon(name, s) {
-    var key = name + s;
-    if (!iconCache[key]) iconCache[key] = G.gfx.bake.layer(32 * s, 32 * s, function (c) { A.reset(); ICONS[name](c, s); });
+  // Phase 69: an item's icon; a lure's is its look's base painted with its keys swapped.
+  function icon(it, s) {
+    var key = (it.swap ? it.id : it.icon) + s;
+    if (!iconCache[key]) iconCache[key] = G.gfx.bake.layer(32 * s, 32 * s, function (c) { A.reset(); A.swap(it.swap || null); ICONS[it.icon](c, s); A.swap(null); });
     return iconCache[key];
   }
 
@@ -225,7 +231,7 @@ G.ui.shop = (function () {
   // ---- Scene ----------------------------------------------------------------------------
   var row = 0, col = 0, t = 0, line_ = null;
   var R = G.ui.shopRoom, walk = null, faced = '';
-  var txt = { name: [], price: '', desc: [], status: [], msg: [], msgKey: 'fog_light', coins: '' }, lastCoins = -1;
+  var txt = { name: [], price: '', desc: [], status: [], msg: [], msgKey: 'fog_light', coins: '', pos: '', posSel: -1, posLen: -1 }, lastCoins = -1;
   var uneaseIn = { loc: 'fog', still: true, atShop: true };
   // Phase 37: what is open over the room: '' (walking), 'box' (Rusty talking), 'choice'
   // (Buy, Talk, Leave) or 'items' (the item window); the list it shows and the choice.
@@ -245,7 +251,8 @@ G.ui.shop = (function () {
   // show: the gear he has, and the minnows and crickets left after what he bought this visit
   // (the shop's stock is endless in the sim; the tank and the crate are full again next visit).
   var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]],
-    lures: [[3, 0], [3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6]] };
+    lures: [] };
+  (function () { for (var i = 0; i < SHELVES[3].length; i++) SHELF_ITEMS.lures.push([3, i]); })(); // Phase 69: all 23
   var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
   var stock = { rod: 0, lantern: false, finder: false, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
   // Phase 39: the hour and the light for the room (the lake's: Fogbound's drizzle and fog),
@@ -323,7 +330,7 @@ G.ui.shop = (function () {
       if (b.unlimited) desc = 'Free, and they never run out. Most fish take them.';
       else if (b.swim) { // Phase 43: a lure
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
-        desc = SWIM_SAYS[b.swim] + ' Not every fish wants it. Lost if the line snaps.';
+        desc = SWIM_SAYS[b.vary || b.swim] + ' ' + (b.sizes.length > 1 ? 'Sizes ' + b.sizes[0] + '-' + b.sizes[b.sizes.length - 1] : 'Size ' + b.sizes[0]) + '. Lost if the line snaps.'; // Phase 69: its action and the fish sizes it is made for
       } else {
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
         if (b.label === false) desc = 'No label. The jar is warm.';
@@ -493,10 +500,19 @@ G.ui.shop = (function () {
       }
     } else if (open === 'items') {
       if (inp.pressed('back')) { if (from === 'rusty') open = 'choice'; else open = ''; return; }
-      var d = M.axis('up', 'down');
+      var d = M.axis('up', 'down'), pg = M.axis('left', 'right');
       if (d) { sel = (sel + d + list.length) % list.length; row = list[sel][0]; col = list[sel][1]; describe(); say(''); }
+      if (pg) pageBy(pg);                                                             // Phase 69: A/D or the arrows turn a page
       if (inp.pressed('action')) act();
     }
+  }
+
+  // Phase 69: the list a page (LIST.rows) up or down, stopping at its ends (the lure case
+  // holds 23, the whole shop 40).
+  function pageBy(n) {
+    var to = Math.max(0, Math.min(list.length - 1, sel + n * LIST.rows));
+    if (to === sel) return;
+    sel = to; row = list[sel][0]; col = list[sel][1]; describe(); say('');
   }
 
   // Phase 36: walking the room. The last direction pressed and still held leads; Space talks
@@ -545,6 +561,9 @@ G.ui.shop = (function () {
           if (i !== sel) { sel = i; row = list[i][0]; col = list[i][1]; describe(); say(''); return 'none'; }
           return 'action';
         }
+      }
+      if (list.length > rows && gx >= LIST.x && gx < LIST.x + LIST.w && gy >= LIST.y + LIST.h - 16 && gy < LIST.y + LIST.h) { // Phase 69: the foot of the list pages it (left half up, right half down)
+        pageBy(gx < LIST.x + (LIST.w >> 1) ? -1 : 1); return 'none';
       }
       var hx = U.left(ITEM.x), hy = ITEM.y + ITEM.h - U.PAD - U.KEY_H;
       if (gy >= hy - 2 && gy < hy + U.KEY_H + 2) {
@@ -602,7 +621,7 @@ G.ui.shop = (function () {
       for (i = top; i < list.length && i < top + rows; i++) {
         var it = SHELVES[list[i][0]][list[i][1]], ry = U.top(y) + (i - top) * LIST.rowH, l = label(it), on = i === sel;
         if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, LIST.w - 6, LIST.rowH); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 1, LIST.rowH); }
-        ctx.drawImage(icon(it.icon, 1), x + U.PAD + 2, ry, 14, 14);
+        ctx.drawImage(icon(it, 1), x + U.PAD + 2, ry, 14, 14);
         F.drawText(ctx, l.name, x + U.PAD + 20, ry + 3, on ? 'signal_amber' : 'bone');
         var pw = F.measure(l.price);
         F.drawText(ctx, l.price, x + LIST.w - U.PAD - pw, ry + 3, l.price === 'OWNED' || l.price === 'BEST' ? 'fog_mid' : 'rust_hi');
@@ -610,6 +629,11 @@ G.ui.shop = (function () {
       }
       if (top > 0) F.drawText(ctx, '^', x + (LIST.w >> 1) - 8, y + LIST.h - 12, 'fog_mid');           // more above, more below
       if (top + rows < list.length) F.drawText(ctx, 'v', x + (LIST.w >> 1) + 4, y + LIST.h - 14, 'fog_mid');
+      if (list.length > rows) { // Phase 69: where in the list, and the keys that page it
+        if (txt.posSel !== sel || txt.posLen !== list.length) { txt.posSel = sel; txt.posLen = list.length; txt.pos = (sel + 1) + '/' + list.length; }
+        F.drawText(ctx, txt.pos, x + LIST.w - U.PAD - F.measure(txt.pos), y + LIST.h - 13, 'fog_mid');
+        F.drawText(ctx, 'A/D page', x + U.PAD + 2, y + LIST.h - 13, 'fog_mid');
+      }
       x = ITEM.x; y = ITEM.y;
       U.frame(ctx, x, y, ITEM.w, ITEM.h, txt.name[0] || '', txt.price, 'signal_amber');
       lines(ctx, txt.desc, U.left(x), U.top(y), 4, 'fog_light');

@@ -21,7 +21,7 @@ G.ui.setup = (function () {
   var R = [0, 0, 0, 0];                          // the panel's bounds
   var L = { rodW: 0, hookW: 0, hookX: 0, nameW: 0, hookNameW: 0, lineW: 0, lineX: 0 };
   var W_MAX = 320; // Phase 53: three columns need more than the small panel's MAX_W
-  var msg = '';
+  var msg = '', posTop = -1, posLen = -1, posStr = '';
 
   function E() { return G.sim.economy; }
   function name(b) { return b.label === false ? '(no label)' : b.name; }
@@ -131,8 +131,11 @@ G.ui.setup = (function () {
     var b = E().baitById(hooks[sel[1]], G.data);
     if (!usable(save, b)) return 'None left.';
     if (!E().isLure(b.id, G.data)) return b.unlimited ? 'Live bait. Never runs out.' : 'Live bait. One a cast.';
-    return { mid: 'Swims mid water.', dive: 'Dives as you reel.', bed: 'Hops along the bed.', top: 'Stays on the top.', lift: 'Sinks fast, lifts and falls.' }[b.swim] || 'A lure.';
+    return (SWIM_SAYS[b.vary || b.swim] || 'A lure.') + ' ' + b.sizes[0] + (b.sizes.length > 1 ? '-' + b.sizes[b.sizes.length - 1] : ''); // Phase 69: its action and sizes
   }
+  var SWIM_SAYS = { mid: 'Swims mid water.', dive: 'Dives as you reel.', top: 'Stays on the top.', lift: 'Sinks fast, lifts and falls.',
+    float: 'A worm under a float.', flutter: 'Falls fluttering.', dropshot: 'Worm held over a weight.', wacky: 'Sinks slow and level.',
+    glide: 'Glides side to side.', rattle: 'Lift it sharp; it shivers.', kick: 'Its paddle tail kicks.' };
 
   var LINE_SAYS = { mono: 'Stretches and forgives. Fish see it.', fluoro: 'Shy fish cannot see it. Sinks.', braid: 'No stretch: every touch shows. Seen.' };
 
@@ -180,6 +183,10 @@ G.ui.setup = (function () {
     }
     if (top > 0) F.drawText(ctx, '^', cx1 + L.hookW - 10, ty - U.ROW, 'fog_mid'); // more above or below, in the header
     if (top + ROWS < hooks.length) F.drawText(ctx, 'v', cx1 + L.hookW - 4, ty - U.ROW, 'fog_mid');
+    if (hooks.length > ROWS) { // Phase 69: which page of the hooks (a tap on the marks turns it)
+      if (posTop !== top || posLen !== hooks.length) { posTop = top; posLen = hooks.length; posStr = (((top + ROWS - 1) / ROWS) | 0) + 1 + '/' + Math.ceil(hooks.length / ROWS); }
+      F.drawText(ctx, posStr, cx1 + L.hookW - 14 - F.measure(posStr), ty - U.ROW, 'fog_dark');
+    }
     ry = ty + ROWS * U.ROW;
     F.drawText(ctx, detail(save), cx0, ry, msg ? 'signal_amber' : 'fog_light');
     var hx = x + U.PAD, hy = y + R[3] - U.PAD - U.KEY_H;
@@ -197,6 +204,12 @@ G.ui.setup = (function () {
     var U = G.ui.panel;
     if (!U.inside(R, gx, gy)) return 'setup';
     var y0 = U.top(R[1]) + U.ROW - 2, i = Math.floor((gy - y0) / U.ROW), cx0 = R[0] + U.PAD, cx1 = R[0] + L.hookX - 3, cx2 = R[0] + L.lineX - 3;
+    if (i < 0 && hooks.length > ROWS && gx >= cx1 + L.hookW - 14 && gx < cx1 + L.hookW + 6) { // Phase 69: the ^ v marks page the hooks
+      col = 1; msg = '';
+      var pg = gx < cx1 + L.hookW - 2 ? -ROWS : ROWS;
+      top = Math.max(0, Math.min(hooks.length - ROWS, top + pg)); sel[1] = top;
+      return 'none';
+    }
     if (i < 0 || i >= ROWS) return 'action';
     if (gx >= cx0 && gx < cx0 + L.rodW + 6 && i < rods.length) { col = 0; sel[0] = i; msg = ''; }
     else if (gx >= cx1 && gx < cx1 + L.hookW + 6 && top + i < hooks.length) { col = 1; sel[1] = top + i; msg = ''; }

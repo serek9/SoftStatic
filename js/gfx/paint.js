@@ -19,8 +19,10 @@ G.gfx.paint = (function () {
 
   // Setting fillStyle parses a colour string, so it is only set when the key changes (these
   // painters fill one pixel at a time, tens of thousands per layer).
-  var penCtx = null, penKey = '';
-  function pen(ctx, key) { if (ctx !== penCtx || key !== penKey) { ctx.fillStyle = P[key]; penCtx = ctx; penKey = key; } }
+  // Phase 69: swap(map) paints key as map[key] until swap(null) (the lures' placeholder icons).
+  var penCtx = null, penKey = '', swapMap = null;
+  function pen(ctx, key) { if (swapMap && swapMap[key]) key = swapMap[key]; if (ctx !== penCtx || key !== penKey) { ctx.fillStyle = P[key]; penCtx = ctx; penKey = key; } }
+  function swap(map) { swapMap = map; penCtx = null; penKey = ''; }
   function px(ctx, key, x, y) { pen(ctx, key); ctx.fillRect(x, y, 1, 1); }
 
   // Smooth value noise over a seeded lattice; ridged() turns it into sharp peaks.
@@ -452,5 +454,5 @@ G.gfx.paint = (function () {
   // Forget the cached pen colour (a painter that also sets ctx.fillStyle itself calls this).
   function reset() { penCtx = null; penKey = ''; }
 
-  return { reset: reset, area: area, pen: pen, px: px, box: box, hash2: hash2, tone: tone, blob: blob, limb: limb, line: line, slab: slab, dither: dither, mountains: mountains, forest: forest, shore: shore, pine: pine, round: round, birch: birch, spruce: spruce, dead: dead, poplar: poplar, TREES: TREES, SHORE_THINGS: SHORE_THINGS, trunk: trunk, cattails: cattails, pad: pad, cloudMask: cloudMask, paintMask: paintMask };
+  return { reset: reset, swap: swap, area: area, pen: pen, px: px, box: box, hash2: hash2, tone: tone, blob: blob, limb: limb, line: line, slab: slab, dither: dither, mountains: mountains, forest: forest, shore: shore, pine: pine, round: round, birch: birch, spruce: spruce, dead: dead, poplar: poplar, TREES: TREES, SHORE_THINGS: SHORE_THINGS, trunk: trunk, cattails: cattails, pad: pad, cloudMask: cloudMask, paintMask: paintMask };
 })();

@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 7;
+  var VERSION = 8;
   var PREFIX = 'SS1';
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
@@ -63,6 +63,28 @@ G.core.save = (function () {
       s.flags = s.flags || {};
       s.flags.lateAt = 0;
       s.flags.heavy = {};
+      return s;
+    },
+    // v7 -> v8 (Phase 69): the seven lures became the reference's 23. Each old lure's count
+    // goes to the nearest new one (data/gear.js oldLures: the spinner to the Spinnerbait, the
+    // plug to the Crankbait, the grub to the Wacky Worm, the popper to the Topwater, the jig to
+    // the Jighead, the spoon to the Small Spoonbait; the Bobber keeps its id), and so do the
+    // one on the hook and the journal's lists of what each species was caught on. A save made without the data loaded keeps its counts as they are.
+    7: function (s) {
+      var map = (G.data && G.data.gear && G.data.gear.oldLures) || {}, b = s.baits || {}, k;
+      for (k in map) {
+        if (map[k] === k || !(k in b)) continue;
+        b[map[k]] = (b[map[k]] | 0) + (b[k] | 0);
+        delete b[k];
+      }
+      s.baits = b;
+      if (s.gear && map[s.gear.bait]) s.gear.bait = map[s.gear.bait];
+      for (k in s.journal || {}) { // what each species was caught on (economy.recordCatch's took)
+        var t = s.journal[k].took;
+        if (!t) continue;
+        for (var i = 0; i < t.length; i++) if (map[t[i]]) t[i] = map[t[i]];
+        s.journal[k].took = t.filter(function (id, n) { return t.indexOf(id) === n; });
+      }
       return s;
     }
   };

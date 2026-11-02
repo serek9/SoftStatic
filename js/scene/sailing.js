@@ -33,6 +33,7 @@ G.scene.sailing = (function () {
     drag: 1.7        // Phase 65: the air's drag on the lure in flight (0: the old even parabola)
   };
   // Phase 65: how big a splash each hook makes as it lands (× the distance's).
+  // Phase 69: a lure by the old lure it is drawn as (underwater.lureBase) until Phase 73.
   var SPLASH = { worm: 0.45, cricket: 0.35, minnow: 0.6, unlabelled: 0.5, spinner: 0.6, plug: 0.75, grub: 0.5, popper: 0.85, jig: 0.65, bobber: 1, spoon: 0.8 };
   var tip = [0, 0], pose = [0, 0, 0];
 
@@ -554,7 +555,7 @@ G.scene.sailing = (function () {
     c.ly = c.y0 + (wy - c.y0) * u - 4 * c.h * u * (1 - u);
     if (u >= 1) {
       c.lx = c.x1; c.ly = wy;
-      fx.splash(c.x1, wy, Math.min(1, (0.3 + c.dist / 140) * (SPLASH[run.gearFx.bait] || 0.6)));
+      fx.splash(c.x1, wy, Math.min(1, (0.3 + c.dist / 140) * (SPLASH[G.scene.underwater.lureBase(run.gearFx.bait)] || 0.6)));
       c.tw = 0;
       G.sim.clock.latch(c.latched, G.state.save.clock, G.data.windows);
       G.sim.unease.castBoost(run.anom, run.spots, c.x1, G.data, c.boost); // casting at a delta or a spot counts now
@@ -924,7 +925,7 @@ G.scene.sailing = (function () {
     else return;
     if (end && isFloat(run)) {                                                          // Phase 65: the float, its leader and the worm
       var hx = c.x1 - camPx + (fsm !== 'sinking' ? Math.round(Math.sin(b.t * 1.1) * 1) : 0), hy = c.ly - camPy;
-      G.scene.underwater.drawFloat(ctx, lx, ly, hx, hy, run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85, run.bite.slot >= 0 ? Math.min(1, 0.4 + run.bite.t * 3) : 0, b.t);
+      G.scene.underwater.drawFloat(ctx, lx, ly, hx, hy, run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85, run.bite.slot >= 0 ? Math.min(1, 0.4 + run.bite.t * 3) : 0, b.t, run.gearFx.bait); // Phase 69: the Bobber or the Deep Bobber
       return;
     }
     G.scene.underwater.drawLure(ctx, c.bait || run.gearFx.bait, lx, ly); // Phase 22: the bait's own body
