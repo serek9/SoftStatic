@@ -21,7 +21,7 @@ function scriptList() {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const all = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
   const keep = all.filter(f => f === 'js/core/rng.js' || f === 'js/core/save.js' || f.startsWith('data/') || f.startsWith('js/sim/'));
-  return keep.concat(['js/gfx/sprites.js', 'js/gfx/fishgen.js']);
+  return keep.concat(['js/gfx/sprites.js', 'js/gfx/fishgen.js', 'js/gfx/luregen.js']);
 }
 
 function load() {
@@ -37,6 +37,49 @@ function load() {
 // Phase 70 (PLAN_SPECIES.md 3.5): every anatomy spec in data/fishlooks.js belongs to a species,
 // names only palette keys, paints (its portrait, and its swimmer in every frame), and its native
 // portrait fits 104×60.
+// Phase 73 (PLAN_SPECIES.md 3.6): every lure in data/gear.js has a look in data/lurelooks.js
+// (and no look is for anything else); its icon paints at its native size (about 38 px wide:
+// 20-48 wide and at most 40 tall; a float nose up, 12-20 wide and 30-44 tall) and fitted into
+// the list's, the chip's and the setup panel's boxes; its sprite paints in every heading and frame, inside a 40 px box; all of it in palette
+// keys only. The size variants of a type are each larger than the one before.
+let lureArtInfo = '';
+function validateLureArt(G, err) {
+  const d = G.data, LG = G.gfx.luregen, PAL = G.gfx.sprites.PALETTE, looks = d.lureLooks, lures = d.gear.lures;
+  if (!looks || !LG) { err('lurelooks: data/lurelooks.js or js/gfx/luregen.js is not loaded'); return; }
+  const keys = new Set(), dims = [];
+  let sprites = 0;
+  function palette(gr, where) { LG.keysOf(gr).forEach(k => { keys.add(k); if (!PAL[k]) err(where + ' paints "' + k + '", not a palette key'); }); }
+  for (const id in looks) if (!lures.some(l => l.id === id)) err('lurelook ' + id + ': no such lure');
+  lures.forEach(l => {
+    const L = looks[l.id];
+    if (!L) { err('lure ' + l.id + ': no look in data/lurelooks.js (no icon, no sprite)'); return; }
+    if (!LG.KINDS[L.kind]) { err('lurelook ' + l.id + ': kind ' + L.kind); return; }
+    if (!(L.len >= 24 && L.len <= 48 && L.uw >= 8 && L.uw <= 20)) err('lurelook ' + l.id + ': len 24..48, uw 8..20');
+    try {
+      const ic = LG.icon(l.id), up = LG.KINDS[L.kind].upright;
+      if (up ? !(ic.W >= 12 && ic.W <= 20 && ic.H >= 30 && ic.H <= 44) : !(ic.W >= 20 && ic.W <= 48 && ic.H <= 40)) err('lurelook ' + l.id + ': icon ' + ic.W + 'x' + ic.H + (up ? ' (a float: 12-20 wide, 30-44 tall)' : ' (20-48 wide, at most 40 tall)'));
+      if (LG.filled(ic) < ic.W * ic.H * 0.15) err('lurelook ' + l.id + ': icon nearly empty');
+      palette(ic, 'lurelook ' + l.id + ' icon');
+      dims.push(l.id + ' ' + ic.W + 'x' + ic.H);
+      [[16, 14], [16, 10], [46, 34]].forEach(([w, h]) => { const f = LG.icon(l.id, w, h); if (f.W > w || f.H > h) err('lurelook ' + l.id + ': fitted to ' + w + 'x' + h + ' it is ' + f.W + 'x' + f.H); palette(f, 'lurelook ' + l.id + ' small icon'); });
+      const B = LG.box(l.id);
+      if (B.S > 40) err('lurelook ' + l.id + ': sprite box ' + B.S + ' px (at most 40)');
+      for (let fr = 0; fr < LG.frames(l.id); fr++) for (let k = 0; k < LG.DIRS; k++) {
+        const sp = LG.sprite(l.id, k, fr);
+        if (!LG.filled(sp)) err('lurelook ' + l.id + ': sprite frame ' + fr + ' heading ' + k + ' is empty');
+        palette(sp, 'lurelook ' + l.id + ' sprite');
+        sprites++;
+      }
+    } catch (e) { err('lurelook ' + l.id + ': does not paint: ' + e.message); }
+  });
+  // the size variants: each a bigger icon and sprite than the smaller one of its type
+  d.LURE_TYPES.forEach(t => {
+    const of = lures.filter(l => l.type === t && looks[l.id]).sort((a, b) => d.SIZE_CLASSES.indexOf(a.sizes[0]) - d.SIZE_CLASSES.indexOf(b.sizes[0]));
+    for (let i = 1; i < of.length; i++) if (!(looks[of[i].id].len > looks[of[i - 1].id].len && looks[of[i].id].uw > looks[of[i - 1].id].uw)) err('lurelook ' + of[i].id + ': not larger than ' + of[i - 1].id);
+  });
+  lureArtInfo = 'lure art: ' + Object.keys(looks).length + ' looks, ' + sprites + ' sprites (heading x frame), ' + keys.size + ' palette keys; icons ' + dims.join(', ');
+}
+
 let looksInfo = '';
 function validateLooks(G, err) {
   const d = G.data, FG = G.gfx.fishgen, PAL = G.gfx.sprites.PALETTE, looks = d.fishLooks;
@@ -106,6 +149,7 @@ function validate(G, opts) {
   if (d.anomalies) d.validateAnomalies(d.anomalies, { locations: d.locations }).forEach(e => err('anomaly ' + e));
   else err('anomalies: data/anomalies.js is not loaded');
   validateLooks(G, err);
+  validateLureArt(G, err);
 
   const g = d.gear;
   // Phase 68: every bait a species takes exists, and every water has fish. Small fish (3-10 cm)
@@ -167,7 +211,7 @@ function validate(G, opts) {
   if (!(g.rodSmall.frac > 0 && g.rodSmall.frac < 1 && g.rodSmall.mass > 0)) err('rodSmall');
   // Phase 69: the 23 lures' actions; bed went with the grub; vary (rattle, kick) on lift and mid.
   const SWIM = ['mid', 'dive', 'top', 'lift', 'float', 'flutter', 'dropshot', 'wacky', 'glide'], lureIds = (g.lures || []).map(l => l.id);
-  const VARY = { rattle: 'lift', kick: 'mid' }, BASES = ['spinner', 'plug', 'grub', 'popper', 'jig', 'bobber', 'spoon', 'minnow'];
+  const VARY = { rattle: 'lift', kick: 'mid' };
   (g.lures || []).forEach(l => {
     if (!(l.cost > 0 && l.pack >= 1 && l.attract > 0 && SWIM.includes(l.swim) && l.sink >= 0 && l.maxDepthM >= 0)) err('lure ' + l.id + ': cost, pack, attract, swim, sink, maxDepthM');
     if (l.rareBoost !== undefined) err('lure ' + l.id + ': rareBoost was removed in Phase 68');
@@ -179,7 +223,7 @@ function validate(G, opts) {
     if ((l.swim === 'float') !== (l.carries !== undefined)) err('lure ' + l.id + ': a float rig, and only a float rig, carries a bait');
     if (l.vary !== undefined && VARY[l.vary] !== l.swim) err('lure ' + l.id + ': vary ' + l.vary + ' goes with swim ' + VARY[l.vary]);                  // Phase 69
     if ((l.swim === 'dropshot') !== (l.dropM > 0)) err('lure ' + l.id + ': a dropshot, and only a dropshot, hangs its hook dropM m over the weight');
-    if (!l.look || !BASES.includes(l.look.base) || Object.keys(l.look.swap || {}).some(k => !PAL[k] || !PAL[l.look.swap[k]])) err('lure ' + l.id + ': look must name an old lure and swap palette keys');
+    if (l.look !== undefined) err('lure ' + l.id + ': the placeholder look went in Phase 73 (data/lurelooks.js has its art)');
   });
   if (lureIds.length !== 23) err('lures: the reference has 23, not ' + lureIds.length);
   for (const k in g.oldLures || {}) if (!lureIds.includes(g.oldLures[k])) err('oldLures: ' + k + ' goes to unknown lure ' + g.oldLures[k]);
@@ -939,6 +983,7 @@ if (require.main === module) {
     if (sizeInfo) console.log('info  ' + sizeInfo);
     if (rosterInfo) console.log('info  ' + rosterInfo);
     if (looksInfo) console.log('info  ' + looksInfo);
+    if (lureArtInfo) console.log('info  ' + lureArtInfo);
     if (lineInfo) console.log('info  ' + lineInfo);
     if (lureInfo) console.log('info  ' + lureInfo);
     r.errors.forEach(e => console.log('ERROR ' + e));

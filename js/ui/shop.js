@@ -27,7 +27,7 @@ G.ui.shop = (function () {
   ];
   (function () {
     var l = G.data.gear.lures;
-    for (var i = 0; i < l.length; i++) SHELVES[3].push({ kind: 'bait', id: l[i].id, icon: l[i].look.base, swap: l[i].look.swap }); // its placeholder icon until Phase 73
+    for (var i = 0; i < l.length; i++) SHELVES[3].push({ kind: 'bait', id: l[i].id, icon: 'lure' }); // Phase 73: its own art (G.gfx.luregen)
   })();
   var SWIM_SAYS = { mid: 'Spins in mid water as you reel.', dive: 'Floats, and dives when reeled.',
     top: 'Stays on top. Tap to make it pop.', lift: 'Sinks fast; jig it up and down.',
@@ -140,47 +140,6 @@ G.ui.shop = (function () {
       blob(c, 13 * s, 10 * s, 3.5 * s, 1.2 * s, ['stone_hi', 'fog_light', 'cream'], { bias: 0.2 }); px(c, 'ink', (11 * s) | 0, (10 * s) | 0);
       line(c, 'fog_light', 16 * s, 10 * s, 18 * s, 9 * s); line(c, 'fog_light', 16 * s, 10 * s, 18 * s, 11 * s);
     },
-    // Phase 43: the lures in the case.
-    spinner: function (c, s) {
-      line(c, 'stone_hi', 6 * s, 16 * s, 26 * s, 16 * s);
-      blob(c, 9 * s, 16 * s, 4.5 * s, 2.6 * s, BRASS, { bias: 0.15 });                // the blade
-      blob(c, 17 * s, 16 * s, 3 * s, 1.6 * s, RUST, { bias: 0.1 });
-      box(c, 'ink', 23 * s, 13 * s, 1 * s, 6 * s); line(c, 'ink', 23 * s, 13 * s, 26 * s, 11 * s); line(c, 'ink', 23 * s, 19 * s, 26 * s, 21 * s);
-    },
-    plug: function (c, s) {
-      blob(c, 15 * s, 16 * s, 9 * s, 4 * s, ['rust_dark', 'rust_hi', 'leaf_gold', 'cream'], { bias: 0.2 });
-      px(c, 'ink', (21 * s) | 0, (15 * s) | 0);
-      limb(c, 24 * s, 18 * s, 29 * s, 22 * s, 1.2 * s, ['stone', 'stone_hi', 'stone_lit'], 0.1); // the lip
-      line(c, 'ink', 9 * s, 21 * s, 9 * s, 25 * s); line(c, 'ink', 18 * s, 21 * s, 18 * s, 25 * s);
-    },
-    grub: function (c, s) {
-      box(c, 'stone_dark', 22 * s, 13 * s, 5 * s, 5 * s); box(c, 'stone_hi', 23 * s, 13 * s, 2 * s, 1 * s);
-      limb(c, 21 * s, 15 * s, 11 * s, 16 * s, 2.4 * s, ['moss_dark', 'moss', 'moss_hi', 'moss_lit'], 0.1);
-      limb(c, 11 * s, 16 * s, 6 * s, 21 * s, 1.6 * s, ['moss', 'moss_hi', 'moss_lit'], 0.1); limb(c, 6 * s, 21 * s, 9 * s, 25 * s, 1.2 * s, ['moss', 'moss_hi'], 0.1);
-    },
-    popper: function (c, s) {
-      blob(c, 15 * s, 16 * s, 8 * s, 4.5 * s, ['rust', 'signal_amber', 'cream'], { bias: 0.15 });
-      box(c, 'ink', 22 * s, 12 * s, 2 * s, 8 * s); px(c, 'ink', (19 * s) | 0, (14 * s) | 0);
-      line(c, 'ink', 6 * s, 16 * s, 3 * s, 20 * s);
-    },
-    jig: function (c, s) {
-      blob(c, 23 * s, 15 * s, 3.5 * s, 3.5 * s, STONE, { bias: 0.2 });
-      for (var k = 0; k < 6; k++) limb(c, 20 * s, 15 * s, 6 * s, (9 + k * 2.6) * s, 0.8 * s, k & 1 ? RUST : ['rust_dark', 'flame', 'brass_hi'], 0.1);
-    },
-    // Phase 65: the float rig (a red-and-white bobber, its line, a worm on the hook) and the spoon.
-    bobber: function (c, s) {
-      line(c, 'fog_light', 16 * s, 4 * s, 16 * s, 26 * s);
-      blob(c, 16 * s, 11 * s, 5.5 * s, 5.5 * s, ['blood', 'neon_red', 'crimson'], { bias: 0.2 });
-      box(c, 'outline', 10 * s, 11 * s, 12 * s, 1);
-      blob(c, 16 * s, 14 * s, 5 * s, 2.8 * s, ['paper_dark', 'bone', 'ivory'], { bias: 0.1 });
-      box(c, 'bone', 15 * s, 3 * s, 2 * s, 3 * s);
-      limb(c, 14 * s, 25 * s, 19 * s, 28 * s, 1 * s, ['flesh_dark', 'flesh'], 0.1); line(c, 'ink', 17 * s, 26 * s, 17 * s, 23 * s);
-    },
-    spoon: function (c, s) {
-      blob(c, 15 * s, 16 * s, 8.5 * s, 3.8 * s, ['rust', 'leaf_gold', 'brass_hi', 'chrome_lit'], { bias: 0.25 });
-      line(c, 'neon_red', 9 * s, 16 * s, 19 * s, 16 * s);
-      line(c, 'ink', 24 * s, 16 * s, 27 * s, 16 * s); line(c, 'ink', 4 * s, 16 * s, 7 * s, 16 * s); line(c, 'ink', 4 * s, 16 * s, 3 * s, 19 * s);
-    },
     jar: function (c, s) {
       for (var y = 9 * s; y < 29 * s; y++) for (var x = 6 * s; x < 26 * s; x++) {
         var nx = (x - 16 * s) / (10 * s), edge = Math.abs(nx) > 0.86 || y > 28 * s - 2;
@@ -196,10 +155,13 @@ G.ui.shop = (function () {
   var iconCache = {}, coin = null;
   // The coin beside the balance: brass, a lit edge, a stamped centre (8×8).
   function paintCoin(c) { A.reset(); blob(c, 4, 4, 3.6, 3.6, BRASS, { bias: 0.1, rim: 0 }); box(c, 'rust', 3, 3, 2, 2); px(c, 'brass_hi', 2, 2); }
-  // Phase 69: an item's icon; a lure's is its look's base painted with its keys swapped.
+  // An item's icon. Phase 73: a lure's is its own art (G.gfx.luregen), painted at the list's
+  // size (LURE_ROW) rather than scaled; the item panel shows it at its native size.
+  var LURE_ROW = [16, 14];
   function icon(it, s) {
-    var key = (it.swap ? it.id : it.icon) + s;
-    if (!iconCache[key]) iconCache[key] = G.gfx.bake.layer(32 * s, 32 * s, function (c) { A.reset(); A.swap(it.swap || null); ICONS[it.icon](c, s); A.swap(null); });
+    if (it.icon === 'lure') return G.gfx.luregen.iconImg(it.id, LURE_ROW[0] * s, LURE_ROW[1] * s);
+    var key = it.icon + s;
+    if (!iconCache[key]) iconCache[key] = G.gfx.bake.layer(32 * s, 32 * s, function (c) { A.reset(); ICONS[it.icon](c, s); });
     return iconCache[key];
   }
 
@@ -231,7 +193,7 @@ G.ui.shop = (function () {
   // ---- Scene ----------------------------------------------------------------------------
   var row = 0, col = 0, t = 0, line_ = null;
   var R = G.ui.shopRoom, walk = null, faced = '';
-  var txt = { name: [], price: '', desc: [], status: [], msg: [], msgKey: 'fog_light', coins: '', pos: '', posSel: -1, posLen: -1 }, lastCoins = -1;
+  var txt = { name: [], icon: '', price: '', desc: [], status: [], msg: [], msgKey: 'fog_light', coins: '', pos: '', posSel: -1, posLen: -1 }, lastCoins = -1;
   var uneaseIn = { loc: 'fog', still: true, atShop: true };
   // Phase 37: what is open over the room: '' (walking), 'box' (Rusty talking), 'choice'
   // (Buy, Talk, Leave) or 'items' (the item window); the list it shows and the choice.
@@ -339,7 +301,8 @@ G.ui.shop = (function () {
       status = (b.unlimited ? '' : 'You have ' + have + '. ') + (on ? 'On the hook.' : '');
     }
     txt.name = F.wrap(name, ITEM.w - 90);
-    txt.desc = F.wrap(desc, ITEM.w - 2 * G.ui.panel.PAD);
+    txt.icon = it.icon === 'lure' ? it.id : ''; // Phase 73: the lure at its native size, the text beside it
+    txt.desc = F.wrap(desc, ITEM.w - 2 * G.ui.panel.PAD - (txt.icon ? G.gfx.luregen.iconImg(txt.icon).width + 6 : 0));
     txt.status = F.wrap(status, ITEM.w - 2 * G.ui.panel.PAD);
   }
 
@@ -621,7 +584,9 @@ G.ui.shop = (function () {
       for (i = top; i < list.length && i < top + rows; i++) {
         var it = SHELVES[list[i][0]][list[i][1]], ry = U.top(y) + (i - top) * LIST.rowH, l = label(it), on = i === sel;
         if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, LIST.w - 6, LIST.rowH); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 1, LIST.rowH); }
-        ctx.drawImage(icon(it, 1), x + U.PAD + 2, ry, 14, 14);
+        var ic = icon(it, 1);
+        if (it.icon === 'lure') ctx.drawImage(ic, x + U.PAD + 2 + ((LURE_ROW[0] - ic.width) >> 1), ry + ((LURE_ROW[1] - ic.height) >> 1)); // Phase 73: at its own size
+        else ctx.drawImage(ic, x + U.PAD + 2, ry, 14, 14);
         F.drawText(ctx, l.name, x + U.PAD + 20, ry + 3, on ? 'signal_amber' : 'bone');
         var pw = F.measure(l.price);
         F.drawText(ctx, l.price, x + LIST.w - U.PAD - pw, ry + 3, l.price === 'OWNED' || l.price === 'BEST' ? 'fog_mid' : 'rust_hi');
@@ -637,6 +602,7 @@ G.ui.shop = (function () {
       x = ITEM.x; y = ITEM.y;
       U.frame(ctx, x, y, ITEM.w, ITEM.h, txt.name[0] || '', txt.price, 'signal_amber');
       lines(ctx, txt.desc, U.left(x), U.top(y), 4, 'fog_light');
+      if (txt.icon) { var li = G.gfx.luregen.iconImg(txt.icon); ctx.drawImage(li, x + ITEM.w - U.PAD - li.width, U.top(y) - 2 + Math.max(0, (4 * F.LINE_H - li.height) >> 1)); }
       if (txt.msg.length) lines(ctx, txt.msg, U.left(x), U.top(y) + 4 * U.ROW + 2, 1, txt.msgKey);
       else lines(ctx, txt.status, U.left(x), U.top(y) + 4 * U.ROW + 2, 1, 'fog_mid');
       var hx = U.left(x), hy = y + ITEM.h - U.PAD - U.KEY_H;
@@ -658,6 +624,8 @@ G.ui.shop = (function () {
     // Tests: choose an item (shelf r, item c) in the window, as if the cursor were on it, and buy.
     select: function (r, c) { row = r; col = c; describe(); return txt.name.join(' '); },
     act: function () { act(); return txt.msg.join(' '); },
+    // Tests (Phase 73): open a shelf's item window (SHELF_ITEMS: 'lures', 'rack', ...) with row i chosen.
+    shelf: function (name, i) { showItems(SHELF_ITEMS[name], name); sel = Math.min(i || 0, list.length - 1); row = list[sel][0]; col = list[sel][1]; describe(); return txt.name.join(' '); },
     text: function () { return txt; },
     // dbg.shop(): where he stands and faces, the dog, what he faces, what is open over the room.
     info: function () { return walk ? { c: walk.c, r: walk.r, face: walk.face, moving: walk.moving, steps: walk.steps, dog: [walk.dog.c, walk.dog.r, walk.dog.sit], faced: faced, open: open, page: page, pages: pages.length, choice: CHOICES[choice], items: list.length, sel: sel, from: from, rusty: [rusty.face, rusty.fr], shown: R.shown(), strange: odd.kind, oddSeen: odd.seen, env: env, bakeMs: +R.bakeMs().toFixed(1), room: [R.OX, R.OY, R.COLS * R.T, R.ROWS * R.T], blocked: R.blocked().length } : null; },

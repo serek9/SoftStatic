@@ -12,7 +12,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.ui = G.ui || {};
 G.ui.setup = (function () {
   var S = G.gfx.sprites, F = S.fine;
-  var ROWS = 6, GAP = 6, BAR = 3; // rows shown per column; px between the columns; px a bar cell takes
+  var ROWS = 6, GAP = 6, BAR = 3, ICON_W = 46; // rows shown per column; px between the columns; px a bar cell takes
   var POWER = ['ultralight', 'light', 'medium light', 'medium', 'medium heavy', 'heavy'];
   var ACTION = ['slow', 'moderate', 'moderate fast', 'fast', 'extra fast'];
   var on = false, col = 0, sel = [0, 0, 0], top = 0, COLS = 3;
@@ -53,6 +53,7 @@ G.ui.setup = (function () {
     L.hookW = Math.max(F.measureBold('HOOK') + 12, L.hookNameW + 4 + F.measure('x99'));
     L.lineW = F.measureBold('LINE');
     for (i = 0; i < g.lineTypes.length; i++) L.lineW = Math.max(L.lineW, F.measure(g.lineTypes[i].name));
+    L.lineW = Math.max(L.lineW, ICON_W); // Phase 73: the hook's icon goes under the lines
     w = Math.min(W_MAX, 2 * U.PAD + 6 + L.rodW + GAP + L.hookW + GAP + L.lineW);
     L.hookX = U.PAD + 3 + L.rodW + GAP;
     L.lineX = L.hookX + L.hookW + GAP;
@@ -186,6 +187,12 @@ G.ui.setup = (function () {
     if (hooks.length > ROWS) { // Phase 69: which page of the hooks (a tap on the marks turns it)
       if (posTop !== top || posLen !== hooks.length) { posTop = top; posLen = hooks.length; posStr = (((top + ROWS - 1) / ROWS) | 0) + 1 + '/' + Math.ceil(hooks.length / ROWS); }
       F.drawText(ctx, posStr, cx1 + L.hookW - 14 - F.measure(posStr), ty - U.ROW, 'fog_dark');
+    }
+    // Phase 73: the lure under the cursor in its own art, under the lines (fitted to the room left)
+    var hb = hooks[sel[1]];
+    if (hb && G.gfx.luregen.has(hb)) {
+      var room = (ROWS - lines.length) * U.ROW - 2, ic = G.gfx.luregen.iconImg(hb, L.lineW, room);
+      ctx.drawImage(ic, cx2 + ((L.lineW - ic.width) >> 1), ty + lines.length * U.ROW + 1 + ((room - ic.height) >> 1));
     }
     ry = ty + ROWS * U.ROW;
     F.drawText(ctx, detail(save), cx0, ry, msg ? 'signal_amber' : 'fog_light');

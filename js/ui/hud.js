@@ -81,6 +81,14 @@ G.ui.hud = (function () {
     return baitStr;
   }
 
+  // Phase 73: the chip before the hook's name: a lure's icon painted at CHIP's size, or a
+  // bait's own body as it looks under water.
+  var CHIP = [16, 10];
+  function chip(id) {
+    if (G.gfx.luregen.has(id)) return G.gfx.luregen.iconImg(id, CHIP[0], CHIP[1]);
+    return G.scene.underwater.lureImg(id, 0, 0);
+  }
+
   // Line tint for fight tension (7.4): plain, then amber, then red. Secondary to the line's shape.
   function tensionKey(T) { return T < 0.5 ? 'fog_light' : (T < 0.8 ? 'signal_amber' : 'neon_red'); }
 
@@ -115,7 +123,9 @@ G.ui.hud = (function () {
       label(ctx, s, X, Y, 'fog_light');
       ctx.drawImage(coinImg(), cx, Y);
       label(ctx, coinText(save.coins), cx + 12, Y, 'paper');
-      label(ctx, baitText(save, run.gearFx.bait), X, Y + 14, 'fog_light');
+      var ch = chip(run.gearFx.bait);                                              // Phase 73: the hook's chip, then its name
+      ctx.drawImage(ch, X + ((CHIP[0] - ch.width) >> 1), Y + 18 - (ch.height >> 1));
+      label(ctx, baitText(save, run.gearFx.bait), X + CHIP[0] + 3, Y + 14, 'fog_light');
       ctx.globalAlpha = 1;
     }
     if (noteT > 0) { ctx.globalAlpha = Math.min(1, noteT); label(ctx, note, X, Y + 28, 'paper'); ctx.globalAlpha = 1; }
