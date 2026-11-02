@@ -1,7 +1,7 @@
 # SoftStatic: Real Fish and Real Tackle, Phases 68–73
 
 **Date:** 2026-11-02. **Repo state:** Phases 1–67 done (PLAN.md §8.1).
-**Status:** Asked for by the user on 2026-11-02. **Phases 68, 69 and 70 done** (PLAN.md 8.3 #347–375); Phases 71–73 not started. Each phase starts only when the user says so. Where Phase 68 settled something this plan left open (prices, the placements in 3.2, the pacing model's bait, costs), PLAN.md 8.3 has the decision.
+**Status:** Asked for by the user on 2026-11-02. **Phases 68–71 done** (PLAN.md 8.3 #347–381); Phases 72–73 not started. Each phase starts only when the user says so. Where Phase 68 settled something this plan left open (prices, the placements in 3.2, the pacing model's bait, costs), PLAN.md 8.3 has the decision.
 
 > Lets change all the lures and all the fish in the lakes, fish should be the 68 especies in this list: https://castnchill.unpack.wiki/docs/fish/ And the lures should be all of this list https://castnchill.unpack.wiki/docs/lures/ Take the reference icon and name of each fish and lure to remake it like that, with that resolution and detail. The fish we already made discard them. I want this list. (you can keep the other animals like snails, frogs, turtles, ducks of the ecosistem) Fish relate to lures so keep in mind.
 
