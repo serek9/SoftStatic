@@ -1,8 +1,8 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // The fish's anatomy specs (Phase 70, PLAN_SPECIES.md 3.5), painted by js/gfx/fishgen.js
-// (paintSpec; the format is described there). One entry per species id in data/fish.js; a
-// species with none keeps the placeholder painter until Phases 71-72. Body lengths run from the
+// (paintSpec; the format is described there). One entry per species id in data/fish.js: since
+// Phase 72 every species has one (--validate fails on a species without). Body lengths run from the
 // tail's root (x 0) to the snout (x 1), y down from the middle line; depths v run 0 (back) to 1
 // (belly). Colours are palette keys (js/gfx/sprites.js, the fish_ ramps). Painted from the real
 // fish and the reference icons for size and detail: our own drawing, facing right as the game's
@@ -480,6 +480,459 @@ G.data = G.data || {};
         pelvic(0.66, 0.11), pectoral(0.7, 0.58, 0.11)
       ],
       marks: [{ k: 'stripes', vs: [0.14, 0.24, 0.34, 0.44, 0.54, 0.64, 0.74], w: 1.2, x0: 0.02, x1: 0.73, d: -3 }]
+    },
+    // ---- pikes (Phase 72): long bodies, the dorsal and anal far back over each other, a flat
+    // duck-bill snout, a long toothed mouth ----
+    northern_pike: {
+      px: 90,
+      body: [[0, -0.0696, 0.0638], [0.15, -0.116, 0.1073], [0.4, -0.1479, 0.1363], [0.6, -0.1508, 0.1392], [0.76, -0.1363, 0.1276], [0.88, -0.1015, 0.087], [0.95, -0.0638, 0.0522], [1, -0.029, 0.0261]],
+      ramp: ramp('pike'), stops: [0.1, 0.24, 0.42, 0.66, 0.82], sheen: [0.24, 0.36],
+      head: { gill: 0.72, bulge: 0.04, pre: 0.78, eye: [0.85, -0.0667, 0.03], iris: 'fish_eye_gold', rim: 'fish_pike_0', mouth: [0.0174, 0.2, 0.012, 3], teeth: 'fish_cream', lip: true, cheek: 1 },
+      lateral: { v: 0.44, arch: 0.02, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.3 },
+      tail: { len: 0.17, spread: 0.1885, fork: 0.38, rays: 15, ramp: ['fish_finpike_0', 'fish_finpike_1', 'fish_finpike_2', 'fish_finpike_3'], speck: { key: 'fish_pike_1', cell: 4, n: 0.5, seed: 31 } },
+      fin: ['fish_finpike_0', 'fish_finpike_1', 'fish_finpike_2', 'fish_finpike_3'],
+      fins: [
+        { k: 'dorsal', a: 0.07, b: 0.24, h: 0.154, prof: [0.6, 0.95, 1, 0.92, 0.8, 0.7], rays: 12, lean: 0.4, speck: { key: 'fish_pike_1', cell: 4, n: 0.5, seed: 32 } },
+        { k: 'anal', a: 0.06, b: 0.21, h: 0.14, prof: [0.6, 0.95, 1, 0.9, 0.75, 0.65], rays: 11, lean: 0.4, speck: { key: 'fish_pike_1', cell: 4, n: 0.5, seed: 33 } },
+        pelvic(0.45, 0.126), pectoral(0.71, 0.74, 0.126)
+      ],
+      marks: [{ k: 'spots', n: 52, x0: 0.04, x1: 0.7, v0: 0.12, v1: 0.74, r: 0.95, sx: 1.9, seed: 7201, key: 'fish_bean' }]
+    },
+    muskie: {
+      px: 94,
+      body: [[0, -0.0667, 0.0609], [0.15, -0.1131, 0.1044], [0.4, -0.1421, 0.1305], [0.6, -0.145, 0.1334], [0.76, -0.1305, 0.1218], [0.88, -0.0957, 0.0841], [0.95, -0.0609, 0.0493], [1, -0.0261, 0.0232]],
+      ramp: ramp('musk'), stops: [0.1, 0.24, 0.42, 0.66, 0.82], sheen: [0.24, 0.36],
+      head: { gill: 0.72, bulge: 0.04, pre: 0.78, eye: [0.85, -0.0638, 0.028], iris: 'fish_eye_gold', rim: 'fish_musk_0', mouth: [0.0174, 0.21, 0.012, 3], teeth: 'fish_cream', lip: true, cheek: 1 },
+      lateral: { v: 0.44, arch: 0.02, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.3 },
+      tail: { len: 0.17, spread: 0.1885, fork: 0.3, rays: 15, ramp: ['fish_finmusk_0', 'fish_finmusk_1', 'fish_finmusk_2', 'fish_finmusk_3'], speck: { key: 'fish_musk_0', cell: 4, n: 0.5, seed: 34 } },
+      fin: ['fish_finmusk_0', 'fish_finmusk_1', 'fish_finmusk_2', 'fish_finmusk_3'],
+      fins: [
+        { k: 'dorsal', a: 0.07, b: 0.23, h: 0.154, prof: [0.6, 0.95, 1, 0.92, 0.8, 0.7], rays: 12, lean: 0.4, speck: { key: 'fish_musk_0', cell: 4, n: 0.5, seed: 35 } },
+        { k: 'anal', a: 0.06, b: 0.2, h: 0.14, prof: [0.6, 0.95, 1, 0.9, 0.75, 0.65], rays: 11, lean: 0.4, speck: { key: 'fish_musk_0', cell: 4, n: 0.5, seed: 36 } },
+        pelvic(0.45, 0.126), pectoral(0.71, 0.74, 0.126)
+      ],
+      marks: [
+        { k: 'saddles', xs: [0.08, 0.15, 0.22, 0.29, 0.36, 0.43, 0.5, 0.57, 0.64], w: 0.032, v0: 0.06, v1: 0.78, taper: 0.3, slant: -0.03, d: -2 },
+        { k: 'spots', n: 18, x0: 0.06, x1: 0.68, v0: 0.2, v1: 0.6, r: 0.8, seed: 7202, d: -2 }
+      ]
+    },
+    tiger_muskie: {
+      px: 94,
+      body: [[0, -0.0696, 0.0638], [0.15, -0.1189, 0.1102], [0.4, -0.1508, 0.1392], [0.6, -0.1537, 0.1421], [0.76, -0.1363, 0.1276], [0.88, -0.0986, 0.087], [0.95, -0.0623, 0.0508], [1, -0.0275, 0.0247]],
+      ramp: ramp('tigm'), stops: [0.1, 0.24, 0.42, 0.66, 0.82], sheen: [0.24, 0.36],
+      head: { gill: 0.72, bulge: 0.04, pre: 0.78, eye: [0.85, -0.0667, 0.029], iris: 'fish_eye_gold', rim: 'fish_tigm_0', mouth: [0.0174, 0.21, 0.012, 3], teeth: 'fish_cream', lip: true, cheek: 1 },
+      lateral: { v: 0.44, arch: 0.02, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.3 },
+      tail: { len: 0.17, spread: 0.1958, fork: 0.25, rays: 15, ramp: ['fish_finmusk_0', 'fish_finmusk_1', 'fish_finmusk_2', 'fish_finmusk_3'] },
+      fin: ['fish_finmusk_0', 'fish_finmusk_1', 'fish_finmusk_2', 'fish_finmusk_3'],
+      fins: [
+        { k: 'dorsal', a: 0.07, b: 0.23, h: 0.161, prof: [0.6, 0.95, 1, 0.92, 0.8, 0.7], rays: 12, lean: 0.4, ramp: ['fish_tigm_1', 'fish_tigm_2', 'fish_tigm_3', 'fish_tigm_4'] },
+        { k: 'anal', a: 0.06, b: 0.2, h: 0.14, prof: [0.6, 0.95, 1, 0.9, 0.75, 0.65], rays: 11, lean: 0.4 },
+        pelvic(0.45, 0.126), pectoral(0.71, 0.74, 0.126)
+      ],
+      marks: [{ k: 'worms', x0: 0.03, x1: 0.71, v0: 0.04, v1: 0.84, sc: 2.6, w: 0.5, ph: 0.7, d: -2 }]
+    },
+    // ---- carp & minnows (Phase 72) ----
+    common_carp: {
+      px: 90,
+      body: [[0, -0.0714, 0.063], [0.15, -0.1449, 0.1218], [0.38, -0.2478, 0.1806], [0.56, -0.2646, 0.1869], [0.72, -0.2331, 0.168], [0.84, -0.1701, 0.1302], [0.94, -0.0945, 0.0735], [1, -0.0315, 0.0315]],
+      ramp: ramp('carp'), stops: [0.08, 0.2, 0.38, 0.6, 0.8], sheen: [0.2, 0.32],
+      head: { gill: 0.76, bulge: 0.05, pre: 0.82, eye: [0.88, -0.0525, 0.04], iris: 'fish_eye_gold', rim: 'fish_carp_0', mouth: [0.0294, 0.05, 0.008, 0, 0.004], lip: true, cheek: 1,
+        barbels: [{ x: 0.985, y: 0.0357, len: 0.045, ang: 100, curl: 30, key: 'fish_carp_1' }, { x: 0.955, y: 0.0462, len: 0.03, ang: 100, curl: 20, key: 'fish_carp_1' }] },
+      lateral: { v: 0.46, arch: 0.03, d: 1 }, scales: { size: 5, v0: 0.06, v1: 0.96, d: -1, n: 0.95 },
+      tail: { len: 0.19, spread: 0.189, fork: 0.36, rays: 16, ramp: ['fish_carp_2', 'fish_carp_3', 'fish_carp_4', 'fish_orange_2'], tip: 'fish_orange_1' },
+      fin: ['fish_carp_2', 'fish_carp_3', 'fish_carp_4', 'fish_carp_5'],
+      fins: [
+        { k: 'dorsal', a: 0.2, b: 0.6, h: 0.143, prof: [1, 0.95, 0.75, 0.6, 0.55, 0.5, 0.5, 0.48, 0.45, 0.4], rays: 16, lean: 0.4, lead: ['fish_carp_1'] },
+        { k: 'anal', a: 0.13, b: 0.23, h: 0.143, prof: [1, 0.95, 0.75, 0.55, 0.45], rays: 7, lean: 0.4, ramp: FIN_OR },
+        ext(pelvic(0.5, 0.121, FIN_OR), { ang: 132 }), pectoral(0.74, 0.76, 0.121)
+      ],
+      marks: []
+    },
+    creek_chub: {
+      px: 84,
+      body: [[0, -0.078, 0.0676], [0.15, -0.1274, 0.1144], [0.4, -0.1768, 0.1586], [0.6, -0.182, 0.1612], [0.78, -0.1664, 0.1456], [0.92, -0.1118, 0.0962], [1, -0.0468, 0.039]],
+      ramp: ramp('chub'), stops: [0.1, 0.24, 0.42, 0.6, 0.8], sheen: [0.24, 0.36],
+      head: { gill: 0.74, bulge: 0.05, pre: 0.8, eye: [0.885, -0.0546, 0.045], iris: 'fish_eye_gold', rim: 'fish_chub_0', mouth: [0.0156, 0.12, 0.012, 0], lip: true, cheek: 1 },
+      lateral: { v: 0.46, arch: 0.06, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.45 },
+      tail: { len: 0.2, spread: 0.247, fork: 0.42, rays: 15, ramp: ['fish_fingold_0', 'fish_fingold_1', 'fish_fingold_2', 'fish_fingold_3'] },
+      fin: ['fish_fingold_0', 'fish_fingold_1', 'fish_fingold_2', 'fish_fingold_3'],
+      fins: [
+        { k: 'dorsal', a: 0.42, b: 0.56, h: 0.2, prof: [0.9, 1, 0.9, 0.75, 0.6, 0.5], rays: 8, lean: 0.4, spot: [0.65, 1, 0, 0.4, 'fish_spot'] },
+        { k: 'anal', a: 0.16, b: 0.27, h: 0.15, prof: [0.9, 1, 0.85, 0.65, 0.5], rays: 8, lean: 0.4, ramp: FIN_OR },
+        pelvic(0.48, 0.125, FIN_OR), pectoral(0.73, 0.76, 0.125)
+      ],
+      marks: [{ k: 'stripes', vs: [0.48], w: 2, x0: 0.02, x1: 0.74, broken: 0.15, d: -1 }]
+    },
+    longnose_dace: {
+      px: 80,
+      body: [[0, -0.0728, 0.065], [0.15, -0.117, 0.1092], [0.4, -0.156, 0.1456], [0.6, -0.1586, 0.1456], [0.78, -0.143, 0.13], [0.9, -0.104, 0.091], [0.97, -0.065, 0.039], [1, -0.0312, 0.0104]],
+      ramp: ramp('dace'), stops: [0.1, 0.24, 0.42, 0.62, 0.8], sheen: [0.24, 0.36],
+      head: { gill: 0.75, bulge: 0.05, pre: 0.81, eye: [0.88, -0.052, 0.042], iris: 'fish_eye_gold', rim: 'fish_dace_0', mouth: [0.039, 0.05, 0.004, 0, 0.022], lip: true, cheek: 1 },
+      lateral: { v: 0.42, arch: 0.04, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.4 },
+      tail: { len: 0.2, spread: 0.234, fork: 0.35, rays: 14, ramp: FIN_OR },
+      fin: FIN_OR,
+      fins: [
+        { k: 'dorsal', a: 0.42, b: 0.56, h: 0.1875, prof: [0.9, 1, 0.9, 0.75, 0.6, 0.5], rays: 8, lean: 0.4 },
+        { k: 'anal', a: 0.16, b: 0.26, h: 0.1375, prof: [0.9, 1, 0.85, 0.65, 0.5], rays: 7, lean: 0.4 },
+        pelvic(0.46, 0.125), pectoral(0.73, 0.78, 0.1375)
+      ],
+      marks: [
+        { k: 'stripes', vs: [0.44], w: 2, x0: 0.02, x1: 1, broken: 0.1, d: -2 },
+        { k: 'mottle', x0: 0.02, x1: 0.75, v0: 0.02, v1: 0.36, sc: 2.2, t: 1.1, d: -1 }
+      ]
+    },
+    peamouth: {
+      px: 84,
+      body: [[0, -0.0729, 0.0648], [0.15, -0.1269, 0.1161], [0.4, -0.1755, 0.162], [0.6, -0.1809, 0.1647], [0.78, -0.1593, 0.1431], [0.92, -0.1053, 0.0891], [1, -0.0405, 0.0351]],
+      ramp: ramp('pea'), stops: [0.1, 0.24, 0.42, 0.62, 0.8], sheen: [0.24, 0.36],
+      head: { gill: 0.75, bulge: 0.05, pre: 0.81, eye: [0.885, -0.0486, 0.045], iris: 'fish_eye_silver', rim: 'fish_pea_0', mouth: [0.0243, 0.06, 0.006, 0, 0.004], lip: true, cheek: 1 },
+      lateral: { v: 0.4, arch: 0.08, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.4 },
+      tail: { len: 0.2, spread: 0.2565, fork: 0.5, rays: 15, ramp: ['fish_findark_0', 'fish_findark_1', 'fish_findark_2', 'fish_findark_3'] },
+      fin: FIN_GR,
+      fins: [
+        { k: 'dorsal', a: 0.42, b: 0.56, h: 0.208, prof: [0.9, 1, 0.9, 0.75, 0.6, 0.5], rays: 8, lean: 0.4, ramp: ['fish_findark_0', 'fish_findark_1', 'fish_findark_2', 'fish_findark_3'] },
+        { k: 'anal', a: 0.15, b: 0.28, h: 0.156, prof: [0.9, 1, 0.85, 0.65, 0.5], rays: 9, lean: 0.4, ramp: FIN_OL },
+        pelvic(0.48, 0.13, FIN_OL), pectoral(0.73, 0.78, 0.13)
+      ],
+      marks: [
+        { k: 'stripes', vs: [0.34], w: 1.5, x0: 0.04, x1: 0.74, broken: 0.2, d: -2 },
+        { k: 'band', v0: 0.58, v1: 0.68, x0: 0.06, x1: 0.82, jag: 0.06, key: 'fish_pinkband_1' }
+      ]
+    },
+    northern_pikeminnow: {
+      px: 88,
+      body: [[0, -0.06, 0.0528], [0.15, -0.1056, 0.096], [0.4, -0.1488, 0.1344], [0.6, -0.1536, 0.1368], [0.78, -0.1392, 0.1248], [0.92, -0.096, 0.0792], [1, -0.0384, 0.0264]],
+      ramp: ramp('pkm'), stops: [0.12, 0.26, 0.42, 0.6, 0.8], sheen: [0.26, 0.38],
+      head: { gill: 0.72, bulge: 0.05, pre: 0.78, eye: [0.875, -0.0528, 0.036], iris: 'fish_eye_silver', rim: 'fish_pkm_0', mouth: [0.012, 0.15, 0.016, 2], lip: true, cheek: 1 },
+      lateral: { v: 0.44, arch: 0.06, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.45 },
+      tail: { len: 0.2, spread: 0.216, fork: 0.55, rays: 15 },
+      fin: FIN_GR,
+      fins: [
+        { k: 'dorsal', a: 0.4, b: 0.54, h: 0.18, prof: [0.9, 1, 0.9, 0.75, 0.6, 0.5], rays: 8, lean: 0.45 },
+        { k: 'anal', a: 0.14, b: 0.26, h: 0.132, prof: [0.9, 1, 0.85, 0.65, 0.5], rays: 8, lean: 0.45 },
+        pelvic(0.46, 0.12, FIN_OL), pectoral(0.71, 0.78, 0.12)
+      ],
+      marks: []
+    },
+    // ---- suckers (Phase 72): the mouth underneath behind a blunt snout, a high dorsal ----
+    white_sucker: {
+      px: 86,
+      body: [[0, -0.0783, 0.0702], [0.15, -0.1404, 0.1269], [0.4, -0.1998, 0.1836], [0.6, -0.2025, 0.1863], [0.78, -0.1755, 0.162], [0.9, -0.1215, 0.1134], [1, -0.0513, 0.0459]],
+      ramp: ramp('wsuck'), stops: [0.1, 0.24, 0.42, 0.62, 0.8], sheen: [0.24, 0.36],
+      head: { gill: 0.76, bulge: 0.05, pre: 0.82, eye: [0.88, -0.0648, 0.034], iris: 'fish_eye_gold', rim: 'fish_wsuck_0', mouth: [0.0864, 0.04, 0.004, 0, 0.034], lip: true, cheek: 1 },
+      lateral: { v: 0.46, arch: 0.02, d: 1 }, scales: { size: 3, v0: 0.1, v1: 0.92, d: -1, n: 0.7 },
+      tail: { len: 0.19, spread: 0.243, fork: 0.42, rays: 15, ramp: FIN_OL },
+      fin: FIN_OL,
+      fins: [
+        { k: 'dorsal', a: 0.44, b: 0.62, h: 0.208, prof: [0.9, 1, 0.85, 0.7, 0.55, 0.45], rays: 10, lean: 0.4 },
+        { k: 'anal', a: 0.13, b: 0.21, h: 0.182, prof: [0.9, 1, 0.8, 0.55], rays: 6, lean: 0.4, ramp: FIN_OR },
+        pelvic(0.42, 0.13, FIN_OR), pectoral(0.75, 0.82, 0.13)
+      ],
+      marks: []
+    },
+    longnose_sucker: {
+      px: 86,
+      body: [[0, -0.0702, 0.0624], [0.15, -0.1248, 0.1144], [0.4, -0.1768, 0.1638], [0.6, -0.1794, 0.1664], [0.78, -0.156, 0.1456], [0.9, -0.1118, 0.1014], [0.97, -0.0702, 0.0546], [1, -0.039, 0.026]],
+      ramp: ramp('lsuck'), stops: [0.1, 0.24, 0.42, 0.62, 0.8], sheen: [0.24, 0.36],
+      head: { gill: 0.75, bulge: 0.05, pre: 0.81, eye: [0.865, -0.065, 0.03], iris: 'fish_eye_gold', rim: 'fish_lsuck_0', mouth: [0.0702, 0.04, 0.004, 0, 0.04], lip: true, cheek: 1 },
+      lateral: { v: 0.46, arch: 0.02, d: 1 }, scales: { size: 2, v0: 0.1, v1: 0.92, d: -1, n: 0.5 },
+      tail: { len: 0.19, spread: 0.234, fork: 0.42, rays: 15, ramp: ['fish_lsuck_1', 'fish_lsuck_2', 'fish_lsuck_3', 'fish_lsuck_4'] },
+      fin: ['fish_lsuck_1', 'fish_lsuck_2', 'fish_lsuck_3', 'fish_lsuck_4'],
+      fins: [
+        { k: 'dorsal', a: 0.44, b: 0.62, h: 0.208, prof: [0.9, 1, 0.85, 0.7, 0.55, 0.45], rays: 10, lean: 0.4 },
+        { k: 'anal', a: 0.13, b: 0.21, h: 0.182, prof: [0.9, 1, 0.8, 0.55], rays: 6, lean: 0.4, ramp: FIN_OR },
+        pelvic(0.42, 0.13, FIN_OR), pectoral(0.75, 0.82, 0.13)
+      ],
+      marks: [{ k: 'band', v0: 0.38, v1: 0.5, x0: 0.04, x1: 0.74, jag: 0.08, d: -1 }]
+    },
+    shorthead_redhorse: {
+      px: 84,
+      body: [[0, -0.0775, 0.07], [0.15, -0.1475, 0.13], [0.4, -0.22, 0.19], [0.6, -0.225, 0.19], [0.78, -0.19, 0.1625], [0.9, -0.125, 0.1125], [1, -0.05, 0.045]],
+      ramp: ramp('redh'), stops: [0.1, 0.24, 0.42, 0.62, 0.8], sheen: [0.22, 0.34],
+      head: { gill: 0.77, bulge: 0.05, pre: 0.83, eye: [0.885, -0.0625, 0.036], iris: 'fish_eye_gold', rim: 'fish_redh_0', mouth: [0.075, 0.04, 0.004, 0, 0.026], lip: true, cheek: 1 },
+      lateral: { v: 0.44, arch: 0.02, d: 1 }, scales: { size: 4, v0: 0.08, v1: 0.94, d: -1, n: 0.9 },
+      tail: { len: 0.19, spread: 0.25, fork: 0.42, rays: 15, ramp: ['fish_finred_0', 'fish_finred_1', 'fish_finred_2', 'fish_finred_3'] },
+      fin: ['fish_finred_0', 'fish_finred_1', 'fish_finred_2', 'fish_finred_3'],
+      fins: [
+        { k: 'dorsal', a: 0.44, b: 0.64, h: 0.24, prof: [0.9, 1, 0.85, 0.65, 0.5, 0.4], rays: 11, lean: 0.4 },
+        { k: 'anal', a: 0.13, b: 0.22, h: 0.18, prof: [0.9, 1, 0.8, 0.55], rays: 6, lean: 0.4 },
+        pelvic(0.42, 0.132), pectoral(0.76, 0.82, 0.132)
+      ],
+      marks: []
+    },
+    largescale_sucker: {
+      px: 88,
+      body: [[0, -0.0728, 0.065], [0.15, -0.13, 0.117], [0.4, -0.1846, 0.169], [0.6, -0.1898, 0.1716], [0.78, -0.1638, 0.1508], [0.9, -0.1144, 0.1066], [1, -0.0468, 0.0416]],
+      ramp: ramp('lgsuck'), stops: [0.1, 0.24, 0.42, 0.62, 0.8], sheen: [0.24, 0.36],
+      zones: [{ x0: 0.04, x1: 0.8, v0: 0.62, v1: 1, ramp: ['fish_lgsuck_2', 'fish_lgsuck_3', 'fish_finsuck_1', 'fish_finsuck_2', 'fish_finsuck_3', 'fish_lgsuck_5'] }],
+      head: { gill: 0.76, bulge: 0.05, pre: 0.82, eye: [0.875, -0.065, 0.032], iris: 'fish_eye_gold', rim: 'fish_lgsuck_0', mouth: [0.078, 0.042, 0.004, 0, 0.034], lip: true, cheek: 1 },
+      lateral: { v: 0.46, arch: 0.02, d: 1 }, scales: { size: 3, v0: 0.1, v1: 0.92, d: -1, n: 0.75 },
+      tail: { len: 0.19, spread: 0.234, fork: 0.42, rays: 15, ramp: ['fish_finmusk_0', 'fish_finmusk_1', 'fish_finmusk_2', 'fish_finmusk_3'] },
+      fin: FIN_GR,
+      fins: [
+        { k: 'dorsal', a: 0.44, b: 0.62, h: 0.208, prof: [0.9, 1, 0.85, 0.7, 0.55, 0.45], rays: 11, lean: 0.4 },
+        { k: 'anal', a: 0.13, b: 0.21, h: 0.182, prof: [0.9, 1, 0.8, 0.55], rays: 6, lean: 0.4, ramp: ['fish_finmusk_0', 'fish_finmusk_1', 'fish_finmusk_2', 'fish_finmusk_3'] },
+        pelvic(0.42, 0.13, ['fish_finmusk_0', 'fish_finmusk_1', 'fish_finmusk_2', 'fish_finmusk_3']), pectoral(0.75, 0.82, 0.13)
+      ],
+      marks: [{ k: 'band', v0: 0.36, v1: 0.5, x0: 0.04, x1: 0.76, jag: 0.06, d: -1 }]
+    },
+    // ---- catfish (Phase 72): no scales, a broad flat head with barbels, a short spined dorsal,
+    // the adipose, a long anal ----
+    bullhead_catfish: {
+      px: 84,
+      body: [[0, -0.075, 0.0625], [0.15, -0.115, 0.1075], [0.4, -0.1625, 0.1625], [0.6, -0.1725, 0.17], [0.78, -0.15, 0.15], [0.9, -0.1, 0.1125], [1, -0.0375, 0.0625]],
+      ramp: ramp('bull'), stops: [0.12, 0.28, 0.46, 0.64, 0.8], sheen: [0.28, 0.42],
+      head: { gill: 0.75, bulge: 0.04, eye: [0.895, -0.045, 0.03], iris: 'fish_eye_gold', rim: 'fish_bull_0', mouth: [0.0375, 0.08, 0.004, 0], lip: true,
+        barbels: [
+          { x: 0.975, y: 0.03, len: 0.2, ang: 112, curl: 25, key: 'fish_barbel', tip: 'fish_chan_3' },
+          { x: 0.985, y: -0.035, len: 0.07, ang: -60, curl: -40, key: 'fish_barbel', tip: 'fish_chan_3' },
+          { x: 0.97, y: 0.0625, len: 0.1, ang: 100, curl: 40, key: 'fish_barbel', tip: 'fish_chan_3' },
+          { x: 0.94, y: 0.0875, len: 0.09, ang: 96, curl: 30, key: 'fish_barbel', tip: 'fish_chan_3' }
+        ] },
+      lateral: { v: 0.46, arch: 0.02, d: 1 },
+      tail: { len: 0.17, spread: 0.1875, fork: 0, round: 0.25, rays: 14, ramp: ['fish_finbull_0', 'fish_finbull_1', 'fish_finbull_2', 'fish_finbull_3'] },
+      fin: ['fish_finbull_0', 'fish_finbull_1', 'fish_finbull_2', 'fish_finbull_3'],
+      fins: [
+        { k: 'dorsal', a: 0.58, b: 0.68, h: 0.24, prof: [1, 0.95, 0.85, 0.7, 0.55], rays: 6, lean: 0.35, lead: ['fish_bull_0'] },
+        { k: 'adipose', a: 0.12, b: 0.22, h: 0.06, prof: [0.35, 0.85, 1, 0.8, 0.4], ramp: ['fish_bull_2', 'fish_bull_2', 'fish_bull_2', 'fish_bull_3'] },
+        { k: 'anal', a: 0.07, b: 0.3, h: 0.132, prof: [0.9, 1, 0.95, 0.85, 0.7, 0.55], rays: 14, lean: 0.35 },
+        pelvic(0.44, 0.12), ext(pectoral(0.74, 0.84, 0.12), { ramp: ['fish_bull_2', 'fish_bull_3', 'fish_bull_4', 'fish_bull_5'] })
+      ],
+      marks: [{ k: 'mottle', x0: 0.02, x1: 0.95, v0: 0.04, v1: 0.6, sc: 3, t: 0.9, d: -1 }]
+    },
+    channel_catfish: {
+      px: 92,
+      body: [[0, -0.065, 0.0546], [0.15, -0.1066, 0.0962], [0.4, -0.1534, 0.1456], [0.6, -0.1612, 0.1534], [0.78, -0.1456, 0.1378], [0.9, -0.0988, 0.104], [1, -0.039, 0.0572]],
+      ramp: ramp('chan'), stops: [0.12, 0.28, 0.46, 0.64, 0.8], sheen: [0.26, 0.4],
+      head: { gill: 0.75, bulge: 0.04, eye: [0.895, -0.0442, 0.03], iris: 'fish_eye_gold', rim: 'fish_chan_0', mouth: [0.0338, 0.08, 0.004, 0], lip: true,
+        barbels: [
+          { x: 0.975, y: 0.026, len: 0.26, ang: 116, curl: 30, key: 'fish_barbel', tip: 'fish_chan_3' },
+          { x: 0.985, y: -0.0338, len: 0.08, ang: -64, curl: -50, key: 'fish_barbel', tip: 'fish_chan_3' },
+          { x: 0.97, y: 0.0598, len: 0.11, ang: 100, curl: 40, key: 'fish_barbel', tip: 'fish_chan_3' },
+          { x: 0.94, y: 0.0806, len: 0.1, ang: 96, curl: 30, key: 'fish_barbel', tip: 'fish_chan_3' }
+        ] },
+      lateral: { v: 0.46, arch: 0.02, d: 1 },
+      tail: { len: 0.2, spread: 0.221, fork: 0.6, rays: 15, ramp: ['fish_finchan_0', 'fish_finchan_1', 'fish_finchan_2', 'fish_finchan_3'] },
+      fin: ['fish_finchan_0', 'fish_finchan_1', 'fish_finchan_2', 'fish_finchan_3'],
+      fins: [
+        { k: 'dorsal', a: 0.58, b: 0.68, h: 0.2375, prof: [1, 0.95, 0.85, 0.7, 0.55], rays: 6, lean: 0.35, lead: ['fish_chan_0'] },
+        { k: 'adipose', a: 0.13, b: 0.21, h: 0.0562, prof: [0.35, 0.85, 1, 0.8, 0.4], ramp: ['fish_chan_2', 'fish_chan_2', 'fish_chan_2', 'fish_chan_3'] },
+        { k: 'anal', a: 0.07, b: 0.27, h: 0.125, prof: [0.9, 1, 0.95, 0.85, 0.7, 0.55], rays: 14, lean: 0.35 },
+        pelvic(0.44, 0.125), ext(pectoral(0.74, 0.84, 0.125), { ramp: ['fish_chan_2', 'fish_chan_3', 'fish_chan_4', 'fish_chan_5'] })
+      ],
+      marks: [{ k: 'spots', n: 24, x0: 0.06, x1: 0.7, v0: 0.12, v1: 0.6, r: 0.75, seed: 7203, key: 'fish_spot' }]
+    },
+    // ---- burbot (Phase 72): an eel-like cod, a chin barbel, long low fins, a rounded tail, marbled ----
+    burbot: {
+      px: 90,
+      body: [[0, -0.051, 0.045], [0.15, -0.093, 0.087], [0.4, -0.138, 0.135], [0.6, -0.159, 0.156], [0.78, -0.159, 0.15], [0.9, -0.12, 0.111], [1, -0.048, 0.051]],
+      ramp: ramp('burbot'), stops: [0.12, 0.28, 0.46, 0.64, 0.82], sheen: [0.26, 0.4],
+      head: { gill: 0.78, bulge: 0.04, eye: [0.905, -0.069, 0.03], iris: 'fish_eye_gold', rim: 'fish_burbot_0', mouth: [0.024, 0.08, 0.008, 0], lip: true,
+        barbels: [{ x: 0.97, y: 0.105, len: 0.06, ang: 104, curl: 20, key: 'fish_burbot_1' }, { x: 0.99, y: -0.036, len: 0.03, ang: -70, key: 'fish_burbot_1' }] },
+      lateral: { v: 0.44, arch: 0.02, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.2 },
+      tail: { len: 0.13, spread: 0.15, fork: 0, round: 0.7, rays: 14 },
+      fin: FIN_OL,
+      fins: [
+        { k: 'dorsal', a: 0.6, b: 0.68, h: 0.084, prof: [0.7, 1, 0.9, 0.6], rays: 5, lean: 0.3 },
+        { k: 'dorsal', a: 0.03, b: 0.58, h: 0.105, prof: [0.6, 0.85, 1, 1, 1, 0.95, 0.85, 0.6], rays: 22, lean: 0.3 },
+        { k: 'anal', a: 0.03, b: 0.5, h: 0.098, prof: [0.6, 0.85, 1, 1, 0.95, 0.8, 0.55], rays: 20, lean: 0.3 },
+        ext(pelvic(0.8, 0.112), { ang: 110 }), pectoral(0.76, 0.6, 0.126)
+      ],
+      marks: [{ k: 'mottle', x0: 0, x1: 0.95, v0: 0.02, v1: 0.8, sc: 2.8, t: 0.6, d: -2 }]
+    },
+    // ---- sturgeon (Phase 72): the rostrum, the mouth and its four barbels underneath, rows of
+    // scutes, the heterocercal tail ----
+    white_sturgeon: {
+      px: 104,
+      body: [[0, -0.04, 0.034], [0.15, -0.088, 0.078], [0.4, -0.138, 0.128], [0.6, -0.146, 0.132], [0.74, -0.13, 0.118], [0.84, -0.096, 0.084], [0.92, -0.06, 0.048], [0.97, -0.03, 0.018], [1, -0.01, 0.004]],
+      ramp: ramp('sturg'), stops: [0.18, 0.36, 0.56, 0.74, 0.88], sheen: [0.26, 0.4],
+      head: { gill: 0.72, bulge: 0.04, eye: [0.85, -0.06, 0.024], iris: 'fish_eye_gold', rim: 'fish_sturg_0', mouth: [0.09, 0.03, 0, 0, 0.13], lip: true,
+        barbels: [
+          { x: 0.925, y: 0.08, len: 0.065, ang: 96, curl: 30, key: 'fish_sturg_4' }, { x: 0.915, y: 0.08, len: 0.065, ang: 100, curl: 30, key: 'fish_sturg_4' },
+          { x: 0.905, y: 0.08, len: 0.065, ang: 104, curl: 30, key: 'fish_sturg_4' }, { x: 0.895, y: 0.08, len: 0.065, ang: 108, curl: 30, key: 'fish_sturg_4' }
+        ] },
+      lateral: { v: 0.5, arch: 0.02, d: 1 },
+      tail: { len: 0.22, spread: 0.105, up: 2, down: 1.1, tilt: 0.7, low: 0.55, fork: 0.3, rays: 15, ramp: ['fish_sturg_1', 'fish_sturg_2', 'fish_sturg_3', 'fish_sturg_4'] },
+      fin: ['fish_sturg_1', 'fish_sturg_2', 'fish_sturg_3', 'fish_sturg_4'],
+      fins: [
+        { k: 'dorsal', a: 0.04, b: 0.15, h: 0.112, prof: [0.9, 1, 0.85, 0.65, 0.5], rays: 8, lean: 0.5 },
+        { k: 'anal', a: 0.04, b: 0.12, h: 0.098, prof: [0.9, 1, 0.85, 0.65, 0.5], rays: 6, lean: 0.5 },
+        ext(pelvic(0.24, 0.098), { ang: 140 }), ext(pectoral(0.74, 0.86, 0.14), { ang: 150 })
+      ],
+      marks: [
+        { k: 'scutes', vs: [0.02], x0: 0.2, x1: 0.72, n: 10, r: 2.2, key: 'fish_scute', rim: 'fish_sturg_1' },
+        { k: 'scutes', vs: [0.4], x0: 0.06, x1: 0.74, n: 22, r: 1.8, key: 'fish_scute', rim: 'fish_sturg_1' },
+        { k: 'scutes', vs: [0.86], x0: 0.3, x1: 0.68, n: 7, r: 1.6, key: 'fish_scute', rim: 'fish_sturg_2' }
+      ]
+    },
+    // ---- mooneyes (Phase 72): deep and thin, a huge eye, the dorsal set back over a long anal ----
+    mooneye: {
+      px: 80,
+      body: [[0, -0.0728, 0.065], [0.15, -0.1274, 0.156], [0.4, -0.182, 0.234], [0.6, -0.1898, 0.2314], [0.78, -0.1664, 0.1846], [0.9, -0.1118, 0.1092], [1, -0.039, 0.0338]],
+      ramp: ramp('moon'), stops: [0.08, 0.18, 0.32, 0.52, 0.74], sheen: [0.18, 0.28],
+      head: { gill: 0.78, bulge: 0.05, pre: 0.84, eye: [0.9, -0.039, 0.058], iris: 'fish_eye_silver', rim: 'fish_moon_0', mouth: [-0.0052, 0.07, 0.016, 0], lip: true, cheek: 1 },
+      lateral: { v: 0.34, arch: 0.06, d: -1 }, scales: { size: 3, v0: 0.08, v1: 0.94, d: -1, n: 0.6 },
+      tail: { len: 0.19, spread: 0.234, fork: 0.6, rays: 15, ramp: FIN_GR },
+      fin: FIN_GR,
+      fins: [
+        { k: 'dorsal', a: 0.22, b: 0.34, h: 0.1875, prof: [0.9, 1, 0.85, 0.65, 0.5], rays: 9, lean: 0.45 },
+        { k: 'anal', a: 0.1, b: 0.4, h: 0.125, prof: [0.6, 0.8, 1, 0.95, 0.85, 0.7, 0.55], rays: 16, lean: 0.4 },
+        pelvic(0.5, 0.1125), pectoral(0.76, 0.8, 0.125)
+      ],
+      marks: []
+    },
+    goldeye: {
+      px: 78,
+      body: [[0, -0.0675, 0.06], [0.15, -0.1175, 0.145], [0.4, -0.1675, 0.2125], [0.6, -0.175, 0.2125], [0.78, -0.1525, 0.17], [0.9, -0.1025, 0.1], [1, -0.0375, 0.03]],
+      ramp: ramp('gold'), stops: [0.08, 0.18, 0.32, 0.52, 0.74], sheen: [0.18, 0.28],
+      head: { gill: 0.78, bulge: 0.05, pre: 0.84, eye: [0.9, -0.035, 0.056], iris: 'fish_eye_gold', rim: 'fish_gold_0', mouth: [-0.005, 0.07, 0.016, 0], lip: true, cheek: 1 },
+      lateral: { v: 0.34, arch: 0.06, d: -1 }, scales: { size: 3, v0: 0.08, v1: 0.94, d: -1, n: 0.6 },
+      tail: { len: 0.19, spread: 0.225, fork: 0.6, rays: 15, ramp: ['fish_finblue_0', 'fish_finblue_1', 'fish_finblue_2', 'fish_finblue_3'] },
+      fin: ['fish_finblue_0', 'fish_finblue_1', 'fish_finblue_2', 'fish_finblue_3'],
+      fins: [
+        { k: 'dorsal', a: 0.2, b: 0.31, h: 0.175, prof: [0.9, 1, 0.85, 0.65, 0.5], rays: 9, lean: 0.45 },
+        { k: 'anal', a: 0.1, b: 0.4, h: 0.125, prof: [0.6, 0.8, 1, 0.95, 0.85, 0.7, 0.55], rays: 16, lean: 0.4 },
+        pelvic(0.5, 0.1125), pectoral(0.76, 0.8, 0.125)
+      ],
+      marks: []
+    },
+    // ---- herring & shad (Phase 72): silver, a keeled belly, one small dorsal mid-back, deep forks ----
+    threadfin_shad: {
+      px: 58,
+      body: [[0, -0.066, 0.0594], [0.15, -0.132, 0.132], [0.4, -0.198, 0.22], [0.6, -0.2046, 0.2156], [0.78, -0.1716, 0.165], [0.9, -0.11, 0.0924], [1, -0.033, 0.0264]],
+      ramp: ramp('tshad'), stops: [0.08, 0.18, 0.32, 0.52, 0.74], sheen: [0.18, 0.28],
+      head: { gill: 0.78, bulge: 0.05, pre: 0.84, eye: [0.9, -0.033, 0.062], iris: 'fish_eye_silver', rim: 'fish_tshad_0', mouth: [0.011, 0.05, 0.008, 0], lip: true, cheek: 1 },
+      scales: { size: 2, v0: 0.08, v1: 0.94, d: -1, n: 0.4 },
+      tail: { len: 0.2, spread: 0.22, fork: 0.62, rays: 12, ramp: ['fish_finyel_0', 'fish_finyel_1', 'fish_finyel_2', 'fish_finyel_3'] },
+      fin: ['fish_finyel_0', 'fish_finyel_1', 'fish_finyel_2', 'fish_finyel_3'],
+      fins: [
+        { k: 'dorsal', a: 0.36, b: 0.52, h: 0.176, prof: [0.9, 1, 0.8, 0.6, 0.6, 1.5], rays: 7, lean: 0.9 },
+        { k: 'anal', a: 0.08, b: 0.3, h: 0.077, prof: [0.6, 0.9, 1, 0.9, 0.7], rays: 10, lean: 0.4 },
+        pelvic(0.5, 0.088), pectoral(0.76, 0.84, 0.099)
+      ],
+      marks: [{ k: 'blotch', x: 0.73, v: 0.24, rx: 0.025, ry: 0.1, d: -3 }]
+    },
+    pacific_herring: {
+      px: 80,
+      body: [[0, -0.065, 0.0572], [0.15, -0.1144, 0.1144], [0.4, -0.1586, 0.169], [0.6, -0.1638, 0.169], [0.78, -0.1456, 0.143], [0.9, -0.1014, 0.091], [1, -0.039, 0.0286]],
+      ramp: ramp('herring'), stops: [0.1, 0.22, 0.34, 0.52, 0.74], sheen: [0.22, 0.3],
+      head: { gill: 0.78, bulge: 0.05, pre: 0.84, eye: [0.905, -0.0338, 0.05], iris: 'fish_eye_silver', rim: 'fish_herring_0', mouth: [-0.013, 0.06, 0.018, 0], lip: true, cheek: 1 },
+      scales: { size: 3, v0: 0.1, v1: 0.94, d: -1, n: 0.6 },
+      tail: { len: 0.2, spread: 0.247, fork: 0.65, rays: 14, ramp: FIN_GR },
+      fin: FIN_GR,
+      fins: [
+        { k: 'dorsal', a: 0.42, b: 0.56, h: 0.182, prof: [0.9, 1, 0.85, 0.65, 0.45], rays: 8, lean: 0.4 },
+        { k: 'anal', a: 0.12, b: 0.26, h: 0.091, prof: [0.6, 0.9, 1, 0.85, 0.6], rays: 9, lean: 0.4 },
+        pelvic(0.46, 0.104), pectoral(0.76, 0.82, 0.117)
+      ],
+      marks: []
+    },
+    american_shad: {
+      px: 84,
+      body: [[0, -0.0728, 0.065], [0.15, -0.143, 0.143], [0.4, -0.2132, 0.2236], [0.6, -0.221, 0.221], [0.78, -0.1924, 0.182], [0.9, -0.13, 0.117], [1, -0.052, 0.0468]],
+      ramp: ramp('amshad'), stops: [0.08, 0.18, 0.32, 0.52, 0.74], sheen: [0.18, 0.28],
+      head: { gill: 0.76, bulge: 0.055, pre: 0.82, eye: [0.885, -0.052, 0.046], iris: 'fish_eye_gold', rim: 'fish_amshad_0', mouth: [0.0052, 0.12, 0.024, 1], lip: true, cheek: 1 },
+      scales: { size: 3, v0: 0.08, v1: 0.94, d: -1, n: 0.6 },
+      tail: { len: 0.2, spread: 0.26, fork: 0.62, rays: 15, ramp: FIN_OL },
+      fin: FIN_OL,
+      fins: [
+        { k: 'dorsal', a: 0.42, b: 0.56, h: 0.1875, prof: [0.9, 1, 0.85, 0.65, 0.45], rays: 8, lean: 0.4 },
+        { k: 'anal', a: 0.1, b: 0.28, h: 0.0875, prof: [0.6, 0.9, 1, 0.85, 0.6], rays: 11, lean: 0.4 },
+        pelvic(0.48, 0.1125), pectoral(0.74, 0.82, 0.125)
+      ],
+      marks: [
+        { k: 'blotch', x: 0.72, v: 0.22, rx: 0.02, ry: 0.08, d: -3 },
+        { k: 'stripes', vs: [0.24], w: 2, x0: 0.36, x1: 0.68, dots: 6, d: -3 }
+      ]
+    },
+    // ---- smelt (Phase 72): slim, an adipose fin ----
+    eulachon: {
+      px: 84,
+      body: [[0, -0.0567, 0.0486], [0.15, -0.0945, 0.0891], [0.4, -0.1269, 0.1242], [0.6, -0.1296, 0.1269], [0.78, -0.1188, 0.1134], [0.9, -0.0864, 0.0783], [1, -0.0324, 0.027]],
+      ramp: ramp('eul'), stops: [0.12, 0.26, 0.42, 0.6, 0.8], sheen: [0.24, 0.36],
+      head: { gill: 0.76, bulge: 0.04, pre: 0.82, eye: [0.89, -0.0405, 0.04], iris: 'fish_eye_silver', rim: 'fish_eul_0', mouth: [0.0054, 0.1, 0.012, 0], lip: true, cheek: 1 },
+      lateral: { v: 0.46, arch: 0.02, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.3 },
+      tail: { len: 0.19, spread: 0.2025, fork: 0.55, rays: 14, ramp: FIN_GR },
+      fin: FIN_GR,
+      fins: sfins({ d: [0.42, 0.56, 0.156], drays: 9, ad: [0.12, 0.17, 0.039], an: [0.12, 0.3, 0.104], pel: [0.46, 0.104], pec: [0.75, 0.84, 0.104], fin: FIN_GR, adr: ['fish_eul_2', 'fish_eul_2', 'fish_eul_2', 'fish_eul_3'] }),
+      marks: [{ k: 'spots', n: 40, x0: 0.04, x1: 0.8, v0: 0.04, v1: 0.3, r: 0.6, seed: 7204, d: -2 }]
+    },
+    capelin: {
+      px: 84,
+      body: [[0, -0.054, 0.0459], [0.15, -0.0891, 0.0837], [0.4, -0.1215, 0.1188], [0.6, -0.1269, 0.1215], [0.78, -0.1134, 0.108], [0.9, -0.0783, 0.0756], [1, -0.0405, 0.0405]],
+      ramp: ramp('cap'), stops: [0.12, 0.26, 0.42, 0.6, 0.8], sheen: [0.24, 0.36],
+      head: { gill: 0.77, bulge: 0.04, pre: 0.83, eye: [0.89, -0.0351, 0.04], iris: 'fish_eye_silver', rim: 'fish_cap_0', mouth: [-0.0162, 0.1, 0.03, 1], lip: true, cheek: 1 },
+      lateral: { v: 0.48, arch: 0.02, d: -1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.3 },
+      tail: { len: 0.19, spread: 0.2025, fork: 0.5, rays: 14, ramp: FIN_OL },
+      fin: FIN_OL,
+      fins: sfins({ d: [0.42, 0.56, 0.156], drays: 9, ad: [0.12, 0.17, 0.039], an: [0.12, 0.3, 0.104], pel: [0.46, 0.117], pec: [0.75, 0.84, 0.117], fin: FIN_OL, adr: ['fish_cap_2', 'fish_cap_2', 'fish_cap_2', 'fish_cap_3'] }),
+      marks: [{ k: 'stripes', vs: [0.5], w: 1, x0: 0.04, x1: 0.76, d: 1 }]
+    },
+    // ---- lingcod (Phase 72): a big head and a toothed mouth, a long notched dorsal, marbled ----
+    lingcod: {
+      px: 100,
+      body: [[0, -0.0594, 0.0513], [0.15, -0.1053, 0.0945], [0.4, -0.1512, 0.1404], [0.6, -0.1674, 0.1512], [0.78, -0.1728, 0.1485], [0.9, -0.135, 0.1134], [1, -0.054, 0.0405]],
+      ramp: ramp('ling'), stops: [0.12, 0.28, 0.46, 0.64, 0.82], sheen: [0.26, 0.4],
+      head: { gill: 0.74, bulge: 0.05, pre: 0.8, eye: [0.89, -0.0945, 0.034], iris: 'fish_eye_gold', rim: 'fish_ling_0', mouth: [0.0081, 0.19, 0.03, 5], teeth: 'fish_cream', lip: true, cheek: 1 },
+      lateral: { v: 0.36, arch: 0.04, d: 1 }, scales: { size: 2, v0: 0.12, v1: 0.92, d: -1, n: 0.2 },
+      tail: { len: 0.15, spread: 0.162, fork: 0, round: 0.35, rays: 14 },
+      fin: FIN_GR,
+      fins: [
+        { k: 'dorsal', a: 0.46, b: 0.72, h: 0.1625, prof: [0.6, 0.9, 1, 0.92, 0.8, 0.6, 0.4], rays: 14, spiny: true, lean: 0.3 },
+        { k: 'dorsal', a: 0.05, b: 0.46, h: 0.15, prof: [0.5, 0.8, 0.95, 1, 1, 0.95, 0.85, 0.6], rays: 18, lean: 0.3 },
+        { k: 'anal', a: 0.05, b: 0.4, h: 0.125, prof: [0.5, 0.8, 0.95, 1, 0.95, 0.8, 0.6], rays: 16, lean: 0.3 },
+        ext(pelvic(0.74, 0.1), { ang: 110 }), pectoral(0.72, 0.6, 0.1875)
+      ],
+      marks: [{ k: 'mottle', x0: 0, x1: 0.92, v0: 0.02, v1: 0.82, sc: 2.6, t: 0.7, d: -2 }]
+    },
+    // ---- rockfish (Phase 72): a perch-like body, a spiny notched dorsal, the yellow eye ----
+    yelloweye_rockfish: {
+      px: 90,
+      body: [[0, -0.0735, 0.063], [0.15, -0.1428, 0.1239], [0.4, -0.21, 0.1785], [0.6, -0.2163, 0.1806], [0.78, -0.189, 0.1575], [0.9, -0.126, 0.105], [1, -0.042, 0.0483]],
+      ramp: ramp('yeye'), stops: [0.1, 0.24, 0.42, 0.62, 0.8], sheen: [0.22, 0.34],
+      head: { gill: 0.72, bulge: 0.06, pre: 0.78, eye: [0.86, -0.0735, 0.066], iris: 'fish_eye_yellow', rim: 'fish_yeye_0', mouth: [0.0315, 0.15, 0.03, 3], lip: true, cheek: 1 },
+      lateral: { v: 0.26, arch: 0.04, d: 1 }, scales: { size: 3, v0: 0.12, v1: 0.92, d: -1, n: 0.6 },
+      tail: { len: 0.17, spread: 0.189, fork: 0.12, rays: 14, ramp: ['fish_finred_0', 'fish_finred_1', 'fish_finred_2', 'fish_finred_3'] },
+      fin: ['fish_finred_0', 'fish_finred_1', 'fish_finred_2', 'fish_finred_3'],
+      fins: [
+        { k: 'dorsal', a: 0.4, b: 0.7, h: 0.1785, prof: [0.4, 0.8, 1, 0.95, 0.85, 0.7, 0.55, 0.45], rays: 13, spiny: true, lean: 0.3 },
+        { k: 'dorsal', a: 0.17, b: 0.4, h: 0.1575, prof: [0.6, 0.9, 1, 0.95, 0.8, 0.5], rays: 12, lean: 0.3 },
+        { k: 'anal', a: 0.15, b: 0.3, h: 0.1575, prof: [0.6, 0.95, 1, 0.85, 0.6], rays: 8, lean: 0.3 },
+        pelvic(0.62, 0.126), pectoral(0.7, 0.6, 0.147)
+      ],
+      marks: [{ k: 'stripes', vs: [0.3], w: 1.5, x0: 0.06, x1: 0.68, broken: 0.3, key: 'fish_yeye_5' }]
+    },
+    // ---- halibut (Phase 72): the eyed side, both eyes over the head, the long dorsal and anal
+    // fins round the edges ----
+    greenland_halibut: {
+      px: 104,
+      body: [[0, -0.0638, 0.058], [0.12, -0.1363, 0.1305], [0.32, -0.2349, 0.2262], [0.52, -0.261, 0.2494], [0.7, -0.2378, 0.2262], [0.84, -0.174, 0.1624], [0.94, -0.1044, 0.0986], [1, -0.0435, 0.0435]],
+      ramp: ramp('ghal'), stops: [0.12, 0.28, 0.46, 0.64, 0.82], sheen: [0.22, 0.36],
+      head: { gill: 0.8, bulge: 0.05, pre: 0.86, eye: [0.91, -0.0435, 0.03], eye2: [0.88, -0.1595, 0.028], iris: 'fish_eye_gold', rim: 'fish_ghal_0', mouth: [0.0435, 0.12, 0.024, 2], lip: true, cheek: 1 },
+      lateral: { v: 0.5, arch: 0, d: 1 }, scales: { size: 2, v0: 0.1, v1: 0.92, d: 1, n: 0.15 },
+      tail: { len: 0.14, spread: 0.1885, fork: 0.25, rays: 14, ramp: ['fish_ghal_1', 'fish_ghal_2', 'fish_ghal_3', 'fish_ghal_4'] },
+      fin: ['fish_ghal_1', 'fish_ghal_2', 'fish_ghal_3', 'fish_ghal_4'],
+      fins: [
+        { k: 'dorsal', a: 0.03, b: 0.8, h: 0.084, prof: [0.5, 0.8, 0.95, 1, 1, 1, 0.95, 0.8, 0.5], rays: 40, lean: 0.25 },
+        { k: 'anal', a: 0.03, b: 0.7, h: 0.084, prof: [0.5, 0.8, 0.95, 1, 1, 0.95, 0.8, 0.5], rays: 36, lean: 0.25 },
+        ext(pelvic(0.76, 0.098), { ang: 120 }), pectoral(0.78, 0.55, 0.112)
+      ],
+      marks: []
+    },
+    pacific_halibut: {
+      px: 104,
+      body: [[0, -0.056, 0.0507], [0.12, -0.1281, 0.1227], [0.32, -0.2268, 0.2188], [0.52, -0.2535, 0.2401], [0.7, -0.2268, 0.2134], [0.84, -0.1601, 0.1494], [0.94, -0.0934, 0.088], [1, -0.04, 0.0374]],
+      ramp: ramp('phal'), stops: [0.12, 0.28, 0.46, 0.64, 0.82], sheen: [0.22, 0.36],
+      head: { gill: 0.8, bulge: 0.05, pre: 0.86, eye: [0.915, -0.058, 0.03], eye2: [0.885, -0.1232, 0.03], iris: 'fish_eye_gold', rim: 'fish_phal_0', mouth: [0.0435, 0.1, 0.02, 1], lip: true, cheek: 1 },
+      lateral: { v: 0.52, arch: 0.22, d: 2 }, scales: { size: 2, v0: 0.1, v1: 0.92, d: 1, n: 0.15 },
+      tail: { len: 0.14, spread: 0.2175, fork: 0.32, rays: 15, ramp: ['fish_phal_1', 'fish_phal_2', 'fish_phal_3', 'fish_phal_4'] },
+      fin: ['fish_phal_1', 'fish_phal_2', 'fish_phal_3', 'fish_phal_4'],
+      fins: [
+        { k: 'dorsal', a: 0.03, b: 0.82, h: 0.091, prof: [0.5, 0.8, 0.95, 1, 1, 1, 0.95, 0.8, 0.5], rays: 40, lean: 0.25 },
+        { k: 'anal', a: 0.03, b: 0.7, h: 0.091, prof: [0.5, 0.8, 0.95, 1, 1, 0.95, 0.8, 0.5], rays: 36, lean: 0.25 },
+        ext(pelvic(0.76, 0.098), { ang: 120 }), pectoral(0.78, 0.55, 0.126)
+      ],
+      marks: [{ k: 'mottle', x0: 0, x1: 0.98, v0: 0.02, v1: 0.98, sc: 3.2, t: 0.75, d: -1 }]
     }
   };
 })();

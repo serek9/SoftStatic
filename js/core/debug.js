@@ -446,7 +446,6 @@ G.core.debug = (function () {
       if (FG && G.data.fish) {
         for (i = 0; i < G.data.fish.length; i += PORTRAITS_PER) pages.push('fish:' + i); // Phase 70: the portraits
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('swimmers:' + i);
-        for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
       pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop', 'panel', 'fishers', 'dogs', 'looks top'); // small: Phase 44; panel: Phase 46; looks: Phase 47
       pages.push('tackle', 'setup', 'life under', 'bed', 'life above', 'shore'); // Phase 50.1
@@ -475,8 +474,8 @@ G.core.debug = (function () {
     }
 
     // One swimmer cell: the frames in turn, the same flipped, and the silhouette. sp is a
-    // species index, or a part on the base `base` ('' for the bare base).
-    function art(sp, base, fr, sil, flip) { return base ? G.gfx.fishgen.partSwimmer(base, sp, fr, sil, flip) : G.gfx.fishgen.swimmer(sp, fr, sil, flip); }
+    // species index (Phase 72: the parts on bare bases went with the old painter).
+    function art(sp, base, fr, sil, flip) { return G.gfx.fishgen.swimmer(sp, fr, sil, flip); }
     function swimCell(ctx, sp, base, frs, label, x0, y0, cw, ch) {
       var F = G.gfx.sprites.fine, fr = frs[Math.floor(t * 3) % frs.length], a = art(sp, base, fr, false, false), b = art(sp, base, fr, false, true), c = art(sp, base, fr, true, false);
       ctx.fillStyle = G.gfx.sprites.PALETTE.water_dark;
@@ -573,8 +572,7 @@ G.core.debug = (function () {
         var start = +arg, fish = G.data.fish;
         for (var s = start; s < Math.min(fish.length, start + SPECIES_PER); s++) {
           var cell = s - start;
-          swimCell(ctx, s, '', FG.swimFrames(fish[s].look),
-            fish[s].id + (FG.specFor(s) ? ' painted' : ' w' + fish[s].look.wrongness + ' ' + fish[s].look.base), 8 + (cell % 4) * 158, 20 + Math.floor(cell / 4) * 66, 158, 66);
+          swimCell(ctx, s, '', FG.SWIM_FRAMES, fish[s].id + ' ' + FG.swimmer(s, 0, false, false).width, 8 + (cell % 4) * 158, 20 + Math.floor(cell / 4) * 66, 158, 66);
         }
       } else if (name === 'small') {
         // Phase 44: the small fish as they swim (1x, then 4x), the beat and a turn playing, the
@@ -595,11 +593,6 @@ G.core.debug = (function () {
           F.drawText(ctx, f.id + ' ' + f.lengthCm[0] + '-' + f.lengthCm[1] + ' cm ' + sw.width + 'px', sx + 4, sy + 46, 'fog_light');
           sm++;
         }
-      } else if (name.indexOf('parts:') === 0) {
-        var list = [''].concat(FG.PARTS);
-        for (var q = 0; q < list.length; q++) {
-          swimCell(ctx, list[q], arg, FG.swimFrames({ wrongness: 0, parts: [list[q]] }), list[q] || 'bare', 8 + (q % 4) * 158, 20 + Math.floor(q / 4) * 84, 158, 84);
-        }
       } else if (name === 'sprites') {
         // Whatever is still a small sprite (drawn at 1×, its own size).
         var names = S.names;
@@ -610,15 +603,16 @@ G.core.debug = (function () {
           F.drawText(ctx, names[m] + ' ' + d.w + 'x' + d.h + ' x' + d.n, x0, y0 + 22, 'fog_light');
         }
       } else if (name === 'swim') {
-        // Phase 27: each base's swimming frames in a row: rest, tail away, tail near, the two
-        // turn frames, then the beat and a full turn playing.
+        // Phase 27: a swimmer's frames in a row: rest, tail away, tail near, the two turn frames,
+        // then the beat and a full turn playing. Phase 72: one species of each build (were the body plans).
         var FRN = ['rest', 'away', 'near', 'turn1', 'turn2', 'roll', 'shake'], FRS = [0, 1, 3, 4, 5, 6, 7]; // roll, shake: Phase 29
-        for (var bb = 0; bb < FG.BASE_NAMES.length; bb++) {
-          var y1 = 20 + bb * 40, base = FG.BASE_NAMES[bb];
-          F.drawText(ctx, base, 8, y1 + 14, 'fog_light');
-          for (var fi = 0; fi < 7; fi++) ctx.drawImage(FG.partSwimmer(base, '', FRS[fi], false, false), 64 + fi * 64, y1);
+        var SWIM_IDS = ['yellow_perch', 'northern_pike', 'common_carp', 'rainbow_trout', 'burbot', 'channel_catfish', 'white_sturgeon', 'pacific_halibut'];
+        for (var bb = 0; bb < SWIM_IDS.length; bb++) {
+          var y1 = 20 + bb * 40, base = G.data.fish.findIndex(function (f) { return f.id === SWIM_IDS[bb]; });
+          F.drawText(ctx, SWIM_IDS[bb].slice(0, 12), 8, y1 + 14, 'fog_light');
+          for (var fi = 0; fi < 7; fi++) ctx.drawImage(FG.swimmer(base, FRS[fi], false, false), 64 + fi * 64, y1);
           var cyc = Math.floor(t * 4) % 8, TURN = [4, 5, 5, 4]; // the beat four times, then a turn
-          ctx.drawImage(cyc < 4 ? FG.partSwimmer(base, '', FG.BEAT[cyc], false, false) : FG.partSwimmer(base, '', TURN[cyc - 4], false, cyc >= 6), 528, y1);
+          ctx.drawImage(cyc < 4 ? FG.swimmer(base, FG.BEAT[cyc], false, false) : FG.swimmer(base, TURN[cyc - 4], false, cyc >= 6), 528, y1);
           if (bb === 0) for (fi = 0; fi < 7; fi++) F.drawText(ctx, FRN[fi], 64 + fi * 64, 344, 'fog_mid');
         }
       } else if (name === 'shop') {
@@ -786,7 +780,7 @@ G.core.debug = (function () {
           G2.eel(ctx, 80, wy4 + 6, -1, t * 4 + 1);
           ctx.fillStyle = P.water_foam; for (var fq = 0; fq < 12; fq++) ctx.fillRect(110 + (fq % 4) * 2.5, wy4 + 2 + (fq >> 2) * 1.5, 1.5, 0.5); // a fry cloud
           ctx.fillStyle = P.ink; for (fq = 0; fq < 12; fq++) ctx.fillRect(111 + (fq % 4) * 2.5, wy4 + 2 + (fq >> 2) * 1.5, 0.5, 0.5);
-          var cvP = G.gfx.fishgen.baseSwimmer('perch', 1, G.gfx.fishgen.BEAT[Math.floor(t * 4) & 3], true, false);
+          var cvP = G.gfx.fishgen.shadow('yellow_perch', 34, G.gfx.fishgen.BEAT[Math.floor(t * 4) & 3], false); // Phase 72
           ctx.globalAlpha = 0.85; ctx.drawImage(cvP, 130, wy4 + 1, cvP.width / 2, cvP.height / 2); ctx.globalAlpha = 1;
         } else {
           var HP = [[0, 0], [1, 0], [2, 0.5], [2, 1], [3, 0]];

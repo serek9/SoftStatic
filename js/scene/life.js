@@ -404,7 +404,7 @@ G.scene.life = (function () {
       ctx.globalAlpha = alpha;
     }
     if (dart.on) {
-      var cv = FG.baseSwimmer('perch', 1, FG.BEAT[Math.floor(dart.ph * 4) & 3], true, dart.dir < 0);
+      var cv = FG.shadow('yellow_perch', 34, FG.BEAT[Math.floor(dart.ph * 4) & 3], dart.dir < 0); // Phase 72: a perch's silhouette (was the bare perch body plan)
       ctx.globalAlpha = alpha * 0.85;
       ctx.drawImage(cv, Math.round((dart.x - camPx - cv.width / (2 * HI)) * HI) / HI, Math.round((wyS + dart.y - cv.midY / HI) * HI) / HI, cv.width / HI, cv.height / HI);
       ctx.globalAlpha = alpha;

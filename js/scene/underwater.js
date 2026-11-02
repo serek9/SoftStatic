@@ -32,7 +32,10 @@ G.scene.underwater = (function () {
   var motesReady = false;
   // Background silhouettes (V3.4): far, dark, drifting; never interact with anything.
   // Phase 30: the far silhouettes are loose shoals (see shoalStep).
-  var SHN = 3, SHMAX = 7, BN = SHN * SHMAX, SH_BASE = ['perch', 'trout', 'carp'];
+  // Phase 72: each shoal is a real species' silhouette (fishgen.shadow) in a box of SH_LEN view px
+  // (the sizes the old perch, trout and carp body plans had).
+  var SHN = 3, SHMAX = 7, BN = SHN * SHMAX, SH_SP = ['yellow_perch', 'rainbow_trout', 'common_carp'], SH_LEN = [34, 40, 38];
+  var HEAVY_SP = 'channel_catfish', HEAVY_LEN = 88; // the heavy shadow (D4), twice a catfish's old box
   var bx = new Float32Array(BN), by = new Float32Array(BN), bvx = new Float32Array(BN), bvy = new Float32Array(BN);
   var bon = new Uint8Array(BN), bsc = new Float32Array(BN), bfl = new Float32Array(BN), bph = new Float32Array(BN), bface = new Int8Array(BN), bturn = new Float32Array(BN);
   var shDir = new Float32Array(SHN), shY = new Float32Array(SHN), shT = new Float32Array(SHN), shV = new Float32Array(SHN), shL = new Float32Array(SHN), shH = new Float32Array(SHN);
@@ -421,12 +424,12 @@ G.scene.underwater = (function () {
     var FG = G.gfx.fishgen;
     for (var i = 0; i < G.data.fish.length; i++) {
       if (G.data.fish[i].locations.indexOf(loc.id) < 0) continue;
-      var frs = FG.swimFrames(G.data.fish[i].look); // Phase 27: the beat and the turn
+      var frs = FG.SWIM_FRAMES; // Phase 27: the beat and the turn
       for (var q = 0; q < frs.length * 4; q++) FG.swimmer(i, frs[q >> 2], (q & 2) > 0, (q & 1) > 0);
       for (q = 0; q < 4; q++) FG.swimmer(i, q < 2 ? FG.FR.ROLL : FG.FR.SHAKE, false, (q & 1) > 0); // Phase 29: only ever hooked, in colour
     }
-    for (q = 0; q < 12; q++) FG.baseSwimmer('catfish', 2, FG.BEAT[q % 3 + 1], true, (q & 1) > 0); // the heavy shadow's beat
-    for (q = 0; q < SHN * 4 * 2; q++) FG.baseSwimmer(SH_BASE[q % SHN], 1, [0, 1, 3, 5][(q / SHN | 0) % 4], true, q >= SHN * 4); // the shoals' beat and quick turn (Phase 30)
+    for (q = 0; q < 12; q++) FG.shadow(HEAVY_SP, HEAVY_LEN, FG.BEAT[q % 3 + 1], (q & 1) > 0); // the heavy shadow's beat
+    for (q = 0; q < SHN * 4 * 2; q++) FG.shadow(SH_SP[q % SHN], SH_LEN[q % SHN], [0, 1, 3, 5][(q / SHN | 0) % 4], q >= SHN * 4); // the shoals' beat and quick turn (Phase 30)
     return set;
   }
 
@@ -721,11 +724,8 @@ G.scene.underwater = (function () {
     return art;
   }
 
-  // Fish (6.8). Reads the AI state and the bodies only. Wrongness w makes the movement wrong
-  // too, all decided by a hash of (fish, 1/8 s time bucket) so it never changes any state:
-  //   twitch: a one-pixel jerk; uneven fins: the tail beat drifts out of step;
-  //   reversing: from w >= 2, a beat drawn facing backwards while still moving forwards;
-  //   shimmer: from w = 3 (or static), glitch frames.
+  // Fish (6.8). Reads the AI state and the bodies only. Phase 72: the wrong movements (the
+  // twitch, the uneven beat, the reversed beat, the glitch frames) went with the wrong fish.
   // Phase 19: each fish is a swimmer (fishgen.swimmer), painted at swimming size in the view's
   // pixels with its own ink outline, so the old 1 px silhouette ring is gone.
   function drawFish(ctx, loc, camPx, camPy, t) {
@@ -734,16 +734,10 @@ G.scene.underwater = (function () {
     for (var i = 0; i < school.fish.length; i++) {
       var f = school.fish[i], bd = bodies[i];
       if (!f.active || bd.uid !== f.uid) continue;
-      var look = G.data.fish[f.sp].look, w = look.wrongness;
       // Deeper than gearFx.nightDepth at night (no lantern): only a silhouette.
       var dark = night && f.y > G.state.run.gearFx.nightDepth;
-      var h = S.hash(f.uid, Math.floor(t * 8));
-      var a = bodyArt(bd, w ? ((h >>> 13) & 3) * 0.075 * w : 0), face = a.face, fr = a.fr;
-      if (w >= 2 && (h & 63) < 2 + 2 * w) face = -face;
-      var jx = 0, jy = 0;
-      if (w >= 1 && ((h >>> 6) & 31) < w * 3) { jx = ((h >>> 11) & 1) ? 0.5 : -0.5; jy = ((h >>> 12) & 1) ? 0.5 : 0; }
-      if (bd.turnT <= 0 && FG.frameCount(look) > 2 && ((h >>> 15) & 15) < w * 2) fr = FG.FR.GLITCH;
-      drawSwimmer(ctx, FG.swimmer(f.sp, fr, dark, face < 0), f.x - camPx + jx, loc.waterY - camPy + f.y + jy, bd.pitch, face);
+      var a = bodyArt(bd, 0);
+      drawSwimmer(ctx, FG.swimmer(f.sp, a.fr, dark, a.face < 0), f.x - camPx, loc.waterY - camPy + f.y, bd.pitch, a.face);
     }
   }
 
@@ -788,11 +782,11 @@ G.scene.underwater = (function () {
   function shoalSetup(loc) {
     for (var i = 0; i < BN; i++) bon[i] = 0;
     for (var k = 0; k < SHN; k++) {
-      var cvs = G.gfx.fishgen.baseSwimmer(SH_BASE[k], 1, 0, true, false);
+      var cvs = G.gfx.fishgen.shadow(SH_SP[k], SH_LEN[k], 0, false);
       shL[k] = cvs.width / HI * 0.8; shH[k] = cvs.height / HI * 0.55; // the body's length and depth (world px)
       shDir[k] = G.vrng.next() < 0.5 ? -1 : 1; shV[k] = G.vrng.range(SB.cruise0, SB.cruise1);
       shY[k] = G.vrng.range(16, Math.max(20, loc.maxDepth * SB.deep)); shT[k] = G.vrng.range(SB.turn0, SB.turn1);
-      var n = SH_BASE[k] === 'carp' ? 3 + (G.vrng.next() * 2 | 0) : 4 + (G.vrng.next() * 4 | 0), x0 = k * FAR / SHN + G.vrng.range(0, 80);
+      var n = SH_SP[k] === 'common_carp' ? 3 + (G.vrng.next() * 2 | 0) : 4 + (G.vrng.next() * 4 | 0), x0 = k * FAR / SHN + G.vrng.range(0, 80);
       for (var j = 0; j < n; j++) {
         var i2 = k * SHMAX + j;
         bon[i2] = 1; bx[i2] = x0 + (j % 3) * shL[k] * 1.1 + G.vrng.range(-3, 3); by[i2] = shY[k] + ((j / 3) | 0) * shH[k] * 1.1 + G.vrng.range(-2, 2);
@@ -873,7 +867,7 @@ G.scene.underwater = (function () {
       if (!bon[i]) continue;
       var k = (i / SHMAX) | 0, xs = ((bx[i] - camPx * 0.5) % FAR + FAR) % FAR - 160; // parallax 0.5, wrapping
       var fr = bturn[i] > 0 ? FG.FR.TURN2 : FG.BEAT[Math.floor(bph[i] * 4) & 3];
-      drawSwimmer(ctx, FG.baseSwimmer(SH_BASE[k], 1, fr, true, bface[i] < 0), xs, wyS + by[i]);
+      drawSwimmer(ctx, FG.shadow(SH_SP[k], SH_LEN[k], fr, bface[i] < 0), xs, wyS + by[i]);
     }
   }
 
@@ -1137,13 +1131,13 @@ G.scene.underwater = (function () {
 
   function resetHeavy(run) { run.heavy.state = 0; run.heavy.hum = 0; }
 
-  // The heavy shadow: a bare catfish painted at twice the swimming size (never a scaled sprite).
+  // The heavy shadow: a channel catfish's silhouette painted at twice the swimming size (never a scaled sprite; Phase 72: was the bare catfish body plan).
   function drawHeavy(ctx, loc, camPx, camPy, alpha) {
     var hv = G.state.run.heavy;
     if (!hv || hv.state !== 1) return;
     var fade = Math.min(1, hv.t / 1.5, (10 - hv.t) / 1.5);
     ctx.globalAlpha = alpha * 0.55 * Math.max(0, fade);
-    drawSwimmer(ctx, G.gfx.fishgen.baseSwimmer('catfish', 2, G.gfx.fishgen.BEAT[Math.floor(hv.t * 2.4) & 3], true, hv.dir < 0), hv.x - camPx, loc.waterY - camPy + hv.y); // slow: 0.6 Hz
+    drawSwimmer(ctx, G.gfx.fishgen.shadow(HEAVY_SP, HEAVY_LEN, G.gfx.fishgen.BEAT[Math.floor(hv.t * 2.4) & 3], hv.dir < 0), hv.x - camPx, loc.waterY - camPy + hv.y); // slow: 0.6 Hz
     ctx.globalAlpha = alpha;
   }
 
@@ -1151,14 +1145,11 @@ G.scene.underwater = (function () {
   function drawHooked(ctx, loc, camPx, camPy, t) {
     var run = G.state.run, fsm = run.fsm;
     if (fsm !== 'hooked' && fsm !== 'fighting' && fsm !== 'landing') return;
-    var h = run.hook, FG = G.gfx.fishgen, look = G.data.fish[h.sp].look, w = look.wrongness;
-    var hh = S.hash(h.uid, Math.floor(t * 8)), jx = 0, jy = 0;
-    if (w && ((hh >>> 6) & 31) < w * 3) jx = (hh & 1) ? 0.5 : -0.5;      // wrongness twitch (Phase 29: the pull's ±1 px jitter is gone)
+    var h = run.hook, FG = G.gfx.fishgen;
     var bd = bodies[HOOKB];
     if (bd.uid !== h.uid) return;
-    var a = bodyArt(bd, 0), fr = a.fr; // Phase 27: its beat, its turns and its pitch
-    if (bd.turnT <= 0 && bd.mode === 0 && FG.frameCount(look) > 2 && ((hh >>> 15) & 15) < w * 2) fr = FG.FR.GLITCH;
-    drawSwimmer(ctx, FG.swimmer(h.sp, fr, false, a.face < 0), h.x - camPx + jx, loc.waterY - camPy + h.y + jy, bd.pitch + bd.jerk, a.face);
+    var a = bodyArt(bd, 0); // Phase 27: its beat, its turns and its pitch
+    drawSwimmer(ctx, FG.swimmer(h.sp, a.fr, false, a.face < 0), h.x - camPx, loc.waterY - camPy + h.y, bd.pitch + bd.jerk, a.face);
   }
 
   // Screen position of the hooked fish's mouth (where the line ties on), written into out:
