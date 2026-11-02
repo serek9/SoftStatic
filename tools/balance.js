@@ -143,10 +143,12 @@ function validate(G, opts) {
   });
   if (!g.rods.some(r => r.ladder === false && r.smallBoost > 1)) err('rods: needs a small-fish rod off the ladder');
   if (!(g.rodSmall.frac > 0 && g.rodSmall.frac < 1 && g.rodSmall.mass > 0)) err('rodSmall');
-  const SWIM = ['mid', 'dive', 'bed', 'top', 'lift'], lureIds = (g.lures || []).map(l => l.id);
+  const SWIM = ['mid', 'dive', 'bed', 'top', 'lift', 'float', 'flutter'], lureIds = (g.lures || []).map(l => l.id); // Phase 65: float, flutter
   (g.lures || []).forEach(l => {
     if (!(l.cost > 0 && l.pack >= 1 && l.attract > 0 && l.rareBoost >= 1 && SWIM.includes(l.swim) && l.sink >= 0 && l.maxDepthM >= 0)) err('lure ' + l.id + ': cost, pack, attract, rareBoost, swim, sink, maxDepthM');
     if (g.baits.some(b => b.id === l.id)) err('lure ' + l.id + ': shares an id with a bait');
+    if (l.carries !== undefined && !g.baits.some(b => b.id === l.carries && b.unlimited)) err('lure ' + l.id + ': carries must be a bait that never runs out');
+    if ((l.swim === 'float') !== (l.carries !== undefined)) err('lure ' + l.id + ': a float rig, and only a float rig, carries a bait');
   });
   d.fish.forEach(f => {
     if (!f.lures || typeof f.lures !== 'object') { err('fish ' + f.id + ': lures'); return; }
@@ -154,7 +156,8 @@ function validate(G, opts) {
   });
   // Every lure catches something in every water with the starting rod.
   for (const id in d.locations) lureIds.forEach(l => {
-    if (!d.fish.some(f => f.locations.includes(id) && f.lures[l] && f.mass <= g.rods[0].maxMass && !f.windows.length)) err('lure ' + l + ': nothing in ' + id + ' takes it on the cane rod');
+    const lr = g.lures.find(x => x.id === l), takes = f => lr.carries ? (!f.baitLikes.length || f.baitLikes.includes(lr.carries)) : f.lures[l];
+    if (!d.fish.some(f => f.locations.includes(id) && takes(f) && f.mass <= g.rods[0].maxMass && !f.windows.length)) err('lure ' + l + ': nothing in ' + id + ' takes it on the cane rod');
   });
   // Phase 47: the looks (four fishers, four dogs): their shapes and every key in the palette.
   if (d.looks) d.validateLooks(d.looks, PAL).forEach(e => err('look ' + e));

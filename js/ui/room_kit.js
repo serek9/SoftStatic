@@ -441,9 +441,206 @@ G.ui.roomKit = (function () {
     for (var i = 0; i < n; i++) { var bh = h - (i * 7 % 4); g.rect(K[(i * 3 + x) % K.length], x + i * 3, y + h - bh, 3, bh); g.rect(S.shift(K[(i * 3 + x) % K.length], -1), x + i * 3 + 2, y + h - bh, 1, bh); g.set('ivory', x + i * 3 + 1, y + h - bh + 2); }
   }
 
+  // ---- Phase 64: things that make a room lived in ---------------------------------------------
+  // A lava lamp, drawn live (its wax moves with the scene's time): a chrome cone foot, a
+  // tapered glass of violet liquid with three blobs of orange wax that rise, swell, meet and
+  // sink, each at its own slow period; a cap. (x, y): the foot's bottom centre. on: lit (the
+  // wax moves only while warm). 9 px wide, 24 tall.
+  var LAVA_W = [1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2];                 // the glass's half widths, top down
+  function lavaLamp(ctx, x, y, t, on, night) {
+    var gy = y - 22, r, i;
+    ctx.fillStyle = P.outline; ctx.fillRect(x - 2, gy - 3, 5, 1);
+    ctx.fillStyle = P.chrome; ctx.fillRect(x - 2, gy - 2, 5, 2); ctx.fillStyle = P.chrome_lit; ctx.fillRect(x - 2, gy - 2, 1, 1);    // the cap
+    for (r = 0; r < 16; r++) {
+      var hw = LAVA_W[r];
+      ctx.fillStyle = P.outline; ctx.fillRect(x - hw - 1, gy + r, 1, 1); ctx.fillRect(x + hw + 1, gy + r, 1, 1);
+      ctx.fillStyle = P[on ? (r > 12 ? 'pink_dark' : 'lav_dark') : 'umber_dark']; ctx.fillRect(x - hw, gy + r, hw * 2 + 1, 1);
+    }
+    // The wax: three blobs on slow loops; a pool on the bottom that a blob leaves and returns to.
+    ctx.fillStyle = P[on ? 'orange_hi' : 'orange_dark'];
+    ctx.fillRect(x - 2, gy + 14, 5, 2);
+    for (i = 0; i < 3; i++) {
+      var ph = on ? (t / (19 + i * 7) + i * 0.37) % 1 : 0.02 + i * 0.01, u = 0.5 - 0.5 * Math.cos(ph * 2 * Math.PI);
+      var by = Math.round(gy + 14 - u * 12), rr = u > 0.15 && u < 0.85 ? 2 : 1, bx = x + Math.round(Math.sin(t * 0.3 + i * 2.1) * (on ? 1.2 : 0));
+      var lim = LAVA_W[Math.max(0, Math.min(15, by - gy))];
+      ctx.fillRect(Math.max(x - lim, bx - rr + 1), by - rr + 1, Math.min(rr * 2 - 1, lim * 2 + 1), rr * 2 - 1);
+      if (rr === 2) { ctx.fillRect(bx - 1, by - 2, 3, 1); ctx.fillRect(bx - 1, by + 2, 3, 1); }
+      if (on) { ctx.fillStyle = P.orange_lit; ctx.fillRect(bx - (rr === 2 ? 1 : 0), by - (rr === 2 ? 1 : 0), 1, 1); ctx.fillStyle = P.orange_hi; }
+    }
+    ctx.fillStyle = P.lav_hi; if (on) ctx.fillRect(x - 2, gy + 3, 1, 5);                     // the glass's shine
+    // The foot: a cone of brushed chrome.
+    for (r = 0; r < 6; r++) { var fw = 2 + (r >> 1); ctx.fillStyle = P.outline; ctx.fillRect(x - fw - 1, gy + 16 + r, fw * 2 + 3, 1); ctx.fillStyle = P[r < 2 ? 'chrome_hi' : 'chrome']; ctx.fillRect(x - fw, gy + 16 + r, fw * 2 + 1, 1); ctx.fillStyle = P.chrome_dark; ctx.fillRect(x + fw - 1, gy + 16 + r, 2, 1); }
+    if (on && night > 0.15) glow(ctx, x, gy + 8, 13, 'neon_pink', 0.05 * night);
+  }
+
+  // A grey games console from the late 90s seen from above at the room's angle (16×10): the
+  // disc lid's circle, the open and reset buttons, a power light, two pad ports, a memory card.
+  function console90s() {
+    return prop(17, 11, function (g) {
+      var GR = ['stone', 'stone_hi', 'hair_lit', 'paper_dark', 'paper'];
+      g.slab(0, 1, 16, 9, GR); g.rect('stone_hi', 1, 8, 14, 1);
+      g.ell(5.5, 4.5, 3.8, 2.8, 'stone', {}); g.ell(5.5, 4.5, 3, 2.1, ['stone_hi', 'hair_lit', 'paper_dark'], { bias: -0.1 });   // the lid in its ring
+      g.ell(5.5, 4.5, 1, 0.7, 'stone', {}); g.rect('stone', 1, 1, 14, 1);
+      g.ell(11, 3.5, 1, 0.8, 'stone_hi', {}); g.ell(14, 3.5, 1, 0.8, 'stone_hi', {});        // open, reset
+      g.set('olive_lit', 12, 6);                                                               // power
+      g.rect('stone_dark', 2, 9, 3, 1); g.rect('stone_dark', 10, 9, 3, 1);                     // pad ports
+      g.rect('outline', 6, 9, 2, 1); g.set('chrome', 6, 10);                                   // a memory card in its slot
+    });
+  }
+  // Its pad, lying on the floor at the end of its cable (12×7): grips, the cross, four buttons.
+  function pad90s() {
+    return prop(13, 8, function (g) {
+      var GR = ['stone', 'stone_hi', 'hair_lit', 'paper_dark'];
+      g.ell(3, 4, 2.6, 3, GR, { bias: 0.05 }); g.ell(9, 4, 2.6, 3, GR, { bias: -0.05 }); g.rect('hair_lit', 3, 2, 7, 3);
+      g.rect('stone', 2, 3, 3, 1); g.rect('stone', 3, 2, 1, 3);                                // the cross
+      g.set('olive_lit', 9, 2); g.set('neon_red', 10, 3); g.set('crt_glow', 8, 3); g.set('pink_hi', 9, 4); // four buttons
+      g.set('stone', 6, 4);
+    });
+  }
+  // The console's screen (the CRT's mode 2): its boot (a dark screen, the four-colour diamond
+  // logo growing, the name), then a fishing game in jittering low polygons: a horizon, the
+  // water, a boat bobbing, a line, the score. ts: seconds since the set was switched on.
+  function console90sScreen(ctx, x, y, w, h, ts) {
+    ctx.fillStyle = P.crt_dark; ctx.fillRect(x, y, w, h);
+    var cx = x + (w >> 1), cy = y + (h >> 1);
+    if (ts < 1) { ctx.fillStyle = P.fog_mid; ctx.fillRect(x, cy, w, 1); return; }           // the tube warming
+    if (ts < 5) {
+      var g = Math.min(1, (ts - 1) / 1.5), k = Math.max(1, Math.round(3 * g));
+      ctx.fillStyle = P.signal_amber; ctx.fillRect(cx - k, cy - k - 1, k, k);
+      ctx.fillStyle = P.neon_red; ctx.fillRect(cx, cy - k - 1, k, k);
+      ctx.fillStyle = P.olive_lit; ctx.fillRect(cx - k, cy - 1, k, k);
+      ctx.fillStyle = P.crt_glow; ctx.fillRect(cx, cy - 1, k, k);
+      if (ts > 2.6) { ctx.fillStyle = P.bone; ctx.fillRect(cx - 5, cy + 3, 11, 1); }
+      return;
+    }
+    var j = (Math.floor(ts * 8) & 1);                                                       // the polygons' jitter
+    ctx.fillStyle = P.crt; ctx.fillRect(x, y, w, (h >> 1) - 1);
+    ctx.fillStyle = P.lav_dark; ctx.fillRect(x, y + (h >> 1) - 2, w, 2);                     // far hills
+    ctx.fillStyle = P.water_mid; ctx.fillRect(x, y + (h >> 1), w, h - (h >> 1));
+    ctx.fillStyle = P.water_hi; ctx.fillRect(x + ((Math.floor(ts * 3)) % w), y + h - 3, 3, 1);
+    var bx = x + 3 + Math.round((Math.sin(ts * 0.4) + 1) * 2), by = y + (h >> 1) - 1 + (Math.floor(ts * 2) & 1);
+    ctx.fillStyle = P.rust_hi; ctx.fillRect(bx + j, by, 6, 2); ctx.fillStyle = P.bone; ctx.fillRect(bx + 3, by - 3 + j, 1, 3);
+    ctx.fillStyle = P.fog_light; ctx.fillRect(bx + 6, by - 2, 1, 1); ctx.fillRect(bx + 7 + j, by, 1, h - (by - y) - 3);
+    ctx.fillStyle = P.mustard_lit; ctx.fillRect(x + w - 5, y + 1, 4, 1);                     // the score
+  }
+
+  // A soft reflection on a varnished floor under a light: a stretched, stepped streak that
+  // fades down the boards and breaks at their seams. (x, y): where the light meets the floor;
+  // w its width; len how far it reaches; board: the boards' height (the seams); a: its alpha.
+  function reflect(ctx, x, y, w, len, key, a, board) {
+    if (a <= 0.003) return;
+    ctx.fillStyle = P[key];
+    for (var r = 0; r < len; r += 2) {
+      if (board && ((y + r) % board) < 2) continue;
+      var u = r / len, ww = Math.max(1, Math.round(w * (1 - u * 0.55)));
+      ctx.globalAlpha = a * (1 - u) * (1 - u);
+      ctx.fillRect(Math.round(x - ww / 2), y + r, ww, 2);
+      if (ww > 4) { ctx.globalAlpha *= 0.6; ctx.fillRect(Math.round(x - ww / 2) - 2, y + r, 2, 2); ctx.fillRect(Math.round(x + ww / 2), y + r, 2, 2); }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // The room's lamps caught in a window's glass at night: two warm smudges low on the pane.
+  function glassLamps(ctx, x, y, w, h, night, key) {
+    if (night < 0.2) return;
+    ctx.fillStyle = P[key || 'lamp_glow'];
+    ctx.globalAlpha = 0.22 * night; ctx.fillRect(x + Math.round(w * 0.3), y + h - 9, 3, 2); ctx.fillRect(x + Math.round(w * 0.3) + 1, y + h - 10, 1, 4);
+    ctx.globalAlpha = 0.12 * night; ctx.fillRect(x + Math.round(w * 0.72), y + h - 7, 2, 2); ctx.fillRect(x + 2, y + h - 3, w - 4, 1);
+    ctx.globalAlpha = 1;
+  }
+  // A curved glare across a CRT's glass (live, so it stays over the picture).
+  function glare(ctx, x, y, w, h) {
+    ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.28;
+    ctx.fillRect(x + 1, y + 2, 1, 3); ctx.fillRect(x + 2, y + 1, 3, 1);
+    ctx.globalAlpha = 0.12; ctx.fillRect(x + w - 3, y + h - 3, 2, 1);
+    ctx.globalAlpha = 1;
+  }
+
+  // A box fan on the floor (22×26), baked without its blades; fanBlades turns them live.
+  function boxFan() {
+    return prop(22, 26, function (g) {
+      g.slab(0, 0, 22, 22, ['outline', 'chrome_dark', 'chrome', 'chrome_hi', 'chrome_lit']);
+      g.ell(11, 11, 8.5, 8.5, 'outline', {}); g.ell(11, 11, 7.5, 7.5, 'stone_dark', {});
+      g.rect('chrome_dark', 4, 22, 3, 3); g.rect('chrome_dark', 15, 22, 3, 3);                 // its feet
+      g.slab(16, 17, 4, 3, ['outline', 'stone', 'stone_hi', 'ivory']);                        // the dial
+    });
+  }
+  function fanBlades(ctx, cx, cy, t, on) {
+    var a = on ? t * 14 : 0.4, i, k;
+    for (i = 0; i < 3; i++) {
+      var b = a + i * 2.094;
+      for (k = 2; k <= 7; k++) { ctx.fillStyle = P[k > 5 ? 'hair_lit' : 'paper_dark']; ctx.fillRect(Math.round(cx + Math.cos(b) * k - 1), Math.round(cy + Math.sin(b) * k - 1), k > 3 ? 3 : 2, k > 3 ? 2 : 1); }
+      if (on) { ctx.globalAlpha = 0.35; ctx.fillStyle = P.stone_hi; for (k = 3; k <= 7; k++) ctx.fillRect(Math.round(cx + Math.cos(b - 0.5) * k), Math.round(cy + Math.sin(b - 0.5) * k), 1, 1); ctx.globalAlpha = 1; } // the blur behind a turning blade
+    }
+    ctx.fillStyle = P.chrome_hi; ctx.fillRect(cx - 1, cy - 1, 3, 3); ctx.fillStyle = P.outline; ctx.fillRect(cx, cy, 1, 1);
+    ctx.fillStyle = P.chrome_dark; for (i = -6; i <= 6; i += 4) ctx.fillRect(cx - 7, cy + i, 15, 1);   // the grille's wires over them
+  }
+  // A small old fridge (26×38) with magnets, a photo, a list; rusted with its door ajar while derelict.
+  function fridge(old) {
+    return prop(26, 38, function (g) {
+      var B = old ? ['rust_dark', 'rust', 'paper_dark', 'bone'] : ['paper_dark', 'bone', 'ivory', 'cream'];
+      g.slab(0, 0, 26, 36, ['outline'].concat(B));
+      g.rect(B[0], 1, 12, 24, 1); g.rect('chrome_hi', 21, 4, 2, 6); g.rect('chrome_hi', 21, 15, 2, 9);  // the freezer door, handles
+      g.rect('stone_dark', 2, 36, 4, 2); g.rect('stone_dark', 20, 36, 4, 2);
+      if (old) { g.fill(1, 20, 12, 14, function (x, y) { return (x * 3 + y * 7) % 11 < 2 ? 'rust_dark' : ''; }); g.rect('outline', 24, 13, 1, 22); return; }
+      g.slab(4, 16, 8, 9, ['paper_dark', 'paper', 'bone', 'ivory']); g.rect('water_hi', 5, 18, 6, 3); g.rect('pine_mid', 5, 21, 6, 2); // a photo of the lake
+      g.rect('paper', 13, 26, 6, 8); g.rect('stone_hi', 14, 28, 4, 1); g.rect('stone_hi', 14, 30, 3, 1);                                 // a list
+      g.set('neon_red', 5, 15); g.set('signal_amber', 15, 25); g.set('olive_lit', 9, 4); g.set('crt_glow', 14, 6); g.set('pink_hi', 4, 7); // magnets
+    });
+  }
+  // A drinks cooler with a glass door (28×52): shelves of cans and bottles behind the glass
+  // (lit live), a sign on top.
+  function cooler() {
+    return prop(28, 52, function (g) {
+      g.slab(0, 0, 28, 50, ['outline', 'brick_dark', 'brick', 'brick_hi', 'pink_hi']);
+      g.rect('outline', 3, 9, 22, 37);                                                        // the glass door's frame
+      g.slab(3, 1, 22, 6, ['outline', 'ivory', 'cream', 'cream']); g.rect('brick', 5, 3, 18, 2); g.rect('ivory', 7, 3, 2, 1); g.rect('ivory', 12, 3, 4, 1); g.rect('ivory', 18, 3, 3, 1);
+      g.rect('chrome_hi', 22, 20, 1, 12);                                                     // the handle
+      g.rect('stone_dark', 2, 50, 4, 2); g.rect('stone_dark', 22, 50, 4, 2);
+    });
+  }
+  // What is behind the cooler's glass, drawn live: its light, a flicker now and then, the
+  // drinks on three shelves.
+  var DRINKS = ['brick_hi', 'olive_hi', 'mustard_hi', 'crt_hi', 'orange_hi', 'lav_hi', 'brick_hi', 'teal_hi'];
+  function coolerInside(ctx, x, y, t, night) {
+    var fl = ((t * 0.5) % 23) < 0.2 && (Math.floor(t * 30) & 1);
+    ctx.fillStyle = P[fl ? 'crt_dark' : 'crt']; ctx.fillRect(x, y, 20, 35);
+    ctx.fillStyle = P[fl ? 'crt' : 'crt_glow']; ctx.fillRect(x, y, 20, 1);
+    for (var s = 0; s < 3; s++) {
+      var sy = y + 10 + s * 11;
+      ctx.fillStyle = P.chrome_hi; ctx.fillRect(x, sy, 20, 1);
+      for (var i = 0; i < 5; i++) { ctx.fillStyle = P[DRINKS[(i + s * 3) % 8]]; ctx.fillRect(x + 1 + i * 4, sy - (s === 1 ? 7 : 5), 3, s === 1 ? 7 : 5); if (s === 1) { ctx.fillRect(x + 2 + i * 4, sy - 9, 1, 2); } }
+    }
+    ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.3; ctx.fillRect(x + 2, y + 2, 1, 12); ctx.fillRect(x + 3, y + 2, 1, 4); ctx.globalAlpha = 1;
+    if (night > 0.2 && !fl) glow(ctx, x + 10, y + 18, 16, 'crt_glow', 0.04 * night);
+  }
+  // A cat asleep, curled (20×13): an orange tabby nose to tail, its back rising and falling,
+  // now and then the tail's tip twitching or an ear flicking. Three frames baked once; the
+  // scene's time picks one. (x, y): its bottom left.
+  var catArt = [];
+  function catFrame(f) {
+    if (catArt[f]) return catArt[f];
+    return (catArt[f] = prop(20, 13, function (g) {
+      var C = ['orange_dark', 'orange', 'orange_hi', 'orange_lit'], up = f === 1 ? 1 : 0;
+      g.ell(11, 8 - up * 0.5, 7.5, 4.6 + up * 0.5, C, { bias: 0.1 });                          // the curled body
+      g.fill(5, 3, 13, 9, function (x, y, k) { return k && (x + (y >> 1)) % 4 === 0 && y < 10 ? 'orange_dark' : ''; }); // stripes
+      g.cap(17, 10, 9, 11.5, 1.3, C, 0.1); g.cap(9, 11.5, 4.5, 10.5, 1.2, C, 0.1);              // the tail round the front
+      g.set(f === 2 ? 'orange_lit' : 'orange_dark', f === 2 ? 4 : 5, f === 2 ? 9 : 10);
+      g.ell(5, 7.5, 3.4, 3, C, { bias: 0.2 });                                                  // the head, tucked
+      g.poly([[2.5, 5.5], [3.2, 2], [5, 4.6]], 'orange'); g.poly([[5.5, 4.6], [7, 2.2 - (f === 2 ? 1 : 0)], [7.8, 5.5]], 'orange_hi'); // the ears
+      g.set('pink', 3, 4); g.line('orange_dark', 3, 8, 4, 8); g.line('orange_dark', 6, 8, 7, 8);  // shut eyes
+      g.set('pink_hi', 5, 9); g.set('cream', 4, 10); g.set('cream', 6, 10);                    // the nose, the muzzle
+    }));
+  }
+  function cat(ctx, x, y, t) {
+    var f = (t % 11) < 0.5 || (t % 17) > 16.6 ? 2 : (Math.sin(t * 1.6) > 0 ? 1 : 0);
+    ctx.drawImage(catFrame(f), x, y - 13);
+  }
+
   return { hash: hash, FLOOR: FLOOR, PANEL: PANEL, WOOD: WOOD, LOG: LOG,
     glow: glow, floor: floor, panelWall: panelWall, logWall: logWall, wallTops: wallTops,
     windowFrame: windowFrame, windowFront: windowFront, glass: glass, lightCable: lightCable, bulbs: bulbs, nightMask: nightMask, rug: rug,
     prop: prop, guitar: guitar, electric: electric, amp: amp, keyboard: keyboard, recordCrate: recordCrate, record: record,
-    crt: crt, screen: screen, boombox: boombox, plant: plant, floorLamp: floorLamp, bankerLamp: bankerLamp, mug: mug, can: can, books: books };
+    crt: crt, screen: screen, boombox: boombox, plant: plant, floorLamp: floorLamp, bankerLamp: bankerLamp, mug: mug, can: can, books: books,
+    lavaLamp: lavaLamp, console90s: console90s, pad90s: pad90s, console90sScreen: console90sScreen, reflect: reflect, glassLamps: glassLamps, glare: glare,
+    boxFan: boxFan, fanBlades: fanBlades, fridge: fridge, cooler: cooler, coolerInside: coolerInside, cat: cat };
 })();

@@ -46,7 +46,13 @@ G.ui.cabin = (function () {
     { id: 'lamp', c: 8, r: 4, w: 1, h: 1, block: true, talk: '' },
     { id: 'bed', c: 9, r: 4, w: 2, h: 2, block: true, talk: 'bed' },
     { id: 'plant', c: 10, r: 6, w: 1, h: 1, block: true, talk: '' },
-    { id: 'plaques', c: 5, r: 0, w: 5, h: 1, block: true, talk: 'plaques' }
+    { id: 'plaques', c: 5, r: 0, w: 5, h: 1, block: true, talk: 'plaques' },
+    // Phase 64: a box fan, an old fridge, a side table by the chair (its lava lamp), the console
+    // on the floor before the TV (Space there is the TV's).
+    { id: 'fan', c: 5, r: 1, w: 1, h: 1, block: true, talk: 'fan' },
+    { id: 'fridge', c: 9, r: 1, w: 1, h: 1, block: true, talk: 'fridge' },
+    { id: 'side', c: 6, r: 4, w: 1, h: 1, block: true, talk: 'lava' },
+    { id: 'console', c: 7, r: 3, w: 1, h: 1, block: true, talk: 'tv' }
   ];
   var DOOR = [4, 7], MAT = [4, 6], PLQ0 = 5, PCOLS = 5;
   var WK = R.walker(MAP, OBJECTS, MAT);
@@ -102,6 +108,11 @@ G.ui.cabin = (function () {
     if (lv >= 4) K.rug(c, tx(8) + 4, ty(6) + 4, 2 * T, T - 10, 'runner', ['lav_dark', 'lav', 'pink', 'lav_hi']);
     // The mat at the door.
     A.area(c, tx(4) + 3, ty(6) + 8, T - 6, T - 11, function (x, y) { return lv < 1 ? ((x + y) % 5 ? 'wood_deep' : 'wood_dark') : ((y - ty(6)) % 3 === 0 ? 'olive_dark' : ((x + y) % 4 ? 'olive' : 'olive_hi')); });
+    // Phase 64: the console's pad on its cable, left on the rug before the chair.
+    if (lv >= 3) {
+      A.line(c, 'outline', tx(7) + 11, ty(3) + 14, tx(7) + 8, ty(3) + 19); A.line(c, 'outline', tx(7) + 8, ty(3) + 19, tx(7) + 3, ty(3) + 20);
+      img(c, K.pad90s(), tx(6) + 25, ty(3) + 18);
+    }
     // Cobwebs while derelict.
     if (lv < 2) for (var w = 0; w < 2; w++) { var cx = w ? W - T - 1 : T, dir = w ? -1 : 1; for (k = 0; k < 5; k++) A.line(c, 'fog_mid', cx, 5, cx + dir * (30 - k * 6), 5 + k * 6); for (k = 1; k < 4; k++) A.line(c, 'fog_dark', cx + dir * k * 8, 5, cx, 5 + k * 8); }
     // String lights from stage 3.
@@ -248,8 +259,30 @@ G.ui.cabin = (function () {
       g2.outline('outline'); g2.paint(c, 0, 0);
     }, tx(1) + 2, ty(7) - 54, ty(7) - 1);
     // The CRT and its console (stage 3), or a stack of boxes.
-    if (lv >= 3) { var tv = K.crt(true); list.push({ img: tv.img, x: tx(7) - 1, y: ty(3) - 36, foot: ty(3) - 1, screen: [tx(7) - 1 + tv.sx, ty(3) - 36 + tv.sy, tv.sw, tv.sh] }); }
+    if (lv >= 3) { var tv = K.crt(false); list.push({ img: tv.img, x: tx(7) - 1, y: ty(3) - 36, foot: ty(3) - 1, screen: [tx(7) - 1 + tv.sx, ty(3) - 36 + tv.sy, tv.sw, tv.sh] }); }
     else add('boxes', 30, 32, function (c) { crate(c, 1, 12, 28, 19); crate(c, 5, 0, 20, 13); }, tx(7) + 1, ty(3) - 33, ty(3) - 1);
+    // Phase 64: before the TV, the grey console on the floor (stage 3), or a box of cables.
+    if (lv >= 3) list.push({ img: K.console90s(), x: tx(7) + 8, y: ty(3) + 4, foot: ty(3) + 14 });
+    else add('cables', 22, 16, function (c) { crate(c, 1, 2, 20, 13); A.line(c, 'outline', 4, 2, 9, 0); A.line(c, 'outline', 9, 0, 15, 3); }, tx(7) + 5, ty(3) + 2, ty(3) + 16);
+    // The box fan (stage 2) turning, or a crate; the fridge (dead and rusted while derelict).
+    if (lv >= 2) list.push({ img: K.boxFan(), x: tx(5) + 5, y: ty(2) - 27, foot: ty(2) - 1, live: function (ctx, x, y) { K.fanBlades(ctx, x + 11, y + 11, t, fanOn); } });
+    else add('crate5', 26, 22, function (c) { crate(c, 1, 1, 24, 20); }, tx(5) + 3, ty(2) - 23, ty(2) - 1);
+    list.push({ img: G.gfx.bake.cached('cabin64:fridge' + (lv < 1 ? 'old' : ''), function () { return K.fridge(lv < 1); }), x: tx(9) + 3, y: ty(2) - 40, foot: ty(2) - 1 });
+    // The side table by the chair: the lava lamp on it (stage 3), a candle in a jar (1-2), or a crate.
+    add('side', 22, 26, function (c) {
+      if (lv < 1) { crate(c, 2, 6, 18, 18); return; }
+      var g2 = X.grid(22, 26);
+      g2.ell(11, 6, 10, 4, ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit'], { bias: 0.1 });
+      g2.rect('wood_dark', 10, 10, 3, 13); g2.rect('wood_mid', 10, 10, 1, 13); g2.ell(11, 23.5, 6, 1.6, WOOD, {});
+      if (lv >= 3) { g2.slab(14, 3, 5, 3, ['paper_dark', 'paper', 'bone', 'cream']); g2.rect('stone_hi', 15, 4, 3, 1); } // a coaster and a note
+      g2.outline('outline'); g2.paint(c, 0, 0);
+    }, tx(6) + 5, ty(5) - 27, ty(5) - 1);
+    var side = list[list.length - 1];
+    if (lv >= 3) side.live = function (ctx, x, y) { K.lavaLamp(ctx, x + 8, y + 7, t, lavaOn, env.night); };
+    else if (lv >= 1) side.live = function (ctx, x, y) {
+      ctx.fillStyle = P.outline; ctx.fillRect(x + 6, y - 1, 6, 7); ctx.fillStyle = P.teal_dark; ctx.fillRect(x + 7, y, 4, 5); ctx.fillStyle = P.cream; ctx.fillRect(x + 8, y + 1, 2, 3);
+      var fl = (Math.floor(t * 9) * 7) % 3; ctx.fillStyle = P.lamp_glow; ctx.fillRect(x + 8 + (fl === 2 ? 1 : 0), y - 2 - (fl ? 1 : 0), 1, 2); ctx.fillStyle = P.flame; ctx.fillRect(x + 8, y - 1, 1, 1);
+    };
     // The armchair from behind (stage 2), facing the CRT; before it an upturned bucket as a seat.
     if (lv >= 2) add('chair', 32, 34, function (c) {
       var g2 = X.grid(32, 34), CH = lv >= 4 ? ['teal_dark', 'teal', 'teal_hi', 'teal_lit'] : ['orange_dark', 'orange', 'orange_hi', 'orange_lit'];
@@ -312,7 +345,7 @@ G.ui.cabin = (function () {
   var turned = [];    // per mounted trophy: faces the door; decided in enter() only
   var order = [];
   var stored = 0, walk = null, faced = '', held = [], txt = { title: '', next: '', stored: '', coins: '' }, lastCoins = -1, coin = null;
-  var open = '', lines = [], tvOn = false, recordT = -1, chordN = 0;
+  var open = '', lines = [], tvOn = false, recordT = -1, chordN = 0, tvT = 0, fanOn = true, lavaOn = true;
   var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, strange: '', st: 0, flash: 0 };
   var BOX = { x: 24, y: 296, w: 592, h: 56 }, HEAD = { x: 120, y: 316, w: 400, h: 40 };
   var R_BOX = [[BOX.x, BOX.y - 13, BOX.w, BOX.h + 13]], R_HEAD = [[HEAD.x, HEAD.y - 13, HEAD.w, HEAD.h]]; // 8.4 #38
@@ -350,7 +383,7 @@ G.ui.cabin = (function () {
   function enter() {
     var save = G.state.save, kept = save.kept, cap = G.data.gear.cabin[save.cabinLevel].plaques, i, j;
     bakeRoom();
-    t = 0; open = ''; faced = ''; held.length = 0; tvOn = false; recordT = -1;
+    t = 0; open = ''; faced = ''; held.length = 0; tvOn = false; recordT = -1; fanOn = true; lavaOn = true;
     walk = WK.create();
     R.prebake('fisher'); R.prebake('dog');                                          // so no step bakes a frame
     order.length = 0;
@@ -408,7 +441,11 @@ G.ui.cabin = (function () {
     if (what === 'guitar') { G.audio.engine.cue('strum', 0, chordN++ % 4); if (lv < 2) say('A chord. Two strings are dead and the rest are flat.'); return; }
     if (what === 'keys') { if (lv < 3) { say(lv < 1 ? 'Junk. Someday.' : 'Something under a tarp. Not yet.'); return; } G.audio.engine.cue('keys', 0, chordN++ % 4); return; }
     if (what === 'records') { if (lv < 3) { say(lv < 1 ? 'A heap of junk.' : 'Crates of old records. Nothing to play them on yet.'); return; } if (recordT < 0) { recordT = t; G.audio.engine.cue('record'); } else recordT = -1; return; }
-    if (what === 'tv') { if (lv < 3) { say('Boxes.'); return; } tvOn = !tvOn; return; }
+    if (what === 'tv') { if (lv < 3) { say('Boxes.'); return; } tvOn = !tvOn; tvT = t; return; }
+    // Phase 64.
+    if (what === 'fan') { if (lv < 2) { say('A crate of something heavy.'); return; } fanOn = !fanOn; return; }
+    if (what === 'lava') { if (lv < 1) { say('An upturned crate.'); return; } if (lv < 3) { say('A candle in a jam jar. It gutters when you breathe.'); return; } lavaOn = !lavaOn; return; }
+    if (what === 'fridge') { say(lv < 1 ? 'The fridge is dead. Something in it was food once.' : ['Cold beer, eggs, a jar of something pickled. The motor shudders and holds.', 'A note on the door in your handwriting: CHECK THE PIER. You do not remember writing it.'][chordN++ % 2]); return; }
     if (what === 'stove') { say(lv < 2 ? 'Cold, and rusted through at the pipe.' : 'The fire ticks and settles. Warm.'); return; }
     if (what === 'chair') { say(lv < 2 ? 'An upturned bucket. It holds.' : 'The chair still keeps the shape of whoever sat in it.'); return; }
     if (what === 'bed') { say(['A sleeping bag on a pallet. The floor breathes cold.', 'A cot. You lie down a minute.', 'You lie down a minute. The stove ticks.', 'You lie down a minute. The lamp hums.', 'You lie down a minute under the quilt. Outside, the lake.'][lv]); return; }
@@ -472,6 +509,7 @@ G.ui.cabin = (function () {
     }
     // The record turning, the CRT's screen.
     if (level >= 3) K.record(ctx, ox + tx(3) + 4, oy + ty(1) - 3, t, recordT >= 0);
+    reflections(ctx, ox, oy);
     // Everything that stands, in order of its feet.
     var f = R.walkers(walk, T, ox, oy + TOP), fr = R.frames(walk);
     order.length = 0;
@@ -481,7 +519,16 @@ G.ui.cabin = (function () {
       var bi = -1, by = 1e9;
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
-      if (id < 100) { ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y); if (props[id].screen) { var s = props[id].screen; if (tvOn) K.screen(ctx, ox + s[0], oy + s[1], s[2], s[3], t, ((t / 12) | 0) % 2); else { ctx.fillStyle = P.crt_dark; ctx.fillRect(ox + s[0], oy + s[1], s[2], s[3]); ctx.fillStyle = P.chrome_dark; ctx.fillRect(ox + s[0] + 1, oy + s[1] + 1, 3, 1); } } }
+      if (id < 100) {
+        ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y);
+        if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y);
+        if (props[id].screen) {
+          var s = props[id].screen;
+          if (tvOn) K.console90sScreen(ctx, ox + s[0], oy + s[1], s[2], s[3], t - tvT);    // Phase 64: the console's boot, then its game
+          else { ctx.fillStyle = P.crt_dark; ctx.fillRect(ox + s[0], oy + s[1], s[2], s[3]); }
+          K.glare(ctx, ox + s[0], oy + s[1], s[2], s[3]);
+        }
+      }
       else if (id === 101) R.drawFigure(ctx, 'dog', walk.dog.face, fr[1], f[2], f[3]);
       else R.drawFigure(ctx, 'fisher', walk.face, fr[0], f[0], f[1]);
     }
@@ -513,12 +560,25 @@ G.ui.cabin = (function () {
     F.drawText(ctx, txt.next, U.left(HEAD.x), ty0, 'signal_amber');
     if (txt.stored) F.drawText(ctx, txt.stored, HEAD.x + HEAD.w - U.PAD - F.measure(txt.stored), ty0, 'fog_light');
     var kx = U.left(HEAD.x), ky = HEAD.y + HEAD.h - U.TAB - U.KEY_H - 2;
-    kx += U.hint(ctx, 'SPACE', !faced ? 'use' : ((level < 3 && (faced === 'tv' || faced === 'keys' || faced === 'records')) || (level < 2 && faced === 'chair') ? 'look' : HINT[faced] || 'use'), kx, ky);
+    kx += U.hint(ctx, 'SPACE', !faced ? 'use' : ((level < 3 && (faced === 'tv' || faced === 'keys' || faced === 'records' || faced === 'lava')) || (level < 2 && (faced === 'chair' || faced === 'fan')) ? 'look' : HINT[faced] || 'use'), kx, ky);
     U.hint(ctx, 'ESC', 'leave', kx, ky);
   }
+  // Phase 64: the varnished boards give back what is lit (the bench's lantern, the floor lamp,
+  // the lava lamp, the TV on the rug), and the window's glass gives back the lamps at night.
+  function reflections(ctx, ox, oy) {
+    var n = env.night, lv = level;
+    if (lv >= 1) K.reflect(ctx, ox + tx(2) + 20, oy + ty(2) + 2, 8, 22, 'lamp_glow', 0.16 * n, 0);
+    if (lv >= 3) K.reflect(ctx, ox + LAMPP[0], oy + ty(5) - 1, 10, 26, 'lamp_glow', 0.2 * n, 0);
+    if (lv >= 3 && lavaOn) K.reflect(ctx, ox + tx(6) + 13, oy + ty(5), 6, 14, 'neon_pink', 0.08 + 0.12 * n, 0);
+    if (lv >= 3 && tvOn) K.reflect(ctx, ox + tx(7) + 15, oy + ty(3) + 15, 12, 18, 'crt_glow', 0.05 + 0.1 * n, 0);
+    if (lv >= 2) K.reflect(ctx, ox + STOVE[0], oy + ty(1) + 24, 10, 8, 'flame', 0.18 * n, 0);
+    K.glassLamps(ctx, ox + GL[0], oy + GL[1], GL[2], GL[3], lv >= 2 ? n : 0);
+    // Moths at the floor lamp's shade.
+    if (lv >= 3 && n > 0.4) { ctx.fillStyle = P.paper; for (var i = 0; i < 2; i++) { var a = t * (2.3 + i * 0.8) + i * 3; ctx.fillRect(Math.round(ox + LAMPP[0] + Math.cos(a) * (7 + i * 3)), Math.round(oy + LAMPP[1] - 24 + Math.sin(a * 1.6) * 4), 1 + (Math.floor(t * 12 + i) & 1), 1); } }
+  }
   var bp = [];
-  var WORD = { bench: 'FIX', mirror: 'LOOK', plaques: 'READ', guitar: 'PLAY', keys: 'PLAY', records: 'PLAY', tv: 'TV', stove: 'WARM', chair: 'SIT', bed: 'REST' }; // Phase 58
-  var HINT = { bench: 'restore', mirror: 'fisher & dog', plaques: 'look', guitar: 'play', keys: 'play', records: 'play', tv: 'switch', stove: 'warm up', chair: 'sit', bed: 'rest' };
+  var WORD = { bench: 'FIX', mirror: 'LOOK', plaques: 'READ', guitar: 'PLAY', keys: 'PLAY', records: 'PLAY', tv: 'TV', stove: 'WARM', chair: 'SIT', bed: 'REST', fan: 'FAN', fridge: 'OPEN', lava: 'LAMP' }; // Phase 58
+  var HINT = { bench: 'restore', mirror: 'fisher & dog', plaques: 'look', guitar: 'play', keys: 'play', records: 'play', tv: 'switch', stove: 'warm up', chair: 'sit', bed: 'rest', fan: 'switch', fridge: 'open', lava: 'switch' };
 
   return {
     native: true,
@@ -541,11 +601,13 @@ G.ui.cabin = (function () {
     },
     word: function () {
       if (open !== '' || !walk || !faced) return '';
-      if ((level < 3 && (faced === 'tv' || faced === 'keys' || faced === 'records')) || (level < 2 && faced === 'chair')) return 'LOOK';
+      if ((level < 3 && (faced === 'tv' || faced === 'keys' || faced === 'records' || faced === 'lava')) || (level < 2 && (faced === 'chair' || faced === 'fan'))) return 'LOOK';
       return WORD[faced] || 'USE';
     },
     // dbg: what is on the wall now; where he is and what he faces.
     state: function () { return { level: level, mounted: mounted.length, turned: turned.filter(Boolean).length, facing: turned.slice(), stored: stored, at: walk ? [walk.c, walk.r, walk.face] : null, faced: faced, open: open, tv: tvOn, record: recordT >= 0, blocked: WK.blocked().length }; },
+    // Phase 64 (dbg.roomLife): the live things and their state.
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'cabin', level: level, live: n, tv: tvOn ? (t - tvT < 5 ? 'booting' : 'game') : 'off', fan: level >= 2 ? (fanOn ? 'on' : 'off') : 'none', lava: level >= 3 ? (lavaOn ? 'on' : 'off') : 'none' }; },
     walkPath: function (path) { if (!walk) return 'not in the cabin'; var nb = WK.walkPath(walk, path || ''); faced = WK.facing(walk); return { c: walk.c, r: walk.r, face: walk.face, faced: faced, blocked: nb }; }
   };
 })();

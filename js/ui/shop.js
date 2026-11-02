@@ -24,10 +24,12 @@ G.ui.shop = (function () {
     [{ kind: 'bait', id: 'worm', icon: 'worm' }, { kind: 'bait', id: 'cricket', icon: 'cricket' },
      { kind: 'bait', id: 'minnow', icon: 'minnow' }, { kind: 'bait', id: 'unlabelled', icon: 'jar' }],
     [{ kind: 'bait', id: 'spinner', icon: 'spinner' }, { kind: 'bait', id: 'plug', icon: 'plug' }, { kind: 'bait', id: 'grub', icon: 'grub' },
-     { kind: 'bait', id: 'popper', icon: 'popper' }, { kind: 'bait', id: 'jig', icon: 'jig' }]
+     { kind: 'bait', id: 'popper', icon: 'popper' }, { kind: 'bait', id: 'jig', icon: 'jig' },
+     { kind: 'bait', id: 'bobber', icon: 'bobber' }, { kind: 'bait', id: 'spoon', icon: 'spoon' }] // Phase 65
   ];
   var SWIM_SAYS = { mid: 'Spins in mid water as you reel.', dive: 'Floats, and dives when reeled.', bed: 'Sinks to the bottom and hops.',
-    top: 'Stays on top. Tap to make it pop.', lift: 'Sinks fast; jig it up and down.' };
+    top: 'Stays on top. Tap to make it pop.', lift: 'Sinks fast; jig it up and down.',
+    float: 'A worm hung under a float. Watch the float: it dips when they take.', flutter: 'Falls fluttering and flashing; wobbles low as you reel.' };
   // Phase 53: what Rusty says of each kind of line.
   var LINE_SAYS = {
     mono: 'Stretches, so it forgives a lunge. Fish can see it.',
@@ -160,6 +162,20 @@ G.ui.shop = (function () {
       blob(c, 23 * s, 15 * s, 3.5 * s, 3.5 * s, STONE, { bias: 0.2 });
       for (var k = 0; k < 6; k++) limb(c, 20 * s, 15 * s, 6 * s, (9 + k * 2.6) * s, 0.8 * s, k & 1 ? RUST : ['rust_dark', 'flame', 'brass_hi'], 0.1);
     },
+    // Phase 65: the float rig (a red-and-white bobber, its line, a worm on the hook) and the spoon.
+    bobber: function (c, s) {
+      line(c, 'fog_light', 16 * s, 4 * s, 16 * s, 26 * s);
+      blob(c, 16 * s, 11 * s, 5.5 * s, 5.5 * s, ['blood', 'neon_red', 'crimson'], { bias: 0.2 });
+      box(c, 'outline', 10 * s, 11 * s, 12 * s, 1);
+      blob(c, 16 * s, 14 * s, 5 * s, 2.8 * s, ['paper_dark', 'bone', 'ivory'], { bias: 0.1 });
+      box(c, 'bone', 15 * s, 3 * s, 2 * s, 3 * s);
+      limb(c, 14 * s, 25 * s, 19 * s, 28 * s, 1 * s, ['flesh_dark', 'flesh'], 0.1); line(c, 'ink', 17 * s, 26 * s, 17 * s, 23 * s);
+    },
+    spoon: function (c, s) {
+      blob(c, 15 * s, 16 * s, 8.5 * s, 3.8 * s, ['rust', 'leaf_gold', 'brass_hi', 'chrome_lit'], { bias: 0.25 });
+      line(c, 'neon_red', 9 * s, 16 * s, 19 * s, 16 * s);
+      line(c, 'ink', 24 * s, 16 * s, 27 * s, 16 * s); line(c, 'ink', 4 * s, 16 * s, 7 * s, 16 * s); line(c, 'ink', 4 * s, 16 * s, 3 * s, 19 * s);
+    },
     jar: function (c, s) {
       for (var y = 9 * s; y < 29 * s; y++) for (var x = 6 * s; x < 26 * s; x++) {
         var nx = (x - 16 * s) / (10 * s), edge = Math.abs(nx) > 0.86 || y > 28 * s - 2;
@@ -229,7 +245,7 @@ G.ui.shop = (function () {
   // show: the gear he has, and the minnows and crickets left after what he bought this visit
   // (the shop's stock is endless in the sim; the tank and the crate are full again next visit).
   var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]],
-    lures: [[3, 0], [3, 1], [3, 2], [3, 3], [3, 4]] };
+    lures: [[3, 0], [3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6]] };
   var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
   var stock = { rod: 0, lantern: false, finder: false, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
   // Phase 39: the hour and the light for the room (the lake's: Fogbound's drizzle and fog),
@@ -383,6 +399,16 @@ G.ui.shop = (function () {
     crimson = line_.kind === 'reverse';
     page = 0; typed = 0; open = 'box';
   }
+  // Phase 64: a line about a thing in the room (the cooler, the cat), in the same box.
+  var REMARKS = { cooler: ['Pop, root beer, and one bottle with no label at the back. The compressor knocks twice and settles.', 'The cooler hums a note just under hearing.'],
+    cat: ['The cat is asleep on the freezer. It has been asleep on the freezer since you can remember.', 'One ear turns toward you. The rest of the cat does not.'] };
+  function remark(id) {
+    var r = REMARKS[id], ls = F.wrap(r[remarkN++ % r.length], BOX.w - 32);
+    pages.length = 0;
+    for (var k = 0; k < ls.length; k += 2) pages.push(ls.slice(k, k + 2));
+    crimson = false; page = 0; typed = 0; open = 'box'; from = 'thing';
+  }
+  var remarkN = 0;
   function pageLen() { var n = 0, p = pages[page]; for (var i = 0; i < p.length; i++) n += p[i].length; return n; }
 
   // The item window over the room, for every shelf (Rusty's Buy) or one shelf (Phase 38).
@@ -453,6 +479,7 @@ G.ui.shop = (function () {
       if (inp.pressed('action')) {
         if (typed < pageLen()) typed = pageLen();                                    // Space finishes the page
         else if (++page < pages.length) typed = 0;
+        else if (from === 'thing') open = '';                                           // Phase 64: a remark on a thing in the room
         else { open = 'choice'; choice = 0; }
       }
     } else if (open === 'choice') {
@@ -488,6 +515,7 @@ G.ui.shop = (function () {
     if (walk.exit) { G.core.state.change('sailing'); return; }
     faced = R.facing(walk);
     if (inp.pressed('action') && faced === 'rusty') { from = 'rusty'; talk(); }
+    else if (inp.pressed('action') && REMARKS[faced]) remark(faced);
     else if (inp.pressed('action') && SHELF_ITEMS[faced]) showItems(SHELF_ITEMS[faced], faced); // Phase 38: a shelf's own items
     else if (inp.pressed('action') && faced === 'guitar') G.audio.engine.cue('strum', 0, Math.floor(t * 7) % 4); // Phase 56: a chord on the old guitar
   }
@@ -602,7 +630,7 @@ G.ui.shop = (function () {
     // on the touch action button for what he faces.
     busy: function () { return open !== ''; }, tap: tap,
     rects: function () { return open === 'box' ? R_BOX : open === 'choice' ? R_CHOICE : open === 'items' ? R_ITEMS : R_NONE; },
-    word: function () { return open !== '' || !walk ? '' : faced === 'rusty' ? 'TALK' : SHELF_ITEMS[faced] ? 'LOOK' : faced === 'guitar' ? 'PLAY' : ''; },
+    word: function () { return open !== '' || !walk ? '' : faced === 'rusty' ? 'TALK' : SHELF_ITEMS[faced] ? 'LOOK' : faced === 'guitar' ? 'PLAY' : REMARKS[faced] ? 'LOOK' : ''; },
     // Tests: choose an item (shelf r, item c) in the window, as if the cursor were on it, and buy.
     select: function (r, c) { row = r; col = c; describe(); return txt.name.join(' '); },
     act: function () { act(); return txt.msg.join(' '); },

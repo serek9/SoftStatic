@@ -370,6 +370,12 @@ G.core.debug = (function () {
     // the dog (c, r, sitting), the mode ('room' or 'panel') and what he faces.
     shop: function () { return G.ui.shop.info(); },
     // dbg.shopWalk('RRRUU') walks him through the shop a tile per letter (U, D, L, R), by the walk's rules.
+    // dbg.dock(): Phase 67, the pier and the boat; dbg.dock(i) chooses row i of its open panel.
+    dock: function (i) { if (i !== undefined) return G.ui.dock.choose(i); return G.ui.dock.info(); },
+    // dbg.mapNav(): Phase 66, the map's arrows checked from every stop.
+    mapNav: function () { return G.ui.map.nav(); },
+    // dbg.roomLife(): Phase 64, the live things in the room you are in (the shop or the cabin).
+    roomLife: function () { var n = G.core.state.sceneName(); return n === 'shop' ? G.ui.shopRoom.life() : (n === 'cabin' ? G.ui.cabin.life() : 'not in a room'); },
     shopWalk: function (path) { return G.core.state.sceneName() === 'shop' ? G.ui.shop.walkPath(path || '') : 'not in the shop'; },
     // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
     // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).

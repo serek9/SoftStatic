@@ -52,7 +52,7 @@ G.ui.menu = (function () {
       return true;
     }
     if (scene === 'gallery') return false;
-    if (inp.pressed('pause') || (scene === 'sailing' && inp.pressed('back') && !G.ui.setup.isOpen())) return open('pause'); // Esc closes the setup panel (Phase 45)
+    if (inp.pressed('pause') || (scene === 'sailing' && inp.pressed('back') && !G.ui.setup.isOpen() && !(G.ui.dock && G.ui.dock.busy()))) return open('pause'); // Esc closes the setup panel (Phase 45) and the pier's (Phase 67)
     if (inp.pressed('journal')) return open('journal');
     if (inp.pressed('map') && mapAllowed()) return open('map');
     return false;

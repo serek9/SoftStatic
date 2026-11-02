@@ -518,14 +518,25 @@ G.ui.room = (function () {
     var key = kind + (L ? L.id : '') + d + fr + (flip ? '<' : '');
     if (art[key]) return art[key];
     if (flip) return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, L), 'x'));
-    var w = kind === 'dog' ? (d === 'side' ? DW : 32) : FW, h = kind === 'dog' ? DH : FH, g = X.grid(w, h);
-    if (kind === 'dog') paintDog(g, d, fr, L); else if (kind === 'rusty') paintRusty(g, d, fr); else paintFisher(g, d, fr, L);
+    var w = kind === 'dog' ? (d === 'side' ? DW : 32) : FW, h = kind === 'dog' ? DH : FH, g;
+    // Phase 63: the dog at its real size beside the fisher. The poses are drawn for a 40×32
+    // box; a scaled grid paints them at the breed's size (data/looks.js size: a golden
+    // retriever's back comes to a third of his height, as a real one's comes to a man's hip).
+    if (kind === 'dog') { var s = dogScale(L); g = X.grid(Math.ceil(w * s) + 1, Math.ceil(h * s) + 1); paintDog(X.scaled(g, s), d, fr, L); }
+    else { g = X.grid(w, h); if (kind === 'rusty') paintRusty(g, d, fr); else paintFisher(g, d, fr, L); }
     return (art[key] = g.canvas());
   }
-  // Where a sprite's feet are within it: [x, y].
-  function anchor(kind, dir) {
-    if (kind === 'dog') return dir === 'left' || dir === 'right' ? [20, 30] : [16, 30];
-    return [16, 46];
+  function dogScale(L) { return L && L.size ? L.size : 0.7; }
+  // Where a sprite's feet are within it: [x, y]. lk: the dog's look (its size).
+  var anc = [0, 0];
+  function anchor(kind, dir, lk) {
+    if (kind === 'dog') {
+      var s = dogScale(look('dog', lk));
+      anc[0] = Math.round((dir === 'left' || dir === 'right' ? 20 : 16) * s); anc[1] = Math.round(30 * s);
+      return anc;
+    }
+    anc[0] = 16; anc[1] = 46;
+    return anc;
   }
   // Paints a look's fisher or dog in every facing and frame. Returns the ms it took.
   function prebake(kind, lk) {
@@ -543,8 +554,8 @@ G.ui.room = (function () {
   }
   // Draws a walking figure with its feet at (x, y), its shadow under it.
   function drawFigure(ctx, kind, dir, fr, x, y, lk) {
-    var img = sprite(kind, dir, fr, lk), a = anchor(kind, dir);
-    shadow(ctx, x, y, kind === 'dog' ? (dir === 'left' || dir === 'right' ? 26 : 18) : 20);
+    var img = sprite(kind, dir, fr, lk), a = anchor(kind, dir, lk), ds = kind === 'dog' ? dogScale(look('dog', lk)) : 1;
+    shadow(ctx, x, y, kind === 'dog' ? Math.round((dir === 'left' || dir === 'right' ? 26 : 18) * ds) : 20);
     ctx.drawImage(img, Math.round(x - a[0]), Math.round(y - a[1]));
   }
 
@@ -564,5 +575,5 @@ G.ui.room = (function () {
   }
 
   return { walker: walker, heldDir: heldDir, sprite: sprite, anchor: anchor, prebake: prebake, shadow: shadow, drawFigure: drawFigure,
-    walkers: walkers, frames: frames, STEP: STEP, TURN: TURN, DIRS: DIRS };
+    walkers: walkers, frames: frames, dogScale: function (lk) { return dogScale(look('dog', lk)); }, STEP: STEP, TURN: TURN, DIRS: DIRS };
 })();

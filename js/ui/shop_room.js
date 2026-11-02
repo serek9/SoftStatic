@@ -48,9 +48,11 @@ G.ui.shopRoom = (function () {
     // Phase 56: the room's things in its corners and between the shelves.
     { id: 'fern', c: 5, r: 1, w: 1, h: 1, block: true, talk: '' },
     { id: 'guitar', c: 7, r: 1, w: 1, h: 1, block: true, talk: 'guitar' },
-    { id: 'freezer', c: 1, r: 6, w: 1, h: 1, block: true, talk: '' },
+    { id: 'freezer', c: 1, r: 6, w: 1, h: 1, block: true, talk: 'cat' },
     { id: 'palm', c: 10, r: 6, w: 1, h: 1, block: true, talk: '' },
-    { id: 'lamp', c: 3, r: 4, w: 1, h: 1, block: true, talk: '' }
+    { id: 'lamp', c: 3, r: 4, w: 1, h: 1, block: true, talk: '' },
+    // Phase 64: a drinks cooler humming by the east wall; the freezer's cat.
+    { id: 'cooler', c: 10, r: 5, w: 1, h: 1, block: true, talk: 'cooler' }
   ];
   var DOOR = [6, 7], MAT = [6, 6], RUSTY = [9, 2], CLOCK = 7;
   var WK = R.walker(MAP, OBJECTS, MAT);
@@ -290,8 +292,13 @@ G.ui.shopRoom = (function () {
         { img: G.gfx.bake.cached('shop:counter56', function () { return G.gfx.bake.layer(3 * T, 2 * T + 18, paintCounter); }), x: tx(8), y: ty(2) - 14, foot: ty(4) },
         { img: G.gfx.bake.cached('shop:freezer56', function () { return G.gfx.bake.layer(32, 31, paintFreezer); }), x: tx(1), y: ty(6) - 2, foot: ty(7) - 1 },
         { img: G.gfx.bake.cached('shop:lamp56', function () { return K.floorLamp(); }), x: tx(3) + 9, y: ty(5) - 56, foot: ty(5) - 2 },
-        { img: G.gfx.bake.cached('shop:palm56', function () { return K.plant('monstera', ['orange_dark', 'orange', 'orange_hi', 'orange_lit']); }), x: tx(10) + 2, y: ty(7) - 42, foot: ty(7) - 1 }
+        { img: G.gfx.bake.cached('shop:palm56', function () { return K.plant('monstera', ['orange_dark', 'orange', 'orange_hi', 'orange_lit']); }), x: tx(10) + 2, y: ty(7) - 42, foot: ty(7) - 1 },
+        { img: G.gfx.bake.cached('shop:cooler64', function () { return K.cooler(); }), x: tx(10) + 2, y: ty(6) - 53, foot: ty(6) - 1 }
       ];
+      // Phase 64: what moves on the props, drawn with them in their place in the order: the
+      // lava lamp on the counter, the cat on the freezer, the lit drinks in the cooler.
+      props[1].live = function (ctx, x, y, t) { K.cat(ctx, x + 6, y + 8, t); };
+      props[4].live = function (ctx, x, y, t, env) { K.coolerInside(ctx, x + 4, y + 10, t, env ? env.night : 0); };
       if (t0) bakeMs = performance.now() - t0;
     }
     return base;
@@ -387,6 +394,9 @@ G.ui.shopRoom = (function () {
       ctx.globalAlpha = 1;
     } else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + T, oy + TOP + 2, W - 2 * T, RH - TOP - 2); ctx.globalAlpha = 1; }
     K.bulbs(ctx, bulbPts(ox, oy), t, env.night);
+    moths(ctx, env, t, ox, oy);
+    K.lavaLamp(ctx, ox + tx(6) + 22, oy + ty(1) - 30, t, true, env.night);             // Phase 64: on top of the gear shelf
+    if (tvRect) K.glare(ctx, ox + tvRect[0], oy + tvRect[1], tvRect[2], tvRect[3]);
     // The floor lamp's shade, lit at night.
     if (env.night > 0.3) K.glow(ctx, ox + LAMP[0], oy + LAMP[1] - 22, 15, 'lamp_glow', 0.06 * env.night);
     // The tank's bubbles; steam from Rusty's cup; smoke from the ashtray.
@@ -403,6 +413,23 @@ G.ui.shopRoom = (function () {
     for (i = 0; i < 3; i++) { var s = (t * 0.25 + i / 3) % 1; ctx.globalAlpha = 0.4 * (1 - s); ctx.fillRect(ox + tx(8) + 42 + Math.round(Math.sin(s * 5 + i * 2) * 2), oy + ty(3) + 2 - Math.floor(s * 18), 1, 1); }
     ctx.globalAlpha = 1;
   }
+  // Phase 64: the varnished boards give back what is lit: the floor lamp's shade at night, the
+  // cooler's glass, the lava lamp on the counter's top; the windows give back the lamps.
+  function reflections(ctx, env, t, ox, oy) {
+    var n = env.night;
+    K.reflect(ctx, ox + LAMP[0], oy + ty(5) - 1, 10, 26, 'lamp_glow', 0.2 * n, 0);
+    K.reflect(ctx, ox + tx(10) + 16, oy + ty(6), 18, 22, 'crt_glow', 0.06 + 0.1 * n, 0);
+    for (var i = 0; i < WINS.length; i++) { var g = glassRect(i); K.glassLamps(ctx, ox + g[0], oy + g[1], g[2], g[3], n); }
+  }
+  // Moths round the floor lamp's shade and the banker's lamp at night.
+  function moths(ctx, env, t, ox, oy) {
+    if (env.night < 0.4) return;
+    ctx.fillStyle = P.paper;
+    for (var i = 0; i < 3; i++) {
+      var a = t * (2.1 + i * 0.7) + i * 2, L = i < 2 ? LAMP : DESK, r = i < 2 ? 7 + i * 3 : 5;
+      ctx.fillRect(Math.round(ox + L[0] + Math.cos(a) * r), Math.round(oy + L[1] - (i < 2 ? 22 : 8) + Math.sin(a * 1.7) * r * 0.6), 1 + (Math.floor(t * 12 + i) & 1), 1);
+    }
+  }
   var bp = [];
   function bulbPts(ox, oy) { if (bp.length !== cable.length) { bp.length = 0; for (var i = 0; i < cable.length; i++) bp.push([0, 0]); } for (i = 0; i < cable.length; i++) { bp[i][0] = ox + cable[i][0]; bp[i][1] = oy + cable[i][1]; } return bp; }
 
@@ -417,6 +444,7 @@ G.ui.shopRoom = (function () {
     if (env) drawLive(ctx, env, t, rusty, ox, oy);
     else ctx.drawImage(front, ox, oy);
     if (stock) drawStock(ctx, stock, t, ox, oy);
+    if (env) reflections(ctx, env, t, ox, oy);
     // Everything that stands, in order of its feet.
     var f = R.walkers(st, T, ox, oy - 0 + TOP), fr = R.frames(st);
     order.length = 0;
@@ -427,7 +455,7 @@ G.ui.shopRoom = (function () {
       var bi = -1, by = 1e9;
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
-      if (id < 100) ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y);
+      if (id < 100) { ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y); if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y, t, env); }
       else if (id === 100) R.drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 16, oy + ty(3) - 2);
       else if (id === 101) R.drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
       else R.drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
@@ -439,5 +467,7 @@ G.ui.shopRoom = (function () {
 
   return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, TOP: TOP, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,
     create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: R.prebake,
-    bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; } };
+    bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
+    // Phase 64 (dbg.roomLife): the live things in the room.
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', live: n, things: ['lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
 })();
