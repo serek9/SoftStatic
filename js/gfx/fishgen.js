@@ -769,7 +769,11 @@ G.gfx.fishgen = (function () {
   //   fins          edge fins {k: dorsal|anal|adipose, a (rear), b (front), h, prof, rays, spiny,
   //                 lean, ramp?, spot?, mottle?} and fan fins {k: pectoral|pelvic, x, v, ang (deg:
   //                 90 down, 180 back), len, spread (deg), prof (lower edge to upper), rays, front}
-  //   marks         bars, saddles, stripes, band, spots, blotch (markAt below)
+  //                 Phase 71, any fin and the tail: lead [key, key2, side] a leading edge (a char's
+  //                 white then dark: the first px, the next; side 1 for a fan fin's upper edge),
+  //                 speck {key, cell, n, seed} spots on the fin, one at most per cell px square
+  //   head.teeth    Phase 71: a key for the teeth along an open mouth's upper jaw (a spawning salmon)
+  //   marks         bars, saddles, stripes, band, spots (halo?), blotch, worms (markAt below)
   // paintSpec returns the key grid (pure: no canvas, so tools/balance.js --validate runs it);
   // bakeSpec turns it into a canvas. The frames (FR) foreshorten as paintLook's do.
   function looksData() { return G.data.fishLooks || {}; }
@@ -851,6 +855,8 @@ G.gfx.fishgen = (function () {
             if (away) n -= 1;
             var key = fk(tailR, n);
             if (T.tip && dy > 0 && u > 0.55 && (smax - s) * T.len * Lp < 3.2) key = T.tip;
+            if (T.speck && s > 0.12 && n >= 1 && speckAt(T.speck, px, py)) key = T.speck.key;
+            if (T.lead && (smax - s) * T.len * Lp * tc < 1.2) key = T.lead[0];
             put(p, key, 1);
           }
         }
@@ -877,6 +883,8 @@ G.gfx.fishgen = (function () {
           var key2 = fk(fr2, away ? nn - 1 : nn);
           if (f.spot && t >= f.spot[0] && t <= f.spot[1] && d / Math.max(1e-6, hm) >= f.spot[2] && d / Math.max(1e-6, hm) <= f.spot[3]) key2 = f.spot[4];
           if (f.mottle && nn === 2 && h2(px >> 1, py >> 1) < 0.3) key2 = f.mottle;
+          if (f.speck && nn >= 0 && d > 1.2 / Lp && speckAt(f.speck, px, py)) key2 = f.speck.key;
+          if (f.lead && d > 1 / Lp) { var dl = t * span * Lp * sq; if (dl < 1.3) key2 = f.lead[0]; else if (f.lead[1] && dl < 2.6) key2 = f.lead[1]; }
           put(p2, key2, 1);
         }
       } else if (!f.front) fanFin(f, fr2, false);
@@ -946,7 +954,7 @@ G.gfx.fishgen = (function () {
     for (i = 0; i <= mn; i++) {
       var mxx = Math.round(mx0 + (mx1 - mx0) * i / mn), myy = Math.round(my0 + (my1 - my0) * i / mn);
       // An open mouth (gape px at the snout) closes to nothing at its corner.
-      for (var gp = 0, gn = Math.round((M[3] || 0) * (1 - i / mn) * Lp / 70); gp <= gn; gp++) if (kind[(myy + gp) * W + mxx] === 2) g[(myy + gp) * W + mxx] = L.ramp[0];
+      for (var gp = 0, gn = Math.round((M[3] || 0) * (1 - i / mn) * Lp / 70); gp <= gn; gp++) if (kind[(myy + gp) * W + mxx] === 2) g[(myy + gp) * W + mxx] = H0.teeth && gn >= 2 && gp === 1 && (i & 1) === 0 ? H0.teeth : L.ramp[0];
       if (H0.lip && i > mn * 0.45 && kind[(myy - 1) * W + mxx] === 2) g[(myy - 1) * W + mxx] = fk(L.ramp, L.ramp.length - 2);
     }
     // The eye: a dark rim, the iris, the pupil a little forward, a highlight.
@@ -982,6 +990,8 @@ G.gfx.fishgen = (function () {
         if (roll && front) nn2 = Math.min(3, nn2 + 1);
         var key3 = fk(fr3, away && !front ? nn2 - 1 : nn2);
         if (front && nn2 === 3 && kind[p5] === 2 && idx[p5] >= 0 && f.clear) key3 = rmp[p5][Math.min(rmp[p5].length - 1, idx[p5] + 1)];
+        if (f.speck && r > 2 && speckAt(f.speck, xx2, yy2)) key3 = f.speck.key;
+        if (f.lead && r > 1.5) { var dl2 = (f.lead[2] ? f.spread / 2 - phi : phi + f.spread / 2) * D2R * r; if (dl2 < 1.2) key3 = f.lead[0]; else if (f.lead[1] && dl2 < 2.4) key3 = f.lead[1]; }
         put(p5, key3, front ? 3 : 1);
       }
     }
@@ -1001,7 +1011,8 @@ G.gfx.fishgen = (function () {
   // Markings: how many keys darker (negative) or lighter this body point is, or a key to paint.
   // bars {xs, w, v0, v1, taper, slant, d}; saddles (the same, ragged); stripes {vs, w (px), x0,
   // x1, broken, dots, d}; band {v0, v1, x0, x1, jag, d}; spots {n, x0, x1, v0, v1, r (px), seed,
-  // d|key}; blotch {x, v, rx, ry (body lengths, depths), d|key}.
+  // d|key, halo? a key ringing each spot}; blotch {x, v, rx, ry (body lengths, depths), d|key};
+  // worms {x0, x1, v0, v1, sc (px), w, ph, d|key} (Phase 71).
   var spotCache = {};
   function markAt(marks, X, v, px, py, bodyPx, Lp) {
     var out = 0;
@@ -1025,11 +1036,20 @@ G.gfx.fishgen = (function () {
         var jg = (mk.jag || 0) * (h2((px / 2) | 0, m) - 0.5), jg2 = (mk.jag || 0) * (h2((px / 2) | 0, m + 5) - 0.5);
         hit = v >= mk.v0 + jg && v <= mk.v1 + jg2;
       } else if (mk.k === 'spots') {
-        var pts = spotCache[mk.seed] || (spotCache[mk.seed] = spotList(mk));
+        var ck = mk.seed + ':' + mk.n + ':' + mk.x0 + ':' + mk.x1 + ':' + mk.v0 + ':' + mk.v1 + ':' + mk.r;
+        var pts = spotCache[ck] || (spotCache[ck] = spotList(mk)), ring = false;
         for (var q = 0; q < pts.length && !hit; q++) {
-          var dx = (X - pts[q][0]) * Lp, dv = (v - pts[q][1]) * bodyPx;
-          if (dx * dx + dv * dv <= pts[q][2] * pts[q][2]) hit = true;
+          var dx = (X - pts[q][0]) * Lp, dv = (v - pts[q][1]) * bodyPx, d2 = dx * dx + dv * dv;
+          if (d2 <= pts[q][2] * pts[q][2]) hit = true;
+          else if (mk.halo && d2 <= (pts[q][2] + 1.1) * (pts[q][2] + 1.1)) ring = true;
         }
+        if (!hit && ring) return mk.halo;
+      } else if (mk.k === 'worms') {
+        // Vermiculation: wavy worm-tracks, the zero lines of two crossed warped waves (a brook
+        // trout's back, a tiger trout all over). sc is the tracks' spacing in px, w their width.
+        if (X < mk.x0 || X > mk.x1 || v < mk.v0 || v > mk.v1) continue;
+        var sc = mk.sc || 4, wv = Math.sin(px / sc * 1.3 + 1.6 * Math.sin(py / sc * 0.9 + (mk.ph || 0))) + Math.sin(py / sc * 1.1 + 1.6 * Math.sin(px / sc * 0.8 + 1.3));
+        hit = Math.abs(wv) < (mk.w || 0.35);
       } else if (mk.k === 'blotch') {
         var bx = (X - mk.x) / mk.rx, bv = (v - mk.v) / mk.ry;
         hit = bx * bx + bv * bv <= 1;
@@ -1037,6 +1057,12 @@ G.gfx.fishgen = (function () {
       if (hit) { if (mk.key) return mk.key; out += mk.d; }
     }
     return out;
+  }
+  // Phase 71: spots on a fin, one at most per cell (px), at a hashed place in it (deliberate dots, never noise).
+  function speckAt(sk, px, py) {
+    var c = sk.cell || 4, cx = Math.floor(px / c), cy = Math.floor(py / c), sd = sk.seed || 0;
+    if (h2(cx + sd, cy * 3 + 1) >= (sk.n || 0.5)) return false;
+    return px - cx * c === Math.floor(h2(cx * 7 + sd, cy) * c) && py - cy * c === Math.floor(h2(cy * 5, cx + sd + 2) * c);
   }
   // Spots: seeded positions (x in body lengths, v in depth) and a radius in px.
   function spotList(mk) {

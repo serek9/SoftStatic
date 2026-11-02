@@ -58,8 +58,10 @@ function validateLooks(G, err) {
     if (!L.tail || !num(L.tail.len) || !num(L.tail.spread)) err('fishlook ' + id + ': tail len, spread');
     if (!Array.isArray(L.fin) || L.fin.length !== 4) err('fishlook ' + id + ': fin ramp of 4 keys');
     if (!Array.isArray(L.fins) || !L.fins.length) err('fishlook ' + id + ': fins');
-    keysIn({ ramp: L.ramp, fin: L.fin, iris: L.head && L.head.iris, rim: L.head && L.head.rim, tail: L.tail && [L.tail.ramp || [], L.tail.tip || []],
-      zones: (L.zones || []).map(z => z.ramp), fins: (L.fins || []).map(f => [f.ramp || [], f.mottle || [], f.spot ? f.spot[4] : []]), marks: (L.marks || []).map(m => m.key || []) }, 'keys', id);
+    keysIn({ ramp: L.ramp, fin: L.fin, iris: L.head && L.head.iris, rim: L.head && L.head.rim, teeth: (L.head && L.head.teeth) || [], // teeth, lead, speck, halo: Phase 71
+      tail: L.tail && [L.tail.ramp || [], L.tail.tip || [], L.tail.lead || [], L.tail.speck ? L.tail.speck.key : []],
+      zones: (L.zones || []).map(z => z.ramp), fins: (L.fins || []).map(f => [f.ramp || [], f.mottle || [], f.spot ? f.spot[4] : [], (f.lead || []).filter(x => typeof x === 'string'), f.speck ? f.speck.key : []]),
+      marks: (L.marks || []).map(m => [m.key || [], m.halo || []]) }, 'keys', id);
     try {
       const g = FG.paintFit(id, L, 1e4, 1e4), wh = FG.cropSize(g), w = wh[0], h = wh[1];
       sizes.push(id + ' ' + w + 'x' + h);
