@@ -1191,7 +1191,7 @@ Phase 73 checks: `--validate` OK (with the lure-art checks of 8.3 #395; the `lur
 
 ### 8.6 Next task
 
-**PLAN_SPECIES.md is done** (Phases 68–73): the 59 real species, the 23 lures and their art. No phase is planned after it; the next one is whatever the user asks for. Waiting on the user: #45 (the 59 painted fish) and #46 (the 23 lures' art, the gallery's `lures` and `lure swim` pages) against the reference icons, both data-only changes; #34 (play it on a real phone); and the watches of 8.4. PLAN_SPECIES.md 1 and 3.2 leave for later an ice water for the "(Ice)" entries and the sea and big river for the 16 waiting species.
+**Phase 74: Nine waters on the chart**, in [PLAN_WATERS.md](PLAN_WATERS.md) (Phases 74–79: the six new waters, a pier with the bait shop in every water, the Red Room retired, and each species' homes by water, reach, depth and hour, asked for on 2026-11-02), when the user says to start it. PLAN_SPECIES.md is done (Phases 68–73): the 59 real species, the 23 lures and their art. Waiting on the user: #45 (the 59 painted fish) and #46 (the 23 lures' art, the gallery's `lures` and `lure swim` pages) against the reference icons, both data-only changes; #34 (play it on a real phone); and the watches of 8.4. PLAN_SPECIES.md 1 and 3.2 leave for later an ice water for the "(Ice)" entries.
 
 ---
 
