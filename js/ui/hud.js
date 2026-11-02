@@ -21,6 +21,9 @@ G.ui.hud = (function () {
   // Phase 43: a short note under the bait (a lure lost), shown for NOTE s.
   var NOTE = 4, note = '', noteT = 0;
   function say(s) { note = s; noteT = NOTE; idle = 0; }
+  // Phase 75 (PLAN_WATERS.md 4.2): the reach's name, quietly at the top centre for REACH s when
+  // the boat crosses into one (or arrives at a water), fading in and out.
+  var REACH = 3.5, reachAt = '', reachName = '', reachT = 0, reachW = 0;
 
   function update(dt, run) {
     var save = G.state.save;
@@ -29,6 +32,16 @@ G.ui.hud = (function () {
     if (G.core.input.pressed('still')) still = !still;
     if (G.core.input.any() || run.fsm !== 'sailing' || save.coins !== seenCoins || run.gearFx.bait !== seenBait) idle = 0;
     seenCoins = save.coins; seenBait = run.gearFx.bait;
+    if (reachT > 0) reachT -= dt;
+    var L = run.loc && G.data.locations[run.loc];
+    if (L && run.boat) {
+      var rid = run.loc + ':' + G.data.reachAt(L, run.boat.x);
+      if (rid !== reachAt) {
+        reachAt = rid; reachT = REACH;
+        for (var i = 0; i < L.reaches.length; i++) if (run.loc + ':' + L.reaches[i].id === rid) reachName = L.reaches[i].name;
+        reachW = F.measure(reachName);
+      }
+    }
   }
 
   // 1 while the HUD shows, falling to 0 as it fades.
@@ -129,6 +142,7 @@ G.ui.hud = (function () {
       ctx.globalAlpha = 1;
     }
     if (noteT > 0) { ctx.globalAlpha = Math.min(1, noteT); label(ctx, note, X, Y + 28, 'paper'); ctx.globalAlpha = 1; }
+    if (reachT > 0 && reachName) { ctx.globalAlpha = Math.min(1, reachT, (REACH - reachT) * 2) * 0.9; label(ctx, reachName, 320 - (reachW >> 1), Y + 22, 'bone'); ctx.globalAlpha = 1; } // Phase 75
 
     if (G.scene.underwater.UNDER[run.fsm]) {
       if (run.gearFx.depthBands && run.uw.alpha >= 1) drawBands(ctx, run, waterY, run.gearFx.depthBands);
@@ -248,7 +262,7 @@ G.ui.hud = (function () {
     return { clock: clockStr, coins: coinStr, bait: baitStr, depth: G.scene.underwater.UNDER[G.state.run.fsm] ? depthStr : '' };
   }
 
-  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, alpha: alpha, drawButtons: drawButtons, word: word,
+  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, reach: function () { return { name: reachName, shown: reachT > 0 }; }, alpha: alpha, drawButtons: drawButtons, word: word,
     // Phase 60.2: the touch layout's pieces for the gallery's touch page.
     touchParts: { keyBox: keyBox, arrow: arrow, round: roundImg }, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

@@ -9,6 +9,7 @@
 //                                                 and time away are gone)
 //   node tools/balance.js --fight                 how fights end by player and gear tier (Phase 23)
 //   node tools/balance.js --rod                   the rod's bend: shapes, action, springing (PLAN_ROD.md)
+//   node tools/balance.js --homes                 where each species lives, against PLAN_WATERS.md §3 (Phase 75)
 // It loads the same files index.html loads, in the same order, into a vm context.
 'use strict';
 const vm = require('vm'), fs = require('fs'), path = require('path');
@@ -237,6 +238,18 @@ function validate(G, opts) {
     if (!lureWaters[l].length) err('lure ' + l + ': nothing in any water takes it on any rod');
   });
   d.fish.forEach(f => { if (f.locations.length && Object.keys(f.lureTypes).length && !lureIds.some(l => !g.lures.find(x => x.id === l).carries && G.sim.fish_ai.interest(f, l, true) > 0)) err('fish ' + f.id + ': no lure fits its types and its size'); });
+  // Phase 75: every reach of every water holds three species or more, each of which something
+  // sold takes there (a lure that fits its type and size, or, for one that ignores lures, a
+  // live bait), and some lure takes something in it.
+  for (const id in d.locations) for (const R of d.locations[id].reaches || []) {
+    const here = d.fish.filter(f => d.homeOf(f, id, R.id)), q = 'reach ' + id + ':' + R.id + ': ';
+    if (here.length < 3) err(q + here.length + ' species (want 3 or more)');
+    here.forEach(f => {
+      const lured = lureIds.some(l => !g.lures.find(x => x.id === l).carries && G.sim.fish_ai.interest(f, l, true) > 0);
+      if (!lured && !(Object.keys(f.lureTypes).length === 0 && f.baitLikes.some(b => g.baits.some(x => x.id === b)))) err(q + f.id + ' is taken by nothing sold');
+    });
+    if (!lureIds.some(l => here.some(f => G.sim.fish_ai.interest(f, l, true) > 0))) err(q + 'no lure takes anything here');
+  }
   lureInfo = 'lures by water: ' + Object.keys(d.locations).map(w => w + ' ' + lureIds.filter(l => lureWaters[l].includes(w)).length).join(', ') + ' (of ' + lureIds.length + ')';
   // Phase 47: the looks (four fishers, four dogs): their shapes and every key in the palette.
   if (d.looks) d.validateLooks(d.looks, PAL).forEach(e => err('look ' + e));
@@ -390,7 +403,7 @@ function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
   const save = G.core.save.defaults();
   const school = S.fish_ai.createSchool(data), bite = S.bite.create(), fight = S.fight.create();
-  const fx = {}, lure = { active: false, x: P.lureX, y: 0, bait: 'worm' }, latched = {};
+  const fx = {}, lure = { active: false, x: (opts && opts.x) || P.lureX, y: 0, bait: 'worm' }, latched = {}; // Phase 75: --tackle fishes each reach (opts.x)
   const uIn = { loc: 'fog', still: true, atShop: false }, bIn = { reel: false, auto: false }, fIn = { reel: false };
   Object.assign(school.ctx, { loc: 'fog', maxDepthPx: data.locations.fog.maxDepth, latched });
   const st = { phase: 'cast', t: 0, time: 0, hash: 7, catches: 0, attempts: 0, events: [], plan: 0, hookUid: 0, willHook: false, cur: null, mix: {}, coinsAt: [],
@@ -457,7 +470,7 @@ function session(G, seed, opts) {
           topUp();
           if (!opts) modelBait();
           lure.active = true; lure.y = 0; lure.bait = S.economy.useBait(save, data);
-          st.depthM = P.depthAt[st.loc];
+          st.depthM = (opts && opts.depthM) || P.depthAt[st.loc];
           S.economy.effects(save, data, fx);
           // a lure fishes its own depth: fish rise to a surface lure; the player reels a plug down to its depth
           if (fx.lure) st.depthM = fx.swim === 'top' ? fx.topDepthM : Math.min(st.depthM, fx.maxDepthM);
@@ -526,27 +539,38 @@ function session(G, seed, opts) {
 // their top sizes, so the big waters' lures are measured against their minnows). The
 // waters run in processes at once (--tackle-water w prints one water's numbers as JSON).
 
+// Phase 75: each reach of a water is fished on its own and a hook is judged by its best reach
+// there (tackleReaches below); the table shows that reach's numbers.
 // Phase 74: nine waters, each with the rod of its stage (by cost: the fibreglass at Fogbound,
 // the graphite at the creek and Copperbend, the lacquered at the Pines, Hartsmere and
 // Stonehorn, the long rod at Russetwood and the seas).
 const TACKLE_WATERS = { fog: 1, creek: 2, copper: 2, pines: 3, harts: 3, stone: 3, russet: 4, sound: 4, wreck: 4 };
 function tackleHooks(d) { return ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)); }
-function tackleFishes(G, hk, w) {
-  const d = G.data, L = d.gear.lures.find(l => l.id === hk);
-  if (!L) return true;
-  return d.fish.some(f => f.locations.includes(w) && G.sim.fish_ai.interest(f, hk, true) > 0 && f.mass <= d.gear.rods[TACKLE_WATERS[w]].maxMass);
+// Phase 75: a water is fished reach by reach (each at its middle), and a hook is judged at a
+// water by its best reach, as a player fishes it where it works. In each reach it is fished at
+// the depth its takers live at (the median of the middles of their homes' depths there; the
+// lure's own depth limits still apply), so a heavy bladebait is fished on the halibut's bed and
+// a float near the top. A hook fishes a reach if something living there takes it on that
+// stage's rod.
+function tackleTakers(G, hk, w, reach) {
+  const d = G.data, lure = d.gear.lures.some(l => l.id === hk), max = d.gear.rods[TACKLE_WATERS[w]].maxMass;
+  return d.fish.map(f => [f, d.homeOf(f, w, reach)]).filter(([f, h]) => h && f.mass <= max && G.sim.fish_ai.interest(f, hk, lure) > 0);
 }
 function tackleWater(w) {
-  const G = load(), d = G.data, out = {};
+  const G = load(), d = G.data, L = d.locations[w], out = {};
   for (const hk of tackleHooks(d)) {
-    if (!tackleFishes(G, hk, w)) continue;
-    let coins = 0, catches = 0;
-    for (let sd = 1; sd <= 4; sd++) {
-      const s = session(G, sd * 97, { stay: true, shop: false, loc: w, rod: TACKLE_WATERS[w], bait: hk, unseen: true }); // Phase 53: the line out of the picture
-      const c0 = s.save.coins; s.run(3600);
-      coins += s.save.coins - c0 - s.st.spent; catches += s.st.catches;
+    for (const R of L.reaches) {
+      const tk = tackleTakers(G, hk, w, R.id);
+      if (!tk.length) continue;
+      const mids = tk.map(([f, h]) => (h.depth[0] + h.depth[1]) / 2).sort((a, b) => a - b), depthM = Math.min(L.maxDepth / 4 - 0.5, mids[mids.length >> 1]);
+      let coins = 0, catches = 0;
+      for (let sd = 1; sd <= 4; sd++) {
+        const s = session(G, sd * 97, { stay: true, shop: false, loc: w, rod: TACKLE_WATERS[w], bait: hk, unseen: true, x: Math.round((R.x[0] + R.x[1]) / 2), depthM }); // Phase 53: the line out of the picture
+        const c0 = s.save.coins; s.run(3600);
+        coins += s.save.coins - c0 - s.st.spent; catches += s.st.catches;
+      }
+      if (!out[hk] || coins / 4 > out[hk].coins) out[hk] = { coins: coins / 4, catches: catches / 4, reach: R.id, depthM };
     }
-    out[hk] = { coins: coins / 4, catches: catches / 4 };
   }
   return out;
 }
@@ -569,8 +593,8 @@ function tackleCheck() {
       const ws = Object.keys(TACKLE_WATERS).filter(w => res[w][l.id]);
       if (!ws.length) { bad++; console.log('FAIL ' + l.id + ' fishes no water on its stage\'s rod'); }
       for (const w of ws) {
-        const best = Math.max(...['worm', 'cricket', 'minnow'].map(b => res[w][b].coins)), c = res[w][l.id].coins;
-        const r = c / Math.max(1, res[w].worm.coins), rb = c / Math.max(1, best);
+        const best = Math.max(...['worm', 'cricket', 'minnow'].map(b => res[w][b] ? res[w][b].coins : -Infinity)), c = res[w][l.id].coins; // Phase 75: a bait nothing here takes is not fished
+        const r = c / Math.max(1, res[w].worm ? res[w].worm.coins : 1), rb = c / Math.max(1, best);
         lo = Math.min(lo, r); hi = Math.max(hi, rb);
         if (r < 0.5) { bad++; console.log('FAIL ' + l.id + ' at ' + w + ': ' + (100 * r).toFixed(0) + '% of worms'); }
         if (rb > 2) { bad++; console.log('FAIL ' + l.id + ' at ' + w + ': ' + (100 * rb).toFixed(0) + '% of the best live bait'); }
@@ -579,6 +603,72 @@ function tackleCheck() {
     console.log((bad ? 'FAIL' : 'PASS') + ' every lure (' + d.gear.lures.length + ') fishes some water, and earns 50%+ of worms and at most 200% of the best live bait at every water it fishes (lowest ' + (100 * lo).toFixed(0) + '% of worms, highest ' + (100 * hi).toFixed(0) + '% of the best bait)');
     return bad ? 1 : 0;
   });
+}
+
+// ---- --homes (Phase 75) ---------------------------------------------------------------------
+// PLAN_WATERS.md §3 placed every species by water, reach, depth and hour. This prints those
+// tables from the data (fish.js homes) and checks them against the plan's, row by row: the
+// same species in the same reaches, at the same depths, on the bottom or not, at the same hours.
+function homesCheck() {
+  const G = load(), d = G.data;
+  const md = fs.readFileSync(path.join(ROOT, 'PLAN_WATERS.md'), 'utf8');
+  const sec = md.slice(md.indexOf('## 3. Where each species lives'), md.indexOf('## 4. Design'));
+  const byName = n => {
+    n = n.replace(/\(.*?\)/g, '').trim();
+    return d.fish.find(f => f.name === n) || d.fish.find(f => f.name.startsWith(n + ' ')) || null;
+  };
+  const hoursOf = s => s.trim() === 'any' ? [] : s.split(/[,\/]/).map(x => x.trim()).filter(Boolean).sort();
+  const depthOf = s => { const m = s.match(/([\d.]+)–([\d.]+) m/) || s.match(/([\d.]+)–([\d.]+)/); return m ? [+m[1], +m[2]] : null; };
+  const plan = [], probs = [];
+  let water = null, reach = '*';
+  for (const line of sec.split('\n')) {
+    const hd = line.match(/^### (.+?) \(/);
+    if (hd) { water = Object.values(d.locations).find(L => L.name === hd[1]); reach = '*'; if (!water) probs.push('unknown water in the plan: ' + hd[1]); continue; }
+    if (!water) continue;
+    if (line.startsWith('|')) {
+      const c = line.split('|').slice(1, -1).map(x => x.trim());
+      if (c[0] === 'Species' || c[0] === 'Reach' || /^-+$/.test(c[0])) continue;
+      let sp, dep, when;
+      if (c.length === 4) { if (c[0]) { const r = water.reaches.find(x => x.name === c[0]); if (!r) probs.push('unknown reach ' + c[0]); reach = r ? r.id : '?'; } [sp, dep, when] = c.slice(1); }
+      else [sp, dep, when] = c;
+      plan.push({ w: water.id, r: reach, sp, dep, when });
+    } else if (line.includes(' · ')) {
+      for (let item of line.replace(/\.\s*\(.*$/, '').replace(/\.$/, '').split(' · ')) {
+        const m = item.trim().match(/^(.+?) ([\d.]+–[\d.]+)( bed,)? (.+)$/);
+        if (!m) { probs.push('cannot read "' + item + '"'); continue; }
+        plan.push({ w: water.id, r: '*', sp: m[1], dep: m[2] + (m[3] ? ', bed' : ''), when: m[4] });
+      }
+    }
+  }
+  const key = (w, r, id) => w + ' ' + r + ' ' + id, want = {};
+  for (const p of plan) {
+    const f = byName(p.sp);
+    if (!f) { probs.push('plan names an unknown species: ' + p.sp); continue; }
+    want[key(p.w, p.r, f.id)] = { depth: depthOf(p.dep), bed: /bed/.test(p.dep), hours: hoursOf(p.when) };
+  }
+  const have = {};
+  for (const f of d.fish) for (const h of f.homes) for (const r of (h.reaches.length ? h.reaches : ['*'])) have[key(h.loc, r, f.id)] = { depth: h.depth, bed: !!h.bed, hours: h.hours.slice().sort() };
+  for (const k in want) {
+    const a = want[k], b = have[k];
+    if (!b) { probs.push('in the plan, not in the data: ' + k); continue; }
+    if (a.depth[0] !== b.depth[0] || a.depth[1] !== b.depth[1] || a.bed !== b.bed || a.hours.join() !== b.hours.join()) probs.push(k + ': plan ' + JSON.stringify(a) + ', data ' + JSON.stringify(b));
+  }
+  for (const k in have) if (!want[k]) probs.push('in the data, not in the plan: ' + k);
+  // The tables, from the data.
+  for (const id in d.locations) {
+    const L = d.locations[id];
+    console.log('\n' + L.name + ' (' + L.maxDepth / 4 + ' m, ' + L.water + ')');
+    for (const R of L.reaches) {
+      const rows = [];
+      for (const f of d.fish) for (const h of f.homes) if (h.loc === id && (!h.reaches.length || h.reaches.includes(R.id))) rows.push('  ' + (L.reaches.length > 1 ? R.name.padEnd(16) : '') + f.name.padEnd(22) + (h.depth[0] + '-' + h.depth[1] + ' m' + (h.bed ? ', bed' : '')).padEnd(14) + (h.hours.join(', ') || 'any'));
+      rows.forEach(r => console.log(r));
+    }
+  }
+  const unplaced = d.fish.filter(f => !f.homes.length).map(f => f.id);
+  console.log('\n' + Object.keys(want).length + ' plan rows, ' + Object.keys(have).length + ' data rows, ' + d.fish.length + ' species' + (unplaced.length ? ', unplaced: ' + unplaced.join(', ') : ', every one placed'));
+  probs.forEach(p => console.log('FAIL ' + p));
+  console.log((probs.length || unplaced.length ? 'FAIL' : 'PASS') + ' the data matches PLAN_WATERS.md §3 (' + probs.length + ' difference(s))');
+  return probs.length || unplaced.length ? 1 : 0;
 }
 
 // ---- --replay -----------------------------------------------------------------------------
@@ -1017,9 +1107,10 @@ if (require.main === module) {
   if (args.includes('--passive')) code = passiveCheck() || code;
   if (args.includes('--fight')) code = fightCheck() || code;
   if (args.includes('--rod')) code = rodCheck() || code;
+  if (args.includes('--homes')) code = homesCheck() || code; // Phase 75
   if (args.includes('--tackle-water')) { console.log(JSON.stringify(tackleWater(args[args.indexOf('--tackle-water') + 1]))); process.exit(0); }
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --replay <seed> [minutes]');
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --replay <seed> [minutes]');
     code = 2;
   }
   if (args.includes('--tackle')) tackleCheck().then(c => process.exit(c || code), e => { console.log('FAIL --tackle: ' + e.message); process.exit(1); }); // Phase 69: in four processes

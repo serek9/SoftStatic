@@ -55,17 +55,19 @@ G.sim.fish_ai = (function () {
   // ---- Species selection ------------------------------------------------------------
 
   // Phase 68: every species that lives here starts at 1; what is on the hook (2 its favourite,
-  // 1 taken, 0 ignored), the depth and the hour weigh it from there.
+  // 1 taken, 0 ignored), the depth and the hour weigh it from there. Phase 75: "here" is its
+  // home in this water and reach (G.data.homeOf), whose depth and hours it weighs by.
   function weightOf(f, ctx) {
-    if (f.locations.indexOf(ctx.loc) < 0) return 0;
+    var hm = G.data.homeOf(f, ctx.loc, ctx.reach);
+    if (!hm) return 0;
     var v = TAKE_W[interest(f, ctx.bait, ctx.lure)];
     if (!v) return 0;
     if (ctx.smallBoost && f.mass <= ctx.smallMass) v *= ctx.smallBoost;             // Phase 43: the ultralight rod
     if (ctx.depthM !== null) {
-      var h = f.habitat, out = ctx.depthM < h.depthMin ? h.depthMin - ctx.depthM : (ctx.depthM > h.depthMax ? ctx.depthM - h.depthMax : 0);
+      var h = hm.habitat, out = ctx.depthM < h.depthMin ? h.depthMin - ctx.depthM : (ctx.depthM > h.depthMax ? ctx.depthM - h.depthMax : 0);
       if (out > 0) v *= Math.max(W.depthFloor, 1 - out / W.depthFalloff);
     }
-    if (f.timeLikes.length) v *= f.timeLikes.indexOf(Math.floor(ctx.hour)) >= 0 ? W.hourLiked : W.hourOther;
+    if (hm.timeLikes.length) v *= hm.timeLikes.indexOf(Math.floor(ctx.hour)) >= 0 ? W.hourLiked : W.hourOther;
     full = v;
     if (COVER[0] < 1) v *= Math.pow(COVER[0], W.coverK);                                // Phase 69: only the fish of its sizes come
     return v;
@@ -102,7 +104,7 @@ G.sim.fish_ai = (function () {
     var s = {
       fish: [], spawnT: 0, uid: 0,
       ctx: {
-        species: data.fish, windows: data.windows, loc: '', depthM: null, hour: 0,
+        species: data.fish, windows: data.windows, loc: '', reach: '', depthM: null, hour: 0, // reach: Phase 75, set from the lure's x (stepSchool)
         unease: 0, bait: '', latched: {}, rodMaxMass: 0, weights: null, tooHeavyNear: false,
         lineSeen: true, // Phase 53: a line-shy species (fish.lineShy) sees this line and will not bite
         attract: 1, // gear and cast spot: attract shortens the wait between arrivals
@@ -114,7 +116,7 @@ G.sim.fish_ai = (function () {
     for (var i = 0; i < MAX; i++) {
       s.fish.push({ active: false, uid: 0, sp: -1, x: 0, y: 0, vx: 0, vy: 0, home: 0, dir: 1,
         state: 'wander', t: 0, turnT: 0, circles: 0, ang: 0, swept: 0, nibbles: 0, nibbleN: 0, nibbleT: 0, nibbleLen: 0, missed: 0,
-        yaw: 0, pitch: 0, spd: 0, back: 0, face: 1, gl: 0, glT: 0, bursts: 0, flow: 0, shied: 0 }); // Phase 28; shied: Phase 53
+        yaw: 0, pitch: 0, spd: 0, back: 0, face: 1, gl: 0, glT: 0, bursts: 0, flow: 0, shied: 0, hab: null }); // Phase 28; shied: Phase 53; hab: Phase 75
     }
     return s;
   }
@@ -124,6 +126,16 @@ G.sim.fish_ai = (function () {
     return c.floorAt ? c.floorAt(x) : c.maxDepthPx;
   }
 
+  // Phase 75: a species' home in the school's water and reach (any of its homes there if the
+  // reach has none, so a fish that swims across a reach's edge keeps a home).
+  var ANY_HOME = { habitat: { depthMin: 0, depthMax: 1e9 }, timeLikes: [], bed: false };
+  function homeHere(school, sp) {
+    var c = school.ctx;
+    return G.data.homeOf(sp, c.loc, c.reach) || G.data.homeOf(sp, c.loc, '') || ANY_HOME;
+  }
+  // Phase 75: a bottom fish's depth: 1-4 px (a metre) over the bed under it.
+  function bedDepth(school, f, rng) { return clampDepth(school, f, floor(school, f.x) - rng.range(1, 4)); }
+
   function clampDepth(school, f, y) {
     var lo = 3, hi = floor(school, f.x) - 2;
     return y < lo ? lo : (y > hi ? hi : y);
@@ -132,15 +144,16 @@ G.sim.fish_ai = (function () {
   function setState(f, s) { f.state = s; f.t = 0; }
 
   // Puts species sp in a free slot at (x, y). Returns the fish, or null if all 8 are taken.
+  // Phase 75: it keeps its home here (f.hab: its depths; bed: it stays by the bottom).
   function spawn(school, sp, x, y, dir, rng, data) {
     for (var i = 0; i < MAX; i++) {
       var f = school.fish[i];
       if (f.active) continue;
-      var h = data.fish[sp].habitat;
-      f.active = true; f.uid = ++school.uid; f.sp = sp;
+      var hb = homeHere(school, data.fish[sp]), h = hb.habitat;
+      f.active = true; f.uid = ++school.uid; f.sp = sp; f.hab = hb;
       f.x = x; f.y = y; f.vx = 0; f.vy = 0; f.dir = dir;
       f.yaw = dir >= 0 ? 0 : Math.PI; f.pitch = 0; f.spd = 0; f.back = 0; f.face = dir >= 0 ? 1 : -1; f.gl = 0; f.glT = 0; f.bursts = 0; f.flow = 0;
-      f.home = clampDepth(school, f, rng.range(h.depthMin, h.depthMax) * 4);
+      f.home = hb.bed ? bedDepth(school, f, rng) : clampDepth(school, f, rng.range(h.depthMin, h.depthMax) * 4);
       f.turnT = rng.range(2, 6); f.circles = 0; f.ang = 0; f.swept = 0; f.nibbles = 0; f.nibbleN = 0; f.nibbleT = 0; f.missed = 0; f.shied = 0;
       setState(f, 'wander');
       return f;
@@ -250,11 +263,11 @@ G.sim.fish_ai = (function () {
             // Near a lure, a wandering fish drifts toward it, and toward its depth when that
             // depth is inside the fish's habitat.
             if (rng.next() < A.drift) f.dir = dx >= 0 ? 1 : -1;
-            var lo = sp.habitat.depthMin * 4, hi = sp.habitat.depthMax * 4;
+            var lo = f.hab.habitat.depthMin * 4, hi = f.hab.habitat.depthMax * 4;
             f.home = clampDepth(school, f, (f.home + (lure.y < lo ? lo : (lure.y > hi ? hi : lure.y))) / 2 + rng.range(-3, 3));
           } else {
             if (rng.next() < 0.35) f.dir = -f.dir;
-            f.home = clampDepth(school, f, f.home + rng.range(-6, 6));
+            f.home = f.hab.bed ? bedDepth(school, f, rng) : clampDepth(school, f, f.home + rng.range(-6, 6));
           }
         }
         // In a current a fish not drawn to the lure faces into it: it swims upstream, or slips
@@ -332,6 +345,7 @@ G.sim.fish_ai = (function () {
 
   // The whole school for one fixed step: spawning near the lure, then every fish.
   function stepSchool(school, lure, dt, rng, data) {
+    school.ctx.reach = data.reachAt(data.locations[school.ctx.loc], lure.x); // Phase 75: the reach the lure is in
     if (lure.active) {
       school.spawnT -= dt;
       if (school.spawnT <= 0) {
@@ -340,8 +354,8 @@ G.sim.fish_ai = (function () {
           var sp = pickSpecies(school.ctx, rng);
           if (sp >= 0) {
             var side = rng.next() < 0.5 ? -1 : 1, x = lure.x + side * rng.range(A.spawnNear, A.spawnFar);
-            var h = data.fish[sp].habitat;
-            spawn(school, sp, x, rng.range(h.depthMin, h.depthMax) * 4, -side, rng, data);
+            var h = homeHere(school, data.fish[sp]).habitat;
+            spawn(school, sp, x, rng.range(h.depthMin, Math.min(h.depthMax, floor(school, x) / 4)) * 4, -side, rng, data);
           }
         }
       }

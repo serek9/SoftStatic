@@ -210,7 +210,7 @@ G.core.debug = (function () {
       var run = G.state.run, sp = -1;
       for (var i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === id) sp = i;
       if (sp < 0 || !run.lureIn.active) return false;
-      var h = G.data.fish[sp].habitat;
+      var hm = G.data.homeOf(G.data.fish[sp], run.school.ctx.loc, run.school.ctx.reach) || G.data.fish[sp].homes[0], h = hm.habitat; // Phase 75: its home here
       return !!G.sim.fish_ai.spawn(run.school, sp, run.lureIn.x - 60, (h.depthMin + h.depthMax) * 2, 1, G.rng, G.data);
     },
     // dbg.cast(charge) casts at once with charge 0..1 (default 0.3); returns the landing x.
@@ -326,21 +326,24 @@ G.core.debug = (function () {
     // dbg.who() (Phase 68): which species can bite here and now, from the same weights the
     // school spawns by (fish_ai.speciesWeights over the current cast's context): the water, the
     // lure's depth, the hour, what is on the hook and the rod. Each: {id, chance (share of the
-    // total), weight}; with tooHeavy, the species the rod cannot hold.
+    // total), weight}; with tooHeavy, the species the rod cannot hold. Phase 75: in the reach the
+    // lure is in (or the boat, with no line out), which it names.
     who: function () {
       var run = G.state.run, ctx = run.school && run.school.ctx;
       if (!ctx) return 'no school yet';
-      var c = { species: ctx.species, loc: ctx.loc || G.state.save.loc, depthM: run.lureIn && run.lureIn.active ? run.lureIn.y * 0.25 : null,
+      var lc = ctx.loc || G.state.save.loc, L = G.data.locations[lc], rx = run.lureIn && run.lureIn.active ? run.lureIn.x : run.boat.x, rid = G.data.reachAt(L, rx);
+      var rn = ''; (L.reaches || []).forEach(function (r) { if (r.id === rid) rn = r.name; });
+      var c = { species: ctx.species, loc: lc, reach: rid, depthM: run.lureIn && run.lureIn.active ? run.lureIn.y * 0.25 : null,
         hour: G.state.save.clock, bait: run.gearFx.bait, lure: run.gearFx.lure, rodMaxMass: run.gearFx.maxMass,
         smallBoost: run.gearFx.smallBoost, smallMass: run.gearFx.smallMass, weights: null };
       var total = G.sim.fish_ai.speciesWeights(c), out = [], heavy = [];
       for (var i = 0; i < c.species.length; i++) {
         var sp = c.species[i];
         if (c.weights[i] > 0) out.push({ id: sp.id, chance: +(c.weights[i] / total).toFixed(3), weight: +c.weights[i].toFixed(3) });
-        else if (sp.locations.indexOf(c.loc) >= 0 && sp.mass > c.rodMaxMass && G.sim.fish_ai.weightOf(sp, c) > 0) heavy.push(sp.id);
+        else if (G.data.homeOf(sp, c.loc, c.reach) && sp.mass > c.rodMaxMass && G.sim.fish_ai.weightOf(sp, c) > 0) heavy.push(sp.id);
       }
       out.sort(function (a, b) { return b.chance - a.chance; });
-      return { loc: c.loc, hook: c.bait, depthM: c.depthM, hour: +c.hour.toFixed(2), species: out, tooHeavy: heavy };
+      return { loc: c.loc, reach: rn, hook: c.bait, depthM: c.depthM, hour: +c.hour.toFixed(2), species: out, tooHeavy: heavy };
     },
     // dbg.fishBody(i) returns a swimmer's body (Phase 27): school slot i (0..7) or 'hook'.
     // face, turn (0 none, else 0..1 through it), beatHz, phase 0..1, glide, pitch (slope,
