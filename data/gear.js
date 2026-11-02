@@ -75,32 +75,31 @@ G.data.gear = {
   // (wide slow S-glides at maxDepthM). vary: 'rattle' (a bladebait: short sharp lifts that
   // shiver, dropping on a slack line) or 'kick' (a swimbait's paddle tail, beating with speed).
   // Costs are the reference's order at about 0.45 of its numbers (the Bobber 6, not free).
-  // look: the placeholder art until Phase 73: the old lure (or bait) it is drawn as, and
-  // palette keys swapped to tell it apart (the shop's icon and the sprite under water).
+  // Phase 73: each lure's art is its look in data/lurelooks.js (painted by js/gfx/luregen.js).
   lures: [
-    { id: 'bobber', name: 'Bobber', type: 'float', sizes: ['S', 'M'], cost: 6, pack: 2, attract: 1.2, swim: 'float', sink: 1, maxDepthM: 1.5, carries: 'worm', look: { base: 'bobber', swap: {} } },
-    { id: 'deep_bobber', name: 'Deep Bobber', type: 'float', sizes: ['S', 'M', 'L'], cost: 14, pack: 2, attract: 1.2, swim: 'float', sink: 1, maxDepthM: 5, carries: 'worm', look: { base: 'bobber', swap: { neon_red: 'teal', pink_hi: 'teal_lit', blood: 'moss_dark', crimson: 'teal_hi' } } },
-    { id: 'crankbait', name: 'Crankbait', type: 'crank', sizes: ['S', 'M'], cost: 7, pack: 2, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 1.5, look: { base: 'plug', swap: {} } },
-    { id: 'big_crankbait', name: 'Big Crankbait', type: 'crank', sizes: ['L', 'XL'], cost: 22, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 3, look: { base: 'plug', swap: { rust_hi: 'moss_hi', leaf_gold: 'moss_lit', rust_dark: 'moss_dark' } } },
-    { id: 'deep_crankbait', name: 'Deep Crankbait', type: 'crank', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 6, look: { base: 'plug', swap: { rust_hi: 'teal', leaf_gold: 'teal_hi', cream: 'teal_lit', rust_dark: 'stone_dark' } } },
-    { id: 'spinnerbait', name: 'Spinnerbait', type: 'spinner', sizes: ['S', 'M', 'L'], cost: 14, pack: 2, attract: 1.3, swim: 'mid', sink: 0.6, maxDepthM: 7, look: { base: 'spinner', swap: {} } },
-    { id: 'big_spinnerbait', name: 'Big Spinnerbait', type: 'spinner', sizes: ['XL', 'XXL'], cost: 27, pack: 1, attract: 1.3, swim: 'mid', sink: 0.8, maxDepthM: 10, look: { base: 'spinner', swap: { leaf_gold: 'chrome', brass_hi: 'chrome_lit', rust_hi: 'flame', rust: 'blood' } } },
-    { id: 'small_spoon', name: 'Small Spoonbait', type: 'spoon', sizes: ['S', 'M', 'L'], cost: 11, pack: 2, attract: 1.3, swim: 'flutter', sink: 1.4, maxDepthM: 99, look: { base: 'spoon', swap: {} } },
-    { id: 'heavy_spoon', name: 'Heavy Spoonbait', type: 'spoon', sizes: ['L', 'XL'], cost: 27, pack: 1, attract: 1.3, swim: 'flutter', sink: 1.8, maxDepthM: 99, look: { base: 'spoon', swap: { leaf_gold: 'chrome', brass_hi: 'chrome_lit', rust: 'stone' } } },
-    { id: 'huge_spoon', name: 'Huge Spoonbait', type: 'spoon', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'flutter', sink: 2.2, maxDepthM: 99, look: { base: 'spoon', swap: { leaf_gold: 'rust', brass_hi: 'flame', chrome_lit: 'signal_amber', neon_red: 'ink' } } },
-    { id: 'dropshot', name: 'Dropshot', type: 'dropshot', sizes: ['S', 'M', 'L'], cost: 22, pack: 1, attract: 1.25, swim: 'dropshot', sink: 1.6, maxDepthM: 99, dropM: 0.5, look: { base: 'grub', swap: { moss_lit: 'skin_hi', moss_hi: 'flesh', moss: 'flesh_dark' } } },
-    { id: 'heavy_dropshot', name: 'Heavy Dropshot', type: 'dropshot', sizes: ['XL', 'XXL'], cost: 45, pack: 1, attract: 1.25, swim: 'dropshot', sink: 2.2, maxDepthM: 99, dropM: 0.5, look: { base: 'grub', swap: { moss_lit: 'stone_lit', moss_hi: 'stone_hi', moss: 'stone' } } },
-    { id: 'wacky_worm', name: 'Wacky Worm', type: 'wacky', sizes: ['S', 'M', 'L'], cost: 14, pack: 2, attract: 1.25, swim: 'wacky', sink: 0.45, maxDepthM: 99, look: { base: 'grub', swap: {} } },
-    { id: 'jighead', name: 'Jighead', type: 'jighead', sizes: ['M', 'L', 'XL'], cost: 22, pack: 1, attract: 1.3, swim: 'lift', sink: 1.8, maxDepthM: 99, look: { base: 'jig', swap: {} } },
-    { id: 'deep_jighead', name: 'Deep Jighead', type: 'jighead', sizes: ['XL', 'XXL'], cost: 45, pack: 1, attract: 1.3, swim: 'lift', sink: 2.6, maxDepthM: 99, look: { base: 'jig', swap: { flame: 'teal_hi', rust: 'teal', rust_dark: 'moss_dark' } } },
-    { id: 'topwater', name: 'Topwater', type: 'topwater', sizes: ['S', 'M', 'L'], cost: 27, pack: 1, attract: 1.25, swim: 'top', sink: 0, maxDepthM: 0, look: { base: 'popper', swap: {} } },
-    { id: 'medium_blade', name: 'Medium Bladebait', type: 'blade', sizes: ['M', 'L'], cost: 14, pack: 2, attract: 1.3, swim: 'lift', vary: 'rattle', sink: 2, maxDepthM: 99, look: { base: 'spoon', swap: { leaf_gold: 'stone_hi', brass_hi: 'stone_lit', neon_red: 'ink' } } },
-    { id: 'large_blade', name: 'Large Bladebait', type: 'blade', sizes: ['L', 'XL'], cost: 27, pack: 1, attract: 1.3, swim: 'lift', vary: 'rattle', sink: 2.3, maxDepthM: 99, look: { base: 'spoon', swap: { leaf_gold: 'chrome', brass_hi: 'chrome_lit', rust: 'stone', neon_red: 'blood' } } },
-    { id: 'heavy_blade', name: 'Heavy Bladebait', type: 'blade', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'lift', vary: 'rattle', sink: 2.6, maxDepthM: 99, look: { base: 'spoon', swap: { leaf_gold: 'stone', brass_hi: 'stone_hi', rust: 'stone_dark', neon_red: 'signal_amber' } } },
-    { id: 'glidebait', name: 'Glidebait', type: 'glide', sizes: ['M', 'L'], cost: 45, pack: 1, attract: 1.3, swim: 'glide', sink: 0.8, maxDepthM: 5, look: { base: 'plug', swap: { rust_hi: 'wood_hi', leaf_gold: 'wood_mid', cream: 'bone', stone_lit: 'wood_hi' } } },
-    { id: 'deep_glidebait', name: 'Deep Glidebait', type: 'glide', sizes: ['XL', 'XXL'], cost: 90, pack: 1, attract: 1.3, swim: 'glide', sink: 1, maxDepthM: 9, look: { base: 'plug', swap: { rust_hi: 'ink', leaf_gold: 'stone', cream: 'stone_hi', stone_lit: 'stone_dark' } } },
-    { id: 'minnow_swimbait', name: 'Minnow Swimbait', type: 'swim', sizes: ['S', 'M', 'L'], cost: 27, pack: 1, attract: 1.3, swim: 'mid', vary: 'kick', sink: 0.9, maxDepthM: 6, look: { base: 'minnow', swap: {} } },
-    { id: 'bluegill_swimbait', name: 'Bluegill Swimbait', type: 'swim', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'mid', vary: 'kick', sink: 1.1, maxDepthM: 10, look: { base: 'minnow', swap: { stone_hi: 'moss_hi', bone: 'signal_amber', stone: 'moss' } } }
+    { id: 'bobber', name: 'Bobber', type: 'float', sizes: ['S', 'M'], cost: 6, pack: 2, attract: 1.2, swim: 'float', sink: 1, maxDepthM: 1.5, carries: 'worm' },
+    { id: 'deep_bobber', name: 'Deep Bobber', type: 'float', sizes: ['S', 'M', 'L'], cost: 14, pack: 2, attract: 1.2, swim: 'float', sink: 1, maxDepthM: 5, carries: 'worm' },
+    { id: 'crankbait', name: 'Crankbait', type: 'crank', sizes: ['S', 'M'], cost: 7, pack: 2, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 1.5 },
+    { id: 'big_crankbait', name: 'Big Crankbait', type: 'crank', sizes: ['L', 'XL'], cost: 22, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 3 },
+    { id: 'deep_crankbait', name: 'Deep Crankbait', type: 'crank', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 6 },
+    { id: 'spinnerbait', name: 'Spinnerbait', type: 'spinner', sizes: ['S', 'M', 'L'], cost: 14, pack: 2, attract: 1.3, swim: 'mid', sink: 0.6, maxDepthM: 7 },
+    { id: 'big_spinnerbait', name: 'Big Spinnerbait', type: 'spinner', sizes: ['XL', 'XXL'], cost: 27, pack: 1, attract: 1.3, swim: 'mid', sink: 0.8, maxDepthM: 10 },
+    { id: 'small_spoon', name: 'Small Spoonbait', type: 'spoon', sizes: ['S', 'M', 'L'], cost: 11, pack: 2, attract: 1.3, swim: 'flutter', sink: 1.4, maxDepthM: 99 },
+    { id: 'heavy_spoon', name: 'Heavy Spoonbait', type: 'spoon', sizes: ['L', 'XL'], cost: 27, pack: 1, attract: 1.3, swim: 'flutter', sink: 1.8, maxDepthM: 99 },
+    { id: 'huge_spoon', name: 'Huge Spoonbait', type: 'spoon', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'flutter', sink: 2.2, maxDepthM: 99 },
+    { id: 'dropshot', name: 'Dropshot', type: 'dropshot', sizes: ['S', 'M', 'L'], cost: 22, pack: 1, attract: 1.25, swim: 'dropshot', sink: 1.6, maxDepthM: 99, dropM: 0.5 },
+    { id: 'heavy_dropshot', name: 'Heavy Dropshot', type: 'dropshot', sizes: ['XL', 'XXL'], cost: 45, pack: 1, attract: 1.25, swim: 'dropshot', sink: 2.2, maxDepthM: 99, dropM: 0.5 },
+    { id: 'wacky_worm', name: 'Wacky Worm', type: 'wacky', sizes: ['S', 'M', 'L'], cost: 14, pack: 2, attract: 1.25, swim: 'wacky', sink: 0.45, maxDepthM: 99 },
+    { id: 'jighead', name: 'Jighead', type: 'jighead', sizes: ['M', 'L', 'XL'], cost: 22, pack: 1, attract: 1.3, swim: 'lift', sink: 1.8, maxDepthM: 99 },
+    { id: 'deep_jighead', name: 'Deep Jighead', type: 'jighead', sizes: ['XL', 'XXL'], cost: 45, pack: 1, attract: 1.3, swim: 'lift', sink: 2.6, maxDepthM: 99 },
+    { id: 'topwater', name: 'Topwater', type: 'topwater', sizes: ['S', 'M', 'L'], cost: 27, pack: 1, attract: 1.25, swim: 'top', sink: 0, maxDepthM: 0 },
+    { id: 'medium_blade', name: 'Medium Bladebait', type: 'blade', sizes: ['M', 'L'], cost: 14, pack: 2, attract: 1.3, swim: 'lift', vary: 'rattle', sink: 2, maxDepthM: 99 },
+    { id: 'large_blade', name: 'Large Bladebait', type: 'blade', sizes: ['L', 'XL'], cost: 27, pack: 1, attract: 1.3, swim: 'lift', vary: 'rattle', sink: 2.3, maxDepthM: 99 },
+    { id: 'heavy_blade', name: 'Heavy Bladebait', type: 'blade', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'lift', vary: 'rattle', sink: 2.6, maxDepthM: 99 },
+    { id: 'glidebait', name: 'Glidebait', type: 'glide', sizes: ['M', 'L'], cost: 45, pack: 1, attract: 1.3, swim: 'glide', sink: 0.8, maxDepthM: 5 },
+    { id: 'deep_glidebait', name: 'Deep Glidebait', type: 'glide', sizes: ['XL', 'XXL'], cost: 90, pack: 1, attract: 1.3, swim: 'glide', sink: 1, maxDepthM: 9 },
+    { id: 'minnow_swimbait', name: 'Minnow Swimbait', type: 'swim', sizes: ['S', 'M', 'L'], cost: 27, pack: 1, attract: 1.3, swim: 'mid', vary: 'kick', sink: 0.9, maxDepthM: 6 },
+    { id: 'bluegill_swimbait', name: 'Bluegill Swimbait', type: 'swim', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'mid', vary: 'kick', sink: 1.1, maxDepthM: 10 }
   ],
   // Phase 69: an old save's lure counts go to the nearest new lure (core/save.js v7 -> v8).
   oldLures: { spinner: 'spinnerbait', plug: 'crankbait', grub: 'wacky_worm', popper: 'topwater', jig: 'jighead', bobber: 'bobber', spoon: 'small_spoon' },

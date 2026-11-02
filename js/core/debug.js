@@ -447,7 +447,7 @@ G.core.debug = (function () {
         for (i = 0; i < G.data.fish.length; i += PORTRAITS_PER) pages.push('fish:' + i); // Phase 70: the portraits
         for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('swimmers:' + i);
       }
-      pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop', 'panel', 'fishers', 'dogs', 'looks top'); // small: Phase 44; panel: Phase 46; looks: Phase 47
+      pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'lure swim:0', 'lure swim:12', 'fx', 'shop', 'panel', 'fishers', 'dogs', 'looks top'); // small: Phase 44; panel: Phase 46; looks: Phase 47
       pages.push('tackle', 'setup', 'life under', 'bed', 'life above', 'shore'); // Phase 50.1
       pages.push('touch', 'notice'); // Phase 60.2: the phone's controls; the portrait notice and the icon
       page = 0; t = 0;
@@ -704,16 +704,38 @@ G.core.debug = (function () {
           }
         }
       } else if (name === 'lures') {
-        // Phase 43: each lure's body in four headings and both phases on water; Phase 69: all
-        // 23 in two columns, ×2 (their placeholder art until Phase 73).
-        var UWl = G.scene.underwater, lids = G.data.gear.lures;
+        // Phase 73: every lure's icon at its native size (the shop's item panel), and painted at
+        // the list's (16x14) and the HUD chip's (16x10) sizes; its sprite under water as drawn
+        // (1x, heading right, frame 0) and its type, action and sizes. 6 columns x 4 rows.
+        var LGg = G.gfx.luregen, lgl = G.data.gear.lures;
+        ctx.imageSmoothingEnabled = false;
+        for (var li = 0; li < lgl.length; li++) {
+          var lx0 = 4 + (li % 6) * 106, ly0 = 20 + Math.floor(li / 6) * 85, lic = LGg.iconImg(lgl[li].id);
+          ctx.fillStyle = P.fog_dark; ctx.fillRect(lx0, ly0, 102, 82);
+          F.drawText(ctx, lgl[li].name, lx0 + 2, ly0 + 2, 'bone');
+          ctx.drawImage(lic, lx0 + 2 + ((54 - lic.width) >> 1), ly0 + 12 + ((46 - lic.height) >> 1));
+          var s1 = LGg.iconImg(lgl[li].id, 16, 14), s2 = LGg.iconImg(lgl[li].id, 16, 10), sp0 = LGg.spriteImg(lgl[li].id, 0, 0);
+          ctx.drawImage(s1, lx0 + 60, ly0 + 14); ctx.drawImage(s2, lx0 + 80, ly0 + 16);
+          ctx.fillStyle = P.water_mid; ctx.fillRect(lx0 + 58, ly0 + 32, 42, 28);
+          ctx.drawImage(sp0, lx0 + 79 - (sp0.width >> 1), ly0 + 46 - (sp0.height >> 1));
+          F.drawText(ctx, (lgl[li].vary || lgl[li].swim) + ' ' + lgl[li].sizes.join(''), lx0 + 2, ly0 + 61, 'fog_light');
+          F.drawText(ctx, lic.width + 'x' + lic.height + '  ' + LGg.frames(lgl[li].id) + 'fr', lx0 + 2, ly0 + 71, 'fog_mid');
+        }
+      } else if (name.indexOf('lure swim:') === 0) {
+        // Phase 73: the sprites under water at 2x: each frame of its action heading right, then
+        // eight headings in frame 0 (the other eight are these mirrored). 12 lures a page.
+        var LGs = G.gfx.luregen, lsl = G.data.gear.lures, l0 = +name.split(':')[1];
         ctx.fillStyle = P.water_mid; ctx.fillRect(0, 18, 640, 342);
         ctx.imageSmoothingEnabled = false;
-        for (var li = 0; li < lids.length; li++) {
-          var lx0 = li < 12 ? 4 : 324, ly0 = 22 + (li % 12) * 28;
-          F.drawText(ctx, lids[li].name, lx0, ly0 + 4, 'bone');
-          F.drawText(ctx, (lids[li].vary || lids[li].swim) + ' ' + lids[li].sizes.join(''), lx0, ly0 + 14, 'fog_mid');
-          for (var lk = 0; lk < 4; lk++) for (var lp = 0; lp < 2; lp++) ctx.drawImage(UWl.lureImg(lids[li].id, lk * 4, lp), lx0 + 96 + (lk * 2 + lp) * 26, ly0, 24, 24);
+        for (var si = l0; si < lsl.length && si < l0 + 12; si++) {
+          var sy0 = 20 + (si - l0) * 28, nf = LGs.frames(lsl[si].id), sbx = 0;
+          F.drawText(ctx, lsl[si].name, 4, sy0 + 4, 'bone');
+          F.drawText(ctx, lsl[si].vary || lsl[si].swim, 4, sy0 + 14, 'fog_light');
+          for (var sf = 0; sf < nf + 8; sf++) {
+            var simg = sf < nf ? LGs.spriteImg(lsl[si].id, 0, sf) : LGs.spriteImg(lsl[si].id, (sf - nf) * 2, 0), sw2 = Math.min(simg.width * 2, 52);
+            ctx.drawImage(simg, 96 + sbx, sy0 + 13 - (sw2 >> 1), sw2, sw2);
+            sbx += sw2 + 2 + (sf === nf - 1 ? 10 : 0);
+          }
         }
       } else if (name === 'tackle') {
         // Phase 50.1: the rack (each rod's blank straight in its own keys at 2×, with its numbers

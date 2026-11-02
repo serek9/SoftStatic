@@ -272,7 +272,8 @@ G.audio.engine = (function () {
   }
 
   // How much a bait weighs in a splash (the worm is a soft plip, the minnow a fuller plop).
-  var BAIT_W = { worm: 0.5, cricket: 0.75, minnow: 1, unlabelled: 1.1, spinner: 0.7, plug: 0.9, grub: 0.6, popper: 0.85, jig: 0.8 }; // Phase 69: a lure by its look's base (scene/underwater.js lureBase)
+  var BAIT_W = { worm: 0.5, cricket: 0.75, minnow: 1, unlabelled: 1.1, spinner: 0.7, crank: 0.9, wacky: 0.6, topwater: 0.85, jighead: 0.8, float: 1, spoon: 0.75,
+    dropshot: 0.8, blade: 0.75, glide: 0.9, swim: 0.8 }; // Phase 73: a lure by its type (scene/underwater.js hookKind)
 
   // Cues from the scenes for what the engine cannot see by reading state (rises, jumps, a lure
   // lifted out, a nibble, a fish thrashing at the surface). a: a size or strength 0..1.
@@ -608,7 +609,7 @@ G.audio.engine = (function () {
       prev.D = F.D;
       if (was === 'casting' && fsm === 'sinking') {
         // The lure goes in (its size from the cast and the bait), and the bail closes.
-        waterSplash((0.08 + 0.35 * Math.min(1, c.dist / 120)) * (BAIT_W[G.scene.underwater.lureBase(c.bait || run.gearFx.bait)] || 0.6), c.x1, 'lurein');
+        waterSplash((0.08 + 0.35 * Math.min(1, c.dist / 120)) * (BAIT_W[G.scene.underwater.hookKind(c.bait || run.gearFx.bait)] || 0.6), c.x1, 'lurein');
         playBuf(pick(KIT.click[tier]), 0.045, boatPan, 0.55); note('bail');
       } else if (fsm === 'charging') { playBuf(pick(KIT.click[tier]), 0.03, boatPan, 0.7); note('bailopen'); }
       else if (was === 'charging' && fsm === 'casting') {             // the rod's whoosh, keener with the charge

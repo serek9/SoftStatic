@@ -140,7 +140,10 @@ G.gfx.sprites = (function () {
     fish_finbull_0: '#1e1e1a', fish_finbull_1: '#2a2a24', fish_finbull_2: '#3a3a32', fish_finbull_3: '#504e44',
     fish_finchan_0: '#3e3a36', fish_finchan_1: '#4c4842', fish_finchan_2: '#645e56', fish_finchan_3: '#82786e',
     fish_finyel_0: '#8a7a3c', fish_finyel_1: '#a08e46', fish_finyel_2: '#c0aa5c', fish_finyel_3: '#d8c47e',
-    fish_bean: '#b0ac78', fish_scute: '#cec6b6', fish_eye_yellow: '#dcbc34', fish_barbel: '#5a524a'
+    fish_bean: '#b0ac78', fish_scute: '#cec6b6', fish_eye_yellow: '#dcbc34', fish_barbel: '#5a524a',
+    // Phase 73 (lure art, PLAN_SPECIES.md 3.6): chartreuse, the one lure colour the palette had
+    // no ramp for (skirts, firetiger backs, a jig's tail). Lure keys only: shift() never picks them.
+    lure_chart_0: '#3a4214', lure_chart_1: '#5e6e1c', lure_chart_2: '#8ea42c', lure_chart_3: '#bccc5a'
   };
   // Phase 56: the interior keys above, which shift() leaves out.
   var INTERIOR = {};
@@ -179,7 +182,7 @@ G.gfx.sprites = (function () {
     if (shifted[id] !== undefined) return shifted[id];
     var c = RGB[key], L = lum(key), m = (c[0] + c[1] + c[2]) / 3, best = key, bd = 1e9;
     for (var k in PALETTE) {
-      if (k === key || k === 'black' || INTERIOR[k] || k.indexOf('fish_') === 0) continue;
+      if (k === key || k === 'black' || INTERIOR[k] || k.indexOf('fish_') === 0 || k.indexOf('lure_') === 0) continue;
       var dl = (lum(k) - L) * dir;
       if (dl < 8 || dl > 80) continue;
       var q = RGB[k], qm = (q[0] + q[1] + q[2]) / 3;
