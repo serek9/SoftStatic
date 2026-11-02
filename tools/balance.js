@@ -38,7 +38,7 @@ const BANNED = /\b(window|document|Math\.random|Date|performance|requestAnimatio
 
 function stripCode(src) { return src.replace(/'(?:[^'\\\n]|\\.)*'/g, "''").replace(/\/\/.*$/gm, ''); }
 
-let sizeInfo = '', lineInfo = '', rosterInfo = '';
+let sizeInfo = '', lineInfo = '', rosterInfo = '', lureInfo = '';
 function validate(G, opts) {
   const errors = [], warnings = [], d = G.data;
   const err = m => errors.push(m), warn = m => warnings.push(m);
@@ -117,7 +117,9 @@ function validate(G, opts) {
   });
   if (!g.rods.some(r => r.ladder === false && r.smallBoost > 1)) err('rods: needs a small-fish rod off the ladder');
   if (!(g.rodSmall.frac > 0 && g.rodSmall.frac < 1 && g.rodSmall.mass > 0)) err('rodSmall');
-  const SWIM = ['mid', 'dive', 'bed', 'top', 'lift', 'float', 'flutter'], lureIds = (g.lures || []).map(l => l.id); // Phase 65: float, flutter
+  // Phase 69: the 23 lures' actions; bed went with the grub; vary (rattle, kick) on lift and mid.
+  const SWIM = ['mid', 'dive', 'top', 'lift', 'float', 'flutter', 'dropshot', 'wacky', 'glide'], lureIds = (g.lures || []).map(l => l.id);
+  const VARY = { rattle: 'lift', kick: 'mid' }, BASES = ['spinner', 'plug', 'grub', 'popper', 'jig', 'bobber', 'spoon', 'minnow'];
   (g.lures || []).forEach(l => {
     if (!(l.cost > 0 && l.pack >= 1 && l.attract > 0 && SWIM.includes(l.swim) && l.sink >= 0 && l.maxDepthM >= 0)) err('lure ' + l.id + ': cost, pack, attract, swim, sink, maxDepthM');
     if (l.rareBoost !== undefined) err('lure ' + l.id + ': rareBoost was removed in Phase 68');
@@ -127,12 +129,23 @@ function validate(G, opts) {
     if (g.baits.some(b => b.id === l.id)) err('lure ' + l.id + ': shares an id with a bait');
     if (l.carries !== undefined && !g.baits.some(b => b.id === l.carries && b.unlimited)) err('lure ' + l.id + ': carries must be a bait that never runs out');
     if ((l.swim === 'float') !== (l.carries !== undefined)) err('lure ' + l.id + ': a float rig, and only a float rig, carries a bait');
+    if (l.vary !== undefined && VARY[l.vary] !== l.swim) err('lure ' + l.id + ': vary ' + l.vary + ' goes with swim ' + VARY[l.vary]);                  // Phase 69
+    if ((l.swim === 'dropshot') !== (l.dropM > 0)) err('lure ' + l.id + ': a dropshot, and only a dropshot, hangs its hook dropM m over the weight');
+    if (!l.look || !BASES.includes(l.look.base) || Object.keys(l.look.swap || {}).some(k => !PAL[k] || !PAL[l.look.swap[k]])) err('lure ' + l.id + ': look must name an old lure and swap palette keys');
   });
-  // Every lure catches something in every water with the starting rod (Phase 68: by its type
-  // and its sizes, through the sim's own interest()).
-  for (const id in d.locations) lureIds.forEach(l => {
-    if (!d.fish.some(f => f.locations.includes(id) && G.sim.fish_ai.interest(f, l, true) > 0 && f.mass <= g.rods[0].maxMass)) err('lure ' + l + ': nothing in ' + id + ' takes it on the cane rod');
+  if (lureIds.length !== 23) err('lures: the reference has 23, not ' + lureIds.length);
+  for (const k in g.oldLures || {}) if (!lureIds.includes(g.oldLures[k])) err('oldLures: ' + k + ' goes to unknown lure ' + g.oldLures[k]);
+  ['spinner', 'plug', 'grub', 'popper', 'jig', 'bobber', 'spoon'].forEach(k => { if (!(g.oldLures || {})[k]) err('oldLures: the old ' + k + ' goes nowhere'); });
+  // Phase 69 (was Phase 68's "every lure in every water on the cane rod"): every lure has a
+  // species that takes it in some water on some rod of the rack, through the sim's own
+  // interest(); and every placed species has a lure that fits its type and size.
+  const heaviest = Math.max(...g.rods.map(r => r.maxMass)), lureWaters = {};
+  lureIds.forEach(l => {
+    lureWaters[l] = Object.keys(d.locations).filter(id => d.fish.some(f => f.locations.includes(id) && G.sim.fish_ai.interest(f, l, true) > 0 && f.mass <= heaviest));
+    if (!lureWaters[l].length) err('lure ' + l + ': nothing in any water takes it on any rod');
   });
+  d.fish.forEach(f => { if (f.locations.length && Object.keys(f.lureTypes).length && !lureIds.some(l => !g.lures.find(x => x.id === l).carries && G.sim.fish_ai.interest(f, l, true) > 0)) err('fish ' + f.id + ': no lure fits its types and its size'); });
+  lureInfo = 'lures by water: ' + Object.keys(d.locations).map(w => w + ' ' + lureIds.filter(l => lureWaters[l].includes(w)).length).join(', ') + ' (of ' + lureIds.length + ')';
   // Phase 47: the looks (four fishers, four dogs): their shapes and every key in the palette.
   if (d.looks) d.validateLooks(d.looks, PAL).forEach(e => err('look ' + e));
   else err('looks: data/looks.js is not loaded');
@@ -399,37 +412,66 @@ function session(G, seed, opts) {
 // Each hook (the live baits and the lures) fished for an hour at each water with the rod of
 // that stage (Fogbound the fibreglass, the creek the graphite, the Pines the lacquered, the
 // Red Room the long rod), 4 seeds: catches and coins an hour, net of what the hook cost.
-// Target: every lure earns 50-200% of what worms earn at every water. Phase 53: the line is
-// left out of it (unseen: line-shy fish bite as on fluorocarbon, the fight is monofilament's),
-// so the lures are compared as they were before the line types.
+// Phase 53: the line is left out of it (unseen: line-shy fish bite as on fluorocarbon, the
+// fight is monofilament's), so the lures are compared as they were before the line types.
+// Phase 69: 23 lures, many made for big fish only, so a lure is fished (and judged) only at
+// the waters where something takes it on that stage's rod ('-' elsewhere). Target: every lure
+// fishes some water, and at every water it fishes earns at least 50% of what worms earn (it is
+// worth buying over the free bait) and at most 200% of the best live bait there (it does not
+// outclass what the shop already sells: a lure made for the big fish of a water hooks them at
+// their top sizes, so the Red Room's lures are measured against its minnows). The four
+// waters run in four processes at once (--tackle-water w prints one water's numbers as JSON).
+
+const TACKLE_WATERS = { fog: 1, creek: 2, pines: 3, red: 4 };
+function tackleHooks(d) { return ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)); }
+function tackleFishes(G, hk, w) {
+  const d = G.data, L = d.gear.lures.find(l => l.id === hk);
+  if (!L) return true;
+  return d.fish.some(f => f.locations.includes(w) && G.sim.fish_ai.interest(f, hk, true) > 0 && f.mass <= d.gear.rods[TACKLE_WATERS[w]].maxMass);
+}
+function tackleWater(w) {
+  const G = load(), d = G.data, out = {};
+  for (const hk of tackleHooks(d)) {
+    if (!tackleFishes(G, hk, w)) continue;
+    let coins = 0, catches = 0;
+    for (let sd = 1; sd <= 4; sd++) {
+      const s = session(G, sd * 97, { stay: true, shop: false, loc: w, rod: TACKLE_WATERS[w], bait: hk, unseen: true }); // Phase 53: the line out of the picture
+      const c0 = s.save.coins; s.run(3600);
+      coins += s.save.coins - c0 - s.st.spent; catches += s.st.catches;
+    }
+    out[hk] = { coins: coins / 4, catches: catches / 4 };
+  }
+  return out;
+}
 
 function tackleCheck() {
-  const G = load(), d = G.data, hooks = ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)), waters = { fog: 1, creek: 2, pines: 3, red: 4 };
+  const G = load(), d = G.data, hooks = tackleHooks(d), cp = require('child_process');
   const res = {};
-  console.log('net coins an hour (catches an hour) over 4 seeds x 60 min');
-  console.log('hook      ' + Object.keys(waters).map(w => w.padStart(16)).join(''));
-  for (const hk of hooks) {
-    let row = hk.padEnd(10);
-    res[hk] = {};
-    for (const w in waters) {
-      let coins = 0, catches = 0;
-      for (let sd = 1; sd <= 4; sd++) {
-        const s = session(G, sd * 97, { stay: true, shop: false, loc: w, rod: waters[w], bait: hk, unseen: true }); // Phase 53: the line out of the picture
-        const c0 = s.save.coins; s.run(3600);
-        coins += s.save.coins - c0 - s.st.spent; catches += s.st.catches;
-      }
-      res[hk][w] = { coins: coins / 4, catches: catches / 4 };
-      row += (Math.round(coins / 4) + ' (' + (catches / 4).toFixed(1) + ')').padStart(16);
+  return Promise.all(Object.keys(TACKLE_WATERS).map(w => new Promise((ok, no) => {
+    cp.execFile(process.execPath, [__filename, '--tackle-water', w], { maxBuffer: 1 << 24 }, (e, so) => { if (e) no(e); else { res[w] = JSON.parse(so); ok(); } });
+  }))).then(() => {
+    console.log('net coins an hour (catches an hour) over 4 seeds x 60 min; - where nothing takes it on that rod');
+    console.log('hook              ' + Object.keys(TACKLE_WATERS).map(w => w.padStart(16)).join(''));
+    for (const hk of hooks) {
+      let row = hk.padEnd(18);
+      for (const w in TACKLE_WATERS) { const r = res[w][hk]; row += (r ? Math.round(r.coins) + ' (' + r.catches.toFixed(1) + ')' : '-').padStart(16); }
+      console.log(row);
     }
-    console.log(row);
-  }
-  let bad = 0;
-  for (const l of d.gear.lures) for (const w in waters) {
-    const r = res[l.id][w].coins / Math.max(1, res.worm[w].coins);
-    if (r < 0.5 || r > 2) { bad++; console.log('FAIL ' + l.id + ' at ' + w + ': ' + (100 * r).toFixed(0) + '% of worms'); }
-  }
-  console.log((bad ? 'FAIL' : 'PASS') + ' every lure earns 50-200% of worms at every water');
-  return bad ? 1 : 0;
+    let bad = 0, lo = Infinity, hi = 0;
+    for (const l of d.gear.lures) {
+      const ws = Object.keys(TACKLE_WATERS).filter(w => res[w][l.id]);
+      if (!ws.length) { bad++; console.log('FAIL ' + l.id + ' fishes no water on its stage\'s rod'); }
+      for (const w of ws) {
+        const best = Math.max(...['worm', 'cricket', 'minnow'].map(b => res[w][b].coins)), c = res[w][l.id].coins;
+        const r = c / Math.max(1, res[w].worm.coins), rb = c / Math.max(1, best);
+        lo = Math.min(lo, r); hi = Math.max(hi, rb);
+        if (r < 0.5) { bad++; console.log('FAIL ' + l.id + ' at ' + w + ': ' + (100 * r).toFixed(0) + '% of worms'); }
+        if (rb > 2) { bad++; console.log('FAIL ' + l.id + ' at ' + w + ': ' + (100 * rb).toFixed(0) + '% of the best live bait'); }
+      }
+    }
+    console.log((bad ? 'FAIL' : 'PASS') + ' every lure (' + d.gear.lures.length + ') fishes some water, and earns 50%+ of worms and at most 200% of the best live bait at every water it fishes (lowest ' + (100 * lo).toFixed(0) + '% of worms, highest ' + (100 * hi).toFixed(0) + '% of the best bait)');
+    return bad ? 1 : 0;
+  });
 }
 
 // ---- --replay -----------------------------------------------------------------------------
@@ -522,7 +564,12 @@ const OLD_SAVES = [
   { from: 'Phase 67 (6a4f20d), v6 with old fish kept', save: { version: 6, coins: 1234, gear: { rod: 2, rods: [0, 1, 2], reel: 2, line: 2, lineType: 'mono', lineTypes: ['mono'], lantern: true, depthFinder: false, bait: 'bobber' }, baits: { bobber: 2, spoon: 1 },
     journal: { sleeper: { caught: 1, bestLen: 150, bestW: 9.1, hints: ['spot:cold_hole'], seen: true, phantom: false, late: { bait: true } }, pier_roach: { caught: 12, bestLen: 20, bestW: 0.3, hints: [], seen: true, phantom: false, took: ['worm'] } },
     kept: [{ id: 'sleeper', len: 150, w: 9.1 }, { id: 'pier_roach', len: 20, w: 0.3 }], cabinLevel: 2, unlocks: { fog: true, creek: true }, loc: 'creek', unease: { creek: 0.2 }, clock: 21, lastSeen: 0,
-    flags: { windowCatch: { owl_247: true }, lines: { carp_fog: true }, shopVisits: 14, heavy: { fog: true }, anomalies: {}, dogStare: { fog: true }, lateAt: 13 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 8 } }
+    flags: { windowCatch: { owl_247: true }, lines: { carp_fog: true }, shopVisits: 14, heavy: { fog: true }, anomalies: {}, dogStare: { fog: true }, lateAt: 13 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 8 } },
+  // Phase 69: a v7 save from Phase 68 (c1ca9e4) with every one of the seven old lures: each count goes to its new lure, the spoon on the hook too.
+  { from: 'Phase 68 (c1ca9e4), v7 with the seven old lures', save: { version: 7, coins: 640, gear: { rod: 1, rods: [0, 1], reel: 1, line: 1, lineType: 'mono', lineTypes: ['mono'], lantern: false, depthFinder: false, bait: 'spoon' },
+    baits: { spinner: 3, plug: 1, grub: 8, popper: 2, jig: 4, bobber: 6, spoon: 5, minnow: 9 }, journal: { yellow_perch: { caught: 5, bestLen: 22, bestW: 0.2, hints: [], seen: true, phantom: false, took: ['worm', 'grub', 'spinner', 'spoon'] } }, kept: [], cabinLevel: 1, unlocks: { fog: true }, loc: 'fog', unease: {}, clock: 20, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 4, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 9 },
+    baits: { spinnerbait: 3, crankbait: 1, wacky_worm: 8, topwater: 2, jighead: 4, bobber: 6, small_spoon: 5, minnow: 9 }, bait: 'small_spoon' }
 ];
 
 function savesCheck() {
@@ -555,6 +602,11 @@ function savesCheck() {
         s.kept.forEach(k => { if (!G.data.fish.some(f => f.id === k.id)) probs.push('kept species ' + k.id + ' no longer exists'); }); // Phase 68
         if (s.coins !== o.save.coins) probs.push('coins ' + s.coins + ' (saved ' + o.save.coins + ')');               // Phase 68: dropping the old fish keeps the coins
         if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
+        for (const id in s.baits) if (!E.baitById(id, G.data)) probs.push('counts an unknown bait or lure ' + id);      // Phase 69: the old lures mapped
+        if (!E.baitById(s.gear.bait, G.data)) probs.push('unknown hook ' + s.gear.bait);
+        if (o.baits && JSON.stringify(Object.keys(o.baits).sort().map(k => [k, s.baits[k]])) !== JSON.stringify(Object.keys(s.baits).sort().map(k => [k, o.baits[k]]))) probs.push('lure counts ' + JSON.stringify(s.baits));
+        if (o.bait && s.gear.bait !== o.bait) probs.push('hook ' + s.gear.bait + ' (wanted ' + o.bait + ')');
+        for (const id in s.journal) (s.journal[id].took || []).forEach(t => { if (!E.baitById(t, G.data)) probs.push(id + ' caught on unknown ' + t); });
         const want = o.look || { fisher: 'red_cap', dog: 'golden' }; // Phase 47: kept when chosen, the default when absent or broken
         if (s.look.fisher !== want.fisher || s.look.dog !== want.dog || G.data.lookOf(G.data.looks.fishers, s.look.fisher).id !== s.look.fisher || G.data.lookOf(G.data.looks.dogs, s.look.dog).id !== s.look.dog) probs.push('look ' + JSON.stringify(s.look));
       } catch (e) { probs.push('throws: ' + e.message); }
@@ -839,6 +891,7 @@ if (require.main === module) {
     if (sizeInfo) console.log('info  ' + sizeInfo);
     if (rosterInfo) console.log('info  ' + rosterInfo);
     if (lineInfo) console.log('info  ' + lineInfo);
+    if (lureInfo) console.log('info  ' + lureInfo);
     r.errors.forEach(e => console.log('ERROR ' + e));
     console.log(r.errors.length ? r.errors.length + ' error(s)' : 'validate: OK (' + r.warnings.length + ' warning(s))');
     if (r.errors.length) code = 1;
@@ -852,12 +905,13 @@ if (require.main === module) {
   if (args.includes('--passive')) code = passiveCheck() || code;
   if (args.includes('--fight')) code = fightCheck() || code;
   if (args.includes('--rod')) code = rodCheck() || code;
-  if (args.includes('--tackle')) code = tackleCheck() || code;
+  if (args.includes('--tackle-water')) { console.log(JSON.stringify(tackleWater(args[args.indexOf('--tackle-water') + 1]))); process.exit(0); }
   if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle'].includes(a))) {
     console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --replay <seed> [minutes]');
     code = 2;
   }
-  process.exit(code);
+  if (args.includes('--tackle')) tackleCheck().then(c => process.exit(c || code), e => { console.log('FAIL --tackle: ' + e.message); process.exit(1); }); // Phase 69: in four processes
+  else process.exit(code);
 }
 
 module.exports = { load, validate, session, replay, pacing, passiveCheck, savesCheck, fightCheck, PLAN, P };

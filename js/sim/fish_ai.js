@@ -15,7 +15,8 @@ G.sim.fish_ai = (function () {
     lureLoved: 1.3,               // × awareness: a lure it loves (its flash, its wobble) draws it from farther
     depthFalloff: 4,              // m outside the habitat at which weight bottoms out
     depthFloor: 0.05,
-    hourLiked: 1.6, hourOther: 0.7 // timeLikes match / no match (no effect when empty)
+    hourLiked: 1.6, hourOther: 0.7, // timeLikes match / no match (no effect when empty)
+    coverK: 1                     // Phase 69: × (share of its sizes the lure is made for)^coverK, the weight and the arrivals
   };
   var A = {
     spawnMin: 1.5, spawnMax: 4,   // s between spawns while the lure is in
@@ -65,12 +66,15 @@ G.sim.fish_ai = (function () {
       if (out > 0) v *= Math.max(W.depthFloor, 1 - out / W.depthFalloff);
     }
     if (f.timeLikes.length) v *= f.timeLikes.indexOf(Math.floor(ctx.hour)) >= 0 ? W.hourLiked : W.hourOther;
+    full = v;
+    if (COVER[0] < 1) v *= Math.pow(COVER[0], W.coverK);                                // Phase 69: only the fish of its sizes come
     return v;
   }
+  var full = 0; // weightOf's weight before the size cover (for ctx.cover)
 
   // ctx: {species, loc, depthM (null = any), hour, unease, bait, lure, rodMaxMass}. Fills ctx.weights (one per species) and ctx.tooHeavyNear. Returns the total.
   function speciesWeights(ctx) {
-    var list = ctx.species, w = ctx.weights, total = 0;
+    var list = ctx.species, w = ctx.weights, total = 0, whole = 0;
     if (!w || w.length !== list.length) w = ctx.weights = new Float64Array(list.length);
     ctx.tooHeavyNear = false;
     for (var i = 0; i < list.length; i++) {
@@ -78,7 +82,11 @@ G.sim.fish_ai = (function () {
       if (v > 0 && list[i].mass > ctx.rodMaxMass) { ctx.tooHeavyNear = true; v = 0; }
       w[i] = v;
       total += v;
+      if (v > 0) whole += full;
     }
+    // Phase 69: a lure made for big fish draws fewer: the arrivals slow by the share of the
+    // species' weight its sizes leave in (1 for baits and lures that cover every size here).
+    ctx.cover = whole > 0 ? total / whole : 1;
     return total;
   }
 
@@ -98,6 +106,7 @@ G.sim.fish_ai = (function () {
         unease: 0, bait: '', latched: {}, rodMaxMass: 0, weights: null, tooHeavyNear: false,
         lineSeen: true, // Phase 53: a line-shy species (fish.lineShy) sees this line and will not bite
         attract: 1, // gear and cast spot: attract shortens the wait between arrivals
+        cover: 1,   // Phase 69: the share of the fish here the hook is sized for (speciesWeights)
         maxDepthPx: 0, floorAt: null, // floorAt(x) -> bottom depth in px; null uses maxDepthPx
         flowAt: null // Phase 28: flowAt(x, depth px) -> px/s of current; null is still water
       }
@@ -142,18 +151,22 @@ G.sim.fish_ai = (function () {
   // Phase 43: how much a species wants what is on the hook: 0 ignores it, 1 takes it, 2 loves
   // it. Live baits by baitLikes (listed: 2, else 0; a bait with `as` is taken as that bait);
   // Phase 68: lures by fish.lureTypes[lure.type], and only if the lure is made for fish of
-  // the species' size (economy.qRange); a float rig is taken as its bait (Phase 65).
+  // the species' size (economy.qRange); a float rig is taken as its bait (Phase 65), and since
+  // Phase 69 only by fish of its sizes (the Bobber S-M, the Deep Bobber S-L).
   var TAKE_W = [0, 1, W.baitLiked]; // the species weight by interest
-  var QR = [0, 1];
+  var QR = [0, 1], COVER = [1];       // COVER[0]: the share of the species' catches (by the size curve) the last hook asked about is made for
   function interest(sp, bait, lure) {
     var g = G.data.gear, i;
+    COVER[0] = 1;
     if (lure) {
       var l = g.lures || [], L = null;
       for (i = 0; i < l.length; i++) if (l[i].id === bait) { L = l[i]; break; }
       if (!L) return 0;
-      if (L.carries) return interest(sp, L.carries, false);
-      var v = sp.lureTypes[L.type] || 0;
-      return v && G.sim.economy.qRange(sp, L.sizes, G.data, QR) ? v : 0;
+      var v = L.carries ? interest(sp, L.carries, false) : (sp.lureTypes[L.type] || 0); // Phase 69: a float rig by its bait and its sizes
+      if (!v || !G.sim.economy.qRange(sp, L.sizes, G.data, QR)) return 0;
+      var ic = 1 / G.data.gear.economy.sizeCurve;                                 // q = u^curve, so u = q^(1/curve)
+      COVER[0] = Math.pow(QR[1], ic) - Math.pow(QR[0], ic);
+      return v;
     }
     var b = g.baits;
     for (i = 0; i < b.length; i++) if (b[i].id === bait && b[i].as) { bait = b[i].as; break; }
@@ -322,7 +335,7 @@ G.sim.fish_ai = (function () {
     if (lure.active) {
       school.spawnT -= dt;
       if (school.spawnT <= 0) {
-        school.spawnT = rng.range(A.spawnMin, A.spawnMax) / (school.ctx.attract || 1);
+        school.spawnT = rng.range(A.spawnMin, A.spawnMax) / ((school.ctx.attract || 1) * (school.ctx.cover || 1)); // Phase 69: cover from the last pick
         if (count(school) < MAX) {
           var sp = pickSpecies(school.ctx, rng);
           if (sp >= 0) {

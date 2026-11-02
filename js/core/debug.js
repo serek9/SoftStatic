@@ -134,7 +134,7 @@ G.core.debug = (function () {
     buy: function (kind, id, n) {
       var E = G.sim.economy, save = G.state.save;
       var r = kind === 'bait' || kind === 'lure' ? E.buyBait(save, id, n || 10, G.data) : (kind === 'rod' && id !== undefined ? E.buyRod(save, +id, G.data) : E.buy(save, kind, G.data));
-      if (kind === 'lure') kind = 'bait'; // Phase 43: dbg.buy('lure', 'spinner', 3); dbg.buy('rod', 5) buys the wand
+      if (kind === 'lure') kind = 'bait'; // Phase 43: dbg.buy('lure', 'spinnerbait', 3); dbg.buy('rod', 5) buys the wand
       if (r === E.OK) { if (kind === 'bait') save.gear.bait = id; G.core.save.autosave('purchase'); }
       return ['ok', 'maxed', 'not enough coins', 'locked', 'unknown'][r];
     },
@@ -316,7 +316,9 @@ G.core.debug = (function () {
       return { T: +F.T.toFixed(3), D: +F.D.toFixed(3), S: +F.S.toFixed(3), mode: F.mode, H: +F.H.toFixed(3), shake: F.shake > 0, jump: F.jump > 0, slips: F.slips };
     },
     // dbg.lureBody() returns the lure's heading (degrees: 0 right, 90 down, 180 left), its
-    // flutter 0..1, its velocity (px/s) and the current at it (Phase 22).
+    // flutter 0..1, its velocity (px/s) and the current at it (Phase 22); Phase 69: action,
+    // the lure's action (mid, dive, top, lift, float, flutter, dropshot, wacky, glide, or its
+    // vary: rattle, kick), or 'bait' for a live bait.
     lureBody: function () { return G.scene.underwater.body(); },
     // dbg.who() (Phase 68): which species can bite here and now, from the same weights the
     // school spawns by (fish_ai.speciesWeights over the current cast's context): the water, the
@@ -692,13 +694,16 @@ G.core.debug = (function () {
           }
         }
       } else if (name === 'lures') {
-        // Phase 43: each lure's body in eight headings and both phases, ×3 on water.
-        var UWl = G.scene.underwater, lids = ['spinner', 'plug', 'grub', 'popper', 'jig'];
+        // Phase 43: each lure's body in four headings and both phases on water; Phase 69: all
+        // 23 in two columns, ×2 (their placeholder art until Phase 73).
+        var UWl = G.scene.underwater, lids = G.data.gear.lures;
         ctx.fillStyle = P.water_mid; ctx.fillRect(0, 18, 640, 342);
         ctx.imageSmoothingEnabled = false;
         for (var li = 0; li < lids.length; li++) {
-          F.drawText(ctx, lids[li], 8, 24 + li * 68, 'bone');
-          for (var lk = 0; lk < 8; lk++) for (var lp = 0; lp < 2; lp++) ctx.drawImage(UWl.lureImg(lids[li], lk * 2, lp), 60 + (lk * 2 + lp) * 36, 30 + li * 68, 33, 33);
+          var lx0 = li < 12 ? 4 : 324, ly0 = 22 + (li % 12) * 28;
+          F.drawText(ctx, lids[li].name, lx0, ly0 + 4, 'bone');
+          F.drawText(ctx, (lids[li].vary || lids[li].swim) + ' ' + lids[li].sizes.join(''), lx0, ly0 + 14, 'fog_mid');
+          for (var lk = 0; lk < 4; lk++) for (var lp = 0; lp < 2; lp++) ctx.drawImage(UWl.lureImg(lids[li].id, lk * 4, lp), lx0 + 96 + (lk * 2 + lp) * 26, ly0, 24, 24);
         }
       } else if (name === 'tackle') {
         // Phase 50.1: the rack (each rod's blank straight in its own keys at 2×, with its numbers
@@ -722,14 +727,12 @@ G.core.debug = (function () {
         F.bold(ctx, 'HOOKS', 8, 168, 'bone');
         ctx.fillStyle = P.water_mid; ctx.fillRect(0, 180, 640, 180);
         ctx.imageSmoothingEnabled = false;
-        for (var hi = 0; hi < HK.length; hi++) {
-          var hb = HK[hi], hx1 = 8 + (hi % 3) * 210, hy1 = 184 + Math.floor(hi / 3) * 58, takers = 0;
+        for (var hi = 0; hi < HK.length; hi++) { // Phase 69: 27 hooks, four columns of seven
+          var hb = HK[hi], hx1 = 4 + (hi % 4) * 159, hy1 = 183 + Math.floor(hi / 4) * 25, takers = 0;
           for (var fi2 = 0; fi2 < G.data.fish.length; fi2++) if (G.data.fish[fi2].locations.length && G.sim.fish_ai.interest(G.data.fish[fi2], hb.id, !!hb.swim) > 0) takers++; // Phase 68
-          ctx.drawImage(UWt.lureImg(hb.id, 0, 0), hx1, hy1, 33, 33);
-          ctx.drawImage(UWt.lureImg(hb.id, 0, 1), hx1 + 34, hy1, 33, 33);
-          F.drawText(ctx, hb.label === false ? '(no label)' : hb.name, hx1 + 72, hy1 + 2, 'bone');
-          F.drawText(ctx, (hb.swim ? 'lure, ' + hb.swim : (hb.unlimited ? 'bait, endless' : 'bait')) + '  ' + hb.cost + 'c' + (hb.pack ? ' x' + hb.pack : ''), hx1 + 72, hy1 + 14, 'fog_light');
-          F.drawText(ctx, takers + ' species take it', hx1 + 72, hy1 + 26, 'fog_light');
+          ctx.drawImage(UWt.lureImg(hb.id, 0, 0), hx1, hy1, 24, 24);
+          F.drawText(ctx, hb.label === false ? '(no label)' : hb.name, hx1 + 26, hy1 + 3, 'bone');
+          F.drawText(ctx, (hb.swim ? (hb.vary || hb.swim) + ' ' + hb.sizes.join('') : (hb.unlimited ? 'endless' : 'bait')) + ' ' + hb.cost + 'c ' + takers + 'sp', hx1 + 26, hy1 + 13, 'fog_light');
         }
       } else if (name === 'setup') {
         // Phase 50.1: the setup panel itself (G.ui.setup, from this save) over sky and water.
