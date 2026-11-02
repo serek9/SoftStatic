@@ -55,6 +55,7 @@ G.data.locations.stone = {
 
   landmarks: [
     { id: 'pier', kind: 'pier', x: 96, seed: 8402 },
+    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
     { id: 'snag_a', kind: 'snag', x: 540 }
   ],
 

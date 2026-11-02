@@ -212,17 +212,24 @@ G.scene.sailing = (function () {
       return [x0, x1];
     },
     // Phase 67: the signpost at the pier's shore end: a leaning post with two boards pointing
-    // up the path, BAIT SHOP and CABIN, and a lantern hook.
-    sign: function (ctx, x, wy, rng) {
-      var deck = wy - 14, FN = G.gfx.sprites.fine, y0 = deck - 40;
+    // up the path, BAIT SHOP and CABIN, and a lantern hook. Phase 76: every water's pier has
+    // one; the CABIN board only where lm.cabin (Fogbound's), and lm.flip turns the boards to
+    // point west (the seas' piers stand at the east end).
+    sign: function (ctx, x, wy, rng, lm) {
+      var deck = wy - 14, FN = G.gfx.sprites.fine, y0 = deck - 40, fl = !!(lm && lm.flip), cab = !!(lm && lm.cabin);
       A.slab(ctx, x - 2, y0, 4, wy - y0 + 2, WOOD); A.box(ctx, 'wood_lit', x - 2, y0, 1, wy - y0);
       var B = ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit'];
-      A.slab(ctx, x - 26, y0 + 2, 44, 11, B); A.box(ctx, 'outline', x + 18, y0 + 4, 3, 7); A.px(ctx, 'wood_mid', x + 18, y0 + 7);
-      A.slab(ctx, x - 20, y0 + 15, 38, 11, B); A.box(ctx, 'outline', x + 18, y0 + 17, 3, 7); A.px(ctx, 'wood_mid', x + 18, y0 + 20);
-      FN.drawText(ctx, 'BAIT SHOP', x - 23, y0 + 4, 'paper_dark');
-      FN.drawText(ctx, 'CABIN', x - 14, y0 + 17, 'paper_dark');
+      // a board w wide with its point 3 px past the post's side (x + 18, or mirrored about the
+      // post for fl), its text tx px in from the tail
+      function board(by, w, txt, tx) {
+        var x0 = fl ? x - 18 : x + 18 - w, tip = fl ? x - 21 : x + 18;
+        A.slab(ctx, x0, by, w, 11, B); A.box(ctx, 'outline', tip, by + 2, 3, 7); A.px(ctx, 'wood_mid', fl ? tip + 2 : tip, by + 5);
+        FN.drawText(ctx, txt, fl ? x0 + w - tx - FN.measure(txt) : x0 + tx, by + 2, 'paper_dark');
+      }
+      board(y0 + 2, 44, 'BAIT SHOP', 3);
+      if (cab) board(y0 + 15, 38, 'CABIN', 6);
       A.reset();
-      return [x - 26, x + 21];
+      return fl ? [x - 22, x + 25] : [x - 26, x + 21];
     },
     // A rusted channel buoy: a float at the waterline, a lattice cage, a dead lamp, a bell.
     marker: function (ctx, x, wy, rng) {

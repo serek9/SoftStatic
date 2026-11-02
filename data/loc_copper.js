@@ -61,6 +61,7 @@ G.data.locations.copper = {
 
   landmarks: [
     { id: 'pier', kind: 'pier', x: 96, seed: 7302 },
+    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
     { id: 'snag_a', kind: 'snag', x: 380 },
     { id: 'snag_b', kind: 'snag', x: 1120 }
   ],

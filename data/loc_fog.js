@@ -32,7 +32,7 @@ G.data.locations.fog = {
   start: 150,
   // Phase 67: the pier at the west end, under the shore with the bait shop and the cabin. A
   // boat within reach px of x can tie up there (js/ui/dock.js).
-  dock: { x: 96, reach: 60 },
+  dock: { x: 96, reach: 60, cabin: true }, // Phase 76: the cabin is up this pier's path only
   // Phase 20: the surface's swell, in the 640×360 view's pixels: amp is the largest height,
   // waves are [wavelength px, speed px/s, share of amp]; mirror scales how much it shivers
   // the reflection. Fogbound is low and slow.
@@ -92,7 +92,7 @@ G.data.locations.fog = {
   // On the water at the boat's distance (parallax 1): x is where the landmark is centred.
   landmarks: [
     { id: 'pier', kind: 'pier', x: 96, seed: 3301 }, // the same pier stands in The Pines (11.4); Phase 67: at the west end
-    { id: 'sign', kind: 'sign', x: 50 },              // Phase 67: the signpost at its shore end
+    { id: 'sign', kind: 'sign', x: 50, cabin: true }, // Phase 67: the signpost at its shore end (76: with its CABIN board)
     { id: 'marker_a', kind: 'marker', x: 560 },
     { id: 'wreck', kind: 'wreck', x: 770 },
     { id: 'marker_b', kind: 'marker', x: 985 }
