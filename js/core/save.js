@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 6;
+  var VERSION = 7;
   var PREFIX = 'SS1';
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
@@ -50,6 +50,19 @@ G.core.save = (function () {
     5: function (s) {
       s.gear.lineType = 'mono';
       s.gear.lineTypes = ['mono'];
+      return s;
+    },
+    // v6 -> v7 (Phase 68): the 46 invented fish became 59 real species. Everything that named
+    // an old species is dropped, as the user chose: the journal (and its late hints), the
+    // fish kept for the cabin's wall and the tapes. Coins, gear, baits, lures, waters opened,
+    // the cabin and the settings stay.
+    6: function (s) {
+      s.journal = {};
+      s.kept = [];
+      s.tapes = [];
+      s.flags = s.flags || {};
+      s.flags.lateAt = 0;
+      s.flags.heavy = {};
       return s;
     }
   };

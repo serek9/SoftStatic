@@ -30,8 +30,39 @@ G.sim.economy = (function () {
     return out;
   }
 
+  // Phase 68: no rarity; a species' price is its own.
   function price(sp, q, data) {
-    return Math.round(sp.price * data.gear.economy.rarityMult[sp.rarity] * sizeFactor(q, data));
+    return Math.round(sp.price * sizeFactor(q, data));
+  }
+
+  // Phase 68: the size quantiles [lo, hi] (into out) of species sp that a hook made for size
+  // classes `sizes` (gear lures' sizes; none: every size) catches, by weight against
+  // G.data.SIZE_CLASSES. Returns false when none of the species is that size. The weight at q
+  // is w0 + (w1 - w0) × q^1.3 (size), so q = ((w - w0) / (w1 - w0))^(1 / 1.3).
+  function qRange(sp, sizes, data, out) {
+    out[0] = 0; out[1] = 1;
+    if (!sizes) return true;
+    var C = data.SIZE_CLASSES, lo = Infinity, hi = -Infinity, w0 = sp.weightKg[0], w1 = sp.weightKg[1], i;
+    for (i = 0; i < C.length; i++) {
+      if (sizes.indexOf(C[i].id) < 0) continue;
+      var a = i ? C[i - 1].maxKg : 0, b = C[i].maxKg;
+      if (a < lo) lo = a;
+      if (b > hi) hi = b;
+    }
+    if (hi <= w0 || lo >= w1) return false;
+    if (w1 > w0) {
+      out[0] = lo > w0 ? Math.pow((lo - w0) / (w1 - w0), 1 / 1.3) : 0;
+      out[1] = hi < w1 ? Math.pow((hi - w0) / (w1 - w0), 1 / 1.3) : 1;
+    }
+    return true;
+  }
+  // The size quantile of a fish of species sp hooked on hook id from a uniform draw u (one
+  // rng.next()): the size curve (sizeQ) inside what the hook is made for (qRange).
+  var QR = [0, 1];
+  function hookQ(sp, id, u, data) {
+    var b = baitById(id, data);
+    if (!qRange(sp, b && b.sizes, data, QR)) { QR[0] = 0; QR[1] = 1; }
+    return QR[0] + (QR[1] - QR[0]) * sizeQ(u, data);
   }
 
   // A bait or a lure (Phase 43) by id: what can go on the hook.
@@ -117,7 +148,6 @@ G.sim.economy = (function () {
     out.swim = out.lure ? bait.swim : ''; out.sink = out.lure ? bait.sink : 1; out.maxDepthM = out.lure ? bait.maxDepthM : 99;
     out.topDepthM = g.topDepthM;
     out.attract = rod.attract * bait.attract;
-    out.rareBoost = bait.rareBoost;
     out.bait = bait.id;
     out.reelSpeed = g.reels[s.reel].speed;
     var lt = lineTypeById(s.lineType, data);                            // Phase 53
@@ -171,7 +201,7 @@ G.sim.economy = (function () {
     return true;
   }
 
-  // A landed fish into the save. c: {id, len, w, price, hintRefs, windowCatch}; choice 'sell',
+  // A landed fish into the save. c: {id, len, w, price, windowCatch, bait}; choice 'sell',
   // 'keep' or (Phase 51) 'release': let go, it still counts in the journal, and earns nothing.
   function recordCatch(save, c, choice) {
     var j = save.journal[c.id];
@@ -179,7 +209,6 @@ G.sim.economy = (function () {
     j.caught++; j.seen = true; j.phantom = false;
     if (c.len > j.bestLen) j.bestLen = c.len;
     if (c.w > j.bestW) j.bestW = c.w;
-    for (var i = 0; i < c.hintRefs.length; i++) if (j.hints.indexOf(c.hintRefs[i]) < 0) j.hints.push(c.hintRefs[i]);
     if (c.windowCatch) save.flags.windowCatch[c.windowCatch] = true;
     if (c.bait) { if (!j.took) j.took = []; if (j.took.indexOf(c.bait) < 0) j.took.push(c.bait); } // Phase 43: what it was caught on
     if (choice === 'sell') save.coins += c.price;
@@ -226,7 +255,7 @@ G.sim.economy = (function () {
 
   return {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
-    sizeFactor: sizeFactor, sizeQ: sizeQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
+    sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
     ownsRod: ownsRod, nextLadderRod: nextLadderRod, buyRod: buyRod, useRod: useRod, loseLure: loseLure,
     lineTypeById: lineTypeById, ownsLineType: ownsLineType, buyLineType: buyLineType, useLineType: useLineType,
     nextItem: nextItem, buy: buy, buyBait: buyBait, useBait: useBait, recordCatch: recordCatch,

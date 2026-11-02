@@ -10,7 +10,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 //   reel:  speed (D shrink while reeling a tired fish, V4)
 //   line:  strength (how fast tension builds against a pulling fish, V4); Phase 53: the tiers
 //          are the line's test (6 lb up to 25 lb), and lineTypes the line itself (below)
-//   bait:  attract (fish turn up sooner) and rareBoost (rare and legendary weights)
+//   bait:  attract (fish turn up sooner); as: the bait fish take it as (Phase 68)
 //   lantern: deep fish show in colour at night; depth finder: depth bands on the HUD
 // Costs are tuned with `node tools/balance.js --pacing` against the V8 targets.
 G.data = G.data || {};
@@ -35,7 +35,7 @@ G.data.gear = {
   ],
   lines: [
     { id: 'line_0', name: '6 lb Test', cost: 0, strength: 1.0 },
-    { id: 'line_1', name: '8 lb Test', cost: 40, strength: 1.25 },
+    { id: 'line_1', name: '8 lb Test', cost: 120, strength: 1.25 },
     { id: 'line_2', name: '12 lb Test', cost: 260, strength: 1.6 },
     { id: 'line_3', name: '17 lb Test', cost: 950, strength: 2.0 },
     { id: 'line_4', name: '25 lb Test', cost: 3200, strength: 2.6 }
@@ -55,28 +55,31 @@ G.data.gear = {
     { id: 'braid', name: 'Braided Line', cost: 240, strength: 1.35, rise: 1.2, shake: 1.4, hold: 0.08, seen: true, feel: 1.8, sinkG: 1.5, belly: 1.012, key: 'moss_hi', alpha: 0.8 }
   ],
   // cost is per bait and the shop sells `pack` at a time; 0 with unlimited: true never runs
-  // out. label false: the shelf item with no label and a strange price (V10.7); it is a real rare bait.
+  // out. label false: the shelf item with no label and a strange price (V10.7). Phase 68: with
+  // no rare fish left it is taken as a worm (as), and fish come to it a little sooner.
   baits: [
-    { id: 'worm', name: 'Nightcrawlers', cost: 0, unlimited: true, attract: 1.0, rareBoost: 1.0 },
-    { id: 'cricket', name: 'Crickets', cost: 3, pack: 10, attract: 1.25, rareBoost: 1.0 },
-    { id: 'minnow', name: 'Minnows', cost: 6, pack: 10, attract: 1.4, rareBoost: 1.3 },
-    { id: 'unlabelled', name: '', label: false, cost: 47, pack: 1, attract: 1.1, rareBoost: 3.0 }
+    { id: 'worm', name: 'Nightcrawlers', cost: 0, unlimited: true, attract: 1.0 },
+    { id: 'cricket', name: 'Crickets', cost: 3, pack: 10, attract: 1.25 },
+    { id: 'minnow', name: 'Minnows', cost: 6, pack: 10, attract: 1.4 },
+    { id: 'unlabelled', name: '', label: false, cost: 47, pack: 1, attract: 1.1, as: 'worm' }
   ],
   // Phase 43: lures. Not used up by a cast: one is lost when the line snaps, and counted in save.baits like the baits. cost is per lure, sold `pack` at a time.
   // swim: where it fishes (the scene: sink × the bait's sink speed, down to maxDepthM m; 'top'
   // floats; 'dive' dives while reeled; Phase 65: 'float' hangs a bait under a float, 'flutter'
-  // falls fluttering). Fish take them by fish.lures, or (carries) as the bait they carry.
+  // falls fluttering). Fish take them by fish.lureTypes[type], or (carries) as the bait they
+  // carry. Phase 68: type (G.data.LURE_TYPES) and sizes, the size classes (S M L XL XXL,
+  // G.data.SIZE_CLASSES) of the fish it is made for; a float rig goes by its bait alone.
   lures: [
-    { id: 'spinner', name: 'Brass Spinner', cost: 18, pack: 2, attract: 1.3, rareBoost: 1.1, swim: 'mid', sink: 0.6, maxDepthM: 7 },
-    { id: 'plug', name: 'Minnow Plug', cost: 26, pack: 1, attract: 1.35, rareBoost: 1.2, swim: 'dive', sink: 0, maxDepthM: 4 },
-    { id: 'grub', name: 'Soft Grub', cost: 6, pack: 4, attract: 1.25, rareBoost: 1.0, swim: 'bed', sink: 1, maxDepthM: 99 },
-    { id: 'popper', name: 'Cup Popper', cost: 22, pack: 1, attract: 1.25, rareBoost: 1.15, swim: 'top', sink: 0, maxDepthM: 0 },
-    { id: 'jig', name: 'Feather Jig', cost: 14, pack: 2, attract: 1.3, rareBoost: 1.25, swim: 'lift', sink: 1.8, maxDepthM: 99 },
+    { id: 'spinner', name: 'Brass Spinner', type: 'spinner', sizes: ['S', 'M', 'L'], cost: 18, pack: 2, attract: 1.3, swim: 'mid', sink: 0.6, maxDepthM: 7 },
+    { id: 'plug', name: 'Minnow Plug', type: 'crank', sizes: ['S', 'M'], cost: 26, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 4 },
+    { id: 'grub', name: 'Soft Grub', type: 'wacky', sizes: ['S', 'M', 'L'], cost: 6, pack: 4, attract: 1.25, swim: 'bed', sink: 1, maxDepthM: 99 },
+    { id: 'popper', name: 'Cup Popper', type: 'topwater', sizes: ['S', 'M', 'L'], cost: 22, pack: 1, attract: 1.25, swim: 'top', sink: 0, maxDepthM: 0 },
+    { id: 'jig', name: 'Feather Jig', type: 'jighead', sizes: ['M', 'L', 'XL'], cost: 14, pack: 2, attract: 1.3, swim: 'lift', sink: 1.8, maxDepthM: 99 },
     // Phase 65: a red-and-white float with a hook and a worm hung under it at maxDepthM ('float':
     // the float lies on the surface, the bait at its depth; carries: the fish take it as that
     // bait), and a casting spoon ('flutter': it falls fast and flutters, and wobbles low).
-    { id: 'bobber', name: 'Bobber Rig', cost: 6, pack: 2, attract: 1.2, rareBoost: 1.0, swim: 'float', sink: 1, maxDepthM: 6, carries: 'worm' },
-    { id: 'spoon', name: 'Casting Spoon', cost: 16, pack: 2, attract: 1.3, rareBoost: 1.1, swim: 'flutter', sink: 1.4, maxDepthM: 99 }
+    { id: 'bobber', name: 'Bobber Rig', type: 'float', sizes: ['S', 'M', 'L', 'XL', 'XXL'], cost: 6, pack: 2, attract: 1.2, swim: 'float', sink: 1, maxDepthM: 6, carries: 'worm' },
+    { id: 'spoon', name: 'Casting Spoon', type: 'spoon', sizes: ['S', 'M', 'L'], cost: 16, pack: 2, attract: 1.3, swim: 'flutter', sink: 1.4, maxDepthM: 99 }
   ],
   lantern: { id: 'lantern', name: 'Storm Lantern', cost: 250, nightDepth: 999 },     // px: no night silhouettes
   depthFinder: { id: 'depth_finder', name: 'Depth Finder', cost: 180, bands: 4 },  // m between bands on the HUD
@@ -99,10 +102,10 @@ G.data.gear = {
     jumpRate: 0.25, jumpLen: 1, jumpHigh: 0.6, jumpSpike: 0.6
   },
 
-  // Prices (V8): base × rarityMult × sizeFactor, sizeFactor from sizeMin to sizeMax.
+  // Prices (V8; Phase 68: no rarity): base × sizeFactor, sizeFactor from sizeMin to sizeMax.
   // sizeCurve (Phase 44): the size quantile is u^sizeCurve, so most fish are on the small side;
   // sizeMin went 0.7 -> 0.85 with it, keeping the mean sizeFactor at 1.1.
-  economy: { rarityMult: { common: 1, uncommon: 2.5, rare: 8, legendary: 40 }, sizeMin: 0.85, sizeMax: 1.5, sizeCurve: 1.6 },
+  economy: { sizeMin: 0.85, sizeMax: 1.5, sizeCurve: 1.6 },
 
   // Cabin restoration (V9), one stage after another; cabinLevel is the index reached.
   // plaques: how many kept fish can be mounted at that stage.

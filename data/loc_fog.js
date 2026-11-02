@@ -105,15 +105,14 @@ G.data.locations.fog = {
     weed: 'moss', weedDark: 'moss_dark', weedDensity: 0.07, shaftEvery: 150
   },
 
-  // Where casts land matters (sim/unease.js castBoost): attract (fish turn up sooner), rare
-  // (× rare and legendary weights) and legend (× legendary weights) for a lure landing
-  // within r px. kind 'hidden': the dog stares at it once (10.3). kind 'legendary': the dog
-  // barks toward it while a legendary species lives here.
+  // Where casts land matters (sim/unease.js castBoost): attract (fish turn up sooner) for a
+  // lure landing within r px. kind 'hidden': the dog stares at it once (10.3). Phase 68: the
+  // legendary spots are ordinary places where fish gather (no rarity, no bark).
   spots: [
     { id: 'pier_shade', kind: 'open', x: 96, r: 36 },
     { id: 'channel', kind: 'open', x: 560, r: 40 },
     { id: 'wreck_hollow', kind: 'open', x: 770, r: 30 },
-    { id: 'cold_hole', kind: 'legendary', x: 880, r: 22, legend: 4, where: 'over the cold hole, past the wreck' },
-    { id: 'reed_gap', kind: 'hidden', x: 1110, r: 24, attract: 1.6, rare: 2 }
+    { id: 'cold_hole', kind: 'open', x: 880, r: 22, attract: 1.3 },
+    { id: 'reed_gap', kind: 'hidden', x: 1110, r: 24, attract: 1.6 }
   ]
 };

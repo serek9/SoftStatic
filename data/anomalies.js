@@ -9,7 +9,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 //     params.place 'near' puts it within a cast of the boat (between 40 px and the rod's
 //     reach, either side); 'boat' puts it on the boat itself.
 //   effect 'spotBoost': a cast landing within params.r px of it, while it shows, gets the
-//     rare and legendary weights × params.rare for that cast (sim/unease.js castBoost).
+//     attract × params.attract for that cast: fish turn up sooner (sim/unease.js castBoost;
+//     Phase 68: it raised rare weights until the rarities went).
 //   effect 'revealHint': when it ends, a true hint the player has not found is written
 //     into the journal (sim/unease.js lateHint).
 // The scheduler rolls every `check` s while none is active: chance × unease per roll,
@@ -21,11 +22,11 @@ G.data.anomalies = {
   gap: 45,
   list: [
     { id: 'reflected_figure', locations: ['fog', 'creek', 'pines', 'red'], uneaseMin: 0.3, hours: [19, 5], cooldown: 240, kind: 'reflection',
-      params: { what: 'figure', place: 'near', dur: [14, 22], r: 26, rare: 3 }, effect: 'spotBoost' },
+      params: { what: 'figure', place: 'near', dur: [14, 22], r: 26, attract: 1.8 }, effect: 'spotBoost' },
     { id: 'lit_window', locations: ['fog', 'creek', 'pines'], uneaseMin: 0.45, hours: [20, 5], cooldown: 300, kind: 'reflection',
-      params: { what: 'window', place: 'near', dur: [16, 24], r: 30, rare: 3 }, effect: 'spotBoost' },
+      params: { what: 'window', place: 'near', dur: [16, 24], r: 30, attract: 1.8 }, effect: 'spotBoost' },
     { id: 'second_pier', locations: ['fog', 'pines'], uneaseMin: 0.6, hours: null, cooldown: 420, kind: 'reflection',
-      params: { what: 'pier', place: 'near', dur: [18, 26], r: 40, rare: 2.5 }, effect: 'spotBoost' },
+      params: { what: 'pier', place: 'near', dur: [18, 26], r: 40, attract: 1.6 }, effect: 'spotBoost' },
     { id: 'empty_boat', locations: ['fog', 'creek', 'pines', 'red'], uneaseMin: 0.8, hours: [1, 4], cooldown: 900, kind: 'reflection',
       params: { what: 'empty_boat', place: 'boat', dur: [8, 12] }, effect: 'revealHint' }
   ]
@@ -51,7 +52,7 @@ G.data.validateAnomalies = function (A, ref) {
     if (!WHAT[q.what]) errs.push(p + 'params.what "' + q.what + '"');
     if (q.place !== 'near' && q.place !== 'boat') errs.push(p + 'params.place');
     if (!(q.dur && q.dur.length === 2 && q.dur[0] > 0 && q.dur[0] <= q.dur[1] && q.dur[1] <= 60)) errs.push(p + 'params.dur (short: at most 60 s)');
-    if (a.effect === 'spotBoost' && !(q.r > 0 && q.rare > 1)) errs.push(p + 'spotBoost needs params.r and params.rare > 1');
+    if (a.effect === 'spotBoost' && !(q.r > 0 && q.attract > 1)) errs.push(p + 'spotBoost needs params.r and params.attract > 1');
     if (a.effect !== undefined && a.effect !== 'spotBoost' && a.effect !== 'revealHint' && a.effect !== 'none') errs.push(p + 'effect "' + a.effect + '"');
   }
   return errs;

@@ -227,7 +227,7 @@ G.core.debug = (function () {
       var save = G.state.save, list = G.data.fish;
       for (var i = 0; i < Math.min(n || list.length, list.length); i++) {
         var sp = list[i];
-        G.sim.economy.recordCatch(save, { id: sp.id, len: sp.lengthCm[0], w: sp.weightKg[0], price: 0, hintRefs: sp.hintRefs, windowCatch: null }, 'sell');
+        G.sim.economy.recordCatch(save, { id: sp.id, len: sp.lengthCm[0], w: sp.weightKg[0], price: 0, windowCatch: null }, 'sell');
       }
       return Object.keys(save.journal).length;
     },
@@ -318,6 +318,25 @@ G.core.debug = (function () {
     // dbg.lureBody() returns the lure's heading (degrees: 0 right, 90 down, 180 left), its
     // flutter 0..1, its velocity (px/s) and the current at it (Phase 22).
     lureBody: function () { return G.scene.underwater.body(); },
+    // dbg.who() (Phase 68): which species can bite here and now, from the same weights the
+    // school spawns by (fish_ai.speciesWeights over the current cast's context): the water, the
+    // lure's depth, the hour, what is on the hook and the rod. Each: {id, chance (share of the
+    // total), weight}; with tooHeavy, the species the rod cannot hold.
+    who: function () {
+      var run = G.state.run, ctx = run.school && run.school.ctx;
+      if (!ctx) return 'no school yet';
+      var c = { species: ctx.species, loc: ctx.loc || G.state.save.loc, depthM: run.lureIn && run.lureIn.active ? run.lureIn.y * 0.25 : null,
+        hour: G.state.save.clock, bait: run.gearFx.bait, lure: run.gearFx.lure, rodMaxMass: run.gearFx.maxMass,
+        smallBoost: run.gearFx.smallBoost, smallMass: run.gearFx.smallMass, weights: null };
+      var total = G.sim.fish_ai.speciesWeights(c), out = [], heavy = [];
+      for (var i = 0; i < c.species.length; i++) {
+        var sp = c.species[i];
+        if (c.weights[i] > 0) out.push({ id: sp.id, chance: +(c.weights[i] / total).toFixed(3), weight: +c.weights[i].toFixed(3) });
+        else if (sp.locations.indexOf(c.loc) >= 0 && sp.mass > c.rodMaxMass && G.sim.fish_ai.weightOf(sp, c) > 0) heavy.push(sp.id);
+      }
+      out.sort(function (a, b) { return b.chance - a.chance; });
+      return { loc: c.loc, hook: c.bait, depthM: c.depthM, hour: +c.hour.toFixed(2), species: out, tooHeavy: heavy };
+    },
     // dbg.fishBody(i) returns a swimmer's body (Phase 27): school slot i (0..7) or 'hook'.
     // face, turn (0 none, else 0..1 through it), beatHz, phase 0..1, glide, pitch (slope,
     // head down positive when swimming its way), frame (fishgen.FR), speed and vy (px/s),
@@ -705,7 +724,7 @@ G.core.debug = (function () {
         ctx.imageSmoothingEnabled = false;
         for (var hi = 0; hi < HK.length; hi++) {
           var hb = HK[hi], hx1 = 8 + (hi % 3) * 210, hy1 = 184 + Math.floor(hi / 3) * 58, takers = 0;
-          for (var fi2 = 0; fi2 < G.data.fish.length; fi2++) { var ff = G.data.fish[fi2]; if (hb.swim ? ff.lures && ff.lures[hb.id] : ff.baitLikes.indexOf(hb.id) >= 0) takers++; }
+          for (var fi2 = 0; fi2 < G.data.fish.length; fi2++) if (G.data.fish[fi2].locations.length && G.sim.fish_ai.interest(G.data.fish[fi2], hb.id, !!hb.swim) > 0) takers++; // Phase 68
           ctx.drawImage(UWt.lureImg(hb.id, 0, 0), hx1, hy1, 33, 33);
           ctx.drawImage(UWt.lureImg(hb.id, 0, 1), hx1 + 34, hy1, 33, 33);
           F.drawText(ctx, hb.label === false ? '(no label)' : hb.name, hx1 + 72, hy1 + 2, 'bone');

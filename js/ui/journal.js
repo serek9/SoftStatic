@@ -1,11 +1,12 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
-// The field journal (9.3, V9): an overlay opened with J. Left page: location and rarity
-// filters over a grid of species, a silhouette until caught, NEW until looked at. Right
-// page: the entry, with the hints discovered so far. Entries are handwritten, and the
-// handwriting degrades with the current location's unease (V10.8, §2).
-// Hints are discovered by catching: the species' hintRefs on the first catch (economy
-// records them), the baits it takes on the second, its depth and hours on the third.
+// The field journal (9.3, V9): an overlay opened with J. Left page: location and family
+// (Phase 68: was rarity) filters over a grid of species, a silhouette until caught, NEW until
+// looked at. Right page: the entry, with the hints discovered so far. Entries are
+// handwritten, and the handwriting degrades with the current location's unease (V10.8, §2).
+// Phase 68: species that live in no water yet (the sea's) are left out. Hints are discovered
+// by catching: its favourite lure type on the first catch, the baits it takes on the second,
+// its depth and hours on the third.
 // The margin note "something heavier circles here" (D4) shows while a fish too heavy for
 // the rod has been near at that location and the rod still cannot hold it.
 // Pages also gain text after you leave them (10.5, V10.8): closing the journal lets
@@ -22,16 +23,19 @@ G.ui.journal = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu;
   var COLS = 5, ROWS = 5, CW = 52, CH = 46, GAP = 6, GX = 322, GY = 46; // Phase 54: the grid in the right panel
   var NOTES_W = 286, NOTES_MAX = 14;
-  var RARITIES = ['all', 'common', 'uncommon', 'rare', 'legendary'];
+  var FAMILIES = ['all'];  // Phase 68: 'all' and every family with a species in some water, in data order
+  // Phase 68: what each lure type is called in the notes.
+  var TYPE_NAMES = { float: 'a float', crank: 'crankbaits', spinner: 'spinnerbaits', spoon: 'spoons', dropshot: 'a dropshot',
+    wacky: 'a wacky worm', jighead: 'jigheads', topwater: 'topwater lures', blade: 'bladebaits', glide: 'glidebaits', swim: 'swimbaits' };
   var HEAVY_NOTE = 'something heavier circles here';
 
-  var locs = [], locIdx = 0, rarIdx = 0;
+  var locs = [], locIdx = 0, famIdx = 0;
   var list = [];          // species indices passing the filters
-  var focus = 2;          // 0 location filter, 1 rarity filter, 2 grid
+  var focus = 2;          // 0 location filter, 1 family filter, 2 grid
   var sel = 0, top = 0;   // selected entry in list; first visible grid row
   var entry = [];         // every line of the entry page, built on selection: {s, key, hand}
   var notes = [];         // the handwritten part of it, wrapped for the page: {s, key}
-  var page = { name: '', rarity: '', where: '', count: '', best: '', got: false, ghost: false };
+  var page = { name: '', family: '', where: '', count: '', best: '', got: false, ghost: false };
   var title = { loc: '', rar: '', count: '', shown: '' }, selIsNew = false, heavyNote = false;
 
   function jitter() {
@@ -39,12 +43,17 @@ G.ui.journal = (function () {
     return run.loc ? G.sim.unease.get(G.state.save, run.loc) : 0;
   }
 
-  // Filter choices: every location that has species, after 'all'.
+  // Filter choices: every location that has species, after 'all'; every family (Phase 68).
   function buildLocs() {
     locs.length = 0;
     locs.push('all');
     for (var id in G.data.locations) {
       for (var i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].locations.indexOf(id) >= 0) { locs.push(id); break; }
+    }
+    FAMILIES.length = 1;
+    for (var k = 0; k < G.data.fish.length; k++) {
+      var f = G.data.fish[k];
+      if (f.locations.length && FAMILIES.indexOf(f.family) < 0) FAMILIES.push(f.family);
     }
   }
 
@@ -56,17 +65,18 @@ G.ui.journal = (function () {
   function caught(id) { var j = G.state.save.journal[id]; return !!j && j.caught > 0; }
 
   function filter() {
-    var loc = locs[locIdx], rar = RARITIES[rarIdx], n = 0;
+    var loc = locs[locIdx], fam = FAMILIES[famIdx] || 'all', n = 0;
     list.length = 0;
     for (var i = 0; i < G.data.fish.length; i++) {
       var f = G.data.fish[i];
+      if (!f.locations.length) continue;                       // Phase 68: not in any water yet
       if (loc !== 'all' && f.locations.indexOf(loc) < 0) continue;
-      if (rar !== 'all' && f.rarity !== rar) continue;
+      if (fam !== 'all' && f.family !== fam) continue;
       list.push(i);
       if (caught(f.id)) n++;
     }
     title.loc = '< ' + locName(loc) + ' >';
-    title.rar = '< ' + (rar === 'all' ? 'all rarities' : rar) + ' >';
+    title.rar = '< ' + (fam === 'all' ? 'all families' : fam) + ' >';
     title.count = n + ' of ' + list.length + ' caught';
     title.shown = n + ' / ' + list.length;
     heavyNote = false;
@@ -82,44 +92,30 @@ G.ui.journal = (function () {
     select(sel);
   }
 
+  // Phase 68: every note is read from the species' data, so each is true: 'lure' (its
+  // favourite lure type and the others it takes), 'bait', 'depth' (and its hours), 'line'.
   function hintText(ref, sp) {
-    var p = ref.split(':');
-    if (p[0] === 'hour' && p[1] === 'grey') return 'Bites best in the grey hours, 07 to 17.';
-    if (p[0] === 'window') {
-      var w = G.sim.clock.windowById(G.data.windows, p[1]);
-      if (w) return 'Only between ' + hhmm(w.from) + ' and ' + hhmm(w.to) + '. The owl calls at ' + hhmm(w.cue) + '.';
-    }
-    if (p[0] === 'unease') return 'Comes only after sitting still a long while at night.';
-    // Phase 14: the rosters' other hint kinds (each is mechanically true; see data/fish.js).
-    if (p[0] === 'hour' && p[1] === 'night') return 'Bites best at night, 20 to 06.';
-    if (p[0] === 'bait') {
-      var b = G.sim.economy.baitById(p[1], G.data);
-      if (b) return 'Comes to ' + (b.label === false ? 'the jar with no label' : b.name.toLowerCase()) + '.';
-    }
     if (ref === 'line') return 'Shy of the line: it saw mine and turned away. Only fluorocarbon fools it.'; // Phase 53
-    if (ref === 'depth:deep') return 'Keeps to the deepest water here.';
-    if (ref === 'depth:shallow') return 'Stays near the surface.';
-    if (p[0] === 'spot') { var sp0 = spotById(sp, p[1]); if (sp0 && sp0.where) return 'Lives ' + sp0.where + '.'; }
-    if (p[0] === 'mover') return 'Stays by the ' + p[1] + ', wherever it stands now. The ' + p[1] + ' moves.';
+    if (ref === 'lure') return lureText(sp);
     if (ref === 'bait') return 'Takes ' + baitNames(sp) + '.';
     if (ref === 'depth') return 'Found ' + sp.habitat.depthMin + ' to ' + sp.habitat.depthMax + ' m down. ' + hoursText(sp);
-    return ref;
+    return '';
   }
 
-  // A spot of the species' own waters (data/loc_*.js spots) by id.
-  function spotById(sp, id) {
-    for (var l = 0; l < sp.locations.length; l++) {
-      var L = G.data.locations[sp.locations[l]], s = (L && L.spots) || [];
-      for (var i = 0; i < s.length; i++) if (s[i].id === id) return s[i];
-    }
-    return null;
+  function lureText(sp) {
+    var fav = [], also = [];
+    for (var k in sp.lureTypes) (sp.lureTypes[k] === 2 ? fav : also).push(TYPE_NAMES[k] || k);
+    if (!fav.length && !also.length) return 'Ignores lures. Only live bait, on a float or not.';
+    var s = fav.length ? 'Its favourite lure: ' + fav.join(', ') + '.' : '';
+    if (also.length) s += s ? ' Also takes ' + also.join(', ') + '.' : 'Takes ' + also.join(', ') + '.';
+    return s;
   }
 
   function hhmm(h) { var m = Math.round(h * 60); return (m < 600 ? '0' : '') + Math.floor(m / 60) + ':' + (m % 60 < 10 ? '0' : '') + (m % 60); }
 
   function baitNames(sp) {
     var name = function (id) { var b = G.sim.economy.baitById(id, G.data); return b ? (b.label === false ? 'the unlabelled jar' : b.name.toLowerCase()) : id; };
-    var s = sp.baitLikes.length ? sp.baitLikes.map(name).join(', ') : 'anything';
+    var s = sp.baitLikes.map(name).join(', ');
     // Phase 43: the lures it is proven to take: those it has been caught on.
     var j = G.state.save.journal[sp.id], on = j && j.took ? j.took.filter(function (id) { return G.sim.economy.isLure(id, G.data); }) : [];
     return on.length ? s + '; caught on ' + on.map(name).join(', ') : s;
@@ -127,8 +123,15 @@ G.ui.journal = (function () {
 
   function hoursText(sp) {
     if (!sp.timeLikes.length) return 'Any hour.';
-    var a = sp.timeLikes[0], b = sp.timeLikes[sp.timeLikes.length - 1];
-    return 'Likes ' + hhmm(a) + ' to ' + hhmm((b + 1) % 24) + '.';
+    // Phase 68: the hours can be two spells (dawn and dusk): each run of hours in turn.
+    var h = sp.timeLikes, out = [], i = 0;
+    while (i < h.length) {
+      var a = h[i];
+      while (i + 1 < h.length && h[i + 1] === (h[i] + 1) % 24) i++;
+      out.push(hhmm(a) + ' to ' + hhmm((h[i] + 1) % 24));
+      i++;
+    }
+    return 'Likes ' + out.join(' and ') + '.';
   }
 
   // Builds the entry page for list[i]. Viewing a caught entry clears its NEW mark.
@@ -138,7 +141,7 @@ G.ui.journal = (function () {
     if (sel >= (top + ROWS) * COLS) top = Math.floor(sel / COLS) - ROWS + 1;
     entry.length = 0; notes.length = 0;
     selIsNew = false;
-    page.name = ''; page.rarity = ''; page.where = ''; page.count = ''; page.best = ''; page.got = false; page.ghost = false;
+    page.name = ''; page.family = ''; page.where = ''; page.count = ''; page.best = ''; page.got = false; page.ghost = false;
     function add(s, key, hand) { entry.push({ s: s, key: key, hand: hand }); }
     function para(s, key, gap) {
       if (gap && notes.length) notes.push({ s: '', key: key });
@@ -148,19 +151,19 @@ G.ui.journal = (function () {
     if (!list.length) { para('Nothing here yet.', 'wood'); return; }
     var sp = G.data.fish[list[sel]], j = G.state.save.journal[sp.id], h, first = true;
     function note(ref) { para(hintText(ref, sp), j.late && j.late[ref] ? 'night_blue' : 'ink', first); first = false; }
-    page.rarity = sp.rarity;
+    page.family = sp.family;
     page.where = sp.locations.map(function (id) { return G.data.locations[id] ? G.data.locations[id].name : id; }).join(', ');
     if (j) j.lateNew = false;
     if (j && !j.caught && j.phantom) {
       page.name = sp.name; page.ghost = true;
-      add(sp.name, 'ink', true); add(sp.rarity, 'wood', false);
+      add(sp.name, 'ink', true); add(sp.family, 'wood', false);
       para('My writing. I do not remember catching it.', 'ink'); first = false;
       for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
       return;
     }
     if (!j || !j.caught) {
       page.name = '???'; page.where = '';
-      add('???', 'ink', true); add(sp.rarity, 'wood', false);
+      add('???', 'ink', true); add(sp.family, 'wood', false);
       para('Not caught yet.', 'wood'); first = false;
       if (j) for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
       return;
@@ -171,9 +174,10 @@ G.ui.journal = (function () {
     page.count = 'Caught ' + j.caught + (j.caught === 1 ? ' time' : ' times') + (j.released ? ', ' + j.released + ' let go' : ''); // Phase 51
     var bw = j.bestW < 0.1 ? Math.round(j.bestW * 1000) + ' g' : j.bestW.toFixed(2) + ' kg'; // Phase 44: small fish in grams
     page.best = j.bestLen.toFixed(1) + ' cm  |  ' + bw;
-    add(sp.name, 'ink', true); add(sp.rarity, 'wood', false); add(page.count, 'ink', true); add('Best ' + j.bestLen.toFixed(1) + ' cm, ' + bw, 'ink', true);
-    para(sp.desc, 'rust'); first = false;
+    add(sp.name, 'ink', true); add(sp.family, 'wood', false); add(page.count, 'ink', true); add('Best ' + j.bestLen.toFixed(1) + ' cm, ' + bw, 'ink', true);
+    para(sp.latin + '.', 'rust'); first = false;                   // Phase 68: the Latin name where the riddle was
     for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
+    if (j.hints.indexOf('lure') < 0) note('lure');
     if (j.caught >= 2 && j.hints.indexOf('bait') < 0) note('bait');
     if (j.caught >= 3 && j.hints.indexOf('depth') < 0) note('depth');
   }
@@ -201,7 +205,7 @@ G.ui.journal = (function () {
     var lr = M.axis('left', 'right'), ud = M.axis('up', 'down');
     if (focus < 2) {
       if (lr && focus === 0) { locIdx = (locIdx + lr + locs.length) % locs.length; sel = 0; top = 0; filter(); }
-      if (lr && focus === 1) { rarIdx = (rarIdx + lr + RARITIES.length) % RARITIES.length; sel = 0; top = 0; filter(); }
+      if (lr && focus === 1) { famIdx = (famIdx + lr + FAMILIES.length) % FAMILIES.length; sel = 0; top = 0; filter(); }
       if (ud > 0) focus++;
       if (ud < 0 && focus > 0) focus--;
       return true;
@@ -214,7 +218,7 @@ G.ui.journal = (function () {
 
   // ---- Drawing (Phase 54: the shared panel style) ------------------------------------------
   // Two panels (G.ui.panel) side by side over the world, nothing dimmed, as every menu since
-  // Phase 46: the entry on the left (the fish's name on its tab, its rarity beside it, the
+  // Phase 46: the entry on the left (the fish's name on its tab, its family beside it, the
   // picture on a dark plate, where it lives, how many, the biggest, then the notes, still in
   // handwriting that degrades with unease), and on the right the JOURNAL with the count, the
   // two filters as key caps and the grid of species with its scrollbar. The open book of
@@ -223,7 +227,6 @@ G.ui.journal = (function () {
   var PLATE_H = 80;
   // The book's ink keys, read on night ink: the notes, the plain words, the description, the late blue pen.
   var INK = { ink: 'bone', wood: 'fog_mid', rust: 'dusk_high', night_blue: 'teal_lit' };
-  var RAR_KEY = { common: 'fog_light', uncommon: 'teal_lit', rare: 'signal_amber', legendary: 'neon_red' };
 
   // A rounded tile: the species' portrait (a silhouette until known), lit when selected.
   function drawCell(ctx, k, x, y) {
@@ -251,7 +254,7 @@ G.ui.journal = (function () {
 
     // The left panel: the entry.
     x = LP[0]; y = LP[1];
-    U.frame(ctx, x, y, LP[2], LP[3], page.name || ' ', selIsNew ? 'NEW' : (page.rarity || ''), selIsNew ? 'neon_red' : (RAR_KEY[page.rarity] || 'fog_light'));
+    U.frame(ctx, x, y, LP[2], LP[3], page.name || ' ', selIsNew ? 'NEW' : (page.family || ''), selIsNew ? 'neon_red' : 'fog_light');
     var lx = U.left(x), ty = U.top(y), iw = LP[2] - 2 * U.PAD;
     ctx.fillStyle = P.night_deep; ctx.fillRect(lx + 1, ty, iw - 2, PLATE_H); ctx.fillRect(lx, ty + 1, iw, PLATE_H - 2);
     ctx.fillStyle = P.fog_dark; ctx.fillRect(lx + 1, ty + PLATE_H - 1, iw - 2, 1);
@@ -343,9 +346,10 @@ G.ui.journal = (function () {
   return {
     native: true,
     open: open, update: update, draw: draw, render: render, tap: tap, warm: warm,
-    rects: function () { return J_RECTS; }, // 8.4 #38: what the ESC key keeps off jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close,
+    rects: function () { return J_RECTS; }, // 8.4 #38: what the ESC key keeps off
+    jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close, // Phase 68: a comment had swallowed these since Phase 61
     lastLate: function () { return lastLate; },
-    state: function () { return { loc: locs[locIdx], rarity: RARITIES[rarIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
+    state: function () { return { loc: locs[locIdx], family: FAMILIES[famIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
   };
 })();
 

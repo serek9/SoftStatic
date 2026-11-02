@@ -93,33 +93,32 @@ G.sim.unease = (function () {
     return NONE;
   }
 
-  // Where a cast lands matters (§2): fills out {attract, rare, legend} for a lure landing at
-  // world x. An active spotBoost anomaly within reach raises rare weights; the location's
-  // spots add their own (data/loc_*.js: hidden spots attract and rare, legendary spots legend).
+  // Where a cast lands matters (§2): fills out {attract} for a lure landing at world x. An
+  // active spotBoost anomaly within reach and the location's spots (data/loc_*.js) bring fish
+  // sooner. Phase 68: the rare and legend boosts went with the rarities.
   // spots is the location's list as it stands for this cast (the Red Room's move, 11.3).
   function castBoost(A, spots, x, data, out) {
-    out.attract = 1; out.rare = 1; out.legend = 1;
+    out.attract = 1;
     if (A && A.on) {
       var a = data.anomalies.list[A.idx];
-      if (a.effect === 'spotBoost' && Math.abs(x - A.x) <= a.params.r) out.rare *= a.params.rare;
+      if (a.effect === 'spotBoost' && Math.abs(x - A.x) <= a.params.r) out.attract *= a.params.attract;
     }
     for (var i = 0; i < spots.length; i++) {
       var s = spots[i];
       if (Math.abs(x - s.x) > s.r) continue;
       if (s.attract) out.attract *= s.attract;
-      if (s.rare) out.rare *= s.rare;
-      if (s.legend) out.legend *= s.legend;
     }
     return out;
   }
 
   // ---- Late journal hints (10.5, and the revealHint effect) ------------------------------
-  // When the journal is closed, a page may gain one true hint the player never found: the
-  // species' hintRefs, then 'bait' and 'depth'. Uncaught species come first, in data order.
+  // When the journal is closed, a page may gain one true hint the player never found: its
+  // favourite 'lure' type, then 'bait' and 'depth' (Phase 68: every note is read from the
+  // species' data). Uncaught species come first, in data order.
   // Deterministic: the same save gives the same hint. Unless forced, it needs this
   // location's unease >= LATE.unease and at least one catch since the last late hint.
   // Writes save.journal (j.hints, j.late[ref], j.lateNew) and save.flags.lateAt.
-  var LATE = { unease: 0.4 };
+  var LATE = { unease: 0.4, refs: ['lure', 'bait', 'depth'] };
 
   function lateHint(save, loc, data, force) {
     var total = 0, id, pass, i, r;
@@ -129,11 +128,10 @@ G.sim.unease = (function () {
       for (i = 0; i < data.fish.length; i++) {
         var sp = data.fish[i], j = save.journal[sp.id], caught = j ? j.caught : 0;
         if (sp.locations.indexOf(loc) < 0 || (caught > 0) !== (pass === 1)) continue;
-        var refs = sp.hintRefs.concat(['bait', 'depth']);
-        for (r = 0; r < refs.length; r++) {
-          var ref = refs[r];
+        for (r = 0; r < LATE.refs.length; r++) {
+          var ref = LATE.refs[r];
           if (j && j.hints.indexOf(ref) >= 0) continue;
-          if ((ref === 'bait' && caught >= 2) || (ref === 'depth' && caught >= 3)) continue; // already shown by catching
+          if ((ref === 'lure' && caught >= 1) || (ref === 'bait' && caught >= 2) || (ref === 'depth' && caught >= 3)) continue; // already shown by catching
           if (!j) j = save.journal[sp.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: false, phantom: false };
           j.hints.push(ref);
           j.late = j.late || {};

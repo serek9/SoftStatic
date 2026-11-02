@@ -1,8 +1,8 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // The dog in the bow (V3.8): points at interested fish, looks down when a too-heavy fish
-// is about (7.6), stares once per location at a real hidden spot and barks toward a spot
-// that holds a legendary (10.3, V10.4). Never harmed, never threatened.
+// is about (7.6) and stares once per location at a real hidden spot (10.3; Phase 68: the
+// bark toward a legendary's spot went with the legendary fish). Never harmed, never threatened.
 G.scene = G.scene || {};
 G.scene.dog = (function () {
   var S = G.gfx.sprites;
@@ -116,11 +116,10 @@ G.scene.dog = (function () {
 
   var T = { alert: 0.5, point: 0.7 }, HOLD = 0.6;
 
-  // 10.3: px from the boat at which the dog notices its hidden spot or a legendary spot,
-  // how long it stares or barks (s), and how far the boat must go before it barks again.
-  var CUE = { stareR: 110, stare: 4, barkR: 80, bark: 2.5, rearm: 160 };
+  // 10.3: px from the boat at which the dog notices its hidden spot, and how long it stares (s).
+  var CUE = { stareR: 110, stare: 4 };
 
-  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0, barkArmed: true, cue: '', petT: 0,
+  function create() { return { pose: 'idle', t: 0, hold: 0, manual: 0, cue: '', petT: 0,
     voiceT: 0, since: 999, woofs: 0, woofT: 0, want: '', wantT: 0, bouts: 0, said: 0, last: '' }; }
 
   // Phase 42 (PLAN_TACKLE.md): the dog's voice. Now and then, by itself, a bout of 1-3 soft
@@ -128,7 +127,7 @@ G.scene.dog = (function () {
   // jumping near the boat, a big catch landed, the shop's bell; birds in Phase 49), but not
   // within VOICE.react s of the last bout. Never while a fish bites or is being hooked (the
   // scene says when: ctx.block), never while it sleeps or is being petted, and not at all
-  // with settings.dogBark off (ctx.on false): then only the legendary cue's pose remains, silent.
+  // with settings.dogBark off (ctx.on false).
   // G.vrng only: the voice is presentation.
   var VOICE = { gap0: 180, gap1: 480, react: 90, delay: 0.4, woof0: 0.35, woof1: 0.55, retry: 45 };
   var REACT = { jump: 1, catch: 1, bell: 1, bird: 1, cue: 1 };
@@ -195,17 +194,11 @@ G.scene.dog = (function () {
     return true;
   }
 
-  // True when a legendary species lives at location id (the bark never points at nothing).
-  function legendHere(id, fish) {
-    for (var i = 0; i < fish.length; i++) if (fish[i].rarity === 'legendary' && fish[i].locations.indexOf(id) >= 0) return true;
-    return false;
-  }
-
-  // 10.3: the stare (once per location, saved in flags.dogStare) and the bark (each time
-  // the boat comes near a legendary spot, after it has been away). Returns the spot id
-  // that set off a cue this step, or ''.
+  // 10.3: the stare (once per location, saved in flags.dogStare). Returns the spot id that
+  // set off a cue this step, or ''. Phase 68: the bark at a legendary spot went with the
+  // legendary fish; the dog still barks now and then on its own (Phase 42).
   function cues(d, save, loc, boatX, data) {
-    var spots = loc.spots || [], far = true, i, s;
+    var spots = loc.spots || [], i, s;
     for (i = 0; i < spots.length; i++) {
       s = spots[i];
       var dist = Math.abs(boatX - s.x);
@@ -214,17 +207,7 @@ G.scene.dog = (function () {
         setPose(d, 'stare', CUE.stare); d.cue = s.id;
         return s.id;
       }
-      if (s.kind === 'legendary') {
-        if (dist <= CUE.rearm) far = false;
-        if (d.barkArmed && dist <= CUE.barkR && legendHere(loc.id, data.fish)) {
-          d.barkArmed = false;
-          setPose(d, 'bark', CUE.bark); d.cue = s.id;
-          request(d, 'cue'); // Phase 42: heard too, when barks are on
-          return s.id;
-        }
-      }
     }
-    if (far) d.barkArmed = true;
     return '';
   }
 
@@ -268,5 +251,5 @@ G.scene.dog = (function () {
   // Phase 47: the woof's playback rate for the breed on the boat.
   function barkPitch(lk) { return breed(lk).bark; }
 
-  return { POSES: POSES, FRAMES: FRAMES, prebake: prebake, barkPitch: barkPitch, breed: breed, T: T, CUE: CUE, PET: PET, VOICE: VOICE, request: request, voice: voice, create: create, setPose: setPose, pet: pet, want: want, cues: cues, legendHere: legendHere, step: step, draw: draw };
+  return { POSES: POSES, FRAMES: FRAMES, prebake: prebake, barkPitch: barkPitch, breed: breed, T: T, CUE: CUE, PET: PET, VOICE: VOICE, request: request, voice: voice, create: create, setPose: setPose, pet: pet, want: want, cues: cues, step: step, draw: draw };
 })();

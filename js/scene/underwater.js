@@ -989,7 +989,7 @@ G.scene.underwater = (function () {
     fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
     h.depth = f.y;
-    h.q = G.sim.economy.sizeQ(G.rng.next(), G.data); // Phase 44: the size curve
+    h.q = G.sim.economy.hookQ(sp, run.cast.bait, G.rng.next(), G.data); // Phase 44: the size curve; Phase 68: in the lure's sizes
     G.sim.economy.size(sp, h.q, h);
     // gearFx: lineStrength, reelSpeed; Phase 23: the hook hold from how long the bite had waited
     G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data, G.sim.bite.hold(b.t, G.data));
@@ -1094,7 +1094,7 @@ G.scene.underwater = (function () {
       if (run.hook.lift >= 1) {
         fx.splash(run.hook.x, loc.waterY, 0.4);
         G.ui.card.open(G.ui.card.build(run.hook.sp, run.hook, G.state.save, run.cast.latched));
-        if (run.hook.sp.rarity !== 'common' || run.hook.w >= DOG_BIG) G.scene.dog.request(run.dog, 'catch'); // Phase 42: a big one
+        if (run.hook.w >= DOG_BIG) G.scene.dog.request(run.dog, 'catch'); // Phase 42: a big one (Phase 68: by weight alone)
         G.core.state.go(run, 'card');
         return;
       }

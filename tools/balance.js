@@ -35,11 +35,10 @@ function load() {
 // ---- --validate ---------------------------------------------------------------------------
 
 const BANNED = /\b(window|document|Math\.random|Date|performance|requestAnimationFrame|localStorage)\b/;
-const ROSTER = { common: 4, uncommon: 3, rare: 1, legendary: 1 }; // per location (V5)
 
 function stripCode(src) { return src.replace(/'(?:[^'\\\n]|\\.)*'/g, "''").replace(/\/\/.*$/gm, ''); }
 
-let sizeInfo = '', lineInfo = '';
+let sizeInfo = '', lineInfo = '', rosterInfo = '';
 function validate(G, opts) {
   const errors = [], warnings = [], d = G.data;
   const err = m => errors.push(m), warn = m => warnings.push(m);
@@ -53,7 +52,7 @@ function validate(G, opts) {
   }
 
   // Fish schema, cross-references, depth <= maxDepth (V5).
-  const ref = { locations: d.locations, windows: d.windows, bases: G.gfx.fishgen.BASE_NAMES, parts: G.gfx.fishgen.PARTS };
+  const ref = { locations: d.locations, bases: G.gfx.fishgen.BASE_NAMES };
   d.validateFish(d.fish, ref).forEach(e => err('fish ' + e));
   G.sim.clock.validateWindows(d.windows).forEach(e => err('window ' + e));
   if (d.anomalies) d.validateAnomalies(d.anomalies, { locations: d.locations }).forEach(e => err('anomaly ' + e));
@@ -61,42 +60,16 @@ function validate(G, opts) {
   d.fish.forEach(f => { try { G.gfx.fishgen.generate(f.look); } catch (e) { err('fish ' + f.id + ': look does not generate: ' + e.message); } });
 
   const g = d.gear;
-  // Phase 14: every hint ref is a known kind and true of the species (the journal prints it).
-  const NIGHT = [20, 21, 22, 23, 0, 1, 2, 3, 4, 5], GREY = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-  d.fish.forEach(f => f.hintRefs.forEach(ref => {
-    const [k, v] = ref.split(':'), p = 'fish ' + f.id + ': hint ' + ref + ' ';
-    const same = (a, b) => a.length === b.length && a.every(x => b.includes(x));
-    if (k === 'hour' && v === 'grey') { if (!same(f.timeLikes, GREY)) err(p + 'needs timeLikes = the grey hours'); }
-    else if (k === 'hour' && v === 'night') { if (!f.timeLikes.length || !f.timeLikes.every(h => NIGHT.includes(h))) err(p + 'needs night timeLikes'); }
-    else if (k === 'window') { if (!f.windows.includes(v)) err(p + 'not in its windows'); }
-    else if (k === 'unease') { if (!(f.uneaseMin > 0)) err(p + 'needs uneaseMin > 0'); }
-    else if (k === 'bait') { if (!f.baitLikes.includes(v) || !g.baits.some(b => b.id === v)) err(p + 'not a bait it takes'); }
-    else if (k === 'depth') {
-      const L = d.locations[f.locations[0]], deepest = L.maxDepth / 4;
-      if (v === 'deep' && f.habitat.depthMax < deepest * 0.6) err(p + 'habitat is not deep here');
-      if (v === 'shallow' && f.habitat.depthMax > 8) err(p + 'habitat is not shallow');
-      if (v !== 'deep' && v !== 'shallow') err(p + 'unknown depth hint');
-    } else if (k === 'spot') { if (!f.locations.some(l => (d.locations[l].spots || []).some(s => s.id === v && s.kind === 'legendary' && s.where))) err(p + 'needs a legendary spot with `where` in its waters'); }
-    else if (k === 'mover') { if (!f.locations.some(l => (d.locations[l].movers || []).some(m => m.id === v && (m.rare || 1) > 1)) || !['rare', 'legendary'].includes(f.rarity)) err(p + 'needs a rare-boosting mover and a rare species'); }
-    else err(p + 'unknown kind');
-  }));
+  // Phase 68: every bait a species takes exists, and every water has fish. Small fish (3-10 cm)
+  // are whichever real species are that small (the Phase 44 rule of two or three a water is gone).
+  d.fish.forEach(f => f.baitLikes.forEach(b => { if (!g.baits.some(x => x.id === b)) err('fish ' + f.id + ': baitLikes ' + b + ' is not a bait'); }));
   for (const id in d.locations) {
-    const n = d.locations[id].need && d.locations[id].need.fish;
-    if (n && !d.fish.some(f => f.id === n && (!d.locations[id].need.windowCatch || f.windows.includes(d.locations[id].need.windowCatch)))) err('location ' + id + ': need.fish ' + n + ' must exist and bite in need.windowCatch');
+    const here = d.fish.filter(f => f.locations.includes(id));
+    if (here.length < 6) err('roster ' + id + ': ' + here.length + ' species (want 6 or more)');
+    if (d.locations[id].need) err('location ' + id + ': need was removed in Phase 68 (the waters open by cost)');
   }
-
-  // Roster counts per location.
-  for (const id in d.locations) {
-    const here = d.fish.filter(f => f.locations.includes(id) && !d.isSmall(f)), have = {}; // Phase 44: small fish apart
-    here.forEach(f => { have[f.rarity] = (have[f.rarity] || 0) + 1; });
-    const short = Object.keys(ROSTER).filter(r => (have[r] || 0) !== ROSTER[r]).map(r => r + ' ' + (have[r] || 0) + '/' + ROSTER[r]);
-    if (short.length) (opts.strict ? err : warn)('roster ' + id + ': ' + short.join(', ') + ' (target 9 species, TODO P14)');
-  }
-  // Phase 44: two or three small fish in each water, 3-10 cm and 5-60 g.
-  for (const id in d.locations) {
-    const n = d.fish.filter(f => f.locations.includes(id) && d.isSmall(f)).length;
-    if (n < 2 || n > 3) err('small fish ' + id + ': ' + n + ' (want 2-3)');
-  }
+  rosterInfo = 'species by water: ' + Object.keys(d.locations).map(id => id + ' ' + d.fish.filter(f => f.locations.includes(id)).length).join(', ') +
+    ', waiting for the sea ' + d.fish.filter(f => !f.locations.length).length + '; small: ' + d.fish.filter(d.isSmall).map(f => f.id).join(', ');
   d.fish.filter(d.isSmall).forEach(f => {
     if (f.lengthCm[0] < 3 || f.weightKg[0] < 0.005 || f.weightKg[1] > 0.06) err('fish ' + f.id + ': a small fish is 3-10 cm and 5-60 g');
   });
@@ -128,12 +101,13 @@ function validate(G, opts) {
   });
   const seenBait = {};
   g.baits.forEach(b => {
-    if (typeof b.attract !== 'number' || typeof b.rareBoost !== 'number') err('bait ' + b.id + ': attract and rareBoost');
-    const key = b.attract + '/' + b.rareBoost;
+    if (typeof b.attract !== 'number') err('bait ' + b.id + ': attract');
+    if (b.rareBoost !== undefined) err('bait ' + b.id + ': rareBoost was removed in Phase 68');
+    if (b.as !== undefined && !g.baits.some(x => x.id === b.as && !x.as)) err('bait ' + b.id + ': as must be another bait');
+    const key = String(b.attract);
     if (seenBait[key]) err('bait ' + b.id + ': does the same as ' + seenBait[key]);
     seenBait[key] = b.id;
   });
-  if (!g.baits.some(b => b.label === false && b.rareBoost > 1)) err('bait: the unlabelled shelf item must be a real rare bait');
   // Phase 43: every rod's power, action, small-fish numbers and look; the lures; fish.lures.
   const PAL = G.gfx.sprites.PALETTE;
   g.rods.forEach(r => {
@@ -145,19 +119,19 @@ function validate(G, opts) {
   if (!(g.rodSmall.frac > 0 && g.rodSmall.frac < 1 && g.rodSmall.mass > 0)) err('rodSmall');
   const SWIM = ['mid', 'dive', 'bed', 'top', 'lift', 'float', 'flutter'], lureIds = (g.lures || []).map(l => l.id); // Phase 65: float, flutter
   (g.lures || []).forEach(l => {
-    if (!(l.cost > 0 && l.pack >= 1 && l.attract > 0 && l.rareBoost >= 1 && SWIM.includes(l.swim) && l.sink >= 0 && l.maxDepthM >= 0)) err('lure ' + l.id + ': cost, pack, attract, rareBoost, swim, sink, maxDepthM');
+    if (!(l.cost > 0 && l.pack >= 1 && l.attract > 0 && SWIM.includes(l.swim) && l.sink >= 0 && l.maxDepthM >= 0)) err('lure ' + l.id + ': cost, pack, attract, swim, sink, maxDepthM');
+    if (l.rareBoost !== undefined) err('lure ' + l.id + ': rareBoost was removed in Phase 68');
+    if (!d.LURE_TYPES.includes(l.type)) err('lure ' + l.id + ': type ' + l.type);                                   // Phase 68
+    const cls = d.SIZE_CLASSES.map(c => c.id);
+    if (!Array.isArray(l.sizes) || !l.sizes.length || l.sizes.some(s => !cls.includes(s)) || l.sizes.some((s, i) => i && cls.indexOf(s) !== cls.indexOf(l.sizes[i - 1]) + 1)) err('lure ' + l.id + ': sizes must be adjacent size classes');
     if (g.baits.some(b => b.id === l.id)) err('lure ' + l.id + ': shares an id with a bait');
     if (l.carries !== undefined && !g.baits.some(b => b.id === l.carries && b.unlimited)) err('lure ' + l.id + ': carries must be a bait that never runs out');
     if ((l.swim === 'float') !== (l.carries !== undefined)) err('lure ' + l.id + ': a float rig, and only a float rig, carries a bait');
   });
-  d.fish.forEach(f => {
-    if (!f.lures || typeof f.lures !== 'object') { err('fish ' + f.id + ': lures'); return; }
-    for (const k in f.lures) if (!lureIds.includes(k) || ![1, 2].includes(f.lures[k])) err('fish ' + f.id + ': lures.' + k + ' must be a lure id and 1 or 2');
-  });
-  // Every lure catches something in every water with the starting rod.
+  // Every lure catches something in every water with the starting rod (Phase 68: by its type
+  // and its sizes, through the sim's own interest()).
   for (const id in d.locations) lureIds.forEach(l => {
-    const lr = g.lures.find(x => x.id === l), takes = f => lr.carries ? (!f.baitLikes.length || f.baitLikes.includes(lr.carries)) : f.lures[l];
-    if (!d.fish.some(f => f.locations.includes(id) && takes(f) && f.mass <= g.rods[0].maxMass && !f.windows.length)) err('lure ' + l + ': nothing in ' + id + ' takes it on the cane rod');
+    if (!d.fish.some(f => f.locations.includes(id) && G.sim.fish_ai.interest(f, l, true) > 0 && f.mass <= g.rods[0].maxMass)) err('lure ' + l + ': nothing in ' + id + ' takes it on the cane rod');
   });
   // Phase 47: the looks (four fishers, four dogs): their shapes and every key in the palette.
   if (d.looks) d.validateLooks(d.looks, PAL).forEach(e => err('look ' + e));
@@ -179,7 +153,6 @@ function validate(G, opts) {
   if (!LT.some(t => !t.seen)) err('lineTypes: no line hides from line-shy fish');
   d.fish.forEach(f => { if (f.lineShy !== undefined && f.lineShy !== true) err('fish ' + f.id + ': lineShy must be true or absent'); });
   const shy = d.fish.filter(f => f.lineShy).map(f => f.id);
-  if (shy.includes((d.locations.red.need || {}).fish)) err('lineShy: the Red Room key fish must not be line-shy');
   lineInfo = 'line-shy species (' + shy.length + '): ' + shy.join(', ');
 
   // Phase 52: passive income is gone; nothing may bring it back (V7, D5 retired).
@@ -266,8 +239,9 @@ function validateLife(L, p, err) {
 // ---- Headless session (used by --replay and --pacing) ----------------------------------------
 // A scripted active player: cast, sink to a depth, wait, hook most bites, fight with the
 // auto-player, sell, buy along a plan. Everything runs through the real sim modules at the
-// fixed 1/60 step. Since Phase 14 it moves to each water it opens, and once it fishes the
-// Pines it hunts the Red Room's key: at the 03:33 window it fishes deep for Three-Thirty-Three.
+// fixed 1/60 step. Since Phase 14 it moves to each water it opens. Phase 68: the Red Room
+// needs no key fish any more (the hunt below finds no key and never runs); in the Pines and
+// the Red Room it fishes minnows it buys (P.baitAt).
 
 const DT = 1 / 60;
 const P = {
@@ -280,6 +254,10 @@ const P = {
   skill: 0.85,     // fight skill of an attentive player
   depthM: 8,       // the player's usual depth (per water: depthAt)
   depthAt: { fog: 8, creek: 6, pines: 8, red: 8 },
+  // Phase 68: the live bait it fishes at each water. The Pines' and the Red Room's best fish
+  // (pike, muskie, the striped bass hybrid) take minnows, not worms, so there it buys minnows
+  // a pack at a time with its own coins (worms when it cannot afford a pack).
+  baitAt: { fog: 'worm', creek: 'worm', pines: 'minnow', red: 'minnow' },
   huntDepthM: 24,  // m: where it fishes for the Red Room's key fish in its window
   lureX: 600
 };
@@ -321,6 +299,13 @@ function session(G, seed, opts) {
     if (!b.unlimited && !b.swim) st.spent += b.cost;
   }
 
+  // Phase 68: the pacing model's bait for this water (P.baitAt), bought when it runs out.
+  function modelBait() {
+    const id = P.baitAt[st.loc] || 'worm', b = S.economy.baitById(id, data);
+    save.gear.bait = id;
+    if (!b.unlimited && !(save.baits[id] > 0) && S.economy.buyBait(save, id, b.pack, data) === S.economy.OK) st.spent += b.cost * b.pack;
+  }
+
   function h(v) { st.hash = (Math.imul(st.hash ^ (v | 0), 0x01000193) >>> 0); }
   function event(what) { st.events.push({ t: st.time, catches: st.catches, coins: save.coins, what }); }
 
@@ -340,7 +325,7 @@ function session(G, seed, opts) {
     S.unease.step(save, uIn, DT, rng, data);
     const c = school.ctx;
     c.hour = save.clock; c.unease = S.unease.get(save, st.loc); c.bait = lure.bait; c.rodMaxMass = fx.maxMass;
-    c.attract = fx.attract; c.rareBoost = fx.rareBoost; c.depthM = lure.y * 0.25;
+    c.attract = fx.attract; c.depthM = lure.y * 0.25;
     c.lure = lure.lure = fx.lure; c.smallBoost = fx.smallBoost; c.smallMass = fx.smallMass; // Phase 43
     c.lineSeen = fx.lineSeen && !(opts && opts.unseen); // Phase 53
     st.t += DT;
@@ -349,6 +334,7 @@ function session(G, seed, opts) {
         if (st.t >= P.castTime) {
           st.phase = 'sink'; st.t = 0; st.attempts++;
           topUp();
+          if (!opts) modelBait();
           lure.active = true; lure.y = 0; lure.bait = S.economy.useBait(save, data);
           // The hunt: in the Pines, in (or just before) the key window, with the key not yet caught.
           const hunt = key && st.loc === 'pines' && !(save.journal[red.fish] && save.journal[red.fish].caught) &&
@@ -368,9 +354,9 @@ function session(G, seed, opts) {
         if (bite.slot >= 0 && school.fish[bite.slot].uid !== st.hookUid) { st.hookUid = school.fish[bite.slot].uid; st.willHook = rng.next() < P.hookRate; }
         bIn.reel = bite.slot >= 0 && st.willHook && bite.t >= P.hookDelay;
         if (S.bite.step(bite, bIn, DT, rng, data, school) === S.bite.HOOK) {
-          const f = school.fish[bite.slot], sp = data.fish[f.sp], q = S.economy.sizeQ(rng.next(), data), sz = S.economy.size(sp, q, {});
+          const f = school.fish[bite.slot], sp = data.fish[f.sp], q = S.economy.hookQ(sp, lure.bait, rng.next(), data), sz = S.economy.size(sp, q, {});
           st.cur = { sp: f.sp, id: sp.id, q, len: sz.len, w: sz.w,
-            price: S.economy.price(sp, q, data), hintRefs: sp.hintRefs, windowCatch: Object.keys(latched)[0] || null };
+            price: S.economy.price(sp, q, data), windowCatch: Object.keys(latched)[0] || null };
           S.fight.start(fight, f.sp, sp, fx, rng, data, S.bite.hold(bite.t, data)); // Phase 23: the hold from the hook-set time
           f.active = false; S.fish_ai.scatter(school); S.bite.reset(bite);
           lure.active = false; st.phase = 'fight'; st.t = 0; h(f.sp);
@@ -479,7 +465,7 @@ function pacing() {
       red: at('red') && at('red').t / 60, catches: s.st.catches, mix: s.st.mix, events: ev, coinsAt: s.st.coinsAt, windowCatch: Object.keys(s.save.flags.windowCatch) });
   }
   const median = k => { const v = rows.map(r => r[k]).filter(x => x != null).sort((a, b) => a - b); return v.length === rows.length ? v[Math.floor(v.length / 2)] : null; };
-  console.log('Active-player model (moves to each water it opens; hunts the Red Room key in the Pines; ' + JSON.stringify(P) + ')\n');
+  console.log('Active-player model (moves to each water it opens; fishes minnows in the Pines and the Red Room; ' + JSON.stringify(P) + ')\n');
   const r0 = rows[0];
   console.log('Seed ' + r0.seed + ' timeline:');
   r0.events.forEach(e => console.log('  ' + (e.t / 60).toFixed(1).padStart(6) + ' min  ' + String(e.catches).padStart(4) + ' catches  ' + e.what));
@@ -531,7 +517,12 @@ const OLD_SAVES = [
   // Phase 53: a v6 save with braid on the reel and fluorocarbon owned, and a released fish.
   { from: 'Phase 53, v6 with line types', save: { version: 6, coins: 300, gear: { rod: 1, rods: [0, 1], reel: 1, line: 2, lineType: 'braid', lineTypes: ['mono', 'fluoro', 'braid'], lantern: false, depthFinder: false, bait: 'worm' }, baits: {},
     journal: { mist_carp: { caught: 1, bestLen: 50, bestW: 1.9, hints: ['line'], seen: true, phantom: false, released: 1 } }, kept: [], cabinLevel: 0, unlocks: { fog: true }, loc: 'fog', unease: {}, clock: 12, lastSeen: 0,
-    flags: { windowCatch: {}, lines: {}, shopVisits: 1, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 6 }, lineType: 'braid' }
+    flags: { windowCatch: {}, lines: {}, shopVisits: 1, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 6 }, lineType: 'braid' },
+  // Phase 68: a v6 save from Phase 67 (6a4f20d) with old species in the journal and on the wall: they are dropped, the rest stays.
+  { from: 'Phase 67 (6a4f20d), v6 with old fish kept', save: { version: 6, coins: 1234, gear: { rod: 2, rods: [0, 1, 2], reel: 2, line: 2, lineType: 'mono', lineTypes: ['mono'], lantern: true, depthFinder: false, bait: 'bobber' }, baits: { bobber: 2, spoon: 1 },
+    journal: { sleeper: { caught: 1, bestLen: 150, bestW: 9.1, hints: ['spot:cold_hole'], seen: true, phantom: false, late: { bait: true } }, pier_roach: { caught: 12, bestLen: 20, bestW: 0.3, hints: [], seen: true, phantom: false, took: ['worm'] } },
+    kept: [{ id: 'sleeper', len: 150, w: 9.1 }, { id: 'pier_roach', len: 20, w: 0.3 }], cabinLevel: 2, unlocks: { fog: true, creek: true }, loc: 'creek', unease: { creek: 0.2 }, clock: 21, lastSeen: 0,
+    flags: { windowCatch: { owl_247: true }, lines: { carp_fog: true }, shopVisits: 14, heavy: { fog: true }, anomalies: {}, dogStare: { fog: true }, lateAt: 13 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 8 } }
 ];
 
 function savesCheck() {
@@ -561,6 +552,8 @@ function savesCheck() {
         if (s.gear.lineType !== (o.lineType || 'mono') || !E.ownsLineType(s, s.gear.lineType) || fx.lineType !== s.gear.lineType) probs.push('line type ' + s.gear.lineType); // Phase 53
         for (const id in G.data.locations) E.canUnlock(s, id, G.data);
         for (const id in s.journal) if (!G.data.fish.some(f => f.id === id)) probs.push('journal species ' + id + ' no longer exists');
+        s.kept.forEach(k => { if (!G.data.fish.some(f => f.id === k.id)) probs.push('kept species ' + k.id + ' no longer exists'); }); // Phase 68
+        if (s.coins !== o.save.coins) probs.push('coins ' + s.coins + ' (saved ' + o.save.coins + ')');               // Phase 68: dropping the old fish keeps the coins
         if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
         const want = o.look || { fisher: 'red_cap', dog: 'golden' }; // Phase 47: kept when chosen, the default when absent or broken
         if (s.look.fisher !== want.fisher || s.look.dog !== want.dog || G.data.lookOf(G.data.looks.fishers, s.look.fisher).id !== s.look.fisher || G.data.lookOf(G.data.looks.dogs, s.look.dog).id !== s.look.dog) probs.push('look ' + JSON.stringify(s.look));
@@ -589,9 +582,9 @@ function passiveCheck() {
   const noKey = !/'passive'/.test(src) && !/Tab:/.test(src) && !/passive\.js|tape\.js|away\(/.test(html);
   console.log((noKey ? 'PASS' : 'FAIL') + ' no TAB key, no button and no time-away call at boot');
   const SV = G.core.save, s0 = SV.defaults();
-  s0.coins = 37; s0.lastSeen = 1e12; s0.journal.gloam_perch = { caught: 2, bestLen: 20, bestW: 0.3, hints: [], seen: true, phantom: false };
+  s0.coins = 37; s0.lastSeen = 1e12; s0.journal.yellow_perch = { caught: 2, bestLen: 20, bestW: 0.3, hints: [], seen: true, phantom: false };
   const r = SV.importString(SV.exportString(JSON.parse(JSON.stringify(s0))));
-  const same = r.ok && r.save.coins === 37 && r.save.journal.gloam_perch.caught === 2 && Object.keys(r.save.journal).length === 1;
+  const same = r.ok && r.save.coins === 37 && r.save.journal.yellow_perch.caught === 2 && Object.keys(r.save.journal).length === 1;
   console.log((same ? 'PASS' : 'FAIL') + ' a save away for hours loads as it was saved (coins ' + (r.ok ? r.save.coins : '-') + ')');
   bad = (gone ? 0 : 1) + (noKey ? 0 : 1) + (same ? 0 : 1);
   return bad ? 1 : 0;
@@ -618,7 +611,7 @@ function fightCheck() {
   console.log('tier  player       landed  snapped  thrown  run out  (s to a loss)');
   for (let tier = 0; tier < g.lines.length; tier++) { // the five ladder tiers (Phase 43: with the rod's small-fish hold)
     const gear = { lineStrength: g.lines[tier].strength, reelSpeed: g.reels[tier].speed, maxMass: g.rods[tier].maxMass, smallHook: g.rods[tier].smallHook };
-    const fish = d.fish.filter(f => f.mass <= g.rods[tier].maxMass);
+    const fish = d.fish.filter(f => f.mass <= g.rods[tier].maxMass && f.locations.length); // Phase 68: the fish of today's waters (not the sea's)
     for (const [name, play] of players) {
       const rng = new G.core.rng.Rng(4242 + tier), n = { win: 0, snap: 0, thrown: 0, run: 0, lossT: 0 };
       for (const f of fish) for (let i = 0; i < N; i++) {
@@ -650,7 +643,7 @@ function fightCheck() {
   console.log('\nline     player      landed  snapped  thrown  run out   (tier 2)');
   for (const t of g.lineTypes) {
     const gear = { lineStrength: g.lines[2].strength * t.strength, reelSpeed: g.reels[2].speed, maxMass: g.rods[2].maxMass, smallHook: g.rods[2].smallHook, lineRise: t.rise, lineShake: t.shake, lineHold: t.hold };
-    const fish = d.fish.filter(f => f.mass <= g.rods[2].maxMass);
+    const fish = d.fish.filter(f => f.mass <= g.rods[2].maxMass && f.locations.length); // Phase 68: today's waters
     lt[t.id] = {};
     for (const sk of [0.5, 0.85]) {
       const rng = new G.core.rng.Rng(777), n = { win: 0, snap: 0, thrown: 0, run: 0 };
@@ -844,6 +837,7 @@ if (require.main === module) {
     const r = validate(load(), { strict: args.includes('--strict') });
     r.warnings.forEach(w => console.log('warn  ' + w));
     if (sizeInfo) console.log('info  ' + sizeInfo);
+    if (rosterInfo) console.log('info  ' + rosterInfo);
     if (lineInfo) console.log('info  ' + lineInfo);
     r.errors.forEach(e => console.log('ERROR ' + e));
     console.log(r.errors.length ? r.errors.length + ' error(s)' : 'validate: OK (' + r.warnings.length + ' warning(s))');
