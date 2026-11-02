@@ -34,6 +34,49 @@ function load() {
 
 // ---- --validate ---------------------------------------------------------------------------
 
+// Phase 70 (PLAN_SPECIES.md 3.5): every anatomy spec in data/fishlooks.js belongs to a species,
+// names only palette keys, paints (its portrait, and its swimmer in every frame), and its native
+// portrait fits 104×60.
+let looksInfo = '';
+function validateLooks(G, err) {
+  const d = G.data, FG = G.gfx.fishgen, PAL = G.gfx.sprites.PALETTE, looks = d.fishLooks;
+  if (!looks) { err('fishlooks: data/fishlooks.js is not loaded'); return; }
+  const sizes = [];
+  function keysIn(v, where, id) {
+    if (typeof v === 'string') { if (!PAL[v]) err('fishlook ' + id + ': ' + where + ' "' + v + '" is not a palette key'); return; }
+    if (Array.isArray(v)) v.forEach((x, i) => keysIn(x, where + '[' + i + ']', id));
+    else if (v && typeof v === 'object') for (const k in v) if (k !== 'k') keysIn(v[k], where + '.' + k, id);
+  }
+  const num = v => typeof v === 'number' && isFinite(v);
+  for (const id in looks) {
+    const L = looks[id], i = d.fish.findIndex(f => f.id === id);
+    if (i < 0) { err('fishlook ' + id + ': no such species'); continue; }
+    if (!(num(L.px) && L.px >= 40 && L.px <= 104)) err('fishlook ' + id + ': px 40..104');
+    if (!Array.isArray(L.body) || L.body.length < 4 || L.body.some((p, j) => !(p.length === 3 && p[1] < p[2] && (!j || p[0] > L.body[j - 1][0])))) err('fishlook ' + id + ': body [x, top, bottom], x rising, top above bottom');
+    if (!Array.isArray(L.ramp) || L.ramp.length < 4 || L.ramp.length > 6 || !Array.isArray(L.stops) || L.stops.length !== L.ramp.length - 1) err('fishlook ' + id + ': ramp of 4-6 keys, one stop fewer');
+    if (!L.head || !num(L.head.gill) || !Array.isArray(L.head.eye) || !Array.isArray(L.head.mouth) || !L.head.iris) err('fishlook ' + id + ': head gill, eye, mouth, iris');
+    if (!L.tail || !num(L.tail.len) || !num(L.tail.spread)) err('fishlook ' + id + ': tail len, spread');
+    if (!Array.isArray(L.fin) || L.fin.length !== 4) err('fishlook ' + id + ': fin ramp of 4 keys');
+    if (!Array.isArray(L.fins) || !L.fins.length) err('fishlook ' + id + ': fins');
+    keysIn({ ramp: L.ramp, fin: L.fin, iris: L.head && L.head.iris, rim: L.head && L.head.rim, tail: L.tail && [L.tail.ramp || [], L.tail.tip || []],
+      zones: (L.zones || []).map(z => z.ramp), fins: (L.fins || []).map(f => [f.ramp || [], f.mottle || [], f.spot ? f.spot[4] : []]), marks: (L.marks || []).map(m => m.key || []) }, 'keys', id);
+    try {
+      const g = FG.paintFit(id, L, 1e4, 1e4), wh = FG.cropSize(g), w = wh[0], h = wh[1];
+      sizes.push(id + ' ' + w + 'x' + h);
+      if (w > 104 || h > 60) err('fishlook ' + id + ': native portrait ' + w + 'x' + h + ' (must fit 104x60)');
+      FG.specKeys(g).forEach(k => { if (!PAL[k]) err('fishlook ' + id + ': paints "' + k + '", not a palette key'); });
+      [[96, 56], [46, 36]].forEach(([bw, bh]) => { const s = FG.cropSize(FG.paintFit(id, L, bw, bh)); if (s[0] > bw || s[1] > bh) err('fishlook ' + id + ': painted for ' + bw + 'x' + bh + ' it is ' + s[0] + 'x' + s[1]); });
+      const sl = FG.swimLen(d.fish[i]);
+      [0, 1, 3, 4, 5, 6, 7].forEach(fr => {
+        const s = FG.paintSpec(id, L, sl, sl, fr, true);
+        if (!(s.W <= sl && s.H <= sl)) err('fishlook ' + id + ': swimmer frame ' + fr + ' is ' + s.W + 'x' + s.H + ', past its ' + sl + ' px box');
+        FG.specKeys(s).forEach(k => { if (!PAL[k]) err('fishlook ' + id + ': swimmer paints "' + k + '"'); });
+      });
+    } catch (e) { err('fishlook ' + id + ': does not paint: ' + e.message); }
+  }
+  looksInfo = 'fish looks: ' + Object.keys(looks).length + ' painted (' + sizes.join(', ') + '), ' + (d.fish.length - Object.keys(looks).length) + ' placeholder';
+}
+
 const BANNED = /\b(window|document|Math\.random|Date|performance|requestAnimationFrame|localStorage)\b/;
 
 function stripCode(src) { return src.replace(/'(?:[^'\\\n]|\\.)*'/g, "''").replace(/\/\/.*$/gm, ''); }
@@ -58,6 +101,7 @@ function validate(G, opts) {
   if (d.anomalies) d.validateAnomalies(d.anomalies, { locations: d.locations }).forEach(e => err('anomaly ' + e));
   else err('anomalies: data/anomalies.js is not loaded');
   d.fish.forEach(f => { try { G.gfx.fishgen.generate(f.look); } catch (e) { err('fish ' + f.id + ': look does not generate: ' + e.message); } });
+  validateLooks(G, err);
 
   const g = d.gear;
   // Phase 68: every bait a species takes exists, and every water has fish. Small fish (3-10 cm)
@@ -890,6 +934,7 @@ if (require.main === module) {
     r.warnings.forEach(w => console.log('warn  ' + w));
     if (sizeInfo) console.log('info  ' + sizeInfo);
     if (rosterInfo) console.log('info  ' + rosterInfo);
+    if (looksInfo) console.log('info  ' + looksInfo);
     if (lineInfo) console.log('info  ' + lineInfo);
     if (lureInfo) console.log('info  ' + lureInfo);
     r.errors.forEach(e => console.log('ERROR ' + e));

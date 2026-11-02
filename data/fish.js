@@ -23,6 +23,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // lineShy (optional, Phase 53): it sees any line but fluorocarbon (gear lineTypes seen) and,
 // having circled the lure, turns away instead of nibbling.
 // look: the placeholder painter's body plan and palette until the real painter (Phases 70-72).
+// Phase 70: a species with an anatomy spec in data/fishlooks.js is painted from that instead.
 G.data = G.data || {};
 
 // The owl's windows: the owl still cries at 02:47 and 03:33 (no fish depends on them since Phase 68).
@@ -46,14 +47,14 @@ G.data.fish = [
     habitat: { depthMin: 1, depthMax: 10 }, speed: 1.3, strength: 0.5, fatigue: 0.13, mass: 0.2,
     lengthCm: [12, 32], weightKg: [0.05, 0.6], awareness: 46, caution: 0.3, price: 6,
     baitLikes: ['worm', 'cricket', 'minnow'], lureTypes: { wacky: 2, jighead: 1, dropshot: 1, spinner: 1, spoon: 1 }, timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], // by day
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1000 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1000 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   {
     id: 'walleye', name: 'Walleye', latin: 'Sander vitreus', family: 'perches', locations: ['fog', 'red'],
     habitat: { depthMin: 3, depthMax: 14 }, speed: 1.5, strength: 1, fatigue: 0.09, mass: 1.4,
     lengthCm: [30, 70], weightKg: [0.3, 5], awareness: 55, caution: 0.5, price: 42,
     baitLikes: ['minnow', 'worm'], lureTypes: { spoon: 2, spinner: 1, jighead: 1, crank: 1, blade: 1, dropshot: 1, wacky: 1 }, timeLikes: [18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6], // from dusk to dawn
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1001 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1001 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   // ---- sunfish & bass ----
   {
@@ -61,35 +62,35 @@ G.data.fish = [
     habitat: { depthMin: 1, depthMax: 8 }, speed: 1.2, strength: 0.6, fatigue: 0.12, mass: 0.25,
     lengthCm: [12, 28], weightKg: [0.1, 0.6], awareness: 44, caution: 0.3, price: 7,
     baitLikes: ['worm', 'cricket', 'minnow'], lureTypes: { dropshot: 2, jighead: 1, spinner: 1, crank: 1, wacky: 1 }, timeLikes: [5, 6, 7, 17, 18, 19, 20, 21], // at dawn and dusk
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'bronze', seed: 1002 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'bronze', seed: 1002 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   {
     id: 'smallmouth_bass', name: 'Smallmouth Bass', latin: 'Micropterus dolomieu', family: 'sunfish & bass', locations: ['fog'],
     habitat: { depthMin: 2, depthMax: 12 }, speed: 1.9, strength: 1.2, fatigue: 0.09, mass: 1, jumps: 0.6,
     lengthCm: [25, 50], weightKg: [0.3, 2.8], awareness: 58, caution: 0.45, price: 33,
     baitLikes: ['worm', 'cricket', 'minnow'], lureTypes: { crank: 2, jighead: 1, spinner: 1, topwater: 1, wacky: 1, dropshot: 1, swim: 1, blade: 1 }, timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], // by day
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1003 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1003 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   {
     id: 'largemouth_bass', name: 'Largemouth Bass', latin: 'Micropterus salmoides', family: 'sunfish & bass', locations: ['pines'],
     habitat: { depthMin: 0.5, depthMax: 8 }, speed: 1.7, strength: 1.3, fatigue: 0.09, mass: 1.4, jumps: 0.7,
     lengthCm: [25, 60], weightKg: [0.3, 5], awareness: 56, caution: 0.4, price: 42,
     baitLikes: ['worm', 'minnow', 'cricket'], lureTypes: { jighead: 2, topwater: 1, crank: 1, spinner: 1, wacky: 1, swim: 1, dropshot: 1 }, timeLikes: [5, 6, 7, 17, 18, 19, 20, 21], // at dawn and dusk
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1004 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1004 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   {
     id: 'bluegill', name: 'Bluegill Sunfish', latin: 'Lepomis macrochirus', family: 'sunfish & bass', locations: ['pines'],
     habitat: { depthMin: 0.5, depthMax: 5 }, speed: 1.3, strength: 0.4, fatigue: 0.15, mass: 0.15,
     lengthCm: [8, 25], weightKg: [0.03, 0.6], awareness: 44, caution: 0.3, price: 5,
     baitLikes: ['worm', 'cricket'], lureTypes: { wacky: 1, spinner: 1, jighead: 1 }, timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], // by day
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1005 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'olive', seed: 1005 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   {
     id: 'crappie', name: 'Crappie', latin: 'Pomoxis nigromaculatus', family: 'sunfish & bass', locations: ['pines', 'red'],
     habitat: { depthMin: 1, depthMax: 8 }, speed: 1.2, strength: 0.5, fatigue: 0.13, mass: 0.35,
     lengthCm: [15, 35], weightKg: [0.1, 1.2], awareness: 48, caution: 0.35, price: 9,
     baitLikes: ['minnow', 'worm'], lureTypes: { spoon: 2, jighead: 1, spinner: 1, wacky: 1, swim: 1 }, timeLikes: [18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6], // from dusk to dawn
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'silver', seed: 1006 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'silver', seed: 1006 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   // ---- temperate bass ----
   {
@@ -97,21 +98,21 @@ G.data.fish = [
     habitat: { depthMin: 1, depthMax: 10 }, speed: 1.8, strength: 0.9, fatigue: 0.1, mass: 0.5, jumps: 0.3,
     lengthCm: [20, 40], weightKg: [0.2, 1.5], awareness: 54, caution: 0.35, price: 12,
     baitLikes: ['minnow', 'worm'], lureTypes: { spinner: 2, crank: 2, spoon: 1, jighead: 1, blade: 1, topwater: 1, swim: 1 }, timeLikes: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], // by day
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'silver', seed: 1007 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'silver', seed: 1007 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   {
     id: 'hybrid_striped_bass', name: 'Hybrid Striped Bass', latin: 'Morone saxatilis × M. chrysops', family: 'temperate bass', locations: ['red'],
     habitat: { depthMin: 2, depthMax: 14 }, speed: 2.1, strength: 1.6, fatigue: 0.07, mass: 2.5, jumps: 0.3,
     lengthCm: [35, 65], weightKg: [1, 7], awareness: 62, caution: 0.45, price: 66,
     baitLikes: ['minnow', 'worm'], lureTypes: { jighead: 2, spinner: 1, crank: 1, spoon: 1, swim: 1, topwater: 1, blade: 1 }, timeLikes: [5, 6, 7, 17, 18, 19, 20, 21], // at dawn and dusk
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'silver', seed: 1008 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'silver', seed: 1008 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   {
     id: 'striped_bass', name: 'Striped Bass', latin: 'Morone saxatilis', family: 'temperate bass', locations: [],
     habitat: { depthMin: 2, depthMax: 20 }, speed: 2.1, strength: 2, fatigue: 0.06, mass: 7, jumps: 0.3,
     lengthCm: [50, 110], weightKg: [2, 25], awareness: 64, caution: 0.5, price: 142,
     baitLikes: ['minnow'], lureTypes: { crank: 2, swim: 1, topwater: 1, spoon: 1, jighead: 1 }, timeLikes: [5, 6, 7, 17, 18, 19, 20, 21], // at dawn and dusk
-    look: { base: 'perch', wrongness: 0, parts: [], palette: 'silver', seed: 1009 } // placeholder until Phases 70-72
+    look: { base: 'perch', wrongness: 0, parts: [], palette: 'silver', seed: 1009 } // Phase 70: painted from data/fishlooks.js; this look is the validator's only
   },
   // ---- pikes ----
   {

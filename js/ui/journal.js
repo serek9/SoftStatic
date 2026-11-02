@@ -224,7 +224,9 @@ G.ui.journal = (function () {
   // two filters as key caps and the grid of species with its scrollbar. The open book of
   // Phase 17 is gone; its colours are mapped onto the panel's (INK below).
   var LP = [8, 8, 300, 344], RP = [316, 8, 316, 344], J_RECTS = [LP, RP];
-  var PLATE_H = 80;
+  // Phase 70: the plate holds a portrait at its native size (the real fish are painted at most
+  // 104×60, PLAN_SPECIES.md 3.5), never scaled: PORT_W × PORT_H, on a plate PLATE_H tall.
+  var PLATE_H = 68, PORT_W = 104, PORT_H = 60;
   // The book's ink keys, read on night ink: the notes, the plain words, the description, the late blue pen.
   var INK = { ink: 'bone', wood: 'fog_mid', rust: 'dusk_high', night_blue: 'teal_lit' };
 
@@ -259,7 +261,7 @@ G.ui.journal = (function () {
     ctx.fillStyle = P.night_deep; ctx.fillRect(lx + 1, ty, iw - 2, PLATE_H); ctx.fillRect(lx, ty + 1, iw, PLATE_H - 2);
     ctx.fillStyle = P.fog_dark; ctx.fillRect(lx + 1, ty + PLATE_H - 1, iw - 2, 1);
     if (list.length) {
-      var img = G.gfx.fishgen.portrait(list[sel], iw - 24, PLATE_H - 10, !(page.got || page.ghost));
+      var img = G.gfx.fishgen.portrait(list[sel], PORT_W, PORT_H, !(page.got || page.ghost));
       if (page.ghost) ctx.globalAlpha = 0.35; else if (!page.got) ctx.globalAlpha = 0.5;
       ctx.drawImage(img, lx + ((iw - img.width) >> 1), ty + ((PLATE_H - img.height) >> 1));
       ctx.globalAlpha = 1;
