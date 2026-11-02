@@ -8,7 +8,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.ui = G.ui || {};
 G.ui.card = (function () {
   var S = G.gfx.sprites, F = S.fine, U = G.ui.panel;
-  var W = 232, H = 82, PW = 80, PH = 40, KEY_Y = 65, HINT = 'A/D  SPACE';
+  // Phase 70: the portrait box grew from 80×40 to 96×56 for the real fish (PLAN_SPECIES.md 3.5),
+  // and the card with it, to the small panel's widest (G.ui.panel.MAX_W).
+  var W = 240, H = 98, PW = 96, PH = 56, KEY_Y = 81, HINT = 'A/D  SPACE';
   var RECT = U.place(W, H, 'top', [0, 0, W, H]), SELL = [0, 0, 0, U.KEY_H], KEEP = [0, 0, 0, U.KEY_H], FREE = [0, 0, 0, U.KEY_H];
   var CHOICES = ['sell', 'keep', 'release'];
   var cur = null, sel = 0, t = 0, at = 0; // at: how long it has been showing (the slide-in, P1-4)

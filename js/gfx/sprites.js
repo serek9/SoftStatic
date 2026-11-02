@@ -57,7 +57,23 @@ G.gfx.sprites = (function () {
     leaf_deep: '#14281a', leaf_dark: '#1e3c24', leaf: '#2e5a32', leaf_hi: '#4c7c42', leaf_lit: '#76a456',
     sun_dark: '#32100a', sun: '#702614', sun_hi: '#ac521c', sun_lit: '#d89a40',
     vinyl: '#121016', vinyl_hi: '#3a3642', neon_pink: '#d0507e', neon_pink_hi: '#f0a0b8',
-    ivory: '#efe6cc', denim_lit: '#6880a4', outline: '#120e0c'
+    ivory: '#efe6cc', denim_lit: '#6880a4', outline: '#120e0c',
+    // Phase 70 (real fish, PLAN_SPECIES.md 3.5): each species' body ramp, back (dark) to belly
+    // (pale), six keys; shared fin ramps (ray, root, membrane, edge); eyes. Fish keys only:
+    // shift() never picks them, so no earlier sprite changes colour.
+    fish_perch_0: '#2c2a18', fish_perch_1: '#4c4824', fish_perch_2: '#76702e', fish_perch_3: '#a29440', fish_perch_4: '#c6b462', fish_perch_5: '#e0d6aa',
+    fish_walleye_0: '#26240f', fish_walleye_1: '#3e3c1e', fish_walleye_2: '#5e5a32', fish_walleye_3: '#827c4a', fish_walleye_4: '#aaa26e', fish_walleye_5: '#d6d2b0',
+    fish_smb_0: '#2a2216', fish_smb_1: '#44381f', fish_smb_2: '#62522e', fish_smb_3: '#84703f', fish_smb_4: '#ab9862', fish_smb_5: '#d4cca6',
+    fish_lmb_0: '#1e2414', fish_lmb_1: '#323e1f', fish_lmb_2: '#4c5c2b', fish_lmb_3: '#6a7a3e', fish_lmb_4: '#909a60', fish_lmb_5: '#cfcfae',
+    fish_rock_0: '#262218', fish_rock_1: '#3d3725', fish_rock_2: '#575036', fish_rock_3: '#766d4a', fish_rock_4: '#9a9268', fish_rock_5: '#c8c3a4',
+    fish_blue_0: '#1c2420', fish_blue_1: '#2c3a31', fish_blue_2: '#44553d', fish_blue_3: '#5f6f48', fish_blue_4: '#7f8c5a', fish_blue_5: '#a9ae7c',
+    fish_breast_0: '#94622a', fish_breast_1: '#bc8230', fish_breast_2: '#d69e4a', fish_breast_3: '#e6bc7a',
+    fish_crap_0: '#1a221e', fish_crap_1: '#27352d', fish_crap_2: '#3c4e40', fish_crap_3: '#586c54', fish_crap_4: '#7e906e', fish_crap_5: '#b4bea0',
+    fish_silver_0: '#23271f', fish_silver_1: '#373d31', fish_silver_2: '#54594b', fish_silver_3: '#767b68', fish_silver_4: '#9ca08a', fish_silver_5: '#cbcdba',
+    fish_finol_0: '#5a5634', fish_finol_1: '#6c6840', fish_finol_2: '#8c875e', fish_finol_3: '#b0ab88',
+    fish_fingr_0: '#585c4e', fish_fingr_1: '#686c5c', fish_fingr_2: '#8a8e7c', fish_fingr_3: '#b0b3a2',
+    fish_orange_0: '#9a4826', fish_orange_1: '#b05a2c', fish_orange_2: '#cc7840', fish_orange_3: '#e29c6c',
+    fish_eye_gold: '#c49234', fish_eye_red: '#b23a2a', fish_eye_glass: '#a09c74'
   };
   // Phase 56: the interior keys above, which shift() leaves out.
   var INTERIOR = {};
@@ -96,7 +112,7 @@ G.gfx.sprites = (function () {
     if (shifted[id] !== undefined) return shifted[id];
     var c = RGB[key], L = lum(key), m = (c[0] + c[1] + c[2]) / 3, best = key, bd = 1e9;
     for (var k in PALETTE) {
-      if (k === key || k === 'black' || INTERIOR[k]) continue;
+      if (k === key || k === 'black' || INTERIOR[k] || k.indexOf('fish_') === 0) continue;
       var dl = (lum(k) - L) * dir;
       if (dl < 8 || dl > 80) continue;
       var q = RGB[k], qm = (q[0] + q[1] + q[2]) / 3;

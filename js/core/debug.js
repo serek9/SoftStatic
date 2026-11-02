@@ -320,6 +320,9 @@ G.core.debug = (function () {
     // the lure's action (mid, dive, top, lift, float, flutter, dropshot, wacky, glide, or its
     // vary: rattle, kick), or 'bait' for a live bait.
     lureBody: function () { return G.scene.underwater.body(); },
+    // dbg.fishLooks() (Phase 70): which species the real-fish painter paints (data/fishlooks.js)
+    // and which still have a placeholder look, by id.
+    fishLooks: function () { var r = G.gfx.fishgen.fishLooks(); r.counts = r.painted.length + ' painted, ' + r.placeholder.length + ' placeholder'; return r; },
     // dbg.who() (Phase 68): which species can bite here and now, from the same weights the
     // school spawns by (fish_ai.speciesWeights over the current cast's context): the water, the
     // lure's depth, the hour, what is on the hook and the rod. Each: {id, chance (share of the
@@ -435,12 +438,14 @@ G.core.debug = (function () {
     var pages = [], page = 0, t = 0, emitT = 0;
     var SAMPLE = 'The quick brown fox jumps over the lazy dog.';
     var SPECIES_PER = 20; // 4 columns × 5 rows of 160×64 cells
+    var PORTRAITS_PER = 20, PCW = 126, PCH = 84; // Phase 70: 5 columns × 4 rows, each portrait at its native size (at most 104×60)
 
     function enter() {
       var FG = G.gfx.fishgen, i;
       pages = ['palette', 'font'];
       if (FG && G.data.fish) {
-        for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('fish:' + i);
+        for (i = 0; i < G.data.fish.length; i += PORTRAITS_PER) pages.push('fish:' + i); // Phase 70: the portraits
+        for (i = 0; i < G.data.fish.length; i += SPECIES_PER) pages.push('swimmers:' + i);
         for (i = 0; i < FG.BASE_NAMES.length; i++) pages.push('parts:' + FG.BASE_NAMES[i]);
       }
       pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'fx', 'shop', 'panel', 'fishers', 'dogs', 'looks top'); // small: Phase 44; panel: Phase 46; looks: Phase 47
@@ -554,11 +559,22 @@ G.core.debug = (function () {
         F.drawText(ctx, 'the 320x180 font (drawn at 1x):', 8, 200, 'fog_mid');
         S.drawText(ctx, SAMPLE, 8, 216, 'paper');
       } else if (name.indexOf('fish:') === 0) {
+        // Phase 70: every species' portrait at its native size, as the journal's plate shows it,
+        // on the plate's colour; the name, and whether the real painter or a placeholder drew it.
+        var p0 = +arg, fsh = G.data.fish;
+        for (var pi = p0; pi < Math.min(fsh.length, p0 + PORTRAITS_PER); pi++) {
+          var pc = pi - p0, pcx = 4 + (pc % 5) * (PCW + 1), pcy = 18 + Math.floor(pc / 5) * (PCH + 1), pim = FG.portrait(pi, 104, 60, false);
+          ctx.fillStyle = P.night_deep; ctx.fillRect(pcx, pcy, PCW, PCH);
+          ctx.drawImage(pim, pcx + ((PCW - pim.width) >> 1), pcy + 2 + ((62 - pim.height) >> 1));
+          F.drawText(ctx, fsh[pi].name, pcx + 3, pcy + PCH - 21, FG.specFor(pi) ? 'bone' : 'fog_mid');
+          F.drawText(ctx, (FG.specFor(pi) ? '' : 'placeholder  ') + pim.width + 'x' + pim.height, pcx + 3, pcy + PCH - 11, 'fog_mid');
+        }
+      } else if (name.indexOf('swimmers:') === 0) {
         var start = +arg, fish = G.data.fish;
         for (var s = start; s < Math.min(fish.length, start + SPECIES_PER); s++) {
           var cell = s - start;
           swimCell(ctx, s, '', FG.swimFrames(fish[s].look),
-            fish[s].id + ' w' + fish[s].look.wrongness + ' ' + fish[s].look.base, 8 + (cell % 4) * 158, 20 + Math.floor(cell / 4) * 66, 158, 66);
+            fish[s].id + (FG.specFor(s) ? ' painted' : ' w' + fish[s].look.wrongness + ' ' + fish[s].look.base), 8 + (cell % 4) * 158, 20 + Math.floor(cell / 4) * 66, 158, 66);
         }
       } else if (name === 'small') {
         // Phase 44: the small fish as they swim (1x, then 4x), the beat and a turn playing, the
