@@ -1,8 +1,8 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // Fish AI (V3.4). Two halves:
-//  - speciesWeights / pickSpecies: which species turns up, from rarity × bait × depth ×
-//    hour × unease × clock window. Species heavier than the rod can hold are never picked;
+//  - speciesWeights / pickSpecies: which species turns up, from the water × bait or lure ×
+//    depth × hour (Phase 68: no rarity, unease or clock window). Species heavier than the rod can hold are never picked;
 //    they only set ctx.tooHeavyNear so the scene can hint at them (D4).
 //  - the spatial school: up to 8 fish that wander, notice the lure, approach, circle it,
 //    nibble, then bite or leave.
@@ -11,12 +11,11 @@ G.sim = G.sim || {};
 G.sim.fish_ai = (function () {
   var MAX = 8;
   var W = {
-    baitLiked: 2, baitOther: 0.6, // baitLikes match / no match (no effect when baitLikes is empty); Phase 43: a lure loved / ignored
+    baitLiked: 2,                 // a live bait it takes, or its favourite lure type (×2 the species weight); Phase 68: no baitOther
     lureLoved: 1.3,               // × awareness: a lure it loves (its flash, its wobble) draws it from farther
     depthFalloff: 4,              // m outside the habitat at which weight bottoms out
     depthFloor: 0.05,
-    hourLiked: 1.6, hourOther: 0.7, // timeLikes match / no match (no effect when empty)
-    uneaseShift: 0.5              // × (1 + unease × wrongness × this)
+    hourLiked: 1.6, hourOther: 0.7 // timeLikes match / no match (no effect when empty)
   };
   var A = {
     spawnMin: 1.5, spawnMax: 4,   // s between spawns while the lure is in
@@ -54,32 +53,22 @@ G.sim.fish_ai = (function () {
 
   // ---- Species selection ------------------------------------------------------------
 
+  // Phase 68: every species that lives here starts at 1; what is on the hook (2 its favourite,
+  // 1 taken, 0 ignored), the depth and the hour weigh it from there.
   function weightOf(f, ctx) {
     if (f.locations.indexOf(ctx.loc) < 0) return 0;
-    if (ctx.unease < f.uneaseMin) return 0;
-    if (f.windows.length) {
-      var open = false;
-      for (var j = 0; j < f.windows.length; j++) {
-        var win = G.sim.clock.windowById(ctx.windows, f.windows[j]);
-        if (win && G.sim.clock.eligible(ctx.latched, ctx.hour, win)) open = true;
-      }
-      if (!open) return 0;
-    }
-    var v = ctx.rarity[f.rarity];
-    if (ctx.lure || f.baitLikes.length) v *= TAKE_W[interest(f, ctx.bait, ctx.lure)]; // Phase 43: lures by fish.lures
+    var v = TAKE_W[interest(f, ctx.bait, ctx.lure)];
+    if (!v) return 0;
     if (ctx.smallBoost && f.mass <= ctx.smallMass) v *= ctx.smallBoost;             // Phase 43: the ultralight rod
-    if (f.rarity === 'rare' || f.rarity === 'legendary') v *= ctx.rareBoost || 1; // bait (V8), cast spot (§2)
-    if (f.rarity === 'legendary') v *= ctx.legendBoost || 1;                        // a legendary spot (10.3)
     if (ctx.depthM !== null) {
       var h = f.habitat, out = ctx.depthM < h.depthMin ? h.depthMin - ctx.depthM : (ctx.depthM > h.depthMax ? ctx.depthM - h.depthMax : 0);
       if (out > 0) v *= Math.max(W.depthFloor, 1 - out / W.depthFalloff);
     }
     if (f.timeLikes.length) v *= f.timeLikes.indexOf(Math.floor(ctx.hour)) >= 0 ? W.hourLiked : W.hourOther;
-    return v * (1 + ctx.unease * f.look.wrongness * W.uneaseShift);
+    return v;
   }
 
-  // ctx: {species, rarity, windows, loc, depthM (null = any), hour, unease, bait, latched,
-  // rodMaxMass}. Fills ctx.weights (one per species) and ctx.tooHeavyNear. Returns the total.
+  // ctx: {species, loc, depthM (null = any), hour, unease, bait, lure, rodMaxMass}. Fills ctx.weights (one per species) and ctx.tooHeavyNear. Returns the total.
   function speciesWeights(ctx) {
     var list = ctx.species, w = ctx.weights, total = 0;
     if (!w || w.length !== list.length) w = ctx.weights = new Float64Array(list.length);
@@ -105,10 +94,10 @@ G.sim.fish_ai = (function () {
     var s = {
       fish: [], spawnT: 0, uid: 0,
       ctx: {
-        species: data.fish, rarity: data.rarity, windows: data.windows, loc: '', depthM: null, hour: 0,
+        species: data.fish, windows: data.windows, loc: '', depthM: null, hour: 0,
         unease: 0, bait: '', latched: {}, rodMaxMass: 0, weights: null, tooHeavyNear: false,
         lineSeen: true, // Phase 53: a line-shy species (fish.lineShy) sees this line and will not bite
-        attract: 1, rareBoost: 1, legendBoost: 1, // gear and cast spot: attract shortens the wait between arrivals
+        attract: 1, // gear and cast spot: attract shortens the wait between arrivals
         maxDepthPx: 0, floorAt: null, // floorAt(x) -> bottom depth in px; null uses maxDepthPx
         flowAt: null // Phase 28: flowAt(x, depth px) -> px/s of current; null is still water
       }
@@ -151,19 +140,24 @@ G.sim.fish_ai = (function () {
   }
 
   // Phase 43: how much a species wants what is on the hook: 0 ignores it, 1 takes it, 2 loves
-  // it. Live baits by baitLikes (listed: 2; an empty list takes every bait: 1); lures by
-  // fish.lures (not listed: 0).
-  var TAKE_W = [W.baitOther, 1, W.baitLiked]; // the species weight by interest
+  // it. Live baits by baitLikes (listed: 2, else 0; a bait with `as` is taken as that bait);
+  // Phase 68: lures by fish.lureTypes[lure.type], and only if the lure is made for fish of
+  // the species' size (economy.qRange); a float rig is taken as its bait (Phase 65).
+  var TAKE_W = [0, 1, W.baitLiked]; // the species weight by interest
+  var QR = [0, 1];
   function interest(sp, bait, lure) {
-    if (lure) { var cr = carries(bait); return cr ? interest(sp, cr, false) : (sp.lures && sp.lures[bait]) || 0; } // Phase 65: a float rig is taken as its bait
-    if (!sp.baitLikes.length) return 1;
+    var g = G.data.gear, i;
+    if (lure) {
+      var l = g.lures || [], L = null;
+      for (i = 0; i < l.length; i++) if (l[i].id === bait) { L = l[i]; break; }
+      if (!L) return 0;
+      if (L.carries) return interest(sp, L.carries, false);
+      var v = sp.lureTypes[L.type] || 0;
+      return v && G.sim.economy.qRange(sp, L.sizes, G.data, QR) ? v : 0;
+    }
+    var b = g.baits;
+    for (i = 0; i < b.length; i++) if (b[i].id === bait && b[i].as) { bait = b[i].as; break; }
     return sp.baitLikes.indexOf(bait) >= 0 ? 2 : 0;
-  }
-  // Phase 65: the bait a rig carries ('' for a lure fish take by fish.lures).
-  function carries(id) {
-    var l = G.data.gear.lures || [];
-    for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i].carries || '';
-    return '';
   }
   function baitOk(sp, bait, lure) { return interest(sp, bait, lure) > 0; }
 

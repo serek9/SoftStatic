@@ -449,7 +449,7 @@ G.scene.sailing = (function () {
     // boost: what the landing spot is worth for this cast (anomaly and spots, 10.1/10.3).
     // tw: seconds the lure has been in the water (the creek's current, 11.1).
     run.cast = { charge: 0, t: 0, x1: 0, dist: 0, seed: 0, n: 0, flying: false, x0: 0, y0: 0, T: 0, h: 0, lx: 0, ly: 0, tw: 0, latched: {}, spotsIn: 0,
-      boost: { attract: 1, rare: 1, legend: 1 } };
+      boost: { attract: 1 } };
     run.school = G.sim.fish_ai.createSchool(G.data);
     run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
     // Phase 28: the current carries the fish as it carries the lure (the same pure function).
@@ -502,8 +502,6 @@ G.scene.sailing = (function () {
     // wait for the next spawn). speciesWeights is pure and draws nothing from the RNG.
     if (ctx.rodMaxMass !== lastRodMax) { lastRodMax = ctx.rodMaxMass; G.sim.fish_ai.speciesWeights(ctx); }
     ctx.attract = gx.attract * c.boost.attract;
-    ctx.rareBoost = gx.rareBoost * c.boost.rare;
-    ctx.legendBoost = c.boost.legend;
     ctx.maxDepthPx = loc.maxDepth;
     G.sim.fish_ai.stepSchool(run.school, li, dt, G.rng, G.data);
     var n = G.sim.fish_ai.interested(run.school);
@@ -578,8 +576,6 @@ G.scene.sailing = (function () {
       if ((c.spotsIn & (1 << i)) || Math.abs(c.x1 - s.x) > s.r) continue;
       c.spotsIn |= 1 << i;
       if (s.attract) c.boost.attract *= s.attract;
-      if (s.rare) c.boost.rare *= s.rare;
-      if (s.legend) c.boost.legend *= s.legend;
       if (G.core.debug) G.core.debug.log('the lure drifted into ' + s.id);
     }
   }
@@ -600,7 +596,7 @@ G.scene.sailing = (function () {
     c.charge = 0;
     c.bait = '';
     G.sim.clock.clearLatch(c.latched);
-    c.boost.attract = 1; c.boost.rare = 1; c.boost.legend = 1;
+    c.boost.attract = 1;
     G.scene.underwater.resetHeavy(run);
     G.core.state.go(run, 'charging');
   }
@@ -1949,7 +1945,7 @@ if (G.core.debug) G.core.debug.addLine(function () {
   var run = G.state.run, A = run.anom, b = run.cast && run.cast.boost;
   if (!A) return 'anomaly: -';
   return 'anomaly ' + (A.on ? A.id + ' x ' + Math.round(A.x) + ' ' + A.t.toFixed(1) + '/' + A.dur.toFixed(1) + 's' : 'none' + (A.gap > 0 ? ' (gap ' + A.gap.toFixed(0) + 's)' : '')) +
-    '  cast boost a' + b.attract.toFixed(2) + ' r' + b.rare.toFixed(2) + ' l' + b.legend.toFixed(2) +
+    '  cast boost a' + b.attract.toFixed(2) +
     (run.owl.on ? '  owl ' + run.owl.t.toFixed(1) + 's' : '') + '  dog cue ' + (run.dog.cue || '-');
 });
 

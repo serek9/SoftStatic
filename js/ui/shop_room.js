@@ -114,7 +114,7 @@ G.ui.shopRoom = (function () {
     for (i = 0; i < WINS.length; i++) { var g = glassRect(i); K.windowFrame(c, g[0], g[1], g[2], g[3]); }
     // The trophy over the rack: a perch on an oval plaque, a brass plate.
     A.blob(c, tx(2), 26, 26, 11, ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit'], { bias: 0.1 });
-    var fi = 0; for (i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === 'gloam_perch') fi = i;
+    var fi = 0; for (i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === 'yellow_perch') fi = i;
     var fp = G.gfx.fishgen.portrait(fi, 40, 14, false); img(c, fp, tx(2) - (fp.width >> 1), 26 - (fp.height >> 1));
     A.slab(c, tx(2) - 7, 33, 14, 3, BRASS);
     // A fish chart beside the window, its corner torn and curling.

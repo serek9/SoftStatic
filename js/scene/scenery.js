@@ -291,7 +291,6 @@ G.scene.scenery = (function () {
       run.spots = loc.spots.slice();
       for (var i = 0; i < n; i++) {
         var m = loc.movers[i], sp = { id: m.id, kind: 'open', x: s.xs[i], r: m.r };
-        if (m.rare) sp.rare = m.rare;
         if (m.attract) sp.attract = m.attract;
         s.spots.push(sp);
         run.spots.push(sp);

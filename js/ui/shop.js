@@ -327,7 +327,7 @@ G.ui.shop = (function () {
       } else {
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
         if (b.label === false) desc = 'No label. The jar is warm.';
-        else desc = 'Fish turn up ' + pct(b.attract) + '% sooner' + (b.rareBoost > 1 ? ', and rare ones are ' + pct(b.rareBoost) + '% likelier.' : '.');
+        else desc = 'Fish turn up ' + pct(b.attract) + '% sooner.';
       }
       status = (b.unlimited ? '' : 'You have ' + have + '. ') + (on ? 'On the hook.' : '');
     }

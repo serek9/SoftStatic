@@ -78,8 +78,8 @@ G.data.locations.pines = {
   spots: [
     { id: 'pier_shade', kind: 'open', x: 330, r: 36 },
     { id: 'under_light', kind: 'open', x: 640, r: 30 },
-    { id: 'lane_deep', kind: 'legendary', x: 770, r: 22, legend: 4, where: 'where the road\'s lane runs deep, past the light' },
+    { id: 'lane_deep', kind: 'open', x: 770, r: 22, attract: 1.3 },
     { id: 'drowned_road', kind: 'open', x: 900, r: 34 },
-    { id: 'culvert', kind: 'hidden', x: 1030, r: 22, attract: 1.6, rare: 2 }
+    { id: 'culvert', kind: 'hidden', x: 1030, r: 22, attract: 1.6 }
   ]
 };

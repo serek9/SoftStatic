@@ -10,10 +10,9 @@ G.data.locations = G.data.locations || {};
 G.data.locations.red = {
   id: 'red',
   name: 'Red Room Reservoir',
-  cost: 5500,
-  // Also needs (V6) a specific fish caught in a specific clock window: the Pines'
-  // Three-Thirty-Three, which bites only in the 03:33 window (economy.canUnlock).
-  need: { windowCatch: 'owl_333', fish: 'three_thirty_three', text: 'It opens to someone who has caught what rises at 03:33 in The Pines.' },
+  cost: 4800,
+  // Phase 68: opened by its cost alone (it needed the Three-Thirty-Three caught at 03:33,
+  // and that fish is gone with the rest of the strange ones).
   width: 1100,
   waterY: 112,
   maxDepth: 80,
@@ -47,9 +46,9 @@ G.data.locations.red = {
 
   // The structures that move. Each one's spot goes wherever it stands.
   movers: [
-    { id: 'lamp', kind: 'floor_lamp', r: 26, rare: 2.5 },
+    { id: 'lamp', kind: 'floor_lamp', r: 26, attract: 1.4 },
     { id: 'chair', kind: 'armchair', r: 28, attract: 1.5 },
-    { id: 'statue', kind: 'statue', r: 24, attract: 1.2, rare: 1.5 }
+    { id: 'statue', kind: 'statue', r: 24, attract: 1.3 }
   ],
   moverGap: 140, // px kept between two structures
 
@@ -58,10 +57,10 @@ G.data.locations.red = {
     weed: 'crimson', weedDark: 'blood', weedDensity: 0.03, shaftEvery: 170
   },
 
-  // These two stay put (the dog's stare and the legendary spot).
+  // These two stay put (the dog's stare, and the drain where fish gather).
   spots: [
-    { id: 'floor_drain', kind: 'legendary', x: 560, r: 20, legend: 4, where: 'over the drain in the floor' },
-    { id: 'hem', kind: 'hidden', x: 990, r: 22, attract: 1.6, rare: 2 }
+    { id: 'floor_drain', kind: 'open', x: 560, r: 20, attract: 1.3 },
+    { id: 'hem', kind: 'hidden', x: 990, r: 22, attract: 1.6 }
   ],
 
   reflect: { tint: 'crimson', alpha: 0.55 },

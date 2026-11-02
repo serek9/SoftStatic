@@ -491,8 +491,8 @@ G.audio.engine = (function () {
       for (var i = 0; i < 4; i++) tone('sine', 1400 - i * 120, 900, 0.04, 0.015, pan, 0.18 + i * 0.13);
     },
     card: function () { hiss('lowpass', 1200, 500, 0.7, 0.09, 0.03, 0); },
-    sting: function (rare) {
-      var notes = rare === 'legendary' ? [220, 277.2, 329.6, 415.3] : [261.6, 329.6, 392];
+    sting: function () { // Phase 68: a big catch (size class XL or XXL), whatever the species
+      var notes = [261.6, 329.6, 392];
       for (var i = 0; i < notes.length; i++) tone('sine', notes[i], notes[i] * 0.995, 2.4, 0.03, (i - 1) * 0.2, i * 0.12, bus.music, 0.25);
     },
     bell: function () { tone('sine', 1568, 1562, 0.9, 0.025, 0); tone('sine', 2093, 2088, 0.7, 0.015, 0, 0.11); }, // Phase 39: the shop door's bell
@@ -624,8 +624,7 @@ G.audio.engine = (function () {
       } else if (fsm === 'card') {
         waterSplash(0.45, run.hook.x, 'land');
         for (var dr = 0; dr < 5; dr++) playBuf(pick(KIT.drip), 0.014, boatPan, 0.9 + 0.3 * G.vrng.next(), bus.water, 0.25 + dr * 0.18);
-        var sp = G.data.fish[run.hook.sp];
-        if (sp && (sp.rarity === 'rare' || sp.rarity === 'legendary')) play('sting', sp.rarity); else play('card');
+        if (G.data.sizeClass(run.hook.w) >= 3) play('sting'); else play('card');
       } else if (was === 'card' && fsm === 'sailing' && save.coins > prev.coins) play('coin');
       prev.fsm = fsm;
     }
