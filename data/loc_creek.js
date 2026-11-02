@@ -14,6 +14,7 @@ G.data.locations.creek = {
   maxDepth: 64,
   seed: 5113,
   start: 160,
+  dock: { x: 96, reach: 60 }, // Phase 74: the pier at the west end (js/ui/dock.js)
   // Phase 20: the surface's swell (view px; see loc_fog.js): short and choppy, running with the current.
   swell: { amp: 2, mirror: 1.1, waves: [[52, 22, 0.45], [27, 15, 0.35], [13, 9, 0.2]] },
 
@@ -50,6 +51,7 @@ G.data.locations.creek = {
   // cabin: on stilts at the water's edge, roof sagging. snag: dead branches out of the water;
   // the same branches reach down to the bottom in the cross-section (underwater.snags).
   landmarks: [
+    { id: 'pier', kind: 'pier', x: 96, seed: 5102 }, // Phase 74: a pier in every water (PLAN_WATERS.md 4.3)
     { id: 'cabin_a', kind: 'cabin', x: 250 },
     { id: 'snag_a', kind: 'snag', x: 470 },
     { id: 'cabin_b', kind: 'cabin', x: 720, sag: 3 },
@@ -77,12 +79,20 @@ G.data.locations.creek = {
   current: { dir: 1, speed: 3, ramp: 2.5, sway: 0.45, period: 7, slack: 0.5, bottom: 0.2 },
 
   // 11.1: px/s the lure drifts at t s after landing, on the cast with this seed, at depth px.
-  // Pure: the same arguments always give the same answer, so a cast's path is fixed by its
-  // seed and the fixed dt (sailing steps it in underwater.lureStep).
-  drift: function (seed, t, depth, onBottom) {
-    var c = this.current, ph = (Math.imul(seed | 0, 0x9e3779b1) >>> 0) / 4294967296 * 6.2832;
-    var v = c.speed * (1 - Math.exp(-t / c.ramp)) * (1 + c.sway * Math.sin(t * 6.2832 / c.period + ph));
-    v *= 1 - c.slack * Math.min(1, Math.max(0, depth) / this.maxDepth);
-    return c.dir * v * (onBottom ? c.bottom : 1);
-  }
+  // Phase 74: the rivers share G.data.riverDrift (below), each with its own current.
+  drift: function (seed, t, depth, onBottom) { return G.data.riverDrift(this, seed, t, depth, onBottom); },
+  // Phase 74 (PLAN_WATERS.md): what kind of water it is, and its stretches by world x.
+  water: 'river',
+  reaches: [{ id: 'blackwater', name: 'Blackwater Creek', x: [0, 1300] }]
+};
+
+// 11.1: a river's current. px/s the lure drifts at t s after landing, on the cast with this
+// seed, at depth px, in water L (its current and maxDepth). Pure: the same arguments always
+// give the same answer, so a cast's path is fixed by its seed and the fixed dt (sailing steps
+// it in underwater.lureStep). Phase 74: shared by every river (Blackwater, Copperbend, Stonehorn).
+G.data.riverDrift = function (L, seed, t, depth, onBottom) {
+  var c = L.current, ph = (Math.imul(seed | 0, 0x9e3779b1) >>> 0) / 4294967296 * 6.2832;
+  var v = c.speed * (1 - Math.exp(-t / c.ramp)) * (1 + c.sway * Math.sin(t * 6.2832 / c.period + ph));
+  v *= 1 - c.slack * Math.min(1, Math.max(0, depth) / L.maxDepth);
+  return c.dir * v * (onBottom ? c.bottom : 1);
 };

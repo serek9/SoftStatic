@@ -489,7 +489,7 @@ G.core.debug = (function () {
     }
 
     // Phase 50.1: the shore page, baked once: each of the shore's things on a strip of bank
-    // and water, every kind of tree in each forest's keys, and the Red Room's floor things.
+    // and water, and every kind of tree in each forest's keys (Phase 74: the Red Room's floor things are gone).
     function shoreBake() {
       return G.gfx.bake.layer(640, 340, function (c) {
         var A = G.gfx.paint, P = G.gfx.sprites.PALETTE, F = G.gfx.sprites.fine, R = new G.core.rng.Rng(50), i, x;
@@ -519,13 +519,6 @@ G.core.debug = (function () {
             col++;
           }
         }
-        // The Red Room's floor: a potted fern, a chair, a side table and lamp, a door frame.
-        var red = G.data.locations.red, zz = null;
-        for (q = 0; q < red.layers.length; q++) if (red.layers[q].kind === 'zigzag') zz = red.layers[q];
-        var fy = 320;
-        A.area(c, 0, fy, 640, 20, function (xx, yy) { var r2 = yy - fy, sh = Math.abs((r2 % 12) - 6); return (((xx + sh) / 6) | 0) & 1 ? (zz ? zz.color : 'ink') : (zz ? zz.alt : 'bone'); });
-        var RT = G.scene.scenery.ROOM_THINGS, RX = 40;
-        for (var rk in RT) { RT[rk](c, RX, fy); F.drawText(c, rk, RX - 10, fy - 56, 'fog_light'); RX += 70; }
         A.reset();
       });
     }
@@ -815,7 +808,7 @@ G.core.debug = (function () {
         F.drawText(ctx, under ? 'eel (both ways), a fry cloud, the darting perch: 2x the game' : 'heron: stand, stalk, strike 0.5 and 1, fly; beaver, dragonfly, strider, lantern: 2x the game', 8, 344, 'fog_mid');
       } else if (name === 'bed') {
         // Phase 50.1: each water's bed things and new weeds on a short strip of bed, 2x the game.
-        var LIDS = ['fog', 'creek', 'pines', 'red'];
+        var LIDS = ['fog', 'creek', 'pines', 'harts']; // Phase 74: four of the nine waters fit the page
         ctx.imageSmoothingEnabled = false;
         for (var bl = 0; bl < LIDS.length; bl++) {
           var lc = G.data.locations[LIDS[bl]], T0 = G.scene.life.table(LIDS[bl]), yb = 20 + bl * 82;
@@ -856,7 +849,7 @@ G.core.debug = (function () {
         F.drawText(ctx, 'the icon (32 x 32 in palette keys, 3x)', 112, 30, 'fog_light');
         G.core.device.drawNotice(ctx, true);
       } else if (name === 'shore') {
-        // Phase 50.1: the shore's things, the trees and the Red Room's floor, painted as the
+        // Phase 50.1: the shore's things and the trees, painted as the
         // layers paint them (baked once here, layer px = the game's view px).
         ctx.drawImage(G.gfx.bake.cached('gallery:shore', shoreBake), 0, 18);
       } else if (name === 'fx') {

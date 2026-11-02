@@ -286,6 +286,22 @@ function validateLocations(G, err) {
     spots.forEach(s => { if (!(s.x >= 0 && s.x < L.width && s.r > 0)) err(p + 'spot ' + s.id + ' x or r'); });
     if (spots.filter(s => s.kind === 'hidden').length > 1) err(p + 'more than one hidden spot (the dog stares once)');
     if (L.need && L.need.windowCatch !== 'any' && !d.windows.some(w => w.id === L.need.windowCatch)) err(p + 'need.windowCatch: unknown window');
+    // Phase 74 (PLAN_WATERS.md): a kind of water, reaches that cover the width in order with
+    // no gap or overlap, and a pier (dock) inside the world with a pier landmark at it.
+    if (!['lake', 'river', 'sea'].includes(L.water)) err(p + 'water must be lake, river or sea');
+    if (L.water === 'river' ? !(L.current && !L.current.lake) : !(L.current && L.current.lake)) err(p + 'a river has a current, a lake or a sea a wind drift (current.lake)');
+    const R = L.reaches || [];
+    if (!R.length) err(p + 'reaches');
+    R.forEach((r, i) => {
+      if (typeof r.id !== 'string' || !r.id || typeof r.name !== 'string' || !r.name) err(p + 'reach ' + i + ': id and name');
+      if (!(Array.isArray(r.x) && r.x.length === 2 && r.x[0] < r.x[1])) err(p + 'reach ' + r.id + ': x [from, to]');
+      else if (r.x[0] !== (i ? R[i - 1].x[1] : 0)) err(p + 'reach ' + r.id + ': starts at ' + r.x[0] + ' (a gap or an overlap)');
+    });
+    if (R.length && R[R.length - 1].x[1] !== L.width) err(p + 'reaches end at ' + R[R.length - 1].x[1] + ', not the width ' + L.width);
+    if (new Set(R.map(r => r.id)).size !== R.length) err(p + 'two reaches share an id');
+    if (!(L.dock && num(L.dock.x) && L.dock.x > 0 && L.dock.x < L.width && L.dock.reach > 0)) err(p + 'dock {x, reach} inside the world');
+    else if (!(L.landmarks || []).some(m => m.kind === 'pier' && m.x === L.dock.x)) err(p + 'no pier landmark at the dock');
+    if (!(L.start > 0 && L.start < L.width)) err(p + 'start');
     if (L.drift) {
       for (let t = 0; t < 30; t += 0.5) for (const depth of [0, L.maxDepth]) {
         const v = L.drift(12345, t, depth, false);
@@ -344,9 +360,9 @@ function validateLife(L, p, err) {
 // ---- Headless session (used by --replay and --pacing) ----------------------------------------
 // A scripted active player: cast, sink to a depth, wait, hook most bites, fight with the
 // auto-player, sell, buy along a plan. Everything runs through the real sim modules at the
-// fixed 1/60 step. Since Phase 14 it moves to each water it opens. Phase 68: the Red Room
-// needs no key fish any more (the hunt below finds no key and never runs); in the Pines and
-// the Red Room it fishes minnows it buys (P.baitAt).
+// fixed 1/60 step. Since Phase 14 it moves to each water it opens (not the last: it stops
+// when that opens). In the Pines it fishes minnows it buys (P.baitAt). Phase 74: the Red
+// Room's key-fish hunt is gone with it; Russetwood is the last water it opens.
 
 const DT = 1 / 60;
 const P = {
@@ -358,16 +374,17 @@ const P = {
   hookDelay: 0.5,  // s to react to a bite
   skill: 0.85,     // fight skill of an attentive player
   depthM: 8,       // the player's usual depth (per water: depthAt)
-  depthAt: { fog: 8, creek: 6, pines: 8, red: 8 },
-  // Phase 68: the live bait it fishes at each water. The Pines' and the Red Room's best fish
+  depthAt: { fog: 8, creek: 6, copper: 5, pines: 8, harts: 8, stone: 4, russet: 8, sound: 12, wreck: 12 },
+  // Phase 68: the live bait it fishes at each water. The Pines' (and Russetwood's and the seas') best fish
   // (pike, muskie, the striped bass hybrid) take minnows, not worms, so there it buys minnows
   // a pack at a time with its own coins (worms when it cannot afford a pack).
-  baitAt: { fog: 'worm', creek: 'worm', pines: 'minnow', red: 'minnow' },
-  huntDepthM: 24,  // m: where it fishes for the Red Room's key fish in its window
+  baitAt: { fog: 'worm', creek: 'worm', copper: 'worm', pines: 'minnow', harts: 'worm', stone: 'worm', russet: 'minnow', sound: 'minnow', wreck: 'minnow' },
   lureX: 600
 };
 // Phase 53: 'fluoro' buys the fluorocarbon spool and puts it on (line-shy fish then bite).
-const PLAN = ['line', 'reel', 'rod', 'lantern', 'depthFinder', 'creek', 'fluoro', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'red', 'line', 'rod', 'reel'];
+// Phase 74: the Red Room is retired; the model opens Russetwood in its place (the same cost,
+// the same step in V8's pacing: location 4 of the model's route) and stops there.
+const PLAN = ['line', 'reel', 'rod', 'lantern', 'depthFinder', 'creek', 'fluoro', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'russet', 'line', 'rod', 'reel'];
 
 function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
@@ -378,7 +395,6 @@ function session(G, seed, opts) {
   Object.assign(school.ctx, { loc: 'fog', maxDepthPx: data.locations.fog.maxDepth, latched });
   const st = { phase: 'cast', t: 0, time: 0, hash: 7, catches: 0, attempts: 0, events: [], plan: 0, hookUid: 0, willHook: false, cur: null, mix: {}, coinsAt: [],
     loc: 'fog', depthM: P.depthAt.fog };
-  const red = data.locations.red.need || {}, key = red.windowCatch && G.sim.clock.windowById(data.windows, red.windowCatch);
 
   // Travels to water id (when the model has opened it): the school there starts empty.
   function moveTo(id) {
@@ -418,7 +434,7 @@ function session(G, seed, opts) {
     while (st.plan < PLAN.length) {
       const k = PLAN[st.plan], E = S.economy;
       const r = data.locations[k] ? E.unlock(save, k, data) : (k === 'fluoro' ? E.buyLineType(save, k, data) : E.buy(save, k, data));
-      if (r === E.OK || r === E.MAXED) { if (r === E.OK) { event(k); if (data.locations[k] && k !== 'red') moveTo(k); } st.plan++; } else break;
+      if (r === E.OK || r === E.MAXED) { if (r === E.OK) { event(k); if (data.locations[k] && k !== 'russet') moveTo(k); } st.plan++; } else break;
     }
   }
 
@@ -441,10 +457,7 @@ function session(G, seed, opts) {
           topUp();
           if (!opts) modelBait();
           lure.active = true; lure.y = 0; lure.bait = S.economy.useBait(save, data);
-          // The hunt: in the Pines, in (or just before) the key window, with the key not yet caught.
-          const hunt = key && st.loc === 'pines' && !(save.journal[red.fish] && save.journal[red.fish].caught) &&
-            G.sim.clock.wrap(save.clock) >= key.from - 0.05 && G.sim.clock.wrap(save.clock) < key.to;
-          st.depthM = hunt ? P.huntDepthM : P.depthAt[st.loc];
+          st.depthM = P.depthAt[st.loc];
           S.economy.effects(save, data, fx);
           // a lure fishes its own depth: fish rise to a surface lure; the player reels a plug down to its depth
           if (fx.lure) st.depthM = fx.swim === 'top' ? fx.topDepthM : Math.min(st.depthM, fx.maxDepthM);
@@ -482,7 +495,6 @@ function session(G, seed, opts) {
           S.economy.recordCatch(save, st.cur, 'sell');
           st.catches++; st.mix[st.cur.id] = (st.mix[st.cur.id] || 0) + 1; h(save.coins);
           if (!opts || opts.shop !== false) shop();
-          if (st.cur.id === red.fish) event('key');
           st.phase = 'cast'; st.t = 0;
         }
         break;
@@ -511,10 +523,13 @@ function session(G, seed, opts) {
 // fishes some water, and at every water it fishes earns at least 50% of what worms earn (it is
 // worth buying over the free bait) and at most 200% of the best live bait there (it does not
 // outclass what the shop already sells: a lure made for the big fish of a water hooks them at
-// their top sizes, so the Red Room's lures are measured against its minnows). The four
-// waters run in four processes at once (--tackle-water w prints one water's numbers as JSON).
+// their top sizes, so the big waters' lures are measured against their minnows). The
+// waters run in processes at once (--tackle-water w prints one water's numbers as JSON).
 
-const TACKLE_WATERS = { fog: 1, creek: 2, pines: 3, red: 4 };
+// Phase 74: nine waters, each with the rod of its stage (by cost: the fibreglass at Fogbound,
+// the graphite at the creek and Copperbend, the lacquered at the Pines, Hartsmere and
+// Stonehorn, the long rod at Russetwood and the seas).
+const TACKLE_WATERS = { fog: 1, creek: 2, copper: 2, pines: 3, harts: 3, stone: 3, russet: 4, sound: 4, wreck: 4 };
 function tackleHooks(d) { return ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)); }
 function tackleFishes(G, hk, w) {
   const d = G.data, L = d.gear.lures.find(l => l.id === hk);
@@ -583,7 +598,7 @@ function replay(seed, minutes) {
 const TARGETS = [
   { what: 'first upgrade', key: 'first', unit: 'catches', lo: 4, hi: 8 },
   { what: 'location 2 (creek)', key: 'creek', unit: 'min', lo: 30, hi: 50 },
-  { what: 'location 4 (red)', key: 'red', unit: 'min', lo: 150, hi: 360 }
+  { what: 'location 4 (russet)', key: 'russet', unit: 'min', lo: 150, hi: 360 } // Phase 74: Russetwood in the Red Room's place
 ];
 
 function pacing() {
@@ -593,20 +608,20 @@ function pacing() {
   for (let i = 1; i <= 20; i++) seeds.push(i * 11);
   for (const seed of seeds) {
     const s = session(load(), seed);
-    s.run(8 * 3600, st => st.events.some(e => e.what === 'red'));
+    s.run(8 * 3600, st => st.events.some(e => e.what === 'russet'));
     const ev = s.st.events, at = k => ev.find(e => e.what === k);
     rows.push({ seed, first: ev[0] ? ev[0].catches : null, firstWhat: ev[0] && ev[0].what, creek: at('creek') && at('creek').t / 60, pines: at('pines') && at('pines').t / 60,
-      red: at('red') && at('red').t / 60, catches: s.st.catches, mix: s.st.mix, events: ev, coinsAt: s.st.coinsAt, windowCatch: Object.keys(s.save.flags.windowCatch) });
+      russet: at('russet') && at('russet').t / 60, catches: s.st.catches, mix: s.st.mix, events: ev, coinsAt: s.st.coinsAt, windowCatch: Object.keys(s.save.flags.windowCatch) });
   }
   const median = k => { const v = rows.map(r => r[k]).filter(x => x != null).sort((a, b) => a - b); return v.length === rows.length ? v[Math.floor(v.length / 2)] : null; };
-  console.log('Active-player model (moves to each water it opens; fishes minnows in the Pines and the Red Room; ' + JSON.stringify(P) + ')\n');
+  console.log('Active-player model (moves to each water it opens; fishes minnows in the Pines; ' + JSON.stringify(P) + ')\n');
   const r0 = rows[0];
   console.log('Seed ' + r0.seed + ' timeline:');
   r0.events.forEach(e => console.log('  ' + (e.t / 60).toFixed(1).padStart(6) + ' min  ' + String(e.catches).padStart(4) + ' catches  ' + e.what));
   console.log('  coins held every 30 min: ' + r0.coinsAt.map(c => c[0] + 'm:' + c[1]).join(' '));
   console.log('  catch mix: ' + JSON.stringify(r0.mix) + '  window catches: ' + r0.windowCatch.join(',') + '\n');
-  console.log('seed   first upgrade        creek     pines     red');
-  rows.forEach(r => console.log(String(r.seed).padEnd(6) + ' ' + (r.first + ' catches (' + r.firstWhat + ')').padEnd(20) + ' ' + (r.creek ? r.creek.toFixed(1) : '-').padStart(6) + 'm  ' + (r.pines ? r.pines.toFixed(1) : '-').padStart(6) + 'm  ' + (r.red ? r.red.toFixed(1) : '-').padStart(6) + 'm'));
+  console.log('seed   first upgrade        creek     pines    russet');
+  rows.forEach(r => console.log(String(r.seed).padEnd(6) + ' ' + (r.first + ' catches (' + r.firstWhat + ')').padEnd(20) + ' ' + (r.creek ? r.creek.toFixed(1) : '-').padStart(6) + 'm  ' + (r.pines ? r.pines.toFixed(1) : '-').padStart(6) + 'm  ' + (r.russet ? r.russet.toFixed(1) : '-').padStart(6) + 'm'));
   console.log('');
   let failed = 0;
   for (const t of TARGETS) {
@@ -692,7 +707,10 @@ function savesCheck() {
         for (const id in G.data.locations) E.canUnlock(s, id, G.data);
         for (const id in s.journal) if (!G.data.fish.some(f => f.id === id)) probs.push('journal species ' + id + ' no longer exists');
         s.kept.forEach(k => { if (!G.data.fish.some(f => f.id === k.id)) probs.push('kept species ' + k.id + ' no longer exists'); }); // Phase 68
-        if (s.coins !== o.save.coins) probs.push('coins ' + s.coins + ' (saved ' + o.save.coins + ')');               // Phase 68: dropping the old fish keeps the coins
+        const coins = o.save.coins + (o.save.unlocks && o.save.unlocks.red ? SV.RED_REFUND : 0);                          // Phase 74: the Red Room's cost comes back
+        if (s.coins !== coins) probs.push('coins ' + s.coins + ' (saved ' + o.save.coins + ', want ' + coins + ')');      // Phase 68: dropping the old fish keeps the coins
+        if (s.unlocks.red || (s.unease && 'red' in s.unease) || s.flags.heavy.red || s.flags.dogStare.red) probs.push('the Red Room is still in the save');
+        if (o.save.loc === 'red' && s.loc !== 'fog') probs.push('a save in the Red Room resumes at ' + s.loc + ', not Fogbound');
         if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
         for (const id in s.baits) if (!E.baitById(id, G.data)) probs.push('counts an unknown bait or lure ' + id);      // Phase 69: the old lures mapped
         if (!E.baitById(s.gear.bait, G.data)) probs.push('unknown hook ' + s.gear.bait);

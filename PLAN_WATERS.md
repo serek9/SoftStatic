@@ -1,7 +1,7 @@
 # SoftStatic: New Waters, Phases 74–79
 
 **Date:** 2026-11-02. **Repo state:** Phases 1–73 done (PLAN.md §8.1).
-**Status:** Asked for by the user on 2026-11-02. **Not started.** Each phase starts only when the user says so.
+**Status:** Asked for by the user on 2026-11-02. **Phase 74 done** (PLAN.md 8.3 #397–404). Each phase starts only when the user says so.
 
 > keeping the same style of locations we have made, create all the locations in this list (dont give the same names, create new ones, but the aspect should be real like the ones in the list) then associate each species to the location, depth and time of the day you can find them — https://castnchill.unpack.wiki/docs/locations/
 

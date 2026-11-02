@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 8;
+  var VERSION = 9;
   var PREFIX = 'SS1';
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
@@ -86,8 +86,22 @@ G.core.save = (function () {
         s.journal[k].took = t.filter(function (id, n) { return t.indexOf(id) === n; });
       }
       return s;
+    },
+    // v8 -> v9 (Phase 74, PLAN_WATERS.md 4.4): the Red Room Reservoir is retired. A save that
+    // had it open gets back what it paid (its cost, 4800, written here: the water's data is
+    // gone); one sitting in it wakes at Fogbound (the boat starts beside the pier). What named
+    // it (its unease, the heavy-fish note, the dog's stare) goes; its catches stay.
+    8: function (s) {
+      s.unlocks = s.unlocks || {};
+      if (s.unlocks.red) { delete s.unlocks.red; s.coins = (s.coins || 0) + RED_REFUND; }
+      if (s.loc === 'red') s.loc = 'fog';
+      if (s.unease) delete s.unease.red;
+      if (s.flags && s.flags.heavy) delete s.flags.heavy.red;
+      if (s.flags && s.flags.dogStare) delete s.flags.dogStare.red;
+      return s;
     }
   };
+  var RED_REFUND = 4800;
 
   function defaults() {
     return {
@@ -239,7 +253,7 @@ G.core.save = (function () {
   }
 
   return {
-    KEY: KEY, VERSION: VERSION, migrations: migrations,
+    KEY: KEY, VERSION: VERSION, migrations: migrations, RED_REFUND: RED_REFUND,
     defaults: defaults, migrate: migrate, load: load, persist: persist, autosave: autosave,
     exportString: encode, importString: decode, claim: claim,
     lost: function () { return lost; },

@@ -114,5 +114,8 @@ G.data.locations.fog = {
     { id: 'wreck_hollow', kind: 'open', x: 770, r: 30 },
     { id: 'cold_hole', kind: 'open', x: 880, r: 22, attract: 1.3 },
     { id: 'reed_gap', kind: 'hidden', x: 1110, r: 24, attract: 1.6 }
-  ]
+  ],
+  // Phase 74 (PLAN_WATERS.md): what kind of water it is, and its stretches by world x.
+  water: 'lake',
+  reaches: [{ id: 'fogbound', name: 'Fogbound Lake', x: [0, 1200] }]
 };
