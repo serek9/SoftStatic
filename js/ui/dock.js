@@ -8,11 +8,16 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // sailing off closes it. Choosing a place fades to black and walks him up (the scene changes,
 // as the map's travel does); leaving the shop or the cabin brings him back to the boat at the
 // pier. The water's `dock` ({x, reach} in world px) says where. Presentation and input only.
+// Phase 76 (PLAN_WATERS.md 4.3): every water has its pier and its signpost. The panel offers
+// the Bait Shop and staying everywhere, The Cabin only where the dock says `cabin` (Fogbound);
+// the shop leaves the run as it was, so he comes back to the boat at the pier he left from.
 G.ui = G.ui || {};
 G.ui.dock = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine;
-  var ROWS = ['Bait Shop', 'The Cabin', 'Stay on the water'], DEST = ['shop', 'cabin', ''];
-  var SAYS = ['Rusty has the coffee on.', '', 'The boat knocks against the posts.'];
+  var WITH = { rows: ['Bait Shop', 'The Cabin', 'Stay on the water'], dest: ['shop', 'cabin', ''], says: ['Rusty has the coffee on.', '', 'The boat knocks against the posts.'] };
+  var PLAIN = { rows: ['Bait Shop', 'Stay on the water'], dest: ['shop', ''], says: ['Rusty has the coffee on.', 'The boat knocks against the posts.'] };
+  var M = WITH, ROWS = M.rows, DEST = M.dest, SAYS = M.says; // the open panel's rows (Phase 76)
+  function menuOf(loc) { return loc && loc.dock && loc.dock.cabin ? WITH : PLAIN; }
   var on = false, sel = 0, armed = false, phase = '', t = 0, dest = '', FADE = 0.35, near = false;
   var R = [0, 0, 0, 0], RECTS = [R];
 
@@ -30,7 +35,7 @@ G.ui.dock = (function () {
     U.place(w, h, 'top', R); R[1] += 34;
     R[2] = w; R[3] = h;
   }
-  function open() { layout(); on = true; sel = 0; armed = false; }
+  function open(loc) { M = menuOf(loc); ROWS = M.rows; DEST = M.dest; SAYS = M.says; layout(); on = true; sel = 0; armed = false; }
   function close() { on = false; }
 
   // One step from the sailing scene, before it casts or sails. Returns true while the dock has
@@ -52,7 +57,7 @@ G.ui.dock = (function () {
       if (inp.pressed('action')) choose(sel);
       return true;
     }
-    if (run.fsm === 'sailing' && run.boat.stopped && (armed || inp.pressed('up'))) { open(); return true; }
+    if (run.fsm === 'sailing' && run.boat.stopped && (armed || inp.pressed('up'))) { open(loc); return true; }
     return false;
   }
   function choose(i) {
@@ -78,7 +83,7 @@ G.ui.dock = (function () {
       if (here) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, R[2] - 6, U.ROW); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 1, U.ROW); }
       F.drawText(ctx, ROWS[i], U.left(x) + 6, ry + 1, here ? 'signal_amber' : 'bone');
     }
-    var say = sel === 1 ? 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.' : SAYS[sel];
+    var say = DEST[sel] === 'cabin' ? 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.' : SAYS[sel];
     F.drawText(ctx, say, U.left(x), U.top(y) + ROWS.length * U.ROW + 4, 'fog_mid');
     var hx = U.left(x), hy = y + R[3] - U.PAD - U.KEY_H;
     hx += U.hint(ctx, 'SPACE', 'go', hx, hy);
@@ -90,7 +95,7 @@ G.ui.dock = (function () {
   function tap(gx, gy) {
     var U = G.ui.panel;
     if (!on) {
-      if (near && gx >= 280 && gx < 280 + U.hintW('TAP', 'the pier') && gy >= 62 && gy < 80) { open(); return 'none'; }
+      if (near && gx >= 280 && gx < 280 + U.hintW('TAP', 'the pier') && gy >= 62 && gy < 80) { var r = G.state.run; open(r && r.loc ? G.data.locations[r.loc] : null); return 'none'; }
       return '';
     }
     if (gx < R[0] || gx >= R[0] + R[2] || gy < R[1] || gy >= R[1] + R[3]) return '';
@@ -108,10 +113,12 @@ G.ui.dock = (function () {
     // The map's trips to the shop and the cabin start from the pier too (Phase 67): no panel
     // until the boat leaves the pier and comes back.
     disarm: function () { armed = false; on = false; },
-    // dbg.dock(): where the pier is and whether the boat is at it.
+    // dbg.dock(): where the pier is, its signpost and its rows (Phase 76), and whether the
+    // boat is at it.
     info: function () {
-      var run = G.state.run, loc = run && run.loc ? G.data.locations[run.loc] : null;
-      return { loc: run ? run.loc : '', pier: loc && loc.dock ? loc.dock.x : null, boat: run && run.boat ? +run.boat.x.toFixed(1) : null, at: at(run, loc), open: on, row: ROWS[sel], armed: armed };
+      var run = G.state.run, loc = run && run.loc ? G.data.locations[run.loc] : null, k, sign = null;
+      for (k = 0; loc && k < loc.landmarks.length; k++) if (loc.landmarks[k].kind === 'sign') sign = loc.landmarks[k].x;
+      return { loc: run ? run.loc : '', pier: loc && loc.dock ? loc.dock.x : null, sign: sign, rows: menuOf(loc).rows.slice(), boat: run && run.boat ? +run.boat.x.toFixed(1) : null, at: at(run, loc), open: on, row: on ? ROWS[sel] : '', armed: armed };
     },
     choose: function (i) { if (!on) return false; choose(i); return true; }
   };

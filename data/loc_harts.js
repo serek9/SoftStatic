@@ -59,6 +59,7 @@ G.data.locations.harts = {
 
   landmarks: [
     { id: 'pier', kind: 'pier', x: 96, seed: 9102 },
+    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
     { id: 'marker_a', kind: 'marker', x: 760 }
   ],
 

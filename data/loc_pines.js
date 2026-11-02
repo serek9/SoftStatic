@@ -66,6 +66,7 @@ G.data.locations.pines = {
   // toward `fast`, and inside a window it blinks at `fast`.
   landmarks: [
     { id: 'pier', kind: 'pier', x: 330, seed: 3301 },
+    { id: 'sign', kind: 'sign', x: 284 }, // Phase 76: the signpost at the pier's shore end
     { id: 'signal', kind: 'signal', x: 640, period: 1.4, fast: 0.45, lead: 1 },
     { id: 'road', kind: 'road', x: 900 },
     { id: 'owl_branch', kind: 'owl_branch', x: 1170 }

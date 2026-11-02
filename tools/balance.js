@@ -314,6 +314,15 @@ function validateLocations(G, err) {
     if (new Set(R.map(r => r.id)).size !== R.length) err(p + 'two reaches share an id');
     if (!(L.dock && num(L.dock.x) && L.dock.x > 0 && L.dock.x < L.width && L.dock.reach > 0)) err(p + 'dock {x, reach} inside the world');
     else if (!(L.landmarks || []).some(m => m.kind === 'pier' && m.x === L.dock.x)) err(p + 'no pier landmark at the dock');
+    // Phase 76 (PLAN_WATERS.md 4.3): a signpost at every pier, beside its shore end, with the
+    // CABIN board where the pier's panel offers The Cabin, and The Cabin at Fogbound only.
+    if (L.dock) {
+      const sg = (L.landmarks || []).filter(m => m.kind === 'sign');
+      if (sg.length !== 1) err(p + 'needs one signpost (sign landmark) at its pier, has ' + sg.length);
+      else if (Math.abs(sg[0].x - L.dock.x) > 80) err(p + 'the signpost at ' + sg[0].x + ' is not beside the pier at ' + L.dock.x);
+      else if (!!sg[0].cabin !== !!L.dock.cabin) err(p + 'the signpost\'s CABIN board and the dock\'s cabin disagree');
+      if (!!L.dock.cabin !== (id === 'fog')) err(p + 'The Cabin is offered at Fogbound\'s pier only');
+    }
     if (!(L.start > 0 && L.start < L.width)) err(p + 'start');
     if (L.drift) {
       for (let t = 0; t < 30; t += 0.5) for (const depth of [0, L.maxDepth]) {

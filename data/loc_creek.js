@@ -52,6 +52,7 @@ G.data.locations.creek = {
   // the same branches reach down to the bottom in the cross-section (underwater.snags).
   landmarks: [
     { id: 'pier', kind: 'pier', x: 96, seed: 5102 }, // Phase 74: a pier in every water (PLAN_WATERS.md 4.3)
+    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
     { id: 'cabin_a', kind: 'cabin', x: 250 },
     { id: 'snag_a', kind: 'snag', x: 470 },
     { id: 'cabin_b', kind: 'cabin', x: 720, sag: 3 },

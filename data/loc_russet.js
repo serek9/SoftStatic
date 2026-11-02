@@ -57,6 +57,7 @@ G.data.locations.russet = {
 
   landmarks: [
     { id: 'pier', kind: 'pier', x: 96, seed: 6602 },
+    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
     { id: 'snag_a', kind: 'snag', x: 420 },
     { id: 'marker_a', kind: 'marker', x: 980 }
   ],
