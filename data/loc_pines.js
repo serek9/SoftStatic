@@ -16,6 +16,7 @@ G.data.locations.pines = {
   maxDepth: 112,
   seed: 6271,
   start: 200,
+  dock: { x: 330, reach: 60 }, // Phase 74: its pier, the same pier as Fogbound's (js/ui/dock.js)
   // Phase 20: the surface's swell (view px; see loc_fog.js): a medium chop.
   swell: { amp: 1.6, mirror: 0.9, waves: [[80, 11, 0.5], [37, -8, 0.3], [19, 6, 0.2]] },
   // Phase 22: a slow wind drift (G.data.lakeDrift in loc_fog.js).
@@ -81,5 +82,8 @@ G.data.locations.pines = {
     { id: 'lane_deep', kind: 'open', x: 770, r: 22, attract: 1.3 },
     { id: 'drowned_road', kind: 'open', x: 900, r: 34 },
     { id: 'culvert', kind: 'hidden', x: 1030, r: 22, attract: 1.6 }
-  ]
+  ],
+  // Phase 74 (PLAN_WATERS.md): what kind of water it is, and its stretches by world x.
+  water: 'lake',
+  reaches: [{ id: 'the_pines', name: 'The Pines', x: [0, 1300] }]
 };

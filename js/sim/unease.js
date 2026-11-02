@@ -131,7 +131,7 @@ G.sim.unease = (function () {
         for (r = 0; r < LATE.refs.length; r++) {
           var ref = LATE.refs[r];
           if (j && j.hints.indexOf(ref) >= 0) continue;
-          if ((ref === 'lure' && caught >= 1) || (ref === 'bait' && caught >= 2) || (ref === 'depth' && caught >= 3)) continue; // already shown by catching
+          if ((ref === 'lure' && caught >= 1) || (ref === 'bait' && caught >= 2) || (ref === 'depth' && caught >= 1)) continue; // already shown by catching (Phase 75: the homes from the first)
           if (!j) j = save.journal[sp.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: false, phantom: false };
           j.hints.push(ref);
           j.late = j.late || {};

@@ -139,7 +139,7 @@ G.audio.engine = (function () {
   //   click: each reel's body (its own resonances, the Tin Reel's double rattle), 3 each
   //   twang: the line as a Karplus-Strong string, 4 pitches × 2 dampings
   //   tick: a nibble felt through the rod; knock: a bite
-  //   ir: a reverb per water (a damped lake echo, tight in the creek, too long in the Red Room)
+  //   ir: a reverb per water (a damped lake echo, tight in the rivers, long and dull at sea)
   var KIT = null, kitMs = 0, VOICE_MAX = 28;
   var TIER = [ // modes [Hz, decay s, amp]; rattle s; whir [Hz, Q, gain]; click gain
     { modes: [[3200, 0.012, 1], [4700, 0.008, 0.6], [1900, 0.02, 0.45]], rattle: 0.004, whir: [1800, 1.2, 0.010], gain: 0.05 },
@@ -148,7 +148,10 @@ G.audio.engine = (function () {
     { modes: [[900, 0.006, 1]], rattle: 0, whir: [700, 1, 0.003], gain: 0.012 },
     { modes: [[1300, 0.020, 0.6], [2600, 0.010, 0.3]], rattle: 0, whir: [220, 8, 0.016], gain: 0.025 }
   ];
-  var IRS = { fog: [1.6, 2600], pines: [1.2, 3000], creek: [0.45, 4200], red: [4.5, 1700] }; // decay s, damping Hz
+  // decay s, damping Hz. Phase 74: the Red Room's long echo is gone; the six new waters each have one.
+  var IRS = { fog: [1.6, 2600], pines: [1.2, 3000], creek: [0.45, 4200], copper: [0.6, 3800], stone: [0.35, 4800], harts: [1.8, 2800], russet: [1.3, 2900], sound: [2.4, 2000], wreck: [2.2, 2100] };
+  // Phase 74: how loud the moving water is in each river (the creek's level before).
+  var STREAM = { creek: 0.018, copper: 0.02, stone: 0.032 };
   var SPLASH_SIZES = [0.12, 0.3, 0.5, 0.75, 1];
 
   function rngK(seed) { var s = seed | 0 || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; }; }
@@ -720,15 +723,15 @@ G.audio.engine = (function () {
   // The continuous layers follow the hour, the place, unease and the boat.
   function ambience(save, run, dt, outside) {
     var loc = run.loc || 'fog', h = G.sim.clock.wrap(save.clock || 0), L = lightShares(h);
-    var u = G.sim.unease.get(save, loc), red = loc === 'red', vx = run.boat ? Math.abs(run.boat.vx) : 0;
-    set(amb.wind.gain, red ? 0.004 : 0.012 + 0.025 * L.grey);
-    set(amb.water.gain, red ? 0.01 : 0.03 + 0.01 * Math.sin(t * 0.8));
+    var u = G.sim.unease.get(save, loc), vx = run.boat ? Math.abs(run.boat.vx) : 0;
+    set(amb.wind.gain, 0.012 + 0.025 * L.grey);
+    set(amb.water.gain, 0.03 + 0.01 * Math.sin(t * 0.8));
     set(amb.lap.gain, outside ? 0.004 + Math.min(1, vx / 42) * 0.06 : 0, 0.15);
     var b = run.boat;
     if (b) amb.motor.update(b.rpm, b.throttle, outside && b.motor, outside && b.startT >= 0, ac.currentTime);
-    set(amb.stream.gain, loc === 'creek' ? 0.018 : 0);
+    set(amb.stream.gain, STREAM[loc] || 0);
     set(amb.rain.gain, G.scene.sailing.rain ? (outside ? 0.035 : (G.core.state.sceneName() === 'shop' ? 0.03 : 0)) * G.scene.sailing.rain() : 0, 0.8); // Phase 39: on the shop's glass, muffled
-    set(amb.drone.gain, (red ? 0.06 : 0.025 + 0.025 * L.night) * (loc === 'pines' ? 0.6 : 1));
+    set(amb.drone.gain, (0.025 + 0.025 * L.night) * (loc === 'pines' ? 0.6 : 1));
     set(amb.sour.detune, 12 + u * 55, 1.5);
     var lamp = loc === 'pines' && run.scen && G.scene.scenery.pines.lampLit ? G.scene.scenery.pines.lampLit(run.scen.t) : true;
     set(amb.hum.gain, loc === 'pines' ? (lamp ? 0.012 : 0.002) : 0, 0.02);

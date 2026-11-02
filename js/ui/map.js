@@ -19,22 +19,40 @@ G.ui.map = (function () {
   var MAP_RECTS = [[FX, FY, FW, FH]];                               // the panel (Phase 54)
   var CX = 16, CY = 16 + 6, CW = 608, CH = 322, FADE = 0.35;           // the chart inside it
 
-  // Where each stop sits on the chart (presentation only), in map order.
+  // Where each stop sits on the chart (presentation only), in map order. Phase 74: nine
+  // waters: the inland lakes and rivers on the left, the coast and its two seas on the right
+  // (sea: drawn as bays of the sea, deeper blue). Rivers are long and narrow (a small ry).
   var STOPS = [
-    { id: 'fog', kind: 'loc', x: 168, y: 184, rx: 68, ry: 30, fill: 'fog_light' },
-    { id: 'creek', kind: 'loc', x: 300, y: 100, rx: 60, ry: 14, fill: 'fog_light' },
-    { id: 'pines', kind: 'loc', x: 432, y: 196, rx: 54, ry: 26, fill: 'fog_light' },
-    { id: 'red', kind: 'loc', x: 544, y: 96, rx: 40, ry: 22, fill: 'dusk_rose' },
+    { id: 'fog', kind: 'loc', x: 168, y: 192, rx: 58, ry: 26 },
+    { id: 'creek', kind: 'loc', x: 190, y: 92, rx: 52, ry: 12 },
+    { id: 'copper', kind: 'loc', x: 330, y: 300, rx: 60, ry: 10 },
+    { id: 'pines', kind: 'loc', x: 334, y: 214, rx: 44, ry: 22 },
+    { id: 'harts', kind: 'loc', x: 338, y: 122, rx: 44, ry: 22 },
+    { id: 'stone', kind: 'loc', x: 466, y: 84, rx: 44, ry: 10 },
+    { id: 'russet', kind: 'loc', x: 468, y: 196, rx: 44, ry: 22 },
+    { id: 'sound', kind: 'loc', x: 580, y: 110, rx: 30, ry: 26, sea: true },
+    { id: 'wreck', kind: 'loc', x: 580, y: 252, rx: 30, ry: 26, sea: true },
     // Phase 66: the shop and the cabin stand on Fogbound's west shore by the pier (Phase 67).
     { id: 'shop', kind: 'shop', x: 70, y: 226 },
     { id: 'cabin', kind: 'cabin', x: 56, y: 150 }
   ];
+  // Phase 74: the coast, in view px: x of the shoreline at view row y (the sea lies east of it).
+  function coastX(y) { return 532 + Math.round(8 * Math.sin(y * 0.05) + 5 * Math.sin(y * 0.13 + 1)); }
+  // Phase 74: the dotted routes between the waters (pairs of stop ids).
+  var ROUTE = [['fog', 'creek'], ['fog', 'copper'], ['fog', 'pines'], ['creek', 'harts'], ['harts', 'pines'], ['harts', 'stone'], ['pines', 'russet'], ['stone', 'sound'], ['russet', 'wreck'], ['sound', 'wreck']];
   var PIER = [98, 190];                                             // where the pier runs out into Fogbound
   var KM = 0.022;                                                    // km a chart pixel
   // Phase 66: more on the chart: rivers between the waters, the shore road and its bridge,
   // soundings in each lake (its deepest, in metres) and the names of things.
-  var RIVERS = [[[300 - 60, 100], [262, 128], [226, 150], [200, 160]], [[300 + 60, 100], [392, 128], [410, 160], [420, 172]], [[544 - 40, 96], [480, 104], [430, 100], [362, 100]], [[432, 222], [424, 240], [414, 270], [404, 330]]];
-  var ROAD = [[60, 250], [140, 262], [240, 250], [330, 240], [420, 236], [500, 250], [580, 236]];
+  // Phase 74: rivers join the waters, the coast's two run out to the sea; the road runs along
+  // the south with its bridge over the river down to Copperbend.
+  var RIVERS = [[[146, 102], [138, 130], [150, 156], [160, 166]], [[242, 94], [270, 102], [296, 116]], [[422, 86], [396, 98], [380, 108]],
+    [[510, 84], [530, 92], [548, 100]], [[338, 144], [344, 170], [336, 192]], [[378, 212], [400, 206], [424, 200]], [[506, 206], [528, 226], [550, 246]],
+    [[198, 214], [230, 250], [272, 294]], [[390, 298], [430, 270], [456, 216]]];
+  var ROAD = [[60, 250], [140, 262], [240, 262], [330, 252], [420, 262], [508, 250]];
+  var BRIDGE = [224, 256];
+
+  function stopById(id) { for (var i = 0; i < STOPS.length; i++) if (STOPS[i].id === id) return STOPS[i]; return null; }
 
   // The chart, baked once: paper with fold creases, the route, the lakes, trees and peaks,
   // the compass and the title.
@@ -49,22 +67,29 @@ G.ui.map = (function () {
     // Peaks along the top and pines scattered over the land.
     for (i = 0; i < 9; i++) {
       var mx = 30 + i * 66 + rng.int(-10, 10), my = 46 + rng.int(-6, 8), mh = rng.int(14, 22);
+      if (mx + CX > coastX(my + CY) - 30 || mx < 130) continue;              // Phase 74: no peaks at sea or over the legend
       for (y = 0; y < mh; y++) { A.box(ctx, 'fog_dark', mx - y, my - mh + y, y + 1, 1); A.box(ctx, 'night_blue', mx + 1, my - mh + y, y, 1); }
       A.box(ctx, 'fog_mid', mx - 2, my - mh + 2, 3, 2);
     }
     for (i = 0; i < 70; i++) {
       var tx = rng.int(20, CW - 20), ty = rng.int(64, CH - 30), near = false;
       for (var k = 0; k < STOPS.length; k++) { var st = STOPS[k]; if (st.kind === 'loc' && Math.abs(tx - st.x + CX) < st.rx + 10 && Math.abs(ty - st.y + CY) < st.ry + 12) near = true; }
-      if (tx > CW - 336 && tx < CW - 206 && ty > CH - 84) near = true;   // Phase 66: the legend
+      if (tx < 126 && ty < 84) near = true;                               // Phase 66: the legend (Phase 74: top left; the place card has the bottom left)
+      if (tx + CX > coastX(ty + CY) - 8) near = true;                     // Phase 74: the sea
       if (Math.abs(tx - 60) < 30 && ty > 120 && ty < 230) near = true;   // the shop, the cabin and their paths
       if (near) continue;
       for (y = 0; y < 7; y++) A.box(ctx, y % 3 === 2 ? 'pine_dark' : 'moss_dark', tx - (y >> 1), ty + y, (y >> 1) * 2 + 1, 1);
       A.px(ctx, 'wood_dark', tx, ty + 7);
     }
-    // The route between the waters, dotted.
-    for (i = 0; i < STOPS.length - 1; i++) {
-      var a = STOPS[i], b = STOPS[i + 1];
-      if (a.kind !== 'loc' || b.kind !== 'loc') continue;
+    // Phase 74: the sea east of the coast: a pale shore line, shallows, then deep water.
+    for (y = 0; y < CH; y++) {
+      var c0 = coastX(y + CY) - CX;
+      A.px(ctx, 'fog_light', c0, y);
+      for (x = c0 + 1; x < CW; x++) A.px(ctx, x - c0 < 5 ? 'water_hi' : ((x * 7 + y * 13) % 41 === 0 ? 'water_mid' : 'water_dark'), x, y);
+    }
+    // The routes between the waters, dotted.
+    for (i = 0; i < ROUTE.length; i++) {
+      var a = stopById(ROUTE[i][0]), b = stopById(ROUTE[i][1]);
       for (var u = 0; u <= 1; u += 0.006) {
         if ((u * 160 | 0) % 3) continue;
         A.box(ctx, 'fog_mid', Math.round(a.x - CX + (b.x - a.x) * u), Math.round(a.y - CY + (b.y - a.y) * u + Math.sin(u * 3.14) * 12), 2, 2);
@@ -74,13 +99,14 @@ G.ui.map = (function () {
     for (i = 0; i < STOPS.length; i++) {
       var s = STOPS[i];
       if (s.kind !== 'loc') continue;
-      var red = s.fill === 'dusk_rose', wob = [rng.range(0, 6.28), rng.range(0, 6.28)];
+      var sea = !!s.sea, wob = [rng.range(0, 6.28), rng.range(0, 6.28)];
       for (y = -s.ry - 2; y <= s.ry + 2; y++) for (x = -s.rx - 3; x <= s.rx + 3; x++) {
         var ang = Math.atan2(y / s.ry, x / s.rx), r = 1 + 0.08 * Math.sin(ang * 3 + wob[0]) + 0.05 * Math.sin(ang * 5 + wob[1]);
         var e = Math.sqrt((x * x) / (s.rx * s.rx) + (y * y) / (s.ry * s.ry)) / r;
         if (e > 1.06) continue;
-        var key = e > 1 ? 'fog_light' : (e > 0.82 ? (red ? 'blood' : 'water_hi') : (red ? 'crimson' : 'water_mid'));
-        if (e <= 0.82 && e > 0.55 && (x + y * 3) % 23 === 0) key = red ? 'dusk_rose' : 'water_hi';
+        if (sea && e > 1) continue;                                       // a bay of the sea has no shore of its own
+        var key = e > 1 ? 'fog_light' : (e > 0.82 ? 'water_mid' : (sea ? 'water_deep' : 'water_mid'));
+        if (e <= 0.82 && e > 0.55 && (x + y * 3) % 23 === 0) key = 'water_hi';
         A.px(ctx, key, s.x - CX + x, s.y - CY + y);
       }
     }
@@ -88,6 +114,7 @@ G.ui.map = (function () {
     var rr = new G.core.rng.Rng(7718);
     for (i = 0; i < 9; i++) {
       var hx0 = 30 + i * 66 + rr.int(-10, 10);
+      if (hx0 + CX > coastX(70) - 30 || hx0 < 130) continue;                 // Phase 74: none at sea or over the legend
       for (var hk = 0; hk < 6; hk++) A.line(ctx, 'fog_dark', hx0 - 4 - hk * 3, 48 + hk, hx0 - 6 - hk * 3, 52 + hk);
     }
     for (i = 0; i < STOPS.length; i++) {
@@ -96,16 +123,16 @@ G.ui.map = (function () {
       for (var ang2 = 0; ang2 < 6.283; ang2 += 0.05) {
         if (((ang2 * 20) | 0) % 3 === 0) continue;
         A.px(ctx, 'fog_dark', Math.round(sl.x - CX + Math.cos(ang2) * (sl.rx + 9)), Math.round(sl.y - CY + Math.sin(ang2) * (sl.ry + 7)));
-        A.px(ctx, sl.fill === 'dusk_rose' ? 'blood' : 'water_mid', Math.round(sl.x - CX + Math.cos(ang2) * sl.rx * 0.42), Math.round(sl.y - CY + Math.sin(ang2) * sl.ry * 0.42)); // a depth contour
+        A.px(ctx, sl.sea ? 'water_mid' : 'water_mid', Math.round(sl.x - CX + Math.cos(ang2) * sl.rx * 0.42), Math.round(sl.y - CY + Math.sin(ang2) * sl.ry * 0.42)); // a depth contour
       }
       var L = G.data.locations[sl.id];
-      if (L) F.drawText(ctx, '' + Math.round(L.maxDepth * 0.25), sl.x - CX + 10, sl.y - CY + 2, sl.fill === 'dusk_rose' ? 'dusk_rose' : 'water_hi'); // the sounding
+      if (L) F.drawText(ctx, '' + Math.round(L.maxDepth * 0.25), sl.x - CX + 10, sl.y - CY + (sl.ry < 14 ? -3 : 2), 'water_hi'); // the sounding
     }
     // Rivers: a winding line two pixels wide, lighter on its upper bank.
     for (i = 0; i < RIVERS.length; i++) poly(ctx, RIVERS[i], function (x, y, k) { A.box(ctx, 'water_mid', x, y, 2, 2); A.px(ctx, 'water_hi', x, y); }, 0.5);
     // The shore road, dashed, and its bridge over the creek's outflow.
     poly(ctx, ROAD, function (x, y, k) { if ((k >> 2) % 2 === 0) A.box(ctx, 'wood_mid', x, y, 2, 1); }, 1);
-    A.slab(ctx, 419 - CX, 232 - CY, 13, 6, ['wood_dark', 'wood', 'wood_mid']); A.box(ctx, 'wood_hi', 419 - CX, 232 - CY, 13, 1);
+    A.slab(ctx, BRIDGE[0] - CX, BRIDGE[1] - CY, 13, 6, ['wood_dark', 'wood', 'wood_mid']); A.box(ctx, 'wood_hi', BRIDGE[0] - CX, BRIDGE[1] - CY, 13, 1);
     // The pier into Fogbound's west shore, and the path up to the shop and the cabin.
     A.slab(ctx, PIER[0] - CX, PIER[1] - CY - 1, 16, 3, ['wood_dark', 'wood', 'wood_hi']);
     for (i = 0; i < 4; i++) A.px(ctx, 'wood_dark', PIER[0] - CX + 2 + i * 4, PIER[1] - CY + 2);
@@ -113,7 +140,7 @@ G.ui.map = (function () {
     poly(ctx, [[PIER[0], PIER[1]], [74, 172], [56, 154]], function (x, y, k) { if (k % 3 === 0) A.px(ctx, 'paper_dark', x, y); }, 1);
     F.drawText(ctx, 'PIER', PIER[0] - CX + 2, PIER[1] - CY - 12, 'wood_hi');
     // A legend at the top right and a scale bar.
-    var lgx = CW - 324, lgy = CH - 70;
+    var lgx = 12, lgy = 12;                                             // Phase 74: top left (the coast took the right, the place card the bottom left)
     A.box(ctx, 'night_deep', lgx - 6, lgy - 6, 112, 70); A.box(ctx, 'fog_dark', lgx - 6, lgy - 6, 112, 1); A.box(ctx, 'fog_dark', lgx - 6, lgy + 63, 112, 1);
     A.box(ctx, 'fog_dark', lgx - 6, lgy - 6, 1, 70); A.box(ctx, 'fog_dark', lgx + 105, lgy - 6, 1, 70);
     for (i = 0; i < 4; i++) A.box(ctx, 'fog_mid', lgx + i * 4, lgy + 4, 2, 2);
@@ -124,14 +151,14 @@ G.ui.map = (function () {
     F.drawText(ctx, 'road', lgx + 22, lgy + 28, 'fog_light');
     A.box(ctx, 'water_hi', lgx + 2, lgy + 44, 10, 1); F.drawText(ctx, '24', lgx, lgy + 38, 'water_hi');
     F.drawText(ctx, 'deepest, m', lgx + 22, lgy + 42, 'fog_light');
-    var sbx = CW - 200, sby = CH - 22;
+    var sbx = 400, sby = CH - 10;
     for (i = 0; i < 4; i++) A.box(ctx, i % 2 ? 'fog_dark' : 'fog_mid', sbx + i * 23, sby, 23, 3);
     F.drawText(ctx, '0', sbx - 2, sby - 12, 'fog_mid'); F.drawText(ctx, Math.round(92 * KM) + ' km', sbx + 80, sby - 12, 'fog_mid');
     // The paper's border with tick marks.
     for (x = 0; x < CW; x++) { A.px(ctx, 'fog_dark', x, 0); A.px(ctx, 'fog_dark', x, CH - 1); if (x % 16 === 0) { A.box(ctx, 'fog_mid', x, 1, 1, 3); A.box(ctx, 'fog_mid', x, CH - 4, 1, 3); } }
     for (y = 0; y < CH; y++) { A.px(ctx, 'fog_dark', 0, y); A.px(ctx, 'fog_dark', CW - 1, y); if (y % 16 === 0) { A.box(ctx, 'fog_mid', 1, y, 3, 1); A.box(ctx, 'fog_mid', CW - 4, y, 3, 1); } }
     // A compass rose in the corner.
-    var cxr = CW - 50, cyr = CH - 64;
+    var cxr = 470, cyr = 128;                                           // Phase 74: on land, west of the coast
     for (i = -14; i <= 14; i++) { A.px(ctx, 'fog_mid', cxr + i, cyr); A.px(ctx, 'fog_mid', cxr, cyr + i); }
     for (i = 0; i < 6; i++) { A.box(ctx, 'signal_amber', cxr - (5 - i) / 2 | 0, cyr - 14 + i * 2, 6 - i, 2); }
     F.bold(ctx, 'N', cxr - 2, cyr - 26, 'fog_light');
@@ -237,6 +264,9 @@ G.ui.map = (function () {
   }
 
   var names = [], nameW = [];
+  // Phase 74: where stop i's name sits (view px), kept inside the chart (Coldharbor Sound's
+  // and Wreckhollow Bay's names are wider than the sea east of them).
+  function labelX(i) { var s = STOPS[i]; return Math.max(CX + 4, Math.min(CX + CW - 4 - nameW[i], s.x - (nameW[i] >> 1))); }
   function open() {
     if (!chart) chart = G.gfx.bake.cached('map:chart640night', function () { return G.gfx.bake.layer(CW, CH, paintChart); });
     for (var k = 0; k < STOPS.length; k++) { names[k] = stopName(STOPS[k]); nameW[k] = F.measureBold(names[k]); }
@@ -308,7 +338,7 @@ G.ui.map = (function () {
         if (open) { ctx.fillStyle = P.night_ink; ctx.fillRect(s.x - 1, s.y - 1, 3, 3); }
       } else ctx.drawImage(mark('house'), s.x - 7, s.y - 10);
       if (s.id === G.state.run.loc) ctx.drawImage(mark('boat'), s.x - 6, s.y - 18);
-      var name = names[i], lx = s.x - (nameW[i] >> 1), ly = s.y + (s.ry || 8) + 6;
+      var name = names[i], lx = labelX(i), ly = s.y + (s.ry || 8) + 6;
       if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(lx - 4, ly - 2, nameW[i] + 8, 13); ctx.fillStyle = P.signal_amber; ctx.fillRect(lx - 4, ly - 2, 1, 13); }
       F.bold(ctx, name, lx, ly, on ? 'signal_amber' : (open ? 'bone' : 'fog_mid'));
     }
@@ -333,7 +363,7 @@ G.ui.map = (function () {
     if (phase !== 'map') return 'none';
     var U = G.ui.panel, i;
     for (i = 0; i < STOPS.length; i++) {
-      var s = STOPS[i], lx = s.x - (nameW[i] >> 1), ly = s.y + (s.ry || 8) + 6;
+      var s = STOPS[i], lx = labelX(i), ly = s.y + (s.ry || 8) + 6;
       var onMark = Math.abs(gx - s.x) <= 10 && Math.abs(gy - s.y) <= 11;
       var onName = gx >= lx - 4 && gx < lx + nameW[i] + 4 && gy >= ly - 2 && gy < ly + 11;
       if (onMark || onName) {

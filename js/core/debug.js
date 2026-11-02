@@ -210,7 +210,7 @@ G.core.debug = (function () {
       var run = G.state.run, sp = -1;
       for (var i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === id) sp = i;
       if (sp < 0 || !run.lureIn.active) return false;
-      var h = G.data.fish[sp].habitat;
+      var hm = G.data.homeOf(G.data.fish[sp], run.school.ctx.loc, run.school.ctx.reach) || G.data.fish[sp].homes[0], h = hm.habitat; // Phase 75: its home here
       return !!G.sim.fish_ai.spawn(run.school, sp, run.lureIn.x - 60, (h.depthMin + h.depthMax) * 2, 1, G.rng, G.data);
     },
     // dbg.cast(charge) casts at once with charge 0..1 (default 0.3); returns the landing x.
@@ -326,21 +326,24 @@ G.core.debug = (function () {
     // dbg.who() (Phase 68): which species can bite here and now, from the same weights the
     // school spawns by (fish_ai.speciesWeights over the current cast's context): the water, the
     // lure's depth, the hour, what is on the hook and the rod. Each: {id, chance (share of the
-    // total), weight}; with tooHeavy, the species the rod cannot hold.
+    // total), weight}; with tooHeavy, the species the rod cannot hold. Phase 75: in the reach the
+    // lure is in (or the boat, with no line out), which it names.
     who: function () {
       var run = G.state.run, ctx = run.school && run.school.ctx;
       if (!ctx) return 'no school yet';
-      var c = { species: ctx.species, loc: ctx.loc || G.state.save.loc, depthM: run.lureIn && run.lureIn.active ? run.lureIn.y * 0.25 : null,
+      var lc = ctx.loc || G.state.save.loc, L = G.data.locations[lc], rx = run.lureIn && run.lureIn.active ? run.lureIn.x : run.boat.x, rid = G.data.reachAt(L, rx);
+      var rn = ''; (L.reaches || []).forEach(function (r) { if (r.id === rid) rn = r.name; });
+      var c = { species: ctx.species, loc: lc, reach: rid, depthM: run.lureIn && run.lureIn.active ? run.lureIn.y * 0.25 : null,
         hour: G.state.save.clock, bait: run.gearFx.bait, lure: run.gearFx.lure, rodMaxMass: run.gearFx.maxMass,
         smallBoost: run.gearFx.smallBoost, smallMass: run.gearFx.smallMass, weights: null };
       var total = G.sim.fish_ai.speciesWeights(c), out = [], heavy = [];
       for (var i = 0; i < c.species.length; i++) {
         var sp = c.species[i];
         if (c.weights[i] > 0) out.push({ id: sp.id, chance: +(c.weights[i] / total).toFixed(3), weight: +c.weights[i].toFixed(3) });
-        else if (sp.locations.indexOf(c.loc) >= 0 && sp.mass > c.rodMaxMass && G.sim.fish_ai.weightOf(sp, c) > 0) heavy.push(sp.id);
+        else if (G.data.homeOf(sp, c.loc, c.reach) && sp.mass > c.rodMaxMass && G.sim.fish_ai.weightOf(sp, c) > 0) heavy.push(sp.id);
       }
       out.sort(function (a, b) { return b.chance - a.chance; });
-      return { loc: c.loc, hook: c.bait, depthM: c.depthM, hour: +c.hour.toFixed(2), species: out, tooHeavy: heavy };
+      return { loc: c.loc, reach: rn, hook: c.bait, depthM: c.depthM, hour: +c.hour.toFixed(2), species: out, tooHeavy: heavy };
     },
     // dbg.fishBody(i) returns a swimmer's body (Phase 27): school slot i (0..7) or 'hook'.
     // face, turn (0 none, else 0..1 through it), beatHz, phase 0..1, glide, pitch (slope,
@@ -489,7 +492,7 @@ G.core.debug = (function () {
     }
 
     // Phase 50.1: the shore page, baked once: each of the shore's things on a strip of bank
-    // and water, every kind of tree in each forest's keys, and the Red Room's floor things.
+    // and water, and every kind of tree in each forest's keys (Phase 74: the Red Room's floor things are gone).
     function shoreBake() {
       return G.gfx.bake.layer(640, 340, function (c) {
         var A = G.gfx.paint, P = G.gfx.sprites.PALETTE, F = G.gfx.sprites.fine, R = new G.core.rng.Rng(50), i, x;
@@ -519,13 +522,6 @@ G.core.debug = (function () {
             col++;
           }
         }
-        // The Red Room's floor: a potted fern, a chair, a side table and lamp, a door frame.
-        var red = G.data.locations.red, zz = null;
-        for (q = 0; q < red.layers.length; q++) if (red.layers[q].kind === 'zigzag') zz = red.layers[q];
-        var fy = 320;
-        A.area(c, 0, fy, 640, 20, function (xx, yy) { var r2 = yy - fy, sh = Math.abs((r2 % 12) - 6); return (((xx + sh) / 6) | 0) & 1 ? (zz ? zz.color : 'ink') : (zz ? zz.alt : 'bone'); });
-        var RT = G.scene.scenery.ROOM_THINGS, RX = 40;
-        for (var rk in RT) { RT[rk](c, RX, fy); F.drawText(c, rk, RX - 10, fy - 56, 'fog_light'); RX += 70; }
         A.reset();
       });
     }
@@ -815,7 +811,7 @@ G.core.debug = (function () {
         F.drawText(ctx, under ? 'eel (both ways), a fry cloud, the darting perch: 2x the game' : 'heron: stand, stalk, strike 0.5 and 1, fly; beaver, dragonfly, strider, lantern: 2x the game', 8, 344, 'fog_mid');
       } else if (name === 'bed') {
         // Phase 50.1: each water's bed things and new weeds on a short strip of bed, 2x the game.
-        var LIDS = ['fog', 'creek', 'pines', 'red'];
+        var LIDS = ['fog', 'creek', 'pines', 'harts']; // Phase 74: four of the nine waters fit the page
         ctx.imageSmoothingEnabled = false;
         for (var bl = 0; bl < LIDS.length; bl++) {
           var lc = G.data.locations[LIDS[bl]], T0 = G.scene.life.table(LIDS[bl]), yb = 20 + bl * 82;
@@ -856,7 +852,7 @@ G.core.debug = (function () {
         F.drawText(ctx, 'the icon (32 x 32 in palette keys, 3x)', 112, 30, 'fog_light');
         G.core.device.drawNotice(ctx, true);
       } else if (name === 'shore') {
-        // Phase 50.1: the shore's things, the trees and the Red Room's floor, painted as the
+        // Phase 50.1: the shore's things and the trees, painted as the
         // layers paint them (baked once here, layer px = the game's view px).
         ctx.drawImage(G.gfx.bake.cached('gallery:shore', shoreBake), 0, 18);
       } else if (name === 'fx') {

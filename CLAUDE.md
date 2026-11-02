@@ -35,6 +35,7 @@ node tools/balance.js --saves                    # saves from every milestone st
 node tools/balance.js --fight                    # how fights end by player and gear (Phase 23)
 node tools/balance.js --rod                      # the rod's bend: shapes, action, springing (Phase 31b)
 node tools/balance.js --tackle                   # each bait and lure's income at each water (Phase 43)
+node tools/balance.js --homes                    # where each species lives, against PLAN_WATERS.md §3 (Phase 75)
 node tools/icon.js --check                       # the home-screen icon files match the grid they are painted from (Phase 61)
 ```
 

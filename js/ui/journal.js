@@ -22,7 +22,7 @@ G.ui = G.ui || {};
 G.ui.journal = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu;
   var COLS = 5, ROWS = 5, CW = 52, CH = 46, GAP = 6, GX = 322, GY = 46; // Phase 54: the grid in the right panel
-  var NOTES_W = 286, NOTES_MAX = 14;
+  var NOTES_W = 286, NOTES_MAX = 14, WHERE_W = 276;
   var FAMILIES = ['all'];  // Phase 68: 'all' and every family with a species in some water, in data order
   // Phase 68: what each lure type is called in the notes.
   var TYPE_NAMES = { float: 'a float', crank: 'crankbaits', spinner: 'spinnerbaits', spoon: 'spoons', dropshot: 'a dropshot',
@@ -98,8 +98,20 @@ G.ui.journal = (function () {
     if (ref === 'line') return 'Shy of the line: it saw mine and turned away. Only fluorocarbon fools it.'; // Phase 53
     if (ref === 'lure') return lureText(sp);
     if (ref === 'bait') return 'Takes ' + baitNames(sp) + '.';
-    if (ref === 'depth') return 'Found ' + sp.habitat.depthMin + ' to ' + sp.habitat.depthMax + ' m down. ' + hoursText(sp);
+    if (ref === 'depth') return homeLines(sp).join(' ');
     return '';
+  }
+
+  // Phase 75 (PLAN_WATERS.md 4.1): where it lives, how deep and when, one line a home:
+  // "Hartsmere Lake, The Old Bench: 20 to 32 m, at dawn."
+  var WHEN = { dawn: 'at dawn', day: 'by day', dusk: 'at dusk', night: 'at night' };
+  function homeLines(sp) {
+    return sp.homes.map(function (h) {
+      var L = G.data.locations[h.loc], rn = h.reaches.map(function (id) { for (var i = 0; i < L.reaches.length; i++) if (L.reaches[i].id === id) return L.reaches[i].name; return id; });
+      var when = h.hours.length ? h.hours.map(function (n) { return WHEN[n]; }) : ['at any hour'];
+      if (when.length > 1) when = [when.slice(0, -1).join(', ') + ' and ' + when[when.length - 1]];
+      return L.name + (rn.length ? ', ' + rn.join(' and ') : '') + ': ' + h.depth[0] + ' to ' + h.depth[1] + ' m' + (h.bed ? ' on the bottom' : '') + ', ' + when[0] + '.';
+    });
   }
 
   function lureText(sp) {
@@ -111,7 +123,6 @@ G.ui.journal = (function () {
     return s;
   }
 
-  function hhmm(h) { var m = Math.round(h * 60); return (m < 600 ? '0' : '') + Math.floor(m / 60) + ':' + (m % 60 < 10 ? '0' : '') + (m % 60); }
 
   function baitNames(sp) {
     var name = function (id) { var b = G.sim.economy.baitById(id, G.data); return b ? (b.label === false ? 'the unlabelled jar' : b.name.toLowerCase()) : id; };
@@ -119,19 +130,6 @@ G.ui.journal = (function () {
     // Phase 43: the lures it is proven to take: those it has been caught on.
     var j = G.state.save.journal[sp.id], on = j && j.took ? j.took.filter(function (id) { return G.sim.economy.isLure(id, G.data); }) : [];
     return on.length ? s + '; caught on ' + on.map(name).join(', ') : s;
-  }
-
-  function hoursText(sp) {
-    if (!sp.timeLikes.length) return 'Any hour.';
-    // Phase 68: the hours can be two spells (dawn and dusk): each run of hours in turn.
-    var h = sp.timeLikes, out = [], i = 0;
-    while (i < h.length) {
-      var a = h[i];
-      while (i + 1 < h.length && h[i + 1] === (h[i] + 1) % 24) i++;
-      out.push(hhmm(a) + ' to ' + hhmm((h[i] + 1) % 24));
-      i++;
-    }
-    return 'Likes ' + out.join(' and ') + '.';
   }
 
   // Builds the entry page for list[i]. Viewing a caught entry clears its NEW mark.
@@ -150,9 +148,15 @@ G.ui.journal = (function () {
     }
     if (!list.length) { para('Nothing here yet.', 'wood'); return; }
     var sp = G.data.fish[list[sel]], j = G.state.save.journal[sp.id], h, first = true;
-    function note(ref) { para(hintText(ref, sp), j.late && j.late[ref] ? 'night_blue' : 'ink', first); first = false; }
+    function note(ref) {
+      var key = j.late && j.late[ref] ? 'night_blue' : 'ink';
+      if (ref === 'depth') homeLines(sp).forEach(function (s, k) { para(s, key, first && k === 0); }); // Phase 75: a line a home
+      else para(hintText(ref, sp), key, first);
+      first = false;
+    }
     page.family = sp.family;
     page.where = sp.locations.map(function (id) { return G.data.locations[id] ? G.data.locations[id].name : id; }).join(', ');
+    if (F.measure(page.where) > WHERE_W) page.where = sp.locations.length + ' waters (where, below)';                // Phase 75: too many to name on one line
     if (j) j.lateNew = false;
     if (j && !j.caught && j.phantom) {
       page.name = sp.name; page.ghost = true;
@@ -179,7 +183,7 @@ G.ui.journal = (function () {
     for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
     if (j.hints.indexOf('lure') < 0) note('lure');
     if (j.caught >= 2 && j.hints.indexOf('bait') < 0) note('bait');
-    if (j.caught >= 3 && j.hints.indexOf('depth') < 0) note('depth');
+    if (j.hints.indexOf('depth') < 0) note('depth');                // Phase 75: where, how deep and when, from the first catch
   }
 
   function open() {

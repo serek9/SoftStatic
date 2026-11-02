@@ -46,8 +46,8 @@ G.scene.sailing = (function () {
 
   // Audit P3-1: a drizzle that comes with unease. From unease 0.45 (full at 0.8), in about
   // one game hour in four (a hash of the hour and the place), fading in and out at the
-  // hour's edges. Streaks fall, rings open on the water and the reflection softens. Never in
-  // the Red Room. Presentation only: it reads unease and the clock.
+  // hour's edges. Streaks fall, rings open on the water and the reflection softens. Never
+  // under a sky without clouds (loc.sky.clouds false). Presentation only: it reads unease and the clock.
   var rainAcc = 0;
   function rainK() {
     if (sky.opt && sky.opt.clouds === false) return 0;
@@ -58,8 +58,8 @@ G.scene.sailing = (function () {
   }
 
   // ---- Thunderstorms (Phase 55) -------------------------------------------------------
-  // In about one game hour in eleven (a hash of the hour and the place; never in the Red Room,
-  // which has no sky of clouds), a storm builds over the hour's first fifth and passes over its
+  // In about one game hour in eleven (a hash of the hour and the place; never under a sky
+  // without clouds), a storm builds over the hour's first fifth and passes over its
   // last fifth: stormK() 0..1. While it is up the sky darkens, the rain is heavy and slants
   // (rainK takes the larger), the surface roughens, and lightning flashes every 6-18 s (fewer
   // as it builds and passes, G.vrng): a soft flicker of fog_light over the sky (at most 0.4)
@@ -1078,7 +1078,7 @@ G.scene.sailing = (function () {
 
   // Stars, the moon, a glow where the sun went down and slow cloud bands, baked once per
   // location (each from its own seeded stream) and drawn with the sky. loc.sky can switch
-  // parts off (the Red Room is indoors) and place the moon and the glow (sky pixels).
+  // parts off (the Red Room did, indoors, until Phase 74) and place the moon and the glow (sky pixels).
   var SKYP = 0.03, CLOUD_P = 0.08, CLOUD_W = 640, CLOUD_DRIFT = 1.6;
   var sky = { stars: null, twinkle: null, glow: null, clouds: null, halo: null, opt: null };
 
