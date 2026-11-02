@@ -1112,7 +1112,7 @@ Phase 67 checks: `--validate` OK; `--replay 12345` still `1966984761`; `--pacing
 
 ### 8.6 Next task
 
-**None planned.** PLAN_PLACES.md (Phases 63–67) is complete. Still open as before: #34 (play it on a real phone) and the watches of 8.4. What comes next is the user's to choose.
+**Phase 68: The species**, in [PLAN_SPECIES.md](PLAN_SPECIES.md) (Phases 68–73: the real fish and lures the user asked for on 2026-11-02), when the user says to start it. Still open as before: #34 (play it on a real phone) and the watches of 8.4.
 
 ---
 
