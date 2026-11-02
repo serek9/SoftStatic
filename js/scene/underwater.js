@@ -452,7 +452,9 @@ G.scene.underwater = (function () {
     if (run.fsm === 'sinking') {
       if (inp.pressed('action') || (lure && sinkK === 0)) { if (lure && sinkK === 0) c.ly = wy + (gx.swim === 'top' ? 0.5 : FLOAT); c.rv = 0; c.tight = 0; G.core.state.go(run, 'waiting'); return; }
       var depth = c.ly - wy;
-      depth += UW.sinkV * sinkK * Math.min(1, 0.15 + (bottom - depth) / 6) * dt;
+      // Phase 77: in fast water (a reach's `sink` under 1, G.data.reachK) the lure barely sinks
+      var rk = loc.current && loc.current.reach ? G.data.reachK(loc, c.x1, 'sink', 1) : 1;
+      depth += UW.sinkV * sinkK * rk * Math.min(1, 0.15 + (bottom - depth) / 6) * dt;
       if (depth >= floorPx) { depth = floorPx; c.rv = 0; c.tight = 0; G.core.state.go(run, 'waiting'); }
       c.ly = wy + depth;
       drift(c, loc, dt, depth >= bottom);
@@ -531,7 +533,7 @@ G.scene.underwater = (function () {
       // Phase 22: a line held in a current lifts the lure off the bottom, the way it swings a
       // real one: up to LIFT px per px/s of flow (the creek's 1–2 m), at 1.5 px/s.
       if (loc.drift && !inp.held('action')) {
-        var hold = Math.min(8, LIFT * Math.abs(loc.drift(c.seed, c.tw, c.ly - wy, false, wind()))), floor = wy + bottomAt(loc, c.x1) - hold;
+        var hold = Math.min(8, LIFT * Math.abs(loc.drift(c.seed, c.tw, c.ly - wy, false, wind(), c.x1))), floor = wy + bottomAt(loc, c.x1) - hold;
         if (c.ly > floor) c.ly = Math.max(floor, c.ly - 1.5 * dt);
       }
     }
@@ -544,13 +546,13 @@ G.scene.underwater = (function () {
 
   // 11.1: the current moves the lure (and where its line enters) by loc.drift, a pure
   // function of the cast's seed, its time in the water, its depth and (Phase 22, the lakes)
-  // the grey hours' wind, at the fixed dt.
+  // the grey hours' wind, at the fixed dt. Phase 77: and where it is (x), for a river's reaches.
   var LIFT = 1.8, FLOAT = 2; // Phase 43: px under the surface a floating plug rests at
   function wind() { return G.scene.sailing.light(G.state.save.clock || 0).grey; }
   function drift(c, loc, dt, onBottom) {
     if (!loc.drift) return;
     c.tw += dt;
-    c.x1 = clamp(c.x1 + loc.drift(c.seed, c.tw, c.ly - loc.waterY, onBottom, wind()) * dt, 8, loc.width - 8);
+    c.x1 = clamp(c.x1 + loc.drift(c.seed, c.tw, c.ly - loc.waterY, onBottom, wind(), c.x1) * dt, 8, loc.width - 8);
   }
 
   // Phase 22: the water around the lure moves with it. flow(loc, depth) is the current now at
@@ -560,7 +562,7 @@ G.scene.underwater = (function () {
   function flow(loc, depth) {
     if (!loc.drift) return 0;
     var c = G.state.run.cast;
-    return loc.drift(c.seed || loc.seed, c.tw + 20, depth, false, wind());
+    return loc.drift(c.seed || loc.seed, c.tw + 20, depth, false, wind(), c.x1 || loc.start);
   }
 
   // ---- View: fade, vertical camera, motes -------------------------------------------
@@ -1190,7 +1192,7 @@ G.scene.underwater = (function () {
   // toward the boat in still water. Each bait moves its own way: the worm undulates, the
   // cricket kicks now and then, the minnow wobbles and flashes a pale pixel. The body only
   // reads the cast; it never moves the lure.
-  var body = { a: 0, flutter: 0, vx: 0, vy: 0, px: 0, py: 0, flow: 0, t: 0, on: false, kick: 0, frame: 0 };
+  var body = { a: 0, flutter: 0, vx: 0, vy: 0, px: 0, py: 0, flow: 0, sink: 1, t: 0, on: false, kick: 0, frame: 0 };
 
   function bodyStep(run, dt, loc) {
     var c = run.cast, fsm = run.fsm, inAir = fsm === 'casting', x = inAir ? c.lx : c.x1, y = c.ly;
@@ -1200,7 +1202,8 @@ G.scene.underwater = (function () {
     body.t += dt;
     body.vx += ((x - body.px) / dt - body.vx) * 0.25; body.vy += ((y - body.py) / dt - body.vy) * 0.25;
     body.px = x; body.py = y;
-    body.flow = inAir ? 0 : (loc.drift ? loc.drift(c.seed, c.tw, c.ly - loc.waterY, false, wind()) : 0);
+    body.flow = inAir ? 0 : (loc.drift ? loc.drift(c.seed, c.tw, c.ly - loc.waterY, false, wind(), c.x1) : 0);
+    body.sink = loc.current && loc.current.reach ? G.data.reachK(loc, c.x1, 'sink', 1) : 1; // Phase 77
     var rx = body.vx - body.flow, ry = body.vy, target, home = run.boat.x - x;
     if (rx * rx + ry * ry > 4) target = Math.atan2(ry, rx);                         // moving: nose first
     else if (Math.abs(body.flow) > 0.05) target = Math.atan2(0.15, -Math.sign(body.flow)); // nose into the flow
@@ -1361,6 +1364,13 @@ G.scene.underwater = (function () {
   // Phase 32: whether the line is being reeled in the fight this step (the reel's handle turns).
   function fightReel() { return fightIn.reel; }
 
+  // dbg.lureBody(): the name of the reach at world x in this water (Phase 77).
+  function reachName(x) {
+    var R = G.data.locations[G.state.run.loc].reaches || [];
+    for (var i = 0; i < R.length; i++) if (x < R[i].x[1]) return R[i].name;
+    return R.length ? R[R.length - 1].name : '';
+  }
+
   return {
     fightReel: fightReel,
     flow: flow, weedFrame: weedFrame, bodyStep: bodyStep, swimStep: swimStep, SW: SW, SB: SB, startle: startle,
@@ -1373,10 +1383,10 @@ G.scene.underwater = (function () {
       var bd = bodies[i === 'hook' ? HOOKB : i];
       if (!bd || bd.uid < 0) return null;
       var a = bodyArt(bd, 0);
-      return { uid: bd.uid, face: a.face, turn: bd.turnT > 0 ? +(1 - bd.turnT / bd.turnLen).toFixed(2) : 0, beatHz: +bd.hz.toFixed(2), phase: +bd.phase.toFixed(2),
+  return { uid: bd.uid, face: a.face, turn: bd.turnT > 0 ? +(1 - bd.turnT / bd.turnLen).toFixed(2) : 0, beatHz: +bd.hz.toFixed(2), phase: +bd.phase.toFixed(2),
         glide: bd.glide, pitch: +bd.pitch.toFixed(3), pitchRaw: bd.pitch + bd.jerk, frame: a.fr, mode: ['swim', 'shake', 'roll'][bd.mode], speed: +bd.spd.toFixed(2), vy: +bd.vy.toFixed(2), len: +bd.len.toFixed(1) };
     }, drawLure: drawLure, drawFloat: drawFloat, lureImg: lureImg, lureFrame: lureFrame, hookIds: hookIds, hookKind: hookKind, BAITS: BAITS, DIRS: DIRS,
-    body: function () { var c = G.state.run.cast; return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3),
+    body: function () { var c = G.state.run.cast; return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3), sink: +body.sink.toFixed(2), reach: reachName(c.x1), // Phase 77
       retrieve: +(c.rv || 0).toFixed(2), swing: !!c.swing, action: (hookIds(), LURE_OF[c.bait || G.state.run.gearFx.bait] ? (LURE_OF[c.bait || G.state.run.gearFx.bait].vary || LURE_OF[c.bait || G.state.run.gearFx.bait].swim) : 'bait'), frame: LURE_OF[c.bait || G.state.run.gearFx.bait] ? body.frame : -1, frames: LURE_OF[c.bait || G.state.run.gearFx.bait] ? LG.frames(c.bait || G.state.run.gearFx.bait) : 0, depthM: +((c.ly - G.data.locations[G.state.run.loc].waterY) * 0.25).toFixed(2) }; },
     UW: UW, UNDER: UNDER, stats: stats, prepare: prepare, galleryBed: galleryBed, bottomAt: bottomAt, deepestX: deepestX,
     lureStep: lureStep, viewStep: viewStep, draw: draw, setLure: setLure,
