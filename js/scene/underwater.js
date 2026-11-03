@@ -64,6 +64,19 @@ G.scene.underwater = (function () {
       if (raw[x] < min) min = raw[x];
     }
     for (x = 0; x < w; x++) prof[x] = Math.round(loc.maxDepth - Math.min(u.bottomAmp, raw[x] - min));
+    // Phase 78 (PLAN_WATERS.md 78.1): a water with `shape` ([[x, depth px], ...], in order)
+    // has its bed drawn through those points (a shallow flat, a point, a steep drop), roughened
+    // by a little of the same walk. Its own stream, so the other waters' beds are unchanged.
+    if (u.shape) {
+      var sh = u.shape, j = 0, r2 = new G.core.rng.Rng(loc.seed * 31 + 207), wk = 0;
+      for (x = 0; x < w; x++) {
+        while (j < sh.length - 2 && x > sh[j + 1][0]) j++;
+        var a = sh[j], b = sh[Math.min(j + 1, sh.length - 1)], f = b[0] > a[0] ? clamp((x - a[0]) / (b[0] - a[0]), 0, 1) : 0;
+        f = f * f * (3 - 2 * f);
+        wk = (wk + r2.range(-0.5, 0.5)) * 0.95;
+        prof[x] = clamp(Math.round(a[1] + (b[1] - a[1]) * f + wk * 1.5), 4, loc.maxDepth);
+      }
+    }
     return prof;
   }
 
@@ -346,6 +359,18 @@ G.scene.underwater = (function () {
     // pixels wide, lit on one side, with blades that alternate up it.
     var strands = [], n = Math.round(w * u.weedDensity);
     for (var s = 0; s < n; s++) strands.push({ x: rng.int(2, w - 3) * HI + rng.int(0, 1), h: rng.int(6, 22) * HI, dark: rng.next() < 0.5, ph: rng.range(0, 6.28) });
+    // Phase 78: weed beds ([[from, to, density], ...]): thick stands over their range, growing
+    // up to within a metre or two of the surface. Their own stream, after the others.
+    if (u.weedBeds) {
+      var rb = new G.core.rng.Rng(loc.seed * 31 + 208);
+      for (var wb = 0; wb < u.weedBeds.length; wb++) {
+        var B0 = u.weedBeds[wb], nb = Math.round((B0[1] - B0[0]) * B0[2]);
+        for (s = 0; s < nb; s++) {
+          var bx = rb.int(B0[0], B0[1] - 1), deep = prof[clamp(bx, 0, w - 1)];
+          strands.push({ x: bx * HI + rb.int(0, 1), h: clamp(Math.round(deep * rb.range(0.55, 0.9)), 6, 60) * HI, dark: rb.next() < 0.5, ph: rb.range(0, 6.28) });
+        }
+      }
+    }
     set.strands = [];
     for (s = 0; s < strands.length; s++) set.strands.push({ x: strands[s].x / HI, base: topAt(strands[s].x) / HI, h: strands[s].h / HI });
     var plants = plantList(loc, topAt, WH); // Phase 48: ribbon weed, fern-like weed, lily stems

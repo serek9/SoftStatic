@@ -3,8 +3,10 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Hartsmere Lake (Phase 74, PLAN_WATERS.md 2; the reference's Fawnmirror Lake): a clear, deep,
 // cold lake in the northern woods. Three reaches: The Weedbed (shallow flats of waving weed),
 // Birch Point (a point with a picnic table, dropping off steeply) and The Old Bench (the quiet
-// far end, a soft bottom). Phase 74 paints it with the existing layer kinds; the point, the
-// bench and the clear weed beds are Phase 78.
+// far end, a soft bottom). Phase 74 painted it with the existing layer kinds; Phase 78 gives it
+// its own scenery (js/scene/lakes.js): birches, the point with its picnic table and fire ring,
+// the old bench and rowboat, weed beds seen through the clear water, and its bed's shape (the
+// shallow flats, the point and the steep drop beyond it).
 G.data = G.data || {};
 G.data.locations = G.data.locations || {};
 G.data.locations.harts = {
@@ -18,6 +20,7 @@ G.data.locations.harts = {
   start: 170, // just past the pier's reach, so arriving does not open its panel
   dock: { x: 96, reach: 60 },
   water: 'lake',
+  scenery: 'harts', // Phase 78 (js/scene/lakes.js)
   reaches: [
     { id: 'the_weedbed', name: 'The Weedbed', x: [0, 480] },
     { id: 'birch_point', name: 'Birch Point', x: [480, 960] },
@@ -37,7 +40,7 @@ G.data.locations.harts = {
     { id: 'woods', kind: 'forest', parallax: 0.5, base: 110, height: 34, gap: [10, 42], mix: { birch: 0.4, pine: 0.35, spruce: 0.2, dead: 0.05 }, place: 9141,
       keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' }, birch: { bark: 'birch', dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'birch' } } },
     { id: 'shore', kind: 'bank', parallax: 0.6, height: 4, reeds: 0.6, rockEvery: 34, place: 9157, pads: 6, trunks: 1, cattails: 2,
-      features: [{ kind: 'posts', x: 70, n: 3 }, { kind: 'moored', x: 700 }, { kind: 'duckbox', x: 300 }] },
+      features: [{ kind: 'posts', x: 70, n: 3 }, { kind: 'duckbox', x: 300 }] }, // Phase 78: the rowboat is at the old bench now
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
 
@@ -57,15 +60,29 @@ G.data.locations.harts = {
     }
   },
 
+  // Phase 78: birches along the Weedbed and the far shore, Birch Point (half its width and its
+  // height, world px), the buoy off its drop, the old bench with the rowboat drawn up by it.
   landmarks: [
     { id: 'pier', kind: 'pier', x: 96, seed: 9102 },
     { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
-    { id: 'marker_a', kind: 'marker', x: 760 }
+    { id: 'birches_a', kind: 'birches', x: 300, n: 4, half: 34 },
+    { id: 'point', kind: 'point', x: 690, half: 44, h: 6 },
+    { id: 'marker_a', kind: 'marker', x: 880 },
+    { id: 'birches_b', kind: 'birches', x: 1070, n: 3, half: 26 },
+    { id: 'bench', kind: 'bench', x: 1290, half: 24, h: 4, boat: true }
   ],
+
+  // Phase 78: the weed beds seen from above through the clear water (a: how plainly).
+  lake: { weed: { x: [[50, 430]], a: 0.45 } },
 
   underwater: {
     bottomAmp: 64, rock: 'stone_dark', silt: 'wood_dark',
-    weed: 'moss', weedDark: 'moss_dark', weedDensity: 0.09, shaftEvery: 140
+    weed: 'moss', weedDark: 'moss_dark', weedDensity: 0.09, shaftEvery: 140,
+    // Phase 78: the bed ([x, depth px], 4 px a metre): the Weedbed's flats at 4-5 m sloping to
+    // 22 m by its edge (the cisco), Birch Point rising to 2 m and dropping sheer to 31 m (the
+    // lake trout), deep water along the far end, shoaling to a soft 7 m by the old bench.
+    shape: [[0, 14], [300, 20], [400, 44], [480, 88], [600, 40], [670, 9], [715, 12], [760, 100], [800, 124], [960, 120], [1150, 112], [1300, 44], [1400, 28]],
+    weedBeds: [[40, 440, 0.3]]
   },
 
   spots: [

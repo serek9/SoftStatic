@@ -330,6 +330,20 @@ function validateLocations(G, err) {
         if (!num(v) || Math.abs(v) > 40) err(p + 'drift gives ' + v + ' px/s at t ' + t + ' x ' + x);
       }
     }
+    // Phase 78: a bed shape ([[x, depth px], ...]): in order across the world, 4 px to maxDepth,
+    // and deep enough in each reach for every home there (its shallowest depth within the reach).
+    const sh = L.underwater && L.underwater.shape;
+    if (sh) {
+      if (!Array.isArray(sh) || sh.length < 2 || sh[0][0] !== 0 || sh[sh.length - 1][0] !== L.width) err(p + 'underwater.shape runs from x 0 to the width');
+      sh.forEach((q, i) => { if (!(num(q[0]) && num(q[1]) && q[1] >= 4 && q[1] <= L.maxDepth && (!i || q[0] > sh[i - 1][0]))) err(p + 'underwater.shape point ' + i + ' (x in order, depth 4..maxDepth)'); });
+      const deepIn = (x0, x1) => { let m = 0; for (let x = x0; x < x1; x++) { let j = 0; while (j < sh.length - 2 && x > sh[j + 1][0]) j++; const a = sh[j], b = sh[j + 1], f = Math.max(0, Math.min(1, (x - a[0]) / (b[0] - a[0]))); m = Math.max(m, a[1] + (b[1] - a[1]) * f); } return m; };
+      for (const sp of d.fish) for (const hm of (sp.homes || [])) {
+        if (hm.loc !== id) continue;
+        const rs = hm.reaches && hm.reaches.length ? R.filter(r => hm.reaches.includes(r.id)) : R;
+        rs.forEach(r => { const m = deepIn(r.x[0], r.x[1]); if (m < hm.depth[0] * 4 + 4) err(p + 'the bed in ' + r.id + ' (' + (m / 4).toFixed(1) + ' m) is too shallow for ' + sp.id + ' at ' + hm.depth[0] + '-' + hm.depth[1] + ' m'); });
+      }
+    }
+    (L.underwater && L.underwater.weedBeds || []).forEach(q => { if (!(q[0] >= 0 && q[1] <= L.width && q[0] < q[1] && q[2] > 0 && q[2] <= 1)) err(p + 'underwater.weedBeds [from, to, density 0-1]'); });
     // Phase 77: a river's current per reach (G.data.reachK): known reaches, flow 0–3, sink 0–1.
     if (L.current && L.current.reach) {
       if (L.water !== 'river') err(p + 'current.reach is for rivers');
@@ -354,7 +368,7 @@ function validateLocations(G, err) {
 // read; `above` with known creatures, hours as [from, to] pairs in 0..24, places inside the
 // world or the named layer, perches above the water. Shore layers' features are known kinds.
 const UNDER_KEYS = ['cray', 'snail', 'fry', 'tad', 'turtle', 'eel', 'mussel', 'caddis', 'litter', 'roots', 'tree', 'ribbon', 'fern', 'lily', 'algae'];
-const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls', 'osprey', 'eagle']; // Phase 77: the osprey and the eagle
+const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls', 'osprey', 'eagle', 'otter']; // Phase 77: the osprey and the eagle; Phase 78: the otter
 const SHORE_KINDS = { bank: ['posts', 'moored', 'lodge', 'duckbox'], zigzag: ['pot', 'chair', 'table', 'door'] };
 function validateLife(L, p, err) {
   const life = L.life, num = v => typeof v === 'number' && isFinite(v);
@@ -388,6 +402,7 @@ function validateLife(L, p, err) {
     if ((k === 'ducks' || k === 'loon') && !(c.p > 0 && c.p <= 1)) err(q + 'p (parallax)');
     // Phase 77: the osprey nests on a landmark with a nest above the water, and fishes inside the world
     if (k === 'osprey') { const lm = (L.landmarks || []).find(m => m.id === c.landmark); if (!(lm && lm.nest && inW(lm.nest.x) && num(lm.nest.y) && lm.nest.y > 0)) err(q + 'landmark with a nest {x, y}'); if (!c.x) err(q + 'x (the water it fishes)'); }
+    if (k === 'otter' && !(c.n >= 1 && c.n <= 3 && c.x && (!c.log || (L.landmarks || []).some(m => m.id === c.log && m.len > 0)))) err(q + 'n (1-3), x, and log: a landmark with len');
     if (k === 'eagle' && !(c.n >= 1 && c.n <= 3 && Array.isArray(c.y) && c.y[0] > 0 && c.y[0] < c.y[1] && c.x)) err(q + 'n (1-3), x and y [low, high]');
   }
 }
