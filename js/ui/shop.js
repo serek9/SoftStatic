@@ -20,14 +20,13 @@ G.ui.shop = (function () {
     [{ kind: 'rod', id: 0, icon: 'rod' }, { kind: 'rod', id: 5, icon: 'rod' }, { kind: 'rod', id: 1, icon: 'rod' }, { kind: 'rod', id: 2, icon: 'rod' },
      { kind: 'rod', id: 3, icon: 'rod' }, { kind: 'rod', id: 4, icon: 'rod' }, { kind: 'reel', icon: 'reel' }, { kind: 'line', icon: 'line' },
      { kind: 'lineType', id: 'mono', icon: 'line' }, { kind: 'lineType', id: 'fluoro', icon: 'line' }, { kind: 'lineType', id: 'braid', icon: 'line' }], // Phase 53: the spools
-    [{ kind: 'lantern', icon: 'lantern' }, { kind: 'depthFinder', icon: 'finder' }],
     [{ kind: 'bait', id: 'worm', icon: 'worm' }, { kind: 'bait', id: 'cricket', icon: 'cricket' },
      { kind: 'bait', id: 'minnow', icon: 'minnow' }, { kind: 'bait', id: 'unlabelled', icon: 'jar' }],
     [] // Phase 69: the case holds data/gear.js's 23 lures, filled below
   ];
   (function () {
     var l = G.data.gear.lures;
-    for (var i = 0; i < l.length; i++) SHELVES[3].push({ kind: 'bait', id: l[i].id, icon: 'lure' }); // Phase 73: its own art (G.gfx.luregen)
+    for (var i = 0; i < l.length; i++) SHELVES[2].push({ kind: 'bait', id: l[i].id, icon: 'lure' }); // Phase 73: its own art (G.gfx.luregen)
   })();
   var SWIM_SAYS = { mid: 'Spins in mid water as you reel.', dive: 'Floats, and dives when reeled.',
     top: 'Stays on top. Tap to make it pop.', lift: 'Sinks fast; jig it up and down.',
@@ -89,29 +88,6 @@ G.ui.shop = (function () {
       box(c, 'crimson', 10 * s, 14 * s + 1, 4 * s, 3 * s); box(c, 'wood_dark', 15 * s, 15 * s, 7 * s, 1); box(c, 'wood_dark', 15 * s, 17 * s, 5 * s, 1);
       blob(c, 16 * s, 7 * s, 12 * s, 3.5 * s, WOOD, { bias: 0.15 });
       blob(c, 16 * s, 7 * s, 3 * s, 1.2 * s, STONE);
-    },
-    lantern: function (c, s) {
-      for (var a = 0; a <= 12; a++) { var t = a / 12 * Math.PI; px(c, 'rust_dark', (16 * s + Math.cos(t) * 6 * s) | 0, (5 * s - Math.sin(t) * 4 * s) | 0); }
-      blob(c, 16 * s, 7 * s, 6 * s, 2.6 * s, RUST, { bias: 0.1 });
-      blob(c, 16 * s, 16 * s, 6.5 * s, 7.5 * s, GLOW, { bias: 0.15, rim: 0.5 });
-      blob(c, 15 * s, 15 * s, 2 * s, 3.5 * s, ['lamp_glow', 'cream'], { bias: 0.4 });
-      for (var g = -1; g <= 1; g++) line(c, 'rust_dark', (16 + g * 5) * s, 9 * s, (16 + g * 5) * s, 23 * s);
-      box(c, 'flame', 15 * s, 17 * s, 2 * s, 3 * s);
-      blob(c, 16 * s, 25 * s, 9 * s, 3.8 * s, RUST);
-      box(c, 'rust_dark', 8 * s, 28 * s, 16 * s, 1 * s);
-    },
-    finder: function (c, s) {
-      slab(c, 3 * s, 5 * s, 26 * s, 20 * s, STONE);
-      box(c, 'ink', 6 * s, 8 * s, 20 * s, 12 * s);
-      for (var x = 6 * s; x < 26 * s; x++) {
-        var by = (8 + 9 + Math.sin(x / s * 0.45) * 1.6) * s | 0;
-        px(c, 'neon_teal', x, by); if (s > 1) px(c, 'teal_hi', x, by + 1);
-        if ((x / s | 0) % 4 === 0) px(c, 'teal_dark', x, 8 * s + 2);
-      }
-      box(c, 'signal_amber', 11 * s, 12 * s, 2 * s, 1 * s); box(c, 'signal_amber', 19 * s, 14 * s, 2 * s, 1 * s);
-      box(c, 'teal', 6 * s, 8 * s, 20 * s, 1);
-      for (var b = 0; b < 3; b++) blob(c, (9 + b * 5) * s, 22 * s, 1.3 * s, 1.3 * s, b === 0 ? RUST : STONE, { bias: 0.2 });
-      box(c, 'stone_dark', 13 * s, 25 * s, 6 * s, 2 * s); slab(c, 9 * s, 27 * s, 14 * s, 3 * s, STONE);
     },
     worm: function (c, s) {
       for (var y = 13 * s; y < 29 * s; y++) {
@@ -212,11 +188,11 @@ G.ui.shop = (function () {
   // Phase 38: the shelves he can face, and their items ([shelf, item] in SHELVES); what they
   // show: the gear he has, and the minnows and crickets left after what he bought this visit
   // (the shop's stock is endless in the sim; the tank and the crate are full again next visit).
-  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10]], gear: [[1, 0], [1, 1]], worms: [[2, 0]], crickets: [[2, 1]], tank: [[2, 2]], jar: [[2, 3]],
+  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10]], worms: [[1, 0]], crickets: [[1, 1]], tank: [[1, 2]], jar: [[1, 3]],
     lures: [] };
-  (function () { for (var i = 0; i < SHELVES[3].length; i++) SHELF_ITEMS.lures.push([3, i]); })(); // Phase 69: all 23
+  (function () { for (var i = 0; i < SHELVES[2].length; i++) SHELF_ITEMS.lures.push([2, i]); })(); // Phase 69: all 23
   var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
-  var stock = { rod: 0, lantern: false, finder: false, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
+  var stock = { rod: 0, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
   // Phase 39: the hour and the light for the room (the lake's: Fogbound's drizzle and fog),
   // and the strange: at Fogbound's unease 0.4 or more, now and then and one at a time, the
   // clock running back for 3 s or a figure on the far shore in the window for 6 s; at 0.6 or
@@ -244,7 +220,7 @@ G.ui.shop = (function () {
 
   function stockStep() {
     var g = G.state.save.gear;
-    stock.rods = g.rods; stock.lantern = !!g.lantern; stock.finder = !!g.depthFinder;
+    stock.rods = g.rods;
     stock.minnows = Math.max(1, 7 - 2 * packs.minnow); stock.crickets = Math.max(1, 6 - 2 * packs.cricket);
   }
 
@@ -282,10 +258,6 @@ G.ui.shop = (function () {
         if (it.kind === 'line') desc = 'A stronger test, any kind of line. Tension builds ' + Math.round((1 - cur.strength / next.strength) * 100) + '% slower while a fish pulls.';
         status = 'In use: ' + cur.name + '.';
       }
-    } else if (it.kind === 'lantern' || it.kind === 'depthFinder') {
-      cur = g[it.kind]; name = cur.name;
-      desc = it.kind === 'lantern' ? 'Deep fish show in colour at night, not just as shapes.' : 'Marks the depth every ' + cur.bands + ' m while the lure is down.';
-      if (save.gear[it.kind]) status = 'Yours already.'; else txt.price = cur.cost + 'c';
     } else {
       var b = E.baitById(it.id, G.data), have = save.baits[b.id] || 0, on = E.baitInUse(save, G.data).id === b.id;
       name = b.label === false ? '(no label)' : b.name;
@@ -323,8 +295,6 @@ G.ui.shop = (function () {
       var next = E.nextItem(save, it.kind, G.data);
       if (next) { lab.name = next.name; lab.price = next.cost + 'c'; }
       else { lab.name = g[E.TIERED[it.kind]][save.gear[it.kind]].name; lab.price = 'BEST'; }
-    } else if (it.kind === 'lantern' || it.kind === 'depthFinder') {
-      lab.name = g[it.kind].name; lab.price = save.gear[it.kind] ? 'OWNED' : g[it.kind].cost + 'c';
     } else {
       var b = E.baitById(it.id, G.data);
       lab.name = b.label === false ? '(no label)' : b.name;
@@ -371,7 +341,8 @@ G.ui.shop = (function () {
   }
   // Phase 64: a line about a thing in the room (the cooler, the cat), in the same box.
   var REMARKS = { cooler: ['Pop, root beer, and one bottle with no label at the back. The compressor knocks twice and settles.', 'The cooler hums a note just under hearing.'],
-    cat: ['The cat is asleep on the freezer. It has been asleep on the freezer since you can remember.', 'One ear turns toward you. The rest of the cat does not.'] };
+    cat: ['The cat is asleep on the freezer. It has been asleep on the freezer since you can remember.', 'One ear turns toward you. The rest of the cat does not.'],
+    gear: ['Boxes of hooks, a coil of rope, a box of fuses. Nothing for sale on this shelf now.', 'A lava lamp, and dust where something used to stand.'] }; // Phase 79b: the lantern and the finder are gone
   function remark(id) {
     var r = REMARKS[id], ls = F.wrap(r[remarkN++ % r.length], BOX.w - 32);
     pages.length = 0;

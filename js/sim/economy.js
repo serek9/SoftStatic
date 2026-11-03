@@ -154,22 +154,20 @@ G.sim.economy = (function () {
     var lt = lineTypeById(s.lineType, data);                            // Phase 53
     out.lineStrength = g.lines[s.line].strength * lt.strength;
     out.lineType = lt.id; out.lineRise = lt.rise; out.lineShake = lt.shake; out.lineHold = lt.hold; out.lineSeen = lt.seen; out.lineFeel = lt.feel;
-    out.nightDepth = s.lantern ? g.lantern.nightDepth : g.nightDepth;
-    out.depthBands = s.depthFinder ? g.depthFinder.bands : 0;
+    out.nightDepth = g.nightDepth;
     return out;
   }
 
-  // The next thing to buy of a kind ('rod', 'reel', 'line', 'lantern', 'depthFinder'), or null.
+  // The next thing to buy of a kind ('rod', 'reel', 'line'), or null.
   function nextItem(save, kind, data) {
     if (kind === 'rod') { var n = nextLadderRod(save, data); return n < 0 ? null : data.gear.rods[n]; }
     if (TIERED[kind]) return data.gear[TIERED[kind]][save.gear[kind] + 1] || null;
-    if (kind === 'lantern' || kind === 'depthFinder') return save.gear[kind] ? null : data.gear[kind];
     return null;
   }
 
   // Buys the next tier (or the equipment) and equips it. Returns OK, MAXED, POOR or UNKNOWN.
   function buy(save, kind, data) {
-    if (!TIERED[kind] && kind !== 'lantern' && kind !== 'depthFinder') return UNKNOWN;
+    if (!TIERED[kind]) return UNKNOWN;
     if (kind === 'rod') { var n = nextLadderRod(save, data); return n < 0 ? MAXED : buyRod(save, n, data); }
     var item = nextItem(save, kind, data);
     if (!item) return MAXED;

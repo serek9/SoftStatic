@@ -20,8 +20,8 @@ G.scene.boat = (function () {
 
   // Phase 18: the boat, the fisher and the gear are painted in the 640×360 view's pixels
   // (HI per world pixel) and drawn at 1/HI size, in the same world boxes as before: a wooden
-  // rowboat with lapped planks, a lit gunwale, a rust stripe and an outboard motor; a lantern
-  // on a pole. The fisher is js/scene/fisher.js since Phase 33.
+  // rowboat with lapped planks, a lit gunwale, a rust stripe and an outboard motor (Phase 79b: the
+  // lantern on its pole is gone). The fisher is js/scene/fisher.js since Phase 33.
   // Each faces right; mirrored copies are made on first use.
   var A = G.gfx.paint, HI = 2;
   var WOOD = ['wood_deep', 'wood_dark', 'wood', 'wood_mid', 'wood_hi'], STONES = ['ink', 'stone_dark', 'stone', 'stone_hi', 'stone_lit'];
@@ -51,11 +51,6 @@ G.scene.boat = (function () {
       A.box(c, 'rust_hi', 2, 3, 5, 1);
       A.slab(c, 4, 8, 3, 6, STONES); A.slab(c, 2, 13, 7, 3, STONES);
     } },
-    lantern: { w: 6, h: 8, paint: function (c) {
-      A.box(c, 'stone_dark', 2, 0, 2, 1); A.box(c, 'stone_dark', 1, 1, 4, 1);
-      A.box(c, 'stone_dark', 0, 2, 6, 5); A.box(c, 'lamp_glow', 1, 2, 4, 4); A.box(c, 'cream', 2, 3, 1, 2);
-      A.box(c, 'stone', 1, 7, 4, 1);
-    } }
   };
   var art = {};
   function img(name, flip, arg) {
@@ -290,7 +285,7 @@ G.scene.boat = (function () {
 
   // sx is the boat centre on screen, wy the waterline. Passengers sit behind the hull's
   // gunwale, so they are drawn first. withFisher false leaves the boat empty, rod and all (P10.2).
-  // gear (optional): {rod: tier, lantern: bool, finder: bool, night: 0..1, fisher: his state
+  // gear (optional): {rod: tier, night: 0..1, fisher: his state
   // (Phase 33), lineKey, lineA: the line's colour and alpha along the rod}.
   // Draws a painted image sheared by the pitch: in 2-view-px columns, each at its own height.
   function putSheared(ctx, b, cv, x, y, sx) {
@@ -311,17 +306,6 @@ G.scene.boat = (function () {
     if (drawDog) drawDog(ctx, flip ? sx - 16 : sx + 4, y - 14 + shear(b, 10), flip, Math.abs(b.vx) / P_SPEED);
     // The rod reaches out over the dog in the bow, so it is drawn after him: its bend shows whole.
     if (withFisher) drawRod(ctx, b, sx, wy, gear ? gear.rod : 0, gear && gear.lineKey, gear ? gear.lineA : 0.6);
-    if (gear && gear.lantern) {
-      var px = sx - f * 13, ly0 = y;                          // a pole at the stern, its arm out back
-      y += shear(b, -13);
-      ctx.fillStyle = P.wood_dark;
-      ctx.fillRect(px, y - 18, 1, 15);
-      ctx.fillRect(f > 0 ? px - 2 : px, y - 18, 3, 1 / HI);
-      ctx.fillStyle = P.wood; ctx.fillRect(px, y - 18, 1 / HI, 15);
-      var lx = px - f * 2; // the user's fixes (2026-11-03): no glow round it for now, to come back with its light
-      put(ctx, img('lantern', false), lx - 1.5, y - 17.5);
-      y = ly0;
-    }
     // The motor, tilted by its thrust: its leg and propeller swing back under throttle.
     var mcv = img('motor', flip), mx = flip ? sx + 16 : sx - 21, my = y - 7 + shear(b, -18), tilt = Math.round(b.throttle * 1.5 * HI) / HI;
     ctx.drawImage(mcv, 0, 0, mcv.width, 16, mx, my, mcv.width / HI, 8);
@@ -332,9 +316,6 @@ G.scene.boat = (function () {
       if (gear && gear.fisher) G.scene.fisher.drawHelm(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -1), shear(b, -12), b.throttle); // Phase 41
       if (gear && gear.fisher) G.scene.fisher.drawCan(ctx, gear.fisher, sx, y, f, b.lean, shear(b, -2)); // Phase 35: a can on the gunwale
       drawReel(ctx, b, sx, wy);
-    }
-    if (gear && gear.finder && (Math.floor(b.t * 1.25) & 1)) {
-      ctx.fillStyle = P.neon_teal; ctx.fillRect(sx - f * 10, y - 3.5, 1, 1 / HI);
     }
     // Contact shadow on the water under the hull (below the waterline, so the mirror pass,
     // which only keeps rows above it, never shows it).

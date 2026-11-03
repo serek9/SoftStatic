@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 9;
+  var VERSION = 10;
   var PREFIX = 'SS1';
   // `?tour`: every water open on the chart for a look round, and nothing written to the save
   // while it is on (persist() below), so a tour never spends, unlocks or moves the real one.
@@ -102,9 +102,18 @@ G.core.save = (function () {
       if (s.flags && s.flags.heavy) delete s.flags.heavy.red;
       if (s.flags && s.flags.dogStare) delete s.flags.dogStare.red;
       return s;
+    },
+    // v9 -> v10 (Phase 79b, the user's word): the Storm Lantern and the Depth Finder are gone. A
+    // save that had them gets back what each cost (250 and 180, written here: their data is gone).
+    9: function (s) {
+      var g = s.gear || {};
+      if (g.lantern) s.coins = (s.coins || 0) + LANTERN_REFUND;
+      if (g.depthFinder) s.coins = (s.coins || 0) + FINDER_REFUND;
+      delete g.lantern; delete g.depthFinder;
+      return s;
     }
   };
-  var RED_REFUND = 4800;
+  var RED_REFUND = 4800, LANTERN_REFUND = 250, FINDER_REFUND = 180;
 
   function defaults() {
     return {
@@ -113,7 +122,7 @@ G.core.save = (function () {
       // Tier index per kind (data/gear.js), equipment owned, and the bait to put on.
       // Phase 43: rods, the rod indices owned (rod is the one in hand); bait may be a lure id.
       // Phase 53: lineType, the line spooled on (data/gear.js lineTypes), and lineTypes, the ones owned.
-      gear: { rod: 0, rods: [0], reel: 0, line: 0, lineType: 'mono', lineTypes: ['mono'], lantern: false, depthFinder: false, bait: 'worm' },
+      gear: { rod: 0, rods: [0], reel: 0, line: 0, lineType: 'mono', lineTypes: ['mono'], bait: 'worm' },
       baits: {},             // bait or lure id -> count left
       journal: {},           // species id -> {caught, bestLen, bestW, hints, seen, phantom}
       kept: [],              // {id, len, w}
@@ -257,7 +266,7 @@ G.core.save = (function () {
   }
 
   return {
-    KEY: KEY, VERSION: VERSION, migrations: migrations, RED_REFUND: RED_REFUND,
+    KEY: KEY, VERSION: VERSION, migrations: migrations, RED_REFUND: RED_REFUND, LANTERN_REFUND: LANTERN_REFUND, FINDER_REFUND: FINDER_REFUND,
     defaults: defaults, migrate: migrate, load: load, persist: persist, autosave: autosave,
     tour: function () { return TOUR; },
     exportString: encode, importString: decode, claim: claim,

@@ -884,7 +884,7 @@ G.scene.underwater = (function () {
     for (var i = 0; i < school.fish.length; i++) {
       var f = school.fish[i], bd = bodies[i];
       if (!f.active || bd.uid !== f.uid) continue;
-      // Deeper than gearFx.nightDepth at night (no lantern): only a silhouette.
+      // Deeper than gearFx.nightDepth at night: only a silhouette.
       var dark = night && f.y > G.state.run.gearFx.nightDepth;
       var a = bodyArt(bd, 0);
       drawSwimmer(ctx, FG.swimmer(f.sp, a.fr, dark, a.face < 0), f.x - camPx, loc.waterY - camPy + f.y, bd.pitch, a.face);
