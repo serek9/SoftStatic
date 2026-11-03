@@ -1753,7 +1753,7 @@ G.scene.sailing = (function () {
     // Phase 26: the moving boat makes its wake (the surface's wake layer), every step.
     G.gfx.surface.wake(boat.stern(b), sp * sp, b.vx, dt);
     // The surface's swell roughens in drizzle and in the grey hours' wind.
-    G.gfx.surface.step(dt, 1 + 0.6 * rainK() + 0.35 * greyF(hourNow()) + 0.8 * stormK()); // Phase 55: a storm roughens it
+    G.gfx.surface.step(dt, 1 + 0.6 * rainK() + 0.35 * greyF(hourNow()) + 0.8 * stormK() * ((loc.sea && loc.sea.storm) || 1)); // Phase 55: a storm roughens it; Phase 79: at sea it lifts the swell more
     fx.update(dt);
     G.core.state.tick(run, dt);
   }

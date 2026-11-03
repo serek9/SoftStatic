@@ -367,6 +367,11 @@ G.core.debug = (function () {
     // dbg.shore() returns, for each layer of this water, the kinds its painter painted (trees,
     // the shore's things) and the ms its first bake took (Phase 49).
     shore: function () { return G.scene.sailing.painted(); },
+    // dbg.sea() (Phase 79): at sea, the swell (its height now, the water's own, the clamp, the
+    // storm), the tide (px and m up the rocks, rising or falling, the next high water) and the
+    // lighthouse's beam (lit, the lamp, its angle, which way it points, its length, the flash);
+    // null on fresh water.
+    sea: function () { return G.scene.seas ? G.scene.seas.sea() : null; },
     // dbg.rodBody() returns the rod (Phase 31): load 0..1, dir (the line's pull, local: x
     // forward, y up), tip (world px), bendDeg (butt to tip, negative bends forward and down),
     // top3 and butt (shares of the bend in the top third and the lower half), tier, taper, ms.
@@ -775,7 +780,7 @@ G.core.debug = (function () {
         // Phase 50.1: Phases 48-49's sprites (every frame at 1x, then 4x, then flipped) and the
         // creatures drawn in code, posed from the gallery's own records (the live ones untouched).
         var LF = G.scene.life, SP = LF.sprites(), under = name === 'life under';
-        var NAMES = under ? ['cray', 'snail', 'turtle', 'tad'] : ['duck', 'duckling', 'duckUnder', 'kingfisher', 'loon', 'frog', 'deer', 'fox', 'gull', 'heron'];
+        var NAMES = under ? ['cray', 'snail', 'turtle', 'tad', 'crab', 'star'] : ['duck', 'duckling', 'duckUnder', 'kingfisher', 'loon', 'frog', 'deer', 'fox', 'gull', 'heron', 'osprey', 'eagle', 'otter', 'otterSit', 'seal', 'sealHead', 'sealSwim', 'cormorant', 'cormFly', 'cormSwim']; // Phase 79: and the sea's
         var Z = under ? 4 : 3, cy0 = 20, cx0 = 8, rowH = 0;
         ctx.imageSmoothingEnabled = false;
         for (var ni = 0; ni < NAMES.length; ni++) {

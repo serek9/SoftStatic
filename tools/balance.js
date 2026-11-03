@@ -342,6 +342,31 @@ function validateLocations(G, err) {
         rs.forEach(r => { const m = deepIn(r.x[0], r.x[1]); if (m < hm.depth[0] * 4 + 4) err(p + 'the bed in ' + r.id + ' (' + (m / 4).toFixed(1) + ' m) is too shallow for ' + sp.id + ' at ' + hm.depth[0] + '-' + hm.depth[1] + ' m'); });
       }
     }
+    // Phase 79: the sea's parts: a sea block only at sea (tide 0-4 px, storm lift 1-3, caps
+    // 0-0.6, kelp on the water inside the world), a swell clamp 3-6 view px, kelp forests and
+    // rock beds inside the world in order, the wreck's hull, a lighthouse on a headland, and
+    // the headland, skerries, breakwater and wreck painted by a sea's scenery module.
+    if (L.sea) {
+      const Sx = L.sea;
+      if (L.water !== 'sea') err(p + 'sea: only at sea');
+      if (Sx.tide && !(num(Sx.tide.amp) && Sx.tide.amp > 0 && Sx.tide.amp <= 4 && num(Sx.tide.high) && Sx.tide.high >= 0 && Sx.tide.high < 24)) err(p + 'sea.tide {amp 0-4 px, high 0-24 h}');
+      if (Sx.storm !== undefined && !(num(Sx.storm) && Sx.storm >= 1 && Sx.storm <= 3)) err(p + 'sea.storm must be 1-3');
+      if (Sx.caps !== undefined && !(num(Sx.caps) && Sx.caps >= 0 && Sx.caps <= 0.6)) err(p + 'sea.caps must be 0-0.6');
+      (Sx.kelpTop || []).forEach(q => { if (!(q[0] >= 0 && q[1] <= L.width && q[0] < q[1])) err(p + 'sea.kelpTop [from, to]'); });
+    } else if (L.water === 'sea') err(p + 'a sea needs its sea block (tide, storm, caps)');
+    if (L.swell && L.swell.clamp !== undefined && !(num(L.swell.clamp) && L.swell.clamp >= 3 && L.swell.clamp <= 6)) err(p + 'swell.clamp must be 3-6 view px');
+    const U_ = L.underwater || {};
+    [['kelp', 3], ['rockBed', 2]].forEach(([k, n]) => (U_[k] || []).forEach((q, i, a) => {
+      if (!(q.length === n && q[0] >= 0 && q[1] <= L.width && q[0] < q[1] && (!i || q[0] >= a[i - 1][1]) && (n < 3 || (q[2] > 0 && q[2] <= 0.3)))) err(p + 'underwater.' + k + ' ' + JSON.stringify(q));
+    }));
+    if (U_.kelp && L.water !== 'sea') err(p + 'underwater.kelp: kelp grows at sea');
+    if (U_.hulk && !(num(U_.hulk.x) && U_.hulk.half > 0 && U_.hulk.x - U_.hulk.half >= 0 && U_.hulk.x + U_.hulk.half <= L.width)) err(p + 'underwater.hulk {x, half} inside the world');
+    (L.landmarks || []).forEach(m => {
+      if (['headland', 'skerries', 'haulout', 'breakwater', 'mooring', 'schooner'].includes(m.kind) && !['sound', 'wreck'].includes(L.scenery)) err(p + 'landmark ' + m.id + ': a ' + m.kind + ' needs a sea\'s scenery');
+      if ((m.kind === 'skerries' || m.kind === 'haulout') && !(Array.isArray(m.hs) && m.hs.length && m.hs.every(v => v > 0 && v <= 14) && m.half > 0)) err(p + 'landmark ' + m.id + ': hs (each rock\'s height 0-14) and half');
+      if (m.kind === 'headland' && !(m.half > 0 && m.h > 0 && (!m.light || (m.light.x > m.x - m.half && m.light.x < m.x + m.half && m.light.tower > 0)))) err(p + 'landmark ' + m.id + ': half, h and a light {x on the headland, tower}');
+      if (m.kind === 'mooring' && !['teal', 'rust'].includes(m.hull)) err(p + 'landmark ' + m.id + ': hull teal or rust');
+    });
     (L.underwater && L.underwater.weedBeds || []).forEach(q => { if (!(q[0] >= 0 && q[1] <= L.width && q[0] < q[1] && q[2] > 0 && q[2] <= 1)) err(p + 'underwater.weedBeds [from, to, density 0-1]'); });
     // Phase 77: a river's current per reach (G.data.reachK): known reaches, flow 0–3, sink 0–1.
     if (L.current && L.current.reach) {
@@ -367,7 +392,7 @@ function validateLocations(G, err) {
 // read; `above` with known creatures, hours as [from, to] pairs in 0..24, places inside the
 // world or the named layer, perches above the water. Shore layers' features are known kinds.
 const UNDER_KEYS = ['cray', 'snail', 'fry', 'tad', 'turtle', 'eel', 'mussel', 'caddis', 'litter', 'roots', 'tree', 'ribbon', 'fern', 'lily', 'algae'];
-const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls', 'osprey', 'eagle', 'otter']; // Phase 77: the osprey and the eagle; Phase 78: the otter
+const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls', 'osprey', 'eagle', 'otter', 'seal', 'cormorant']; // Phase 77: the osprey and the eagle; Phase 78: the otter; Phase 79: the seal and the cormorant
 const SHORE_KINDS = { bank: ['posts', 'moored', 'lodge', 'duckbox'], zigzag: ['pot', 'chair', 'table', 'door'] };
 function validateLife(L, p, err) {
   const life = L.life, num = v => typeof v === 'number' && isFinite(v);
@@ -379,6 +404,15 @@ function validateLife(L, p, err) {
   if (!life) { err(p + 'life (needs under and above)'); return; }
   const u = life.under;
   if (!u) err(p + 'life.under'); else UNDER_KEYS.forEach(k => { if (u[k] === undefined) err(p + 'life.under.' + k); });
+  // Phase 79: the sea floor's life, optional: crabs in place of crayfish, starfish in place of snails.
+  if (u) {
+    ['crab', 'star', 'anemone', 'flat'].forEach(k => { if (u[k] !== undefined && !(Number.isInteger(u[k]) && u[k] >= 0 && u[k] <= 20)) err(p + 'life.under.' + k + ' must be a count 0-20'); });
+    if (u.crab > 0 && u.cray > 0) err(p + 'life.under: crabs or crayfish, not both');
+    if (u.star > 0 && u.snail > 0) err(p + 'life.under: starfish or snails, not both');
+    if ((u.crab > 0 || u.star > 0 || u.flat > 0 || u.anemone > 0) && L.water !== 'sea') err(p + 'life.under: crabs, starfish, anemones and flatfish live at sea');
+    if (u.flat > 4) err(p + 'life.under.flat: at most 4');
+    if (u.flat > 0 && L.underwater.rockBed && !(L.underwater.rockBed.reduce((a, r) => a - (r[1] - r[0]), L.width) > 60)) err(p + 'life.under.flat: no sand for the flatfish');
+  }
   const a = life.above;
   if (!a) { err(p + 'life.above'); return; }
   const hoursOk = hs => Array.isArray(hs) && hs.length && hs.every(h => Array.isArray(h) && h.length === 2 && h.every(v => num(v) && v >= 0 && v <= 24) && h[0] !== h[1]);
@@ -402,6 +436,11 @@ function validateLife(L, p, err) {
     // Phase 77: the osprey nests on a landmark with a nest above the water, and fishes inside the world
     if (k === 'osprey') { const lm = (L.landmarks || []).find(m => m.id === c.landmark); if (!(lm && lm.nest && inW(lm.nest.x) && num(lm.nest.y) && lm.nest.y > 0)) err(q + 'landmark with a nest {x, y}'); if (!c.x) err(q + 'x (the water it fishes)'); }
     if (k === 'otter' && !(c.n >= 1 && c.n <= 3 && c.x && (!c.log || (L.landmarks || []).some(m => m.id === c.log && m.len > 0)))) err(q + 'n (1-3), x, and log: a landmark with len');
+    // Phase 79: seals haul out on spots above the water (at least one) and swim inside x; the
+    // cormorant perches above the water and fishes inside x. Both at sea only.
+    if ((k === 'seal' || k === 'cormorant') && L.water !== 'sea') err(q + 'lives at sea');
+    if (k === 'seal' && !(c.n >= 1 && c.n <= 4 && c.x && Array.isArray(c.spots) && c.spots.length >= 1 && c.spots.every(s => inW(s.x) && num(s.y) && s.y > 0 && s.x >= c.x[0] && s.x <= c.x[1]))) err(q + 'n (1-4), x, and spots {x, y} above the water inside x');
+    if (k === 'cormorant' && !(c.x && (c.perches || []).length >= 1 && c.perches.length <= 2)) err(q + 'x and 1-2 perches');
     if (k === 'eagle' && !(c.n >= 1 && c.n <= 3 && Array.isArray(c.y) && c.y[0] > 0 && c.y[0] < c.y[1] && c.x)) err(q + 'n (1-3), x and y [low, high]');
   }
 }
