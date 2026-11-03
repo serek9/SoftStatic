@@ -3,7 +3,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Stonehorn River (Phase 74, PLAN_WATERS.md 2; the reference's Grizzlyridge River): a cold
 // mountain river of the north Pacific slope under snowy peaks and spruce. Two reaches: Boulder
 // Run (rapids, a fast current) and Osprey Bluff (a deep green pool under a cliff). Phase 74
-// paints it with the existing layer kinds; the white water, the bluff and the nest are Phase 77.
+// painted it with the existing layer kinds; Phase 77 gives it its own scenery (js/scene/rivers.js):
+// boulders and white water in Boulder Run, the bluff with the osprey's nest over the pool, the
+// osprey and the eagles, and a current per reach.
 G.data = G.data || {};
 G.data.locations = G.data.locations || {};
 G.data.locations.stone = {
@@ -17,15 +19,19 @@ G.data.locations.stone = {
   start: 170, // just past the pier's reach, so arriving does not open its panel
   dock: { x: 96, reach: 60 },
   water: 'river',
+  scenery: 'stone', // Phase 77 (js/scene/rivers.js)
   reaches: [
     { id: 'boulder_run', name: 'Boulder Run', x: [0, 700] },
     { id: 'osprey_bluff', name: 'Osprey Bluff', x: [700, 1300] }
   ],
   // A choppy, quick surface (view px; see loc_fog.js).
   swell: { amp: 2.4, mirror: 1.3, waves: [[40, 28, 0.45], [21, 18, 0.35], [10, 12, 0.2]] },
-  // About half again Blackwater's current (G.data.riverDrift); per reach in Phase 77.
-  current: { dir: 1, speed: 4.6, ramp: 2, sway: 0.5, period: 6, slack: 0.45, bottom: 0.25 },
-  drift: function (seed, t, depth, onBottom) { return G.data.riverDrift(this, seed, t, depth, onBottom); },
+  // About half again Blackwater's current (G.data.riverDrift). Phase 77: Boulder Run's
+  // rapids run about twice that and the lure barely sinks in them (sink, G.data.reachK);
+  // the bluff's deep green pool turns slowly.
+  current: { dir: 1, speed: 4.6, ramp: 2, sway: 0.5, period: 6, slack: 0.45, bottom: 0.25,
+    reach: { boulder_run: { flow: 2, sink: 0.3 }, osprey_bluff: { flow: 0.6, sink: 1 } } },
+  drift: function (seed, t, depth, onBottom, wind, x) { return G.data.riverDrift(this, seed, t, depth, onBottom, wind, x); },
 
   layers: [
     { id: 'peaks', kind: 'mountains', parallax: 0.05, base: 90, amp: 62, color: 'mount_far', lit: 'mount_lit', dark: 'night_deep', haze: 'mount_haze' },
@@ -48,16 +54,33 @@ G.data.locations.stone = {
     above: {
       ducks: { p: 0.9, x: [700, 1150], young: 2, hours: [[6, 19.5]] },
       heron: { x: [1150, 1270], hours: [[5, 10], [16.5, 21]] },
-      kingfisher: { perches: [{ x: 420, y: 30 }, { x: 980, y: 28 }], hours: [[6.5, 18.5]] },
-      deer: { layer: 'bank', x: [520, 700], hours: [[5, 7.5], [17.5, 20]] }
+      kingfisher: { perches: [{ x: 420, y: 30 }, { x: 350, y: 17 }], hours: [[6.5, 18.5]] }, // Phase 77: one perch on a boulder
+      deer: { layer: 'bank', x: [520, 700], hours: [[5, 7.5], [17.5, 20]] },
+      // Phase 77: the osprey nests on the bluff (its landmark's nest) and fishes the pool; bald
+      // eagles soar over the valley by day, y px above the water.
+      osprey: { landmark: 'bluff', x: [760, 1260], hours: [[5.5, 20]] },
+      eagle: { n: 2, x: [60, 1240], y: [62, 94], hours: [[8, 17.5]] }
     }
   },
 
+  // Phase 77: Boulder Run's boulders (r world px; foam: the current breaks on them) and the
+  // bluff (half its width, its height, world px) with the osprey's nest (x, px above the water).
   landmarks: [
     { id: 'pier', kind: 'pier', x: 96, seed: 8402 },
     { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
-    { id: 'snag_a', kind: 'snag', x: 540 }
+    { id: 'boulder_a', kind: 'boulder', x: 236, r: 11, foam: true },
+    { id: 'boulder_b', kind: 'boulder', x: 352, r: 14, foam: true },
+    { id: 'boulder_c', kind: 'boulder', x: 452, r: 8, foam: true },
+    { id: 'snag_a', kind: 'snag', x: 540 },
+    { id: 'boulder_d', kind: 'boulder', x: 612, r: 11, foam: true },
+    { id: 'bluff', kind: 'bluff', x: 1010, half: 115, h: 58, nest: { x: 942, y: 72 } }
   ],
+
+  // Phase 77: the live water (js/scene/rivers.js): Boulder Run's white water (n foam streaks
+  // at v px/s, and standing waves).
+  river: {
+    rapids: [{ x: [170, 700], n: 70, v: 22, waves: 12 }]
+  },
 
   underwater: {
     bottomAmp: 12, rock: 'stone_dark', silt: 'stone_dark',

@@ -382,6 +382,9 @@ G.scene.sailing = (function () {
   //   afterLayer(c, id, ox, oy, run, loc): draws over the layer just drawn; ox and oy are
   //     that layer's scroll, so layer pixel (x, y) is at screen (x - ox, y - oy)
   //   reflect(c, run, loc): inside the mirror pass only, after the anomaly deltas
+  //   surface(c, run, loc): Phase 77, after the waterline and the pier's posts: what moves on the
+  //     water (a river's riffles, white water, spill and mist), in world px at the view's scale
+  //   things(loc): Phase 77, the live parts by world x [{kind, x: [from, to]}], for dbg.shore()
   //   debugLine(run): the module's overlay line
   var NO_SCENERY = {}, scen = NO_SCENERY;
   // Phase 49: what each layer's painter says it painted (kinds of tree, the shore's things),
@@ -1860,6 +1863,7 @@ G.scene.sailing = (function () {
     drawStormWater(ctx); // Phase 55
     ctx.drawImage(glint, camPx * HI, 0, VIEW_W * HI, 1, 0, wy - camPy, VIEW_W, 1 / HI);
     drawPosts(ctx, wy - camPy);
+    if (scen.surface) scen.surface(ctx, run, loc); // Phase 77: a river's live water (js/scene/rivers.js)
     G.scene.life.drawSurface(ctx, camPx, camPy); // Phase 49: lily pads, the frog, the striders
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
@@ -1899,6 +1903,7 @@ G.scene.sailing = (function () {
     stormTick: function (dt) { if (loc) stormStep(dt); },
     flash: function () { return loc ? flashF() : 0; },
     light: function (h) { return { night: nightF(h), grey: greyF(h), dusk: duskF(h) }; },
+    stormK: function () { return stormK(); }, // Phase 77: the storm's strength 0..1, without storm()'s report
     fogAlpha: function () { return fogMul() / FOG_HEAD; },
     moon: function () { return { x: moonPt[0], y: moonPt[1], a: moonPt[2] }; },
     waterLight: function () { return waterLight; },
@@ -1912,6 +1917,14 @@ G.scene.sailing = (function () {
     painted: function () {
       var o = {};
       for (var i = 0; i < loc.layers.length; i++) { var k = 'loc:' + loc.id + ':' + loc.layers[i].id; o[loc.layers[i].id] = { kinds: paintedKinds[k] || [], ms: bakeMs[k] === undefined ? null : +bakeMs[k].toFixed(1) }; }
+      // Phase 77: what each reach has: the landmarks standing in it and the scenery's live parts.
+      var R = loc.reaches || [], th = scen.things ? scen.things(loc) : [], j;
+      o.reaches = {};
+      for (i = 0; i < R.length; i++) {
+        var has = o.reaches[R[i].name] = [];
+        for (j = 0; j < loc.landmarks.length; j++) { var m = loc.landmarks[j]; if (m.x >= R[i].x[0] && m.x < R[i].x[1] && has.indexOf(m.kind) < 0) has.push(m.kind); }
+        for (j = 0; j < th.length; j++) if (th[j].x[0] < R[i].x[1] && (th[j].x[1] > R[i].x[0] || th[j].x[0] >= R[i].x[0]) && has.indexOf(th[j].kind) < 0) has.push(th[j].kind);
+      }
       return o;
     },
     skyLum: function () { return skyLum; }

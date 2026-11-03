@@ -81,7 +81,7 @@ G.data.locations.creek = {
 
   // 11.1: px/s the lure drifts at t s after landing, on the cast with this seed, at depth px.
   // Phase 74: the rivers share G.data.riverDrift (below), each with its own current.
-  drift: function (seed, t, depth, onBottom) { return G.data.riverDrift(this, seed, t, depth, onBottom); },
+  drift: function (seed, t, depth, onBottom, wind, x) { return G.data.riverDrift(this, seed, t, depth, onBottom, wind, x); },
   // Phase 74 (PLAN_WATERS.md): what kind of water it is, and its stretches by world x.
   water: 'river',
   reaches: [{ id: 'blackwater', name: 'Blackwater Creek', x: [0, 1300] }]
@@ -91,9 +91,32 @@ G.data.locations.creek = {
 // seed, at depth px, in water L (its current and maxDepth). Pure: the same arguments always
 // give the same answer, so a cast's path is fixed by its seed and the fixed dt (sailing steps
 // it in underwater.lureStep). Phase 74: shared by every river (Blackwater, Copperbend, Stonehorn).
-G.data.riverDrift = function (L, seed, t, depth, onBottom) {
+// Phase 77 (PLAN_WATERS.md 4.5): x is the lure's world x; the current runs at the reach's
+// `flow` there (G.data.reachK). Blackwater has no per-reach current, so its casts drift
+// exactly as before, and a call without x (the old five arguments) gets the plain current.
+G.data.riverDrift = function (L, seed, t, depth, onBottom, wind, x) {
   var c = L.current, ph = (Math.imul(seed | 0, 0x9e3779b1) >>> 0) / 4294967296 * 6.2832;
   var v = c.speed * (1 - Math.exp(-t / c.ramp)) * (1 + c.sway * Math.sin(t * 6.2832 / c.period + ph));
   v *= 1 - c.slack * Math.min(1, Math.max(0, depth) / L.maxDepth);
+  if (c.reach && typeof x === 'number') v *= G.data.reachK(L, x, 'flow', 1);
   return c.dir * v * (onBottom ? c.bottom : 1);
 };
+
+// Phase 77: a reach's number `key` from L.current.reach[reachId] (def where a reach has none)
+// at world x, blended linearly over EDGE px either side of a reach's edge, so the water does
+// not change speed in a step. Pure and allocation-free.
+G.data.reachK = (function () {
+  function reachKOf(L, j, key, def) {
+    var q = L.current && L.current.reach && L.current.reach[L.reaches[j].id];
+    return q && typeof q[key] === 'number' ? q[key] : def;
+  }
+  return function (L, x, key, def) {
+    var R = L.reaches, EDGE = 30, i, r, a, b, n = R ? R.length : 0;
+    if (!n) return def;
+    for (i = 0; i < n - 1 && x >= R[i].x[1]; i++);
+    r = R[i]; b = reachKOf(L, i, key, def);
+    if (i > 0 && x < r.x[0] + EDGE) { a = reachKOf(L, i - 1, key, def); return a + (b - a) * (0.5 + 0.5 * (x - r.x[0]) / EDGE); }
+    if (i < n - 1 && x > r.x[1] - EDGE) { a = reachKOf(L, i + 1, key, def); return b + (a - b) * (0.5 - 0.5 * (r.x[1] - x) / EDGE); }
+    return b;
+  };
+})();

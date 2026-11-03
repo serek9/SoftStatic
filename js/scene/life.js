@@ -429,7 +429,9 @@ G.scene.life = (function () {
     heronR: 45, heronV: 1.5, heronFly: 16,
     kingR: 40, kingDive0: 6, kingDive1: 14, kingV: 34,
     loonV: 1.5, loonR: 55, loonDive0: 20, loonDive1: 45, loonUV: 12, loonCall0: 40, loonCall1: 90,
-    flyV: 40, frogR: 50, deerR: 70, deerWalk: 3, beaverV: 4, beaverR: 50, foxV: 6, gullR: 45, gullBack: 80
+    flyV: 40, frogR: 50, deerR: 70, deerWalk: 3, beaverV: 4, beaverR: 50, foxV: 6, gullR: 45, gullBack: 80,
+    ospV: 26, ospY: 46, ospDrop: 80, ospCatch: 0.5, osp0: 18, osp1: 45,     // Phase 77: px/s, its hover's height, px/s down, its luck, s on the nest
+    otterV: 6, otterUV: 11, otterR: 45                                          // Phase 78: px/s swimming and under, px from the boat that sends one under
   };
   var ab = { loc: null, T: {}, lim: 0, ghost: 0, mirror: false, night: false, h: 0, lilies: [], layer: {}, lodge: -1, moored: [] };
   function hrs(list, h) {
@@ -514,6 +516,48 @@ G.scene.life = (function () {
     ]);
   }
 
+  // Phase 77: the osprey (white below, dark brown above, the dark band through its eye; frames:
+  // perched, wings up, wings down, the stoop) and the bald eagle (dark, white head and tail;
+  // gliding and a beat). Rows shorter than the widest are padded on the right.
+  function padded(frames) {
+    var w = 0, f, r;
+    for (f = 0; f < frames.length; f++) for (r = 0; r < frames[f].length; r++) w = Math.max(w, frames[f][r].length);
+    for (f = 0; f < frames.length; f++) for (r = 0; r < frames[f].length; r++) while (frames[f][r].length < w) frames[f][r] += '.';
+    return frames;
+  }
+  function ospreyArt() {
+    var m = { w: 'paper', d: 'umber_dark', D: 'umber_deep', e: 'ink', b: 'stone_dark', y: 'stone_hi' };
+    return sprite('osprey', m, padded([
+      ['.................', '.......ww........', '......wweb.......', '......eDwbb......', '......dwww.......', '.....ddwww.......', '.....ddwww.......', '.....dddww.......', '.....ddd.........', '......yy.........'],
+      ['.................', 'D...............D', 'Dd.............dD', '.ddd.........ddd.', '..ddww..w..wwdd..', '....dwwwwwebdd...', '......ddwww......', '........dd.......', '.................', '.................'],
+      ['.................', '.................', '.................', '........ww.......', '.......wwweb.....', '..ddwwwwwwwwwdd..', '.ddd...ddd...ddd.', 'Dd.............dD', 'D...............D', '.................'],
+      ['.......D.D.......', '.......ddd.......', '......dddd.......', '......ddwd.......', '.......dww.......', '.......www.......', '.......wwe.......', '........wb.......', '........yy.......', '.................']
+    ]));
+  }
+  function eagleArt() {
+    var m = { d: 'umber_deep', D: 'umber_dark', w: 'paper', e: 'ink', b: 'brass_hi' };
+    return sprite('eagle', m, padded([
+      ['dd.................dd', '.ddd.............ddd.', '...dDdd...ww..dDdd...', '.....dddDDdwwebd.....', '......wwddddd........', '......ww.............'],
+      ['.....................', '.....................', '..........www........', '..ddddDDDddwwebdddd..', '.ddd..wwdddd.....ddd.', 'dd....ww...........dd']
+    ]));
+  }
+
+  // Phase 78: the otter swimming (head up, then the arch of a dive) and sitting up on a log.
+  function otterArt() {
+    var m = { d: 'umber_dark', D: 'umber', e: 'ink', n: 'ink', w: 'umber_hi' };
+    return sprite('otter', m, padded([
+      ['..........', '.......Dd.', '.......dde', '..ddd..ddn', '.dDDDddd..'],
+      ['...DDd....', '..DddddD..', '.dd....dd.', 'd.......dn', '..........']
+    ]));
+  }
+  function otterSitArt() {
+    var m = { d: 'umber_dark', D: 'umber', e: 'ink', n: 'ink', w: 'umber_hi' };
+    return sprite('otterSit', m, padded([
+      ['...dd...', '..ddde..', '..dwwn..', '..dDw...', '.ddDw...', '.dDDd...', '.dDDd...', '.ddDdd..', 'ddd.ddd.', 'd.......'],
+      ['..dd....', '.ddde...', '.dwwn...', '..dDw...', '.ddDw...', '.dDDd...', '.dDDd...', '.ddDdd..', 'ddd.ddd.', 'd.......']
+    ]));
+  }
+
   // The creatures (one family, one heron, ... per water; a few small arrays).
   var dk = { on: false, a: 0, x: 0, dir: 1, v: 0, mode: 0, t: 0, wait: 0, dvx: 0, dy: 0, ph: 0, faced: 0, faceT: 0, tgt: 0, under: false }; // mode 0 paddle 1 flee 2 pass 3 dive 4 face
   var YMAX = 6, yx = new Float32Array(YMAX), yph = new Float32Array(YMAX), ydir = new Int8Array(YMAX), yn = 0;
@@ -527,7 +571,15 @@ G.scene.life = (function () {
   var bv = { on: false, x: 0, dir: 1, mode: 0, t: 0, wait: 0, ph: 0 }; // 0 swim 1 dive
   var fo = { on: false, a: 0, x: 0, dir: 1, mode: 0, t: 0, wait: 0, ph: 0, sits: 0 }; // 0 trot 1 sit 2 leave
   var GMAX = 4, gx = new Float32Array(GMAX), gy = new Float32Array(GMAX), gmode = new Uint8Array(GMAX), gt = new Float32Array(GMAX), gph = new Float32Array(GMAX), gcx = new Float32Array(GMAX), gang = new Float32Array(GMAX), gper = new Uint8Array(GMAX), gn = 0, ga = 0; // 0 sit 1 fly 2 back
-  var acts = { strikes: 0, takes: 0, dives: 0, plops: 0, calls: 0, slaps: 0 }; // dbg: how often each has happened
+  // Phase 77: the osprey (mode 0 perched on its nest, 1 out to the pool, 2 hovering, 3 the stoop,
+  // 4 in the water, 5 climbing out, 6 home) and up to EMAX eagles circling (x, y px above the water).
+  var os = { on: false, a: 0, x: 0, y: 0, nx: -1, ny: 0, dir: 1, mode: 0, t: 0, wait: 0, ph: 0, tx: 0, fish: 0, vx: 0 };
+  var EMAX = 3, ecx = new Float32Array(EMAX), ecy = new Float32Array(EMAX), er = new Float32Array(EMAX), eang = new Float32Array(EMAX), ew = new Float32Array(EMAX), ev = new Float32Array(EMAX), eph = new Float32Array(EMAX), en = 0, ea = 0;
+  // Phase 78: up to OTMAX otters (mode 0 swimming at the surface, 1 under, 2 sitting on the log);
+  // x world px; lt: where along the log one sits (0 its root end .. 1 its tip).
+  var OTMAX = 3, otx = new Float32Array(OTMAX), ottx = new Float32Array(OTMAX), ott = new Float32Array(OTMAX), otph = new Float32Array(OTMAX), otlt = new Float32Array(OTMAX), otdir = new Int8Array(OTMAX), otm = new Uint8Array(OTMAX), otn = 0, ota = 0;
+  var otLog = null;
+  var acts = { strikes: 0, takes: 0, dives: 0, plops: 0, calls: 0, slaps: 0, plunges: 0, fish: 0, otterDives: 0 }; // dbg: how often each has happened
 
   function aboveSetup(loc, set) {
     var A = (loc.life && loc.life.above) || {}, r = G.vrng, i;
@@ -550,6 +602,13 @@ G.scene.life = (function () {
     for (i = 0; i < dfn; i++) { dzone[i] = i % A.dragonflies.x.length; var z = A.dragonflies.x[dzone[i]]; dfx[i] = dtx[i] = r.range(z[0], z[1]); dfy[i] = dty[i] = r.range(3, 14); dhov[i] = r.range(0, 2); }
     rn = A.striders ? Math.min(RMAX_, A.striders.n) : 0; ra = 0;
     for (i = 0; i < rn; i++) { rzone[i] = i % A.striders.x.length; var zs = A.striders.x[rzone[i]]; rx_[i] = r.range(zs[0], zs[1]); rvx[i] = 0; rt[i] = r.range(0, 1.5); }
+    os.on = false; os.nx = -1; os.wait = r.range(2, 8); os.fish = 0;
+    if (A.osprey) for (i = 0; i < loc.landmarks.length; i++) if (loc.landmarks[i].id === A.osprey.landmark && loc.landmarks[i].nest) { os.nx = loc.landmarks[i].nest.x; os.ny = loc.landmarks[i].nest.y + 1; }
+    en = A.eagle ? Math.min(EMAX, A.eagle.n || 1) : 0; ea = 0;
+    for (i = 0; i < en; i++) { ecx[i] = r.range(A.eagle.x[0], A.eagle.x[1]); ecy[i] = r.range(A.eagle.y[0], A.eagle.y[1]); er[i] = r.range(18, 36); eang[i] = r.range(0, 6.28); ew[i] = (r.next() < 0.5 ? -1 : 1) * r.range(0.22, 0.34); ev[i] = (r.next() < 0.5 ? -1 : 1) * r.range(2, 4); eph[i] = r.range(0, 9); }
+    otn = A.otter ? Math.min(OTMAX, A.otter.n || 1) : 0; ota = 0; otLog = null;
+    if (A.otter) for (i = 0; i < loc.landmarks.length; i++) if (loc.landmarks[i].id === A.otter.log) otLog = loc.landmarks[i];
+    for (i = 0; i < otn; i++) { otx[i] = ottx[i] = r.range(A.otter.x[0], A.otter.x[1]); otm[i] = 0; ott[i] = r.range(4, 12); otph[i] = r.range(0, 6); otdir[i] = 1; }
     gn = A.gulls ? Math.min(GMAX, A.gulls.n, A.gulls.perches.length) : 0; ga = 0;
     for (i = 0; i < gn; i++) { gper[i] = i; gx[i] = A.gulls.perches[i].x; gy[i] = A.gulls.perches[i].y; gmode[i] = 0; gt[i] = 0; gph[i] = r.range(0, 6); }
     for (var q in acts) acts[q] = 0;
@@ -618,7 +677,121 @@ G.scene.life = (function () {
     if (A.beaver && ab.lodge >= 0) beaverStep(A.beaver, dt, cam, bs, h, r, loc);
     if (A.fox) foxStep(A.fox, dt, h, r);
     if (gn) gullStep(A.gulls, dt, b, h, r);
+    if (A.osprey && os.nx >= 0) ospreyStep(A.osprey, dt, b, h, r, loc);
+    if (en) eagleStep(A.eagle, dt, h);
+    if (otn) otterStep(A.otter, dt, b, h, r, loc);
   }
+
+  // Phase 78: the otters play about the cove: they swim with their heads up, arch and dive,
+  // come up somewhere else, and now and then haul out on the deadfall to sit up and look about.
+  // The boat near sends a swimmer under and away, and slides a sitter off the log.
+  function otterLogXY(i, out) {                                                   // where along the log (world x, px over the water)
+    var L = otLog, len = L.len || 50, t = otlt[i];
+    out[0] = L.x + L.dir * len * t; out[1] = 8 - 6.5 * t;
+  }
+  var olog = [0, 0];
+  function otterStep(T, dt, b, h, r, loc) {
+    ota = toward(ota, hrs(T.hours, h) ? 1 : 0, dt / LA.fade);
+    var lo = T.x[0], hi = T.x[1];
+    for (var i = 0; i < otn; i++) {
+      otph[i] += dt; ott[i] -= dt;
+      var near = Math.abs(b.x - otx[i]) < LA.otterR;
+      if (otm[i] === 2) {                                                        // on the log
+        if (near || ott[i] <= 0 || ota < 0.5) {
+          otterLogXY(i, olog); otx[i] = olog[0]; otm[i] = 1; ott[i] = r.range(2, 3.5); ring(otx[i], 0.25, loc); acts.otterDives++;
+          ottx[i] = clamp(otx[i] + sgn(otx[i] - b.x) * r.range(20, 50), lo, hi);
+        }
+        continue;
+      }
+      if (otm[i] === 1) {                                                        // under: swimming on below
+        otx[i] += clamp(ottx[i] - otx[i], -LA.otterUV * dt, LA.otterUV * dt);
+        if (ott[i] <= 0 && !(Math.abs(b.x - otx[i]) < LA.otterR * 0.7)) { otm[i] = 0; ott[i] = r.range(3, 9); ring(otx[i], 0.2, loc); otph[i] = 0; }
+        continue;
+      }
+      if (near) {                                                                // the boat: under and away
+        otm[i] = 1; ott[i] = r.range(2.5, 4); ring(otx[i], 0.3, loc); acts.otterDives++;
+        ottx[i] = clamp(otx[i] + sgn(otx[i] - b.x) * r.range(40, 70), lo, hi);
+        continue;
+      }
+      var dx = ottx[i] - otx[i];
+      if (Math.abs(dx) < 1) ottx[i] = r.range(lo, hi);
+      else { otdir[i] = sgn(dx); otx[i] += otdir[i] * LA.otterV * dt; }
+      if (ott[i] <= 0) {
+        if (otLog && ota > 0.5 && r.next() < 0.35) {                            // out onto the log
+          otlt[i] = r.range(0.35, 0.9); otterLogXY(i, olog);
+          if (Math.abs(b.x - olog[0]) > LA.otterR * 1.5) { otm[i] = 2; otx[i] = olog[0]; ott[i] = r.range(6, 16); otdir[i] = r.next() < 0.5 ? -1 : 1; ring(olog[0], 0.15, loc); continue; }
+        }
+        otm[i] = 1; ott[i] = r.range(1.5, 3.5); ring(otx[i], 0.2, loc); acts.otterDives++; otph[i] = 0;
+        ottx[i] = clamp(otx[i] + otdir[i] * r.range(15, 40), lo, hi);
+      }
+    }
+  }
+
+  // Phase 77: the osprey fishes the pool below its nest: it sits a while, flies out, hangs on
+  // beating wings over the water, folds and drops feet first, and climbs out, with a fish now
+  // and then, back to the nest. Never near the boat: it picks water away from it.
+  function ospreyStep(T, dt, b, h, r, loc) {
+    var want = hrs(T.hours, h), lo = T.x[0], hi = T.x[1], v, dx;
+    if (!os.on) {
+      if (!want || (os.wait -= dt) > 0) return;
+      os.on = true; os.a = 0; os.x = os.nx; os.y = os.ny; os.mode = 0; os.t = r.range(4, 12); os.dir = 1;
+      return;
+    }
+    os.ph += dt;
+    if (os.fish > 0 && os.mode === 0) os.fish -= dt;
+    if (os.mode === 0) {
+      os.a = toward(os.a, want ? 1 : 0, dt / LA.fade);
+      if (!want && os.a <= 0) { os.on = false; os.wait = r.range(20, 60); return; }
+      if (want && (os.t -= dt) <= 0) {
+        os.tx = r.range(lo, hi);
+        if (Math.abs(os.tx - b.x) < 60) os.tx = clamp(b.x + sgn(os.tx - b.x || 1) * 80, lo, hi);
+        if (Math.abs(os.tx - b.x) < 50) { os.t = 5; return; }                   // nowhere away from the boat: wait
+        os.mode = 1; os.fish = 0;
+      }
+      return;
+    }
+    os.a = toward(os.a, 1, dt / LA.fade);
+    if (os.mode === 1) {                                                         // out to the water, at height
+      dx = os.tx - os.x; os.dir = sgn(dx);
+      os.x += clamp(dx, -LA.ospV * dt, LA.ospV * dt); os.y += clamp(LA.ospY - os.y, -12 * dt, 12 * dt);
+      if (Math.abs(dx) < 1 && Math.abs(os.y - LA.ospY) < 2) { os.mode = 2; os.t = r.range(1.5, 3.5); }
+    } else if (os.mode === 2) {                                                  // hovering, looking down
+      os.y = LA.ospY + Math.sin(os.ph * 7) * 0.6;
+      if ((os.t -= dt) <= 0) {
+        if (Math.abs(b.x - os.x) < 50 || !want) { os.mode = 6; return; }          // the boat came: home
+        os.mode = 3;
+      }
+    } else if (os.mode === 3) {                                                  // the stoop
+      os.y -= LA.ospDrop * dt; os.x += os.dir * 6 * dt;
+      if (os.y <= 0) {
+        os.y = 0; os.mode = 4; os.t = 0;
+        G.gfx.fx.splash(os.x, loc.waterY, 0.35); ring(os.x, 0.7, loc); G.audio.engine.cue('dive', os.x); acts.plunges++;
+        if (r.next() < LA.ospCatch) { os.fish = 30; acts.fish++; }
+      }
+    } else if (os.mode === 4) {                                                  // under, a moment
+      if ((os.t += dt) >= 0.45) { os.mode = 5; ring(os.x, 0.3, loc); }
+    } else if (os.mode === 5) {                                                  // climbing out, shaking off
+      os.y += 16 * dt; os.x += os.dir * 4 * dt;
+      if (os.y >= 30) os.mode = 6;
+    } else {                                                                     // home to the nest
+      dx = os.nx - os.x; v = os.ny - os.y; os.dir = sgn(dx);
+      os.x += clamp(dx, -LA.ospV * dt, LA.ospV * dt); os.y += clamp(v, -14 * dt, 14 * dt);
+      if (Math.abs(dx) < 0.5 && Math.abs(v) < 0.5) { os.x = os.nx; os.y = os.ny; os.mode = 0; os.t = r.range(LA.osp0, LA.osp1); os.dir = 1; }
+    }
+  }
+
+  // Phase 77: bald eagles soar in wide slow circles high over the valley (an ellipse: seen
+  // from the side), drifting along it, gliding mostly, a few beats now and then.
+  function eagleStep(T, dt, h) {
+    ea = toward(ea, hrs(T.hours, h) ? 1 : 0, dt / (LA.fade * 2));
+    for (var i = 0; i < en; i++) {
+      eang[i] += ew[i] * dt; eph[i] += dt;
+      ecx[i] += ev[i] * dt;
+      if ((ecx[i] < T.x[0] && ev[i] < 0) || (ecx[i] > T.x[1] && ev[i] > 0)) ev[i] = -ev[i];
+    }
+  }
+  function eagleX(i) { return ecx[i] + Math.cos(eang[i]) * er[i]; }
+  function eagleY(i) { return ecy[i] + Math.sin(eang[i]) * er[i] * 0.22; }
 
   // Ducks: a hen and her young paddle about their stretch of water, further out than the boat.
   function ducksStep(T, dt, cam, bs, h, r, loc) {
@@ -1029,6 +1202,39 @@ G.scene.life = (function () {
   // After the landmarks: the heron, the kingfisher, the gulls, the dragonflies (all at parallax 1).
   function drawNear(c, camPx, wyS) {
     var i;
+    if (en && ea > 0) {                                                          // Phase 77: the eagles, high up
+      var E = eagleArt();
+      c.globalAlpha = ea;
+      for (i = 0; i < en; i++) {
+        var EX = eagleX(i) - camPx;
+        if (EX < -12 || EX > 332) continue;
+        img(c, E, (eph[i] % 7) < 0.5 && (Math.floor(eph[i] * 6) & 1) ? 1 : 0, -Math.sin(eang[i]) * ew[i] < 0, EX, wyS - eagleY(i));
+      }
+      c.globalAlpha = 1;
+    }
+    if (otn && ota > 0) {                                                        // Phase 78: the otters
+      var OT = otterArt(), OS = otterSitArt(), surf = G.gfx.surface;
+      c.globalAlpha = ota;
+      for (i = 0; i < otn; i++) {
+        if (otm[i] === 1) continue;
+        var TX = otx[i] - camPx;
+        if (TX < -10 || TX > 330) continue;
+        if (otm[i] === 2) { otterLogXY(i, olog); img(c, OS, (Math.floor(otph[i] / 2.5) & 1), otdir[i] < 0, olog[0] - camPx, wyS - olog[1]); continue; }
+        var wyO = wyS - surf.at(otx[i]) / HI + 1.5, arch = otph[i] < 0.3;
+        if (!arch) { c.fillStyle = P.water_foam; c.globalAlpha = ota * 0.45; for (var sw = 1; sw <= 8; sw++) { var wx = TX - otdir[i] * (2 + sw); c.fillRect(sp(c, wx), sp(c, wyO - 0.5 - sw * 0.06), 0.5, 0.5); c.fillRect(sp(c, wx), sp(c, wyO + sw * 0.12), 0.5, 0.5); } c.globalAlpha = ota; }
+        img(c, OT, arch ? 1 : 0, otdir[i] < 0, TX, wyO);
+      }
+      c.globalAlpha = 1;
+    }
+    if (os.on && os.a > 0 && os.mode !== 4) {                                    // Phase 77: the osprey
+      var O = ospreyArt(), OX = os.x - camPx, of = os.mode === 0 ? 0 : (os.mode === 3 ? 3 : (Math.floor(os.ph * (os.mode === 2 ? 12 : 6)) & 1 ? 1 : 2));
+      if (OX > -12 && OX < 332) {
+        c.globalAlpha = os.a;
+        img(c, O, of, os.dir < 0, OX, wyS - os.y);
+        if (os.fish > 0 && os.mode !== 0) px1(c, 'stone_hi', OX - 1, wyS - os.y + 0.5, 3, 0.5); // a fish in its feet
+        c.globalAlpha = 1;
+      }
+    }
     if (hr.on && hr.a > 0) drawHeron(c, camPx, wyS, false);
     if (kf.on && kf.a > 0 && kf.mode !== 2) {
       var K = kingArt(), kfr = kf.mode === 0 ? 0 : (Math.floor(kf.ph * 14) & 1 ? 1 : 2);
@@ -1172,6 +1378,26 @@ G.scene.life = (function () {
     c.globalAlpha = alpha;
   }
 
+  // Phase 77: which creatures live in each reach of this water (dbg.life(), dbg.lifeAbove()):
+  // from each one's range in the table (x, perches, the lodge, the osprey's nest), a layer's x
+  // put back into world px as seen with the boat at the middle of the view.
+  function byReach() {
+    var o = {}, loc = ab.loc, A = ab.T, R = (loc && loc.reaches) || [], i, k;
+    if (!loc) return o;
+    for (i = 0; i < R.length; i++) o[R[i].name] = [];
+    function world(x, p) { return p >= 1 ? x : (x - 160 * (1 - p)) / p; }
+    function put(name, x0, x1) { for (var q = 0; q < R.length; q++) if (x0 < R[q].x[1] && x1 >= R[q].x[0] && o[R[q].name].indexOf(name) < 0) o[R[q].name].push(name); }
+    for (k in A) {
+      var c = A[k], p = c.layer && ab.layer[c.layer] ? ab.layer[c.layer].parallax : (c.p || 1), j;
+      if (k === 'beaver') { if (ab.lodge >= 0) put(k, world(ab.lodge, p) - 40, world(ab.lodge, p) + 40); continue; }
+      if (k === 'osprey') { if (os.nx >= 0) put(k, Math.min(os.nx, c.x[0]), Math.max(os.nx, c.x[1])); continue; }
+      if (c.x) { var xs = Array.isArray(c.x[0]) ? c.x : [c.x]; for (j = 0; j < xs.length; j++) put(k, world(xs[j][0], p), world(xs[j][1], p)); }
+      else if (c.perches) for (j = 0; j < c.perches.length; j++) put(k, c.perches[j].x, c.perches[j].x);
+      else put(k, 0, loc.width);                                                   // the whole water (the frog's lilies, ...)
+    }
+    return o;
+  }
+
   // dbg.lifeAbove(): who is out above the water now, and what they are doing.
   function aboveState() {
     var A = ab.T, o = { loc: ab.loc ? ab.loc.id : '', hour: +ab.h.toFixed(2), lim: +ab.lim.toFixed(2), touches: { ducksFace: dk.on && dk.mode === 4, heronStill: hr.on && hr.mode === 5, deerNoReflection: +ab.ghost.toFixed(2) }, acts: acts };
@@ -1187,6 +1413,10 @@ G.scene.life = (function () {
     if (A.deer) o.deer = dr.on ? { a: +dr.a.toFixed(2), x: +dr.x.toFixed(1), fromBoat: scr(dr.x, ab.layer[A.deer.layer].parallax), mode: ['walk', 'drink', 'look', 'leave'][dr.mode] } : null;
     if (A.beaver) o.beaver = bv.on ? { x: +bv.x.toFixed(1), lodge: ab.lodge, fromBoat: scr(bv.x, ab.layer[A.beaver.layer].parallax), mode: bv.mode ? (bv.slap ? 'slap' : 'dive') : 'swim' } : { lodge: ab.lodge };
     if (A.fox) o.fox = fo.on ? { a: +fo.a.toFixed(2), x: +fo.x.toFixed(1), mode: ['trot', 'sit', 'leave'][fo.mode] } : null;
+    if (A.osprey) o.osprey = os.on ? { a: +os.a.toFixed(2), x: +os.x.toFixed(1), y: +os.y.toFixed(1), fromBoat: scr(os.x, 1), mode: ['perch', 'out', 'hover', 'stoop', 'under', 'climb', 'home'][os.mode], fish: os.fish > 0, nest: [os.nx, os.ny] } : { nest: [os.nx, os.ny] };
+    if (A.eagle) { o.eagle = { a: +ea.toFixed(2), birds: [] }; for (var e = 0; e < en; e++) o.eagle.birds.push({ x: +eagleX(e).toFixed(1), y: +eagleY(e).toFixed(1), fromBoat: scr(eagleX(e), 1) }); }
+    if (A.otter) { o.otter = { a: +ota.toFixed(2), log: otLog ? otLog.id : '', otters: [] }; for (var q = 0; q < otn; q++) o.otter.otters.push({ x: +otx[q].toFixed(1), fromBoat: scr(otx[q], 1), mode: ['swim', 'under', 'log'][otm[q]] }); }
+    o.reaches = byReach();
     if (A.gulls) { o.gulls = { a: +ga.toFixed(2), birds: [] }; for (var i = 0; i < gn; i++) o.gulls.birds.push({ x: +gx[i].toFixed(1), y: +gy[i].toFixed(1), fromBoat: scr(gx[i], 1), mode: ['sit', 'fly', 'back'][gmode[i]] }); }
     return o;
   }
@@ -1196,6 +1426,8 @@ G.scene.life = (function () {
     if (dk.on && dk.a > 0) o.push('ducks'); if (hr.on && hr.a > 0) o.push('heron'); if (kf.on && kf.a > 0) o.push('kingfisher');
     if (ln.on && ln.a > 0) o.push('loon'); if (dfn && dfa > 0) o.push('dragonflies'); if (fr.on && fr.a > 0) o.push('frog');
     if (rn && ra > 0) o.push('striders'); if (dr.on && dr.a > 0) o.push('deer'); if (bv.on) o.push('beaver'); if (fo.on && fo.a > 0) o.push('fox'); if (gn && ga > 0) o.push('gulls');
+    if (os.on && os.a > 0) o.push('osprey'); if (en && ea > 0) o.push('eagle'); // Phase 77
+    if (otn && ota > 0) o.push('otter');                                         // Phase 78
     return o;
   }
   // dbg.lifeSpawn for the life above: brings one on now, or makes it act now. False if it cannot.
@@ -1206,6 +1438,11 @@ G.scene.life = (function () {
     if (kind === 'loondive') { if (!ln.on || ln.mode !== 0) return false; ln.dive = 0; return true; }
     if (kind === 'call') { if (!A.loon) return false; G.audio.engine.cue('loon', b.x); acts.calls++; return true; }
     if (kind === 'kingdive') { if (!kf.on || kf.mode !== 0) return false; kf.t = 0; return true; }
+    if (kind === 'osprey') { if (!A.osprey || os.nx < 0) return false; if (!os.on) { os.wait = 0; return hrs(A.osprey.hours, ab.h); } return true; }
+    if (kind === 'ospreydive') { if (!os.on || os.mode !== 0) return false; os.t = 0; os.a = 1; return true; } // Phase 77: out to fish now
+    if (kind === 'eagle') { if (!en) return false; ea = 1; return true; }
+    if (kind === 'otter') { if (!otn) return false; ota = 1; return true; }                                     // Phase 78
+    if (kind === 'otterlog') { if (!otn || !otLog) return false; otlt[0] = 0.6; otm[0] = 2; ott[0] = 30; ota = 1; otterLogXY(0, olog); otx[0] = olog[0]; return true; }
     var map = { ducks: dk, heron: hr, kingfisher: kf, loon: ln, frog: fr, deer: dr, beaver: bv, fox: fo };
     if (map[kind] && A[kind] && !map[kind].on) { map[kind].wait = 0; return hrs(A[kind].hours, ab.h) || (kind === 'heron' && ab.lim > 0.5 && ab.night); }
     return false;
@@ -1215,7 +1452,7 @@ G.scene.life = (function () {
   function state() {
     var out = { loc: locId, cray: [], snails: [], clouds: [], dart: dart.on ? { x: +dart.x.toFixed(1), y: +dart.y.toFixed(1) } : null,
       turtle: turtle.on ? { x: +turtle.x.toFixed(1), y: +turtle.y.toFixed(1) } : null, eel: eel.on ? { x: +eel.x.toFixed(1), y: +eel.y.toFixed(1) } : null,
-      silt: sn, threats: tn, lastReact: +react.lastDelay.toFixed(3), waits: { dart: +dart.wait.toFixed(1), turtle: +turtle.wait.toFixed(1), eel: +eel.wait.toFixed(1) }, ms: +stats.ms.toFixed(3), bedMs: +stats.bedMs.toFixed(3), waterMs: +stats.waterMs.toFixed(3) };
+      reaches: byReach(), silt: sn, threats: tn, lastReact: +react.lastDelay.toFixed(3), waits: { dart: +dart.wait.toFixed(1), turtle: +turtle.wait.toFixed(1), eel: +eel.wait.toFixed(1) }, ms: +stats.ms.toFixed(3), bedMs: +stats.bedMs.toFixed(3), waterMs: +stats.waterMs.toFixed(3) };
     for (var i = 0; i < cn; i++) out.cray.push({ x: +cxs[i].toFixed(1), y: +cys[i].toFixed(1), mode: ['walk', 'rest', 'back'][cmode[i]], dir: cdir[i], react: creact[i] >= 0 ? +creact[i].toFixed(3) : -1 });
     for (i = 0; i < nn; i++) out.snails.push({ x: +nx[i].toFixed(1), y: +ny[i].toFixed(1), hidden: nhide[i] > 0 });
     for (var q = 0; q < qn; q++) {
@@ -1234,7 +1471,7 @@ G.scene.life = (function () {
   // ---- Phase 50.1: for the gallery ---------------------------------------------------------
   // Every sprite baked (by name: {w, h, cv, fl}), and the drawn-in-code creatures posed from
   // the gallery's own scratch records, never the live ones. World px, the ctx at the view's scale.
-  var ARTS = [crayArt, snailArt, turtleArt, tadArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt];
+  var ARTS = [crayArt, snailArt, turtleArt, tadArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt, ospreyArt, eagleArt, otterArt, otterSitArt];
   function sprites() { for (var i = 0; i < ARTS.length; i++) ARTS[i](); return spr; }
   var gH = { x: 0, dir: 1, mode: 0, reach: 0, ph: 0, lift: 0, a: 1, fish: 0 }, gB = { dir: 1, mode: 0, t: 0 };
   var gEx = new Float32Array(EELN), gEy = new Float32Array(EELN);
