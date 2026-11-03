@@ -28,13 +28,16 @@ G.ui.setup = (function () {
   // How many of a hook item are left: -1 without limit.
   function left(save, b) { return b.unlimited ? -1 : (save.baits[b.id] | 0); }
   function usable(save, b) { return b.unlimited || save.baits[b.id] > 0; }
+  // Phase 80 (PLAN_WINTER.md 2.2): on the ice only what fishes straight down a hole; the rest is greyed.
+  function downHole(save, b) { return !E().onIce(save, G.data) || E().iceHook(b.id, G.data); }
 
   // The lists: the rods owned in the rack's order (the shop's), and worms, then every bait and
   // lure you have, then the one on the hook if it ran out (greyed, so you see it is gone).
   function build(save) {
     var g = G.data.gear, i, b;
     rods.length = 0; hooks.length = 0; lines.length = 0;
-    for (i = 0; i < g.rods.length; i++) if (E().ownsRod(save, i)) rods.push(i);
+    var ice = E().onIce(save, G.data); // Phase 80: the ice rods on the ice, the others off it
+    for (i = 0; i < g.rods.length; i++) if (E().ownsRod(save, i) && !!g.rods[i].ice === ice) rods.push(i);
     for (i = 0; i < g.lineTypes.length; i++) if (E().ownsLineType(save, g.lineTypes[i].id)) lines.push(g.lineTypes[i].id);
     var all = g.baits.concat(g.lures || []);
     for (i = 0; i < all.length; i++) {
@@ -63,7 +66,7 @@ G.ui.setup = (function () {
   }
 
   function cursorTo(save) {
-    sel[0] = Math.max(0, rods.indexOf(save.gear.rod));
+    sel[0] = Math.max(0, rods.indexOf(E().rodInHand(save, G.data)));
     sel[1] = Math.max(0, hooks.indexOf(save.gear.bait));
     sel[2] = Math.max(0, lines.indexOf(save.gear.lineType));
     top = Math.max(0, Math.min(sel[1] - ROWS + 1, hooks.length - ROWS));
@@ -74,13 +77,13 @@ G.ui.setup = (function () {
     var save = G.state.save;
     build(save); layout(); cursorTo(save);
     col = 0; msg = ''; on = true;
-    took.rod = false; took.hook = false; took.rod0 = save.gear.rod; took.hook0 = save.gear.bait; took.line0 = save.gear.lineType;
+    took.rod = false; took.hook = false; took.rod0 = E().rodInHand(save, G.data); took.hook0 = save.gear.bait; took.line0 = save.gear.lineType;
   }
 
   function close() {
     var save = G.state.save;
     on = false;
-    took.rod = save.gear.rod !== took.rod0;
+    took.rod = E().rodInHand(save, G.data) !== took.rod0;
     took.hook = save.gear.bait !== took.hook0;
     if (took.rod || took.hook || save.gear.lineType !== took.line0) G.core.save.autosave('setup');
   }
@@ -89,8 +92,8 @@ G.ui.setup = (function () {
   function pick(save) {
     if (col === 0) {
       var i = rods[sel[0]];
-      if (save.gear.rod === i) return false;
-      E().useRod(save, i);
+      if (E().rodInHand(save, G.data) === i) return false;
+      E().useRod(save, i, G.data);
       return true;
     }
     if (col === 2) { // Phase 53: a line type (spooled at once; no act for it)
@@ -101,6 +104,7 @@ G.ui.setup = (function () {
     }
     var b = E().baitById(hooks[sel[1]], G.data);
     if (!usable(save, b)) { msg = 'None left. Rusty sells more.'; return false; }
+    if (!downHole(save, b)) { msg = 'Needs open water.'; return false; } // Phase 80
     if (save.gear.bait === b.id) return false;
     save.gear.bait = b.id;
     return true;
@@ -131,6 +135,7 @@ G.ui.setup = (function () {
     if (col === 2) return LINE_SAYS[lines[sel[2]]] || '';
     var b = E().baitById(hooks[sel[1]], G.data);
     if (!usable(save, b)) return 'None left.';
+    if (!downHole(save, b)) return 'Needs open water.';
     if (!E().isLure(b.id, G.data)) return b.unlimited ? 'Live bait. Never runs out.' : 'Live bait. One a cast.';
     return (SWIM_SAYS[b.vary || b.swim] || 'A lure.') + ' ' + b.sizes[0] + (b.sizes.length > 1 ? '-' + b.sizes[b.sizes.length - 1] : ''); // Phase 69: its action and sizes
   }
@@ -159,7 +164,7 @@ G.ui.setup = (function () {
     F.bold(ctx, 'LINE', cx2, ty, col === 2 ? 'bone' : 'fog_mid');
     ty += U.ROW;
     for (i = 0; i < rods.length && i < ROWS; i++) {
-      var r = g.rods[rods[i]], inUse = save.gear.rod === rods[i];
+      var r = g.rods[rods[i]], inUse = E().rodInHand(save, G.data) === rods[i];
       ry = ty + i * U.ROW;
       if (col === 0 && i === sel[0]) U.row(ctx, cx0 - 3, ry, L.rodW + 6);
       key = inUse ? 'signal_amber' : 'fog_light';
@@ -172,7 +177,7 @@ G.ui.setup = (function () {
       var b = E().baitById(hooks[top + i], G.data), n = left(save, b), ok = usable(save, b);
       ry = ty + i * U.ROW;
       if (col === 1 && top + i === sel[1]) U.row(ctx, cx1 - 3, ry, L.hookW + 6);
-      key = !ok ? 'fog_dark' : (save.gear.bait === b.id ? 'signal_amber' : 'fog_light');
+      key = !ok || !downHole(save, b) ? 'fog_dark' : (save.gear.bait === b.id ? 'signal_amber' : 'fog_light');
       F.drawText(ctx, name(b), cx1, ry, key);
       if (n >= 0) { var cnt = 'x' + n; F.drawText(ctx, cnt, cx1 + L.hookW - F.measure(cnt), ry, ok ? 'fog_mid' : 'fog_dark'); }
     }

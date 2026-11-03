@@ -128,6 +128,13 @@ G.core.debug = (function () {
     land: function () { var F = G.state.run.fight; if (!F.active) return false; F.D = 0; F.mode = 'tired'; F.modeT = 9; return true; },
     // dbg.rod(kg) overrides the rod's mass limit (D4) for testing; dbg.rod(0) restores it.
     rod: function (kg) { return G.scene.sailing.setRodMax(kg); },
+    // dbg.snow(true) buys the Snow Machine (Phase 80); dbg.snow() reads the ice's gear and whether
+    // the chart opens the ice: {snow, iceRod, rods, seaSeen, iceAll, unlock (economy's verdict)}.
+    snow: function (buy) {
+      var E = G.sim.economy, s = G.state.save, r = buy ? E.buySnow(s, G.data) : -1;
+      if (r === E.OK) G.core.save.autosave('purchase');
+      return { bought: r, snow: !!s.gear.snow, iceRod: s.gear.iceRod, rods: s.gear.rods.slice(), seaSeen: !!s.flags.seaSeen, iceAll: E.iceAll(s, G.data), unlock: ['ok', 'open', 'poor', 'locked', 'unknown'][E.canUnlock(s, 'tamarack', G.data)] };
+    },
     // dbg.money(n) adds n coins (negative takes them); returns the balance.
     money: function (n) { G.state.save.coins = Math.max(0, G.state.save.coins + (n || 0)); return G.state.save.coins; },
     // dbg.buy(kind) buys the next 'rod' | 'reel' | 'line', or dbg.buy('bait', id, n).
@@ -159,12 +166,12 @@ G.core.debug = (function () {
     // Phase 50.1: dbg.tackle(rod, hook) also puts an owned rod (index or id) in hand and a hook
     // you have (bait or lure id) on, as the setup panel would (null or undefined leaves one as
     // it is), saves, and lets the fisher play the act for it; refused gear is named in `refused`.
-    useRod: function (i) { var r = G.sim.economy.useRod(G.state.save, +i); return r === G.sim.economy.OK ? G.data.gear.rods[+i].name : 'not owned'; },
+    useRod: function (i) { var r = G.sim.economy.useRod(G.state.save, +i, G.data); return r === G.sim.economy.OK ? G.data.gear.rods[+i].name : 'not owned'; },
     tackle: function (rod, hook) {
       var s = G.state.save, E = G.sim.economy, refused = [], g = s.gear, rod0 = g.rod, hook0 = g.bait;
       if (rod !== undefined && rod !== null) {
         var ri = typeof rod === 'string' ? G.data.gear.rods.map(function (r) { return r.id; }).indexOf(rod) : +rod;
-        if (E.useRod(s, ri) !== E.OK) refused.push('rod ' + rod);
+        if (E.useRod(s, ri, G.data) !== E.OK) refused.push('rod ' + rod);
       }
       if (hook !== undefined && hook !== null) {
         var b = E.baitById(hook, G.data);

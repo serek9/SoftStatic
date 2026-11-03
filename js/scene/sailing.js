@@ -434,6 +434,7 @@ G.scene.sailing = (function () {
     loc = G.data.locations[id];
     if (!loc) throw new Error('unknown location: ' + id);
     G.state.save.loc = id;
+    if (loc.water === 'sea' && !G.core.save.tour()) G.state.save.flags.seaSeen = true; // Phase 80: out to sea once opens the ice
     scen = (loc.scenery && G.scene.scenery && G.scene.scenery[loc.scenery]) || NO_SCENERY;
     layers.length = 0;
     for (var i = 0; i < loc.layers.length; i++) layers.push(bakeLayer(loc.layers[i], i));
@@ -1790,7 +1791,7 @@ G.scene.sailing = (function () {
   var gearLook = { rod: 0, night: 0, fisher: null, lineKey: 'fog_light', lineA: 0.6 };
   function drawBoat(c, fisher) {
     var run = G.state.run, g = G.state.save.gear, fsm = run.fsm;
-    gearLook.rod = g.rod || 0;
+    gearLook.rod = G.sim.economy.rodInHand(G.state.save, G.data) || 0; // Phase 80: the ice rod on the ice
     gearLook.night = 1 - greyF(hourNow());
     gearLook.fisher = run.fisher; // Phase 33: P2-2's thermos is one of his idle acts now
     // Phase 31: the line along the rod in the same colour as the line out (drawCast).

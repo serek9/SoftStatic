@@ -78,6 +78,7 @@ G.sim.fish_ai = (function () {
       if (out > 0) v *= Math.max(W.depthFloor, 1 - out / W.depthFalloff);
     }
     if (hm.timeLikes.length) v *= hm.timeLikes.indexOf(Math.floor(ctx.hour)) >= 0 ? W.hourLiked : W.hourOther;
+    if (f.turnUp) v *= f.turnUp;                                                       // Phase 80: the (Ice) species' rarity
     full = v;
     if (COVER[0] < 1) v *= Math.pow(COVER[0], W.coverK);                                // Phase 69: only the fish of its sizes come
     return v;

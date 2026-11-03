@@ -143,8 +143,30 @@ G.gfx.sprites = (function () {
     fish_bean: '#b0ac78', fish_scute: '#cec6b6', fish_eye_yellow: '#dcbc34', fish_barbel: '#5a524a',
     // Phase 73 (lure art, PLAN_SPECIES.md 3.6): chartreuse, the one lure colour the palette had
     // no ramp for (skirts, firetiger backs, a jig's tail). Lure keys only: shift() never picks them.
-    lure_chart_0: '#3a4214', lure_chart_1: '#5e6e1c', lure_chart_2: '#8ea42c', lure_chart_3: '#bccc5a'
+    lure_chart_0: '#3a4214', lure_chart_1: '#5e6e1c', lure_chart_2: '#8ea42c', lure_chart_3: '#bccc5a',
+    // Phase 80 (PLAN_WINTER.md): snow and ice, pale but under the dusk ceiling (§0.9: checked
+    // below with the sky and water keys). Winter keys only: shift() never picks them.
+    snow_deep: '#3a4050', snow_dark: '#545a68', snow: '#6e7482', snow_hi: '#82889a', snow_lit: '#8c929c',
+    ice_deep: '#1e2c38', ice_dark: '#2a3a48', ice: '#44586a', ice_hi: '#62788a', ice_lit: '#7c8e9c'
   };
+  // Phase 80: the (Ice) fish's winter colours, made from the summer fish's ramps: every fish_
+  // key gains a pale, cold copy (fish_w_...: desaturated and lifted toward a blue-grey) and a
+  // dark, cold one for the deep fish (fish_d_...: desaturated and sunk toward a deep blue).
+  (function () {
+    var add = {}, k;
+    function hx(v) { v = Math.max(0, Math.min(255, Math.round(v))); return (v < 16 ? '0' : '') + v.toString(16); }
+    function make(c, to, mix, desat) {
+      var h = parseInt(c.slice(1), 16), r = (h >> 16) & 255, g = (h >> 8) & 255, b = h & 255, m = (r + g + b) / 3;
+      r += (m - r) * desat; g += (m - g) * desat; b += (m - b) * desat;
+      return '#' + hx(r + (to[0] - r) * mix) + hx(g + (to[1] - g) * mix) + hx(b + (to[2] - b) * mix);
+    }
+    for (k in PALETTE) {
+      if (k.indexOf('fish_') !== 0) continue;
+      add['fish_w_' + k.slice(5)] = make(PALETTE[k], [168, 178, 192], 0.28, 0.4);
+      add['fish_d_' + k.slice(5)] = make(PALETTE[k], [22, 30, 44], 0.3, 0.35);
+    }
+    for (k in add) PALETTE[k] = add[k];
+  })();
   // Phase 56: the interior keys above, which shift() leaves out.
   var INTERIOR = {};
   ('panel_deep panel panel_mid panel_hi panel_lit mustard_dark mustard mustard_hi mustard_lit orange_dark orange orange_hi orange_lit ' +
@@ -154,7 +176,7 @@ G.gfx.sprites = (function () {
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.
   var CEILING_KEY = 'dusk_high';
-  var SKY_WATER = /^(night_|dusk_|fog_|water_)/;
+  var SKY_WATER = /^(night_|dusk_|fog_|water_|snow(_|$)|ice(_|$))/; // Phase 80: snow and ice too
 
   var RGB = {};
   for (var k in PALETTE) {
@@ -182,7 +204,7 @@ G.gfx.sprites = (function () {
     if (shifted[id] !== undefined) return shifted[id];
     var c = RGB[key], L = lum(key), m = (c[0] + c[1] + c[2]) / 3, best = key, bd = 1e9;
     for (var k in PALETTE) {
-      if (k === key || k === 'black' || INTERIOR[k] || k.indexOf('fish_') === 0 || k.indexOf('lure_') === 0) continue;
+      if (k === key || k === 'black' || INTERIOR[k] || k.indexOf('fish_') === 0 || k.indexOf('lure_') === 0 || k.indexOf('snow_') === 0 || k.indexOf('ice_') === 0 || k === 'snow' || k === 'ice') continue;
       var dl = (lum(k) - L) * dir;
       if (dl < 8 || dl > 80) continue;
       var q = RGB[k], qm = (q[0] + q[1] + q[2]) / 3;
