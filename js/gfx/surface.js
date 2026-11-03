@@ -33,7 +33,7 @@ G.gfx.surface = (function () {
   var hw = null, vw = null;                  // the wake's (Phase 26)
   var cols = new Float32Array(642);          // the view's columns this frame (fill)
   var sw = CALM, ks = [], ws = [], as = [], ph = [];
-  var t = 0, mult = 1, ampMax = 0;
+  var t = 0, mult = 1, ampMax = 0, clampH = 3; // Phase 79: clampH per water (the sea's swell stands higher)
   var stats = { ms: 0, energy: 0, min: 0, max: 0, wake: 0 };
 
   // Sizes the arrays for a water and resets it. Called on location load (not a hot path).
@@ -43,6 +43,7 @@ G.gfx.surface = (function () {
     else { h.fill(0); v.fill(0); hw.fill(0); vw.fill(0); }
     n = need;
     sw = loc.swell || CALM;
+    clampH = sw.clamp || K.clampH;
     ks.length = ws.length = as.length = ph.length = 0;
     for (var i = 0; i < sw.waves.length; i++) {
       var w = sw.waves[i], k = 6.2832 / w[0];
@@ -57,7 +58,7 @@ G.gfx.surface = (function () {
     var t0 = typeof performance !== 'undefined' ? performance.now() : 0;
     t += dt; mult = m || 1;
     ampMax = sw.amp * mult;
-    var C2 = K.c * K.c, damp = 1 - K.damp * dt, relax = 1 - K.relax * dt, lim = K.clampH, e = 0, lo = 0, hi = 0, i;
+    var C2 = K.c * K.c, damp = 1 - K.damp * dt, relax = 1 - K.relax * dt, lim = clampH, e = 0, lo = 0, hi = 0, i;
     for (i = 1; i < n - 1; i++) {
       v[i] = (v[i] + C2 * (h[i - 1] + h[i + 1] - 2 * h[i]) * dt) * damp;
     }
@@ -114,7 +115,7 @@ G.gfx.surface = (function () {
     return h[i] + (h[i + 1] - h[i]) * f + hw[i] + (hw[i + 1] - hw[i]) * f;
   }
 
-  function lim(y) { return y > K.clampH ? K.clampH : (y < -K.clampH ? -K.clampH : y); }
+  function lim(y) { return y > clampH ? clampH : (y < -clampH ? -clampH : y); }
 
   // Height (view px, up positive) at world x.
   function at(x) { var X = x * HI; return h ? lim(swellAt(X) + rippleAt(X)) : 0; }

@@ -148,6 +148,13 @@ G.scene.underwater = (function () {
         A.line(ctx, 'wood', bx1, by1, bx1 + dirT * r.int(2, 7), by1 - r.int(3, 9)); // a twig
       }
     }
+    // Phase 79: sea anemones on the rocks: a short column and a crown of tentacles.
+    var ANE = [['pink_dark', 'pink', 'pink_lit'], ['orange_dark', 'orange', 'orange_lit'], ['stone', 'paper_dark', 'cream']];
+    for (i = 0; i < (T.anemone || 0) && rk.length; i++) {
+      var Ra = rk[r.int(0, rk.length - 1)], au = r.range(-0.6, 0.6), ax = Math.round((Ra.x + au * Ra.rw) * HI), ay = Math.round((Ra.cy - Ra.rh * Math.sqrt(1 - au * au)) * HI) + 1, kc = ANE[i % 3], ah = r.int(2, 4);
+      A.box(ctx, kc[0], ax - 1, ay - ah, 3, ah); A.px(ctx, kc[1], ax - 1, ay - ah);
+      for (k = -3; k <= 3; k++) A.line(ctx, (k & 1) ? kc[1] : kc[2], ax, ay - ah, ax + k, ay - ah - 2 - (3 - Math.abs(k)) * 0.6);
+    }
     // Litter, one of each in the table, spread along the water.
     var Lt = T.litter, snagI = 0;
     for (i = 0; i < Lt.length; i++) {
@@ -160,6 +167,11 @@ G.scene.underwater = (function () {
         A.box(ctx, 'teal_dark', bd > 0 ? X + 7 : bx - 4, y - 1, 4, 2); A.px(ctx, 'teal_hi', bd > 0 ? X + 8 : bx - 3, y - 1);
       } else if (Lt[i] === 'tyre') { // a tyre half in the silt
         buried(X, y + 3, 11, 8, function (nx, ny, x) { var d = nx * nx + ny * ny; return d < 0.3 ? u.silt : (d < 0.42 ? 'stone_dark' : ((x & 3) === 0 ? 'stone_dark' : 'ink')); });
+      } else if (Lt[i] === 'pot') { // Phase 79: a lost crab pot: a wire cage on the bed, its line gone slack
+        var pw = 16, ph2 = 10;
+        for (k = 0; k <= pw; k += 4) A.box(ctx, 'stone_dark', X - 8 + k, y - ph2, 1, ph2);
+        A.box(ctx, 'stone_dark', X - 8, y - ph2, pw + 1, 1); A.box(ctx, 'stone_dark', X - 8, y - (ph2 >> 1), pw + 1, 1); A.box(ctx, 'rust', X - 8, y - 1, pw + 1, 1);
+        A.px(ctx, 'stone_hi', X - 4, y - ph2); A.line(ctx, 'paper_dark', X + 8, y - ph2, X + 14, y - ph2 - 14); A.line(ctx, 'paper_dark', X + 14, y - ph2 - 14, X + 24, y - 2);
       } else if (Lt[i] === 'lure') { // a lost lure caught on a snag (or on the bed), its line trailing up
         var lx2 = X, ly2 = y - 2;
         if (set.snagAt.length) { var sa = set.snagAt[snagI++ % set.snagAt.length], hh2 = Math.round((sa.foot - sa.tip) * 0.35); lx2 = Math.round(sa.X + sa.lean * Math.sin(hh2 * 0.025) * 12) + 7; ly2 = sa.foot - hh2; }
@@ -219,6 +231,27 @@ G.scene.underwater = (function () {
         A.box(ctx, u.weed, cx - (p.pad >> 1) + 1, 1, p.pad - 3, 1);
         A.px(ctx, u.weedDark, cx + 2, 1); // the pad's notch
       }
+    }
+  }
+
+  // Phase 79: kelp, in one lean frame: a stipe swaying more toward its top, blades in olive off
+  // alternate sides, a gas float at the top and streamers trailing along the surface.
+  function paintKelp(ctx, kelps, lean) {
+    var A = G.gfx.paint;
+    for (var i = 0; i < kelps.length; i++) {
+      var k = kelps[i], y, q, dx = 0, X = 0;
+      for (y = 0; y < k.h; y++) {
+        q = y / k.h; dx = Math.round(lean * 8 * Math.pow(q, 1.4) + Math.sin(y * 0.045 + k.ph) * 2.5 * q);
+        X = k.x + dx;
+        A.px(ctx, 'olive_dark', X, k.base - 1 - y);
+        if (y > 6 && y % 9 === (i % 9)) {
+          var sd = (y / 9 | 0) % 2 ? 1 : -1, bl = 4 + ((y + i) % 4);
+          for (var b = 1; b <= bl; b++) A.px(ctx, b > bl - 2 ? 'olive_hi' : 'olive', X + sd * b, k.base - 1 - y + (b >> 1) + (lean * sd > 0 ? 0 : 1));
+        }
+      }
+      var ty = k.base - k.h;
+      A.blob(ctx, X, ty, 2, 2, ['olive_dark', 'olive', 'olive_hi'], { rim: 0 });
+      for (var st = 0; st < 3; st++) A.line(ctx, st === 1 ? 'olive_hi' : 'olive', X, ty + st - 1, X + (lean >= 0 ? 1 : -1) * (8 + st * 3), ty - 1 + st + (st & 1));
     }
   }
 
@@ -297,9 +330,19 @@ G.scene.underwater = (function () {
         for (X = 0; X < WH; X++) { var lo = Math.max(0, X - R), hi = Math.min(WH, X + R + 1); sm[X] = (sum[hi] - sum[lo]) / (hi - lo); }
         // The bed: a lit rim, a band of sand, then silt that darkens a step two strata down,
         // with grain strokes along some of the seams between strata.
+        // Phase 79: a rock bed (the sea's head and reef, u.rockBed [[from, to], ...] world px): bare
+        // rock in its own keys where the others have sand, broken in blocks.
+        var RB = u.rockBed, rockCol = null;
+        if (RB) { rockCol = new Uint8Array(WH); for (var rb = 0; rb < RB.length; rb++) for (X = Math.max(0, RB[rb][0] * HI); X < Math.min(WH, RB[rb][1] * HI); X++) rockCol[X] = 1; }
+        var RKB = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' };
         A.area(ctx, 0, 0, WH, HH, function (x, y) {
           var d = y - top[x];
           if (d < 0) return '';
+          if (rockCol && rockCol[x] && d < 14) {
+            if (d < 1) return RKB.lit;
+            if (((x + (y >> 2) * 7) % 19) === 0 || (d === 5 && A.hash2(x >> 3, 3) < 0.5)) return 'ink';
+            return A.hash2(x >> 3, y >> 2) < 0.3 ? RKB.dark : RKB.mid;
+          }
           if (d < 2) return SAND[2];
           if (d < 6) return SAND[1];
           var s = y - sm[x] + 3 * Math.sin(x * 0.013 + ph) + 2 * Math.sin(x * 0.041), band = Math.floor(s / 10), seam = s - band * 10;
@@ -329,6 +372,37 @@ G.scene.underwater = (function () {
           var pr = rng.range(1.5, 3.2), pt = Math.round(top[X] + 1 - pr * 0.4);
           A.blob(ctx, X, pt, pr + 1, pr * 0.7 + 1, [rim]);
           A.blob(ctx, X, pt, pr, pr * 0.7, ramp, { rim: 0 });
+        }
+        // Phase 79: more and bigger boulders over a rock bed, from their own stream.
+        if (RB) {
+          var r9 = new G.core.rng.Rng(loc.seed * 31 + 209);
+          for (var rr = 0; rr < RB.length; rr++) for (i = 0; i < (RB[rr][1] - RB[rr][0]) / 14; i++) {
+            var bxr = r9.int(Math.max(4, RB[rr][0]), Math.min(w - 12, RB[rr][1])) * HI, rwr = r9.int(4, 11) * HI, rhr = r9.int(3, 7) * HI, baser = 1e9;
+            for (var kk = -rwr; kk <= rwr; kk += 2) baser = Math.min(baser, topAt(bxr + kk) + 2);
+            var bcr = Math.round(baser - rhr * 0.3);
+            set.rocks.push({ x: bxr / HI, cy: bcr / HI, rw: rwr / HI, rh: rhr / HI });
+            A.blob(ctx, bxr, bcr, rwr + 1, rhr + 1, [rim]);
+            A.blob(ctx, bxr, bcr, rwr, rhr, ramp, { rim: 0.3 });
+            A.line(ctx, rim, bxr - (rwr >> 2), bcr - (rhr >> 1), bxr + (rwr >> 3), bcr + (rhr >> 1));
+          }
+        }
+        // Phase 79: the schooner's hull under the water (u.hulk {x, half}, world px), from the
+        // surface down to the bank she lies on: planking gone grey and green, barnacles and
+        // weed, ribs in the dark of a stove-in hole.
+        if (u.hulk) {
+          var hx0 = (u.hulk.x - u.hulk.half) * HI, hx1 = (u.hulk.x + u.hulk.half) * HI, ha = hx0 + Math.round((hx1 - hx0) * 0.3), hb = hx0 + Math.round((hx1 - hx0) * 0.45);
+          A.area(ctx, hx0, 0, hx1 - hx0, HH, function (x, y) {
+            var t = (x - hx0) / (hx1 - hx0), uu = Math.abs(2 * t - 1), bot = Math.round((top[clamp(x, 0, WH - 1)] + 2) * Math.sqrt(Math.max(0, 1 - Math.pow(uu, 3))));
+            if (y >= bot) return '';
+            var e = bot - y, sk = Math.floor((y + Math.round((x - hx0) * 0.02)) / 6), seam = (y + Math.round((x - hx0) * 0.02)) % 6;
+            if (e < 2) return 'wood_deep';
+            if (x > ha && x < hb && y > 8 && e > 6) return ((x - ha) % 9 < 2) ? 'wood_dark' : 'ink';
+            if (seam === 0) return 'wood_deep';
+            var hsh = A.hash2(x >> 1, y >> 1);
+            if (hsh < 0.04) return 'stone_hi';
+            if (hsh < 0.16) return u.weedDark;
+            return ['stone_dark', 'wood_dark', 'teal_dark', 'stone_dark'][(A.hash2(x >> 4, sk) * 4) | 0];
+          });
         }
         // 11.1: submerged branches standing up from the bottom to depth s.top (0: the surface):
         // a tapering trunk in four bark keys (outline, shadow, bark, lit left edge) with notches,
@@ -375,6 +449,22 @@ G.scene.underwater = (function () {
     }
     set.strands = [];
     for (s = 0; s < strands.length; s++) set.strands.push({ x: strands[s].x / HI, base: topAt(strands[s].x) / HI, h: strands[s].h / HI });
+    // Phase 79: kelp forests (u.kelp [[from, to, density], ...]): stipes from the rock to near
+    // the surface where the water is shallow enough (to 25 m), each with its blades, a float
+    // and streamers lying along the top. Their own stream.
+    var kelps = [];
+    if (u.kelp) {
+      var rk = new G.core.rng.Rng(loc.seed * 31 + 210);
+      for (var kb = 0; kb < u.kelp.length; kb++) {
+        var K0 = u.kelp[kb], nk = Math.round((K0[1] - K0[0]) * K0[2]);
+        for (s = 0; s < nk; s++) {
+          var kx = rk.int(K0[0], K0[1] - 1), kd = prof[clamp(kx, 0, w - 1)];
+          if (kd > 100) { rk.next(); rk.next(); continue; }
+          kelps.push({ x: kx * HI + rk.int(0, 1), base: topAt(kx * HI) + 1, h: Math.max(8, Math.round((kd - rk.range(1.5, 6)) * HI)), ph: rk.range(0, 6.28) });
+        }
+      }
+    }
+    set.kelp = kelps.length;
     var plants = plantList(loc, topAt, WH); // Phase 48: ribbon weed, fern-like weed, lily stems
     set.lilies = []; // Phase 49: where the pads lie on the surface (world x, width), for the frog and the pads seen from above
     for (s = 0; s < plants.length; s++) if (plants[s].kind === 2) set.lilies.push({ x: (plants[s].x + Math.round(Math.sin(plants[s].h * 0.03 + plants[s].ph) * 2)) / HI, w: plants[s].pad / HI });
@@ -397,6 +487,7 @@ G.scene.underwater = (function () {
               }
             }
             paintPlants(ctx, u, plants, lean);
+            paintKelp(ctx, kelps, lean);
             A.reset();
           });
         };

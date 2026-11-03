@@ -35,7 +35,9 @@ G.scene.life = (function () {
     sepX: 2, sepY: 1,                       // px: no two fry nearer than this across while nearer than sepY down
     dart0: 35, dart1: 80, dartV: 46,        // s between a perch darting through a cloud, its px/s
     turtle0: 70, turtle1: 150, turtleV: 5,  // s between turtles, px/s
-    eel0: 50, eel1: 110, eelV: 9, eelLen: 26 // s between eels (night only), px/s, body length px
+    eel0: 50, eel1: 110, eelV: 9, eelLen: 26, // s between eels (night only), px/s, body length px
+    starV: 0.1,                                // Phase 79: px/s a starfish creeps over its rock
+    flatR: 14, flatV: 18, flatSettle: 0.6      // px from the lure (on the bed) that lifts a flatfish, px/s it glides, s it takes to settle
   };
 
   // ---- Sprites: rows of view pixels in palette keys, baked once, drawn at 1/HI ---------------
@@ -94,6 +96,19 @@ G.scene.life = (function () {
       top.concat(['..pkkkkkkkkkkkk.ss..', '...pp....pp.pp......'])
     ]);
   }
+  // Phase 79: the sea floor's: a shore crab (claws up, legs walking) and a starfish on a rock.
+  function crabArt() {
+    return sprite('crab', { o: 'umber_dark', r: 'umber', h: 'umber_hi', e: 'ink', c: 'rust_hi' }, [
+      ['.c.......c.', 'cc.e...e.cc', '.crrhhhrrc.', '..rrrrrrr..', '.o.o...o.o.'],
+      ['.c.......c.', 'cc.e...e.cc', '.crrhhhrrc.', '..rrrrrrr..', 'o.o.....o.o']
+    ]);
+  }
+  function starArt() {
+    return sprite('star', { o: 'orange_dark', r: 'orange', h: 'orange_hi' }, [
+      ['...h...', '.orhro.', 'oorrroo'],
+      ['...h...', '..rhr..', 'oorrroo']
+    ]);
+  }
   function tadArt() {
     return sprite('tad', { k: 'wood_deep', e: 'wood_dark' }, [
       ['...kk', 'kkkke', '...kk'],
@@ -114,6 +129,9 @@ G.scene.life = (function () {
   // Threats this step: x, depth, reach.
   var TMAX = 16, tx = new Float32Array(TMAX), ty = new Float32Array(TMAX), tr = new Float32Array(TMAX), tn = 0;
   // The rare visitors.
+  // Phase 79: flatfish lying on the sand (mode 0), gliding off when the lure comes (1), settling (2).
+  var FLMAX = 4, flx = new Float32Array(FLMAX), fltx = new Float32Array(FLMAX), flt = new Float32Array(FLMAX), flph = new Float32Array(FLMAX), fldir = new Int8Array(FLMAX), flm = new Uint8Array(FLMAX), fln = 0, flLifts = 0;
+  var crabs = false, stars = false; // Phase 79: the walkers are crabs and the climbers starfish (the sea)
   var dart = { on: false, x: 0, y: 0, dir: 1, go: 0, wait: 0, ph: 0 };
   var turtle = { on: false, x: 0, y: 0, dir: 1, wait: 0, ph: 0, y0: 0 };
   var eel = { on: false, x: 0, y: 0, dir: 1, wait: 0, ph: 0, silt: 0 };
@@ -133,12 +151,13 @@ G.scene.life = (function () {
     var T = table(loc.id), set = U().prepare(loc), r = G.vrng, i, j;
     curLoc = loc; locId = loc.id; rocks = set.rocks || [];
     siltKey = S.shift(loc.underwater.silt, 1);
-    cn = Math.min(CMAX, T.cray);
+    crabs = (T.crab || 0) > 0; stars = (T.star || 0) > 0;
+    cn = Math.min(CMAX, crabs ? T.crab : T.cray);
     for (i = 0; i < cn; i++) {
       cxs[i] = r.range(30, loc.width - 30); cys[i] = bed(cxs[i]); cdir[i] = r.next() < 0.5 ? -1 : 1;
       cmode[i] = r.next() < 0.5 ? 0 : 1; ct[i] = r.range(1, 6); cph[i] = r.next(); creact[i] = -1; csilt[i] = r.range(0, 1);
     }
-    nn = Math.min(NMAX, T.snail, rocks.length);
+    nn = Math.min(NMAX, stars ? T.star : T.snail, rocks.length);
     for (i = 0; i < nn; i++) {
       nr[i] = Math.floor(i * rocks.length / Math.max(1, nn)); var rk = rocks[nr[i]];
       nx[i] = rk.x + r.range(-rk.rw * 0.6, rk.rw * 0.6); ndir[i] = r.next() < 0.5 ? -1 : 1; nhide[i] = 0;
@@ -153,10 +172,24 @@ G.scene.life = (function () {
     }
     for (i = 0; i < T.tad && qn < QMAX; i++) addCloud(1, i % 2 ? loc.width - r.range(40, 140) : r.range(40, 140), r.range(5, 13), PER_TAD);
     for (j = 0; j < fnum; j++) { fface[j] = r.next() < 0.5 ? -1 : 1; fgone[j] = 0; }
+    fln = Math.min(FLMAX, T.flat || 0); flLifts = 0;
+    for (i = 0; i < fln; i++) { flx[i] = sandX(loc, r, i); flm[i] = 0; flt[i] = r.range(30, 80); fldir[i] = r.next() < 0.5 ? -1 : 1; flph[i] = r.range(0, 6); }
     dart.on = turtle.on = eel.on = false;
     dart.wait = r.range(15, 40); turtle.wait = r.range(25, 60); eel.wait = r.range(20, 50);
     sn = 0;
     aboveSetup(loc, set);
+  }
+  // Phase 79: a place on the sand (not on the water's rock bed), for a flatfish.
+  function onRock(loc, x) { var RB = loc.underwater.rockBed || []; for (var i = 0; i < RB.length; i++) if (x >= RB[i][0] && x < RB[i][1]) return true; return false; }
+  function sandX(loc, r, n) {
+    var x = 0;
+    for (var k = 0; k < 12; k++) {
+      x = r.range(30, loc.width - 30);
+      var ok = !onRock(loc, x);
+      for (var j = 0; j < n && ok; j++) if (Math.abs(flx[j] - x) < 40) ok = false; // apart from the others
+      if (ok) break;
+    }
+    return x;
   }
   // Rest offsets on a loose grid, so a cloud at rest has no two fry overlapping.
   function addCloud(kind, x, y, n) {
@@ -187,7 +220,7 @@ G.scene.life = (function () {
       if (creact[i] > worst) worst = creact[i];
     }
     if (worst >= 0) react.lastDelay = worst;
-    for (var j = 0; j < nn; j++) if (Math.abs(nx[j] - x) < L.snailR) nhide[j] = L.snailHide;
+    if (!stars) for (var j = 0; j < nn; j++) if (Math.abs(nx[j] - x) < L.snailR) nhide[j] = L.snailHide; // a starfish does not pull in
   }
   G.gfx.fx.listen(onSplash);
 
@@ -258,9 +291,30 @@ G.scene.life = (function () {
     for (i = 0; i < nn; i++) {
       if (nhide[i] > 0) { nhide[i] -= dt; continue; }
       var rk = rocks[nr[i]];
-      nx[i] += ndir[i] * L.snailV * dt;
+      nx[i] += ndir[i] * (stars ? L.starV : L.snailV) * dt;
       if (Math.abs(nx[i] - rk.x) > rk.rw * 0.8) { ndir[i] = nx[i] > rk.x ? -1 : 1; nx[i] = rk.x + clamp(nx[i] - rk.x, -rk.rw * 0.8, rk.rw * 0.8); }
       ny[i] = rockTop(rk, nx[i]);
+    }
+
+    // Phase 79: flatfish: lying in the sand they are a faint outline and two eyes; the lure
+    // dragged near (or a fish nosing over) lifts one in a puff of sand, it glides off low,
+    // undulating, and settles, sand drifting over it. Now and then one shifts by itself.
+    for (i = 0; i < fln; i++) {
+      flph[i] += dt;
+      if (flm[i] === 0) {
+        var scare = under && Math.abs(c.lx - flx[i]) < L.flatR && c.ly - wy > bed(flx[i]) - 10;
+        for (j = 0; j < tn && !scare; j++) if (Math.abs(tx[j] - flx[i]) < 8 && ty[j] > bed(flx[i]) - 8) scare = true;
+        if (scare || (flt[i] -= dt) <= 0) {
+          fldir[i] = scare ? (flx[i] >= c.lx ? 1 : -1) : (r.next() < 0.5 ? -1 : 1);
+          fltx[i] = clamp(flx[i] + fldir[i] * r.range(30, 60), 30, loc.width - 30);
+          if (onRock(loc, fltx[i])) fltx[i] = clamp(flx[i] - fldir[i] * r.range(30, 60), 30, loc.width - 30), fldir[i] = -fldir[i];
+          flm[i] = 1; flph[i] = 0; siltPuff(flx[i], bed(flx[i]), 6); if (scare) flLifts++;
+        }
+      } else if (flm[i] === 1) {
+        var fd = fltx[i] - flx[i];
+        flx[i] += clamp(fd, -L.flatV * dt, L.flatV * dt);
+        if (Math.abs(fd) < 0.5) { flm[i] = 2; flt[i] = L.flatSettle; siltPuff(flx[i], bed(flx[i]), 5); }
+      } else if ((flt[i] -= dt) <= 0) { flm[i] = 0; flt[i] = r.range(40, 90); }
     }
 
     // The clouds: each fry springs back to its place in the cloud and is pushed away from
@@ -372,10 +426,21 @@ G.scene.life = (function () {
   function drawBed(ctx, loc, camPx, wyS, alpha) {
     if (locId !== loc.id) return;
     var t0 = performance.now(), i, d, x0 = camPx - 12, x1 = camPx + 332;
-    d = crayArt();
+    d = crabs ? crabArt() : crayArt();
     for (i = 0; i < cn; i++) if (cxs[i] > x0 && cxs[i] < x1) img(ctx, d, cmode[i] === 1 ? 0 : (Math.floor(cph[i] * 2) & 1), cdir[i] < 0, cxs[i] - camPx, wyS + cys[i]);
-    d = snailArt();
-    for (i = 0; i < nn; i++) if (nx[i] > x0 && nx[i] < x1) img(ctx, d, nhide[i] > 0 ? 1 : 0, ndir[i] < 0, nx[i] - camPx, wyS + ny[i] + 0.5);
+    d = stars ? starArt() : snailArt();
+    for (i = 0; i < nn; i++) if (nx[i] > x0 && nx[i] < x1) img(ctx, d, stars ? (Math.floor(nx[i] * 3) & 1) : (nhide[i] > 0 ? 1 : 0), ndir[i] < 0, nx[i] - camPx, wyS + ny[i] + 0.5);
+    for (i = 0; i < fln; i++) {                                                   // Phase 79: the flatfish
+      var FX = flx[i] - camPx;
+      if (FX < -12 || FX > 332) continue;
+      var lift = flm[i] === 1 ? Math.min(3, flph[i] * 8) * (Math.abs(fltx[i] - flx[i]) < 6 ? Math.abs(fltx[i] - flx[i]) / 6 : 1) : 0, FY = wyS + bed(flx[i]) - 1 - lift;
+      ctx.globalAlpha = alpha * (flm[i] === 0 ? 0.55 : 0.9);
+      ctx.fillStyle = P.stone_dark; ctx.fillRect(Math.round((FX - 4.5) * HI) / HI, Math.round(FY * HI) / HI, 9, 1);
+      ctx.fillRect(Math.round((FX - 3) * HI) / HI, Math.round((FY - 0.5 + (flm[i] === 1 ? Math.sin(flph[i] * 14) * 0.5 : 0)) * HI) / HI, 6, 0.5);
+      if (flm[i] === 1) { ctx.fillStyle = P.stone; for (var fe = -4; fe <= 4; fe += 2) ctx.fillRect(Math.round((FX + fe) * HI) / HI, Math.round((FY + 1 + (Math.sin(flph[i] * 14 + fe) > 0 ? 0 : 0.5)) * HI) / HI, 1, 0.5); }
+      ctx.globalAlpha = alpha; ctx.fillStyle = P.ink;
+      ctx.fillRect(Math.round((FX + fldir[i] * 2.5) * HI) / HI, Math.round((FY - 0.5) * HI) / HI, 0.5, 0.5); ctx.fillRect(Math.round((FX + fldir[i] * 3.5) * HI) / HI, Math.round((FY - 0.5) * HI) / HI, 0.5, 0.5);
+    }
     if (eel.on) drawEel(ctx, ex, ey, eel.dir, camPx, wyS);
     ctx.fillStyle = P[siltKey];
     for (i = 0; i < sn; i++) {
@@ -558,6 +623,39 @@ G.scene.life = (function () {
     ]));
   }
 
+  // Phase 79: the harbour or grey seal hauled out on its rock (lying, then the banana with head
+  // and tail up), its head up in the water watching, and swimming under; the cormorant perched
+  // (wings folded, then held out to dry), flying low, swimming low with its neck up.
+  function sealArt() {
+    var m = { s: 'stone', h: 'stone_hi', k: 'stone_dark', e: 'ink', n: 'ink', l: 'stone_lit' };
+    return sprite('seal', m, [
+      ['................', '.......sssssss..', '...sssshhlhhhsse', 's.sshhkhhhkhhhsn', 'sssssssssssssss.'],
+      ['.............ss.', '............sse.', 's..sssssssssshsn', 'sssshhkhhhkhhhs.', '.sssssssssssss..']
+    ]);
+  }
+  function sealHeadArt() { return sprite('sealHead', { s: 'stone', h: 'stone_hi', e: 'ink', n: 'ink' }, [['..ss.', '.shse', '.sssn', 'sss..'], ['.....', '..ss.', '.shse', 'ssssn']]); }
+  function sealSwimArt() {
+    return sprite('sealSwim', { s: 'stone_dark', h: 'stone', e: 'ink', n: 'ink' }, [
+      ['......ssss....', '..sssshhhhsse.', 'ssssssssssssn.', 's.............'],
+      ['......ssss....', 's.sssshhhhsse.', '.sssssssssssn.', '..............']
+    ]);
+  }
+  function cormArt() {
+    var m = { k: 'ink', g: 'night_deep', b: 'stone_dark', y: 'brass_hi', f: 'stone_dark' };
+    return sprite('cormorant', m, padded([
+      ['....kk', '...kkkb', '...ky', '..kgk', '..kgk', '..kgk', '..kkk', '..kk', '..ff'],
+      ['.....kk....', '....kkkb...', 'k...ky....k', 'kk.kkgk..kk', '.kkkkgkkkk.', '..kkkgkkk..', '....kkk....', '....kk.....', '....ff.....']
+    ]));
+  }
+  function cormFlyArt() {
+    var m = { k: 'ink', g: 'night_deep', b: 'stone_dark', y: 'brass_hi' };
+    return sprite('cormFly', m, [
+      ['k.........k..', '.kk.....kk...', '..kkkgkkkkkkb', '.....kk......'],
+      ['.............', 'kkkkgkkkkkkkb', '.kk..kk..kk..', 'k.........k..']
+    ]);
+  }
+  function cormSwimArt() { return sprite('cormSwim', { k: 'ink', g: 'night_deep', b: 'stone_dark', y: 'brass_hi' }, [['......kk.', '......kkb', '......ky.', 'kgkkkkk..'], ['.........', '.......kk', '......kkb', 'kgkkkkkk.']]); }
+
   // The creatures (one family, one heron, ... per water; a few small arrays).
   var dk = { on: false, a: 0, x: 0, dir: 1, v: 0, mode: 0, t: 0, wait: 0, dvx: 0, dy: 0, ph: 0, faced: 0, faceT: 0, tgt: 0, under: false }; // mode 0 paddle 1 flee 2 pass 3 dive 4 face
   var YMAX = 6, yx = new Float32Array(YMAX), yph = new Float32Array(YMAX), ydir = new Int8Array(YMAX), yn = 0;
@@ -579,7 +677,12 @@ G.scene.life = (function () {
   // x world px; lt: where along the log one sits (0 its root end .. 1 its tip).
   var OTMAX = 3, otx = new Float32Array(OTMAX), ottx = new Float32Array(OTMAX), ott = new Float32Array(OTMAX), otph = new Float32Array(OTMAX), otlt = new Float32Array(OTMAX), otdir = new Int8Array(OTMAX), otm = new Uint8Array(OTMAX), otn = 0, ota = 0;
   var otLog = null;
-  var acts = { strikes: 0, takes: 0, dives: 0, plops: 0, calls: 0, slaps: 0, plunges: 0, fish: 0, otterDives: 0 }; // dbg: how often each has happened
+  // Phase 79: up to SEMAX seals (mode 0 out on a rock spot, 1 head up in the water, 2 under;
+  // spot: which haul-out spot it has, -1 none) and up to CMMAX cormorants (0 perched, 1 flying
+  // out, 2 swimming, 3 under, 4 flying home; y px above the water or depth under it).
+  var SEMAX = 4, sex = new Float32Array(SEMAX), setx = new Float32Array(SEMAX), set_ = new Float32Array(SEMAX), seph = new Float32Array(SEMAX), sedir = new Int8Array(SEMAX), sem = new Uint8Array(SEMAX), sespot = new Int8Array(SEMAX), sen = 0, sea_ = 0;
+  var CMMAX = 2, cmx = new Float32Array(CMMAX), cmy = new Float32Array(CMMAX), cmtx = new Float32Array(CMMAX), cmt = new Float32Array(CMMAX), cmph = new Float32Array(CMMAX), cmdir = new Int8Array(CMMAX), cmm = new Uint8Array(CMMAX), cmwing = new Float32Array(CMMAX), cmuvx = new Float32Array(CMMAX), cmdeep = new Float32Array(CMMAX), cmdives = new Uint8Array(CMMAX), cmn = 0, cma = 0;
+  var acts = { strikes: 0, takes: 0, dives: 0, plops: 0, calls: 0, slaps: 0, plunges: 0, fish: 0, otterDives: 0, sealDives: 0, hauls: 0, cormDives: 0 }; // dbg: how often each has happened
 
   function aboveSetup(loc, set) {
     var A = (loc.life && loc.life.above) || {}, r = G.vrng, i;
@@ -609,6 +712,14 @@ G.scene.life = (function () {
     otn = A.otter ? Math.min(OTMAX, A.otter.n || 1) : 0; ota = 0; otLog = null;
     if (A.otter) for (i = 0; i < loc.landmarks.length; i++) if (loc.landmarks[i].id === A.otter.log) otLog = loc.landmarks[i];
     for (i = 0; i < otn; i++) { otx[i] = ottx[i] = r.range(A.otter.x[0], A.otter.x[1]); otm[i] = 0; ott[i] = r.range(4, 12); otph[i] = r.range(0, 6); otdir[i] = 1; }
+    sen = A.seal ? Math.min(SEMAX, A.seal.n || 1) : 0; sea_ = 0;
+    for (i = 0; i < sen; i++) {
+      var hasSpot = i < A.seal.spots.length;
+      sespot[i] = hasSpot ? i : -1; sem[i] = hasSpot ? 0 : 1; sex[i] = setx[i] = hasSpot ? A.seal.spots[i].x : r.range(A.seal.x[0], A.seal.x[1]);
+      set_[i] = r.range(20, 80); seph[i] = r.range(0, 9); sedir[i] = r.next() < 0.5 ? -1 : 1;
+    }
+    cmn = A.cormorant ? Math.min(CMMAX, A.cormorant.perches.length) : 0; cma = 0;
+    for (i = 0; i < cmn; i++) { cmx[i] = A.cormorant.perches[i].x; cmy[i] = A.cormorant.perches[i].y; cmm[i] = 0; cmt[i] = r.range(8, 40); cmph[i] = r.range(0, 6); cmdir[i] = i & 1 ? -1 : 1; cmwing[i] = r.next() < 0.5 ? r.range(5, 15) : 0; cmdives[i] = 0; }
     gn = A.gulls ? Math.min(GMAX, A.gulls.n, A.gulls.perches.length) : 0; ga = 0;
     for (i = 0; i < gn; i++) { gper[i] = i; gx[i] = A.gulls.perches[i].x; gy[i] = A.gulls.perches[i].y; gmode[i] = 0; gt[i] = 0; gph[i] = r.range(0, 6); }
     for (var q in acts) acts[q] = 0;
@@ -680,6 +791,101 @@ G.scene.life = (function () {
     if (A.osprey && os.nx >= 0) ospreyStep(A.osprey, dt, b, h, r, loc);
     if (en) eagleStep(A.eagle, dt, h);
     if (otn) otterStep(A.otter, dt, b, h, r, loc);
+    if (sen) sealStep(A.seal, dt, b, h, r, loc);
+    if (cmn) cormStep(A.cormorant, dt, b, h, r, loc);
+  }
+
+  // Phase 79: seals lie out on their rocks; the boat within sealR slides them into the water,
+  // where they come up farther off and watch it (heads up, turned to it) from a distance,
+  // dive and come up again, and haul out once it has gone. A seal never comes near the boat.
+  var SEAL = { R: 60, watch: 140, V: 3, UV: 12, haulFar: 90 };
+  function spotFree(T, k) { for (var j = 0; j < sen; j++) if (sespot[j] === k) return false; return true; }
+  function sealStep(T, dt, b, h, r, loc) {
+    sea_ = toward(sea_, hrs(T.hours, h) ? 1 : 0, dt / LA.fade);
+    var lo = T.x[0], hi = T.x[1];
+    for (var i = 0; i < sen; i++) {
+      seph[i] += dt; set_[i] -= dt;
+      var d = b.x - sex[i], ad = Math.abs(d);
+      if (sem[i] === 0) {                                                        // out on the rock
+        if (ad < SEAL.R || set_[i] <= 0 && r.next() < 0.4) {
+          sem[i] = 2; set_[i] = r.range(2.5, 4.5); sespot[i] = -1; acts.sealDives++;
+          setx[i] = clamp(sex[i] - sgn(d || 1) * r.range(40, 80), lo, hi);
+          G.gfx.fx.splash(sex[i], loc.waterY, 0.25); ring(sex[i], 0.45, loc);
+        } else if (set_[i] <= 0) set_[i] = r.range(10, 30);
+        continue;
+      }
+      if (sem[i] === 2) {                                                        // under, swimming on
+        sex[i] += clamp(setx[i] - sex[i], -SEAL.UV * dt, SEAL.UV * dt);
+        if (set_[i] <= 0 && Math.abs(b.x - sex[i]) > SEAL.R * 0.7) { sem[i] = 1; set_[i] = r.range(8, 20); ring(sex[i], 0.25, loc); seph[i] = 0; }
+        continue;
+      }
+      if (ad < SEAL.R * 0.75) {                                                  // the boat came: under and away
+        sem[i] = 2; set_[i] = r.range(3, 5); acts.sealDives++; ring(sex[i], 0.3, loc);
+        setx[i] = clamp(sex[i] - sgn(d || 1) * r.range(50, 90), lo, hi); continue;
+      }
+      if (ad < SEAL.watch) { sedir[i] = sgn(d); continue; }                        // heads up, watching it
+      var tx = setx[i] - sex[i];
+      if (Math.abs(tx) > 0.5) { sedir[i] = sgn(tx); sex[i] += clamp(tx, -SEAL.V * dt, SEAL.V * dt); }
+      if (set_[i] > 0) continue;
+      var k = -1;
+      for (var q = 0; q < T.spots.length && k < 0; q++) if (spotFree(T, q) && Math.abs(b.x - T.spots[q].x) > SEAL.haulFar) k = q;
+      if (k >= 0 && r.next() < 0.5) {                                            // out onto a rock
+        if (Math.abs(T.spots[k].x - sex[i]) < 1.5) { sem[i] = 0; sespot[i] = k; sex[i] = T.spots[k].x; set_[i] = r.range(30, 90); sedir[i] = r.next() < 0.5 ? -1 : 1; ring(sex[i], 0.2, loc); acts.hauls++; }
+        else { setx[i] = T.spots[k].x; set_[i] = 0.5; }
+      } else { sem[i] = 2; set_[i] = r.range(3, 6); setx[i] = r.range(lo, hi); ring(sex[i], 0.2, loc); acts.sealDives++; }
+    }
+  }
+
+  // Phase 79: cormorants sit on the rocks, holding their wings out to dry now and then, fly out
+  // low over the water, swim low and dive (a long while under, in the cross-section, after the
+  // fry), come up, and after a few dives fly home. The boat near the rock sends one off.
+  var CORM = { R: 40, flyV: 30, swimV: 3, UV: 14 };
+  function cormStep(T, dt, b, h, r, loc) {
+    var want = hrs(T.hours, h);
+    cma = toward(cma, want ? 1 : 0, dt / LA.fade);
+    for (var i = 0; i < cmn; i++) {
+      var pp = T.perches[i], m = cmm[i];
+      cmph[i] += dt; cmt[i] -= dt; if (cmwing[i] > 0) cmwing[i] -= dt;
+      if (m === 0) {
+        cmx[i] = pp.x; cmy[i] = pp.y;
+        if ((Math.abs(b.x - pp.x) < CORM.R || cmt[i] <= 0) && want) {
+          cmtx[i] = clamp(pp.x + (Math.abs(b.x - pp.x) < CORM.R ? sgn(pp.x - b.x) : (r.next() < 0.5 ? -1 : 1)) * r.range(50, 120), T.x[0], T.x[1]);
+          if (Math.abs(cmtx[i] - b.x) < 50) cmtx[i] = clamp(b.x + sgn(cmtx[i] - b.x || 1) * 70, T.x[0], T.x[1]);
+          cmm[i] = 1; cmwing[i] = 0; cmdives[i] = 0;
+        } else if (cmt[i] <= 0) cmt[i] = 5;
+        continue;
+      }
+      if (m === 1 || m === 4) {                                                  // flying low
+        var gx = m === 1 ? cmtx[i] : pp.x, gy = m === 1 ? 0 : pp.y, dx = gx - cmx[i];
+        cmdir[i] = sgn(dx);
+        cmx[i] += clamp(dx, -CORM.flyV * dt, CORM.flyV * dt);
+        var far = Math.abs(dx) > 20 ? Math.max(gy, 5) : gy;
+        cmy[i] += clamp(far - cmy[i], -10 * dt, 10 * dt);
+        if (Math.abs(dx) < 0.5 && Math.abs(cmy[i] - gy) < 0.5) {
+          if (m === 1) { cmm[i] = 2; cmy[i] = 0; cmt[i] = r.range(3, 8); ring(cmx[i], 0.3, loc); }
+          else { cmm[i] = 0; cmt[i] = r.range(25, 70); cmwing[i] = r.next() < 0.7 ? r.range(10, 20) : 0; cmdir[i] = r.next() < 0.5 ? -1 : 1; }
+        }
+        continue;
+      }
+      if (m === 2) {                                                             // swimming low
+        cmx[i] = clamp(cmx[i] + cmdir[i] * CORM.swimV * dt, T.x[0], T.x[1]);
+        var near = Math.abs(b.x - cmx[i]) < CORM.R * 0.9;
+        if (!want && !near) { cmm[i] = 4; continue; }
+        if (near || cmt[i] <= 0) {
+          if (cmdives[i] >= 3 && !near) { cmm[i] = 4; continue; }
+          cmm[i] = 3; cmt[i] = r.range(6, 14); cmdives[i]++; acts.cormDives++;
+          cmuvx[i] = (near ? sgn(cmx[i] - b.x) : (r.next() < 0.5 ? -1 : 1)) * CORM.UV;
+          cmdeep[i] = Math.min(r.range(10, 30), Math.max(4, G.scene.underwater.bottomAt(loc, cmx[i]) - 4));
+          ring(cmx[i], 0.25, loc); cmy[i] = 0;
+        }
+        continue;
+      }
+      cmx[i] = clamp(cmx[i] + cmuvx[i] * dt, T.x[0], T.x[1]);                   // under
+      if (cmx[i] <= T.x[0] || cmx[i] >= T.x[1]) cmuvx[i] = -cmuvx[i];
+      cmy[i] += clamp((cmt[i] > 1.2 ? cmdeep[i] : 0) - cmy[i], -9 * dt, 9 * dt);
+      if (takePrey(cmx[i], cmy[i], 5)) acts.fish++;
+      if (cmt[i] <= 0 && cmy[i] < 0.5) { cmm[i] = 2; cmy[i] = 0; cmdir[i] = sgn(cmuvx[i]); cmt[i] = r.range(3, 8); ring(cmx[i], 0.2, loc); }
+    }
   }
 
   // Phase 78: the otters play about the cove: they swim with their heads up, arch and dive,
@@ -1128,6 +1334,8 @@ G.scene.life = (function () {
     if (hr.on && hr.reach > 0.5) addThreat(hr.x + hr.dir * 10, 3, 10);
     if (kf.on && kf.mode === 2) addThreat(kf.x, -kf.y, 8);
     if (fr.on && fr.mode === 2) addThreat(fr.ux, fr.uy, 8);
+    for (var i = 0; i < cmn; i++) if (cmm[i] === 3) addThreat(cmx[i], cmy[i], 10);   // Phase 79
+    for (i = 0; i < sen; i++) if (sem[i] === 2) addThreat(sex[i], 8, 18);
   }
 
   // ---- Drawing above the water ---------------------------------------------------------------
@@ -1234,6 +1442,29 @@ G.scene.life = (function () {
         if (os.fish > 0 && os.mode !== 0) px1(c, 'stone_hi', OX - 1, wyS - os.y + 0.5, 3, 0.5); // a fish in its feet
         c.globalAlpha = 1;
       }
+    }
+    if (sen && sea_ > 0) {                                                       // Phase 79: the seals
+      var SO = sealArt(), SH = sealHeadArt(), sf = G.gfx.surface;
+      c.globalAlpha = sea_;
+      for (i = 0; i < sen; i++) {
+        var SX = sex[i] - camPx;
+        if (sem[i] === 2 || SX < -12 || SX > 332) continue;
+        if (sem[i] === 0) img(c, SO, (Math.floor(seph[i] / 4) % 3) === 1 ? 1 : 0, sedir[i] < 0, SX, wyS - ab.T.seal.spots[sespot[i]].y);
+        else img(c, SH, Math.floor(seph[i] / 1.6) & 1, sedir[i] < 0, SX, wyS - sf.at(sex[i]) / HI + 1.5);
+      }
+      c.globalAlpha = 1;
+    }
+    if (cmn && cma > 0) {                                                        // Phase 79: the cormorants
+      var CP = cormArt(), CF = cormFlyArt(), CS = cormSwimArt(), sf2 = G.gfx.surface;
+      c.globalAlpha = cma;
+      for (i = 0; i < cmn; i++) {
+        var CX = cmx[i] - camPx;
+        if (cmm[i] === 3 || CX < -12 || CX > 332) continue;
+        if (cmm[i] === 0) img(c, CP, cmwing[i] > 0 ? 1 : 0, cmdir[i] < 0, CX, wyS - cmy[i]);
+        else if (cmm[i] === 2) img(c, CS, (Math.floor(cmph[i] / 3) & 1), cmdir[i] < 0, CX, wyS - sf2.at(cmx[i]) / HI + 1.5);
+        else img(c, CF, Math.floor(cmph[i] * 7) & 1, cmdir[i] < 0, CX, wyS - cmy[i] - 1);
+      }
+      c.globalAlpha = 1;
     }
     if (hr.on && hr.a > 0) drawHeron(c, camPx, wyS, false);
     if (kf.on && kf.a > 0 && kf.mode !== 2) {
@@ -1375,6 +1606,8 @@ G.scene.life = (function () {
     if (ln.on && ln.mode === 1) img(c, loonArt(), 1, ln.uvx < 0, ln.ux - camPx * A.loon.p, wyS + ln.uy + 2);
     if (kf.on && kf.mode === 2) img(c, kingArt(), 1, kf.dir < 0, kf.x - camPx, wyS - kf.y + 1);
     if (fr.on && fr.mode === 2) img(c, frogArt(), 1, fr.dir < 0, fr.ux - camPx, wyS + fr.uy + 1);
+    for (var i = 0; i < cmn; i++) if (cmm[i] === 3) img(c, cormFlyArt(), 1, cmuvx[i] < 0, cmx[i] - camPx, wyS + cmy[i] + 2);   // Phase 79
+    for (i = 0; i < sen; i++) if (sem[i] === 2) img(c, sealSwimArt(), Math.floor(seph[i] * 3) & 1, setx[i] < sex[i], sex[i] - camPx, wyS + 10);
     c.globalAlpha = alpha;
   }
 
@@ -1393,6 +1626,7 @@ G.scene.life = (function () {
       if (k === 'osprey') { if (os.nx >= 0) put(k, Math.min(os.nx, c.x[0]), Math.max(os.nx, c.x[1])); continue; }
       if (c.x) { var xs = Array.isArray(c.x[0]) ? c.x : [c.x]; for (j = 0; j < xs.length; j++) put(k, world(xs[j][0], p), world(xs[j][1], p)); }
       else if (c.perches) for (j = 0; j < c.perches.length; j++) put(k, c.perches[j].x, c.perches[j].x);
+      if (c.spots) for (j = 0; j < c.spots.length; j++) put(k, c.spots[j].x, c.spots[j].x); // Phase 79: the seals' rocks
       else put(k, 0, loc.width);                                                   // the whole water (the frog's lilies, ...)
     }
     return o;
@@ -1416,6 +1650,8 @@ G.scene.life = (function () {
     if (A.osprey) o.osprey = os.on ? { a: +os.a.toFixed(2), x: +os.x.toFixed(1), y: +os.y.toFixed(1), fromBoat: scr(os.x, 1), mode: ['perch', 'out', 'hover', 'stoop', 'under', 'climb', 'home'][os.mode], fish: os.fish > 0, nest: [os.nx, os.ny] } : { nest: [os.nx, os.ny] };
     if (A.eagle) { o.eagle = { a: +ea.toFixed(2), birds: [] }; for (var e = 0; e < en; e++) o.eagle.birds.push({ x: +eagleX(e).toFixed(1), y: +eagleY(e).toFixed(1), fromBoat: scr(eagleX(e), 1) }); }
     if (A.otter) { o.otter = { a: +ota.toFixed(2), log: otLog ? otLog.id : '', otters: [] }; for (var q = 0; q < otn; q++) o.otter.otters.push({ x: +otx[q].toFixed(1), fromBoat: scr(otx[q], 1), mode: ['swim', 'under', 'log'][otm[q]] }); }
+    if (A.seal) { o.seal = { a: +sea_.toFixed(2), seals: [] }; for (var sI = 0; sI < sen; sI++) o.seal.seals.push({ x: +sex[sI].toFixed(1), fromBoat: scr(sex[sI], 1), mode: ['out', 'up', 'under'][sem[sI]], spot: sespot[sI] }); }
+    if (A.cormorant) { o.cormorant = { a: +cma.toFixed(2), birds: [] }; for (var cI = 0; cI < cmn; cI++) o.cormorant.birds.push({ x: +cmx[cI].toFixed(1), y: +cmy[cI].toFixed(1), fromBoat: scr(cmx[cI], 1), mode: ['perch', 'out', 'swim', 'under', 'home'][cmm[cI]], wings: cmwing[cI] > 0 && cmm[cI] === 0 }); }
     o.reaches = byReach();
     if (A.gulls) { o.gulls = { a: +ga.toFixed(2), birds: [] }; for (var i = 0; i < gn; i++) o.gulls.birds.push({ x: +gx[i].toFixed(1), y: +gy[i].toFixed(1), fromBoat: scr(gx[i], 1), mode: ['sit', 'fly', 'back'][gmode[i]] }); }
     return o;
@@ -1428,6 +1664,7 @@ G.scene.life = (function () {
     if (rn && ra > 0) o.push('striders'); if (dr.on && dr.a > 0) o.push('deer'); if (bv.on) o.push('beaver'); if (fo.on && fo.a > 0) o.push('fox'); if (gn && ga > 0) o.push('gulls');
     if (os.on && os.a > 0) o.push('osprey'); if (en && ea > 0) o.push('eagle'); // Phase 77
     if (otn && ota > 0) o.push('otter');                                         // Phase 78
+    if (sen && sea_ > 0) o.push('seal'); if (cmn && cma > 0) o.push('cormorant'); // Phase 79
     return o;
   }
   // dbg.lifeSpawn for the life above: brings one on now, or makes it act now. False if it cannot.
@@ -1443,6 +1680,10 @@ G.scene.life = (function () {
     if (kind === 'eagle') { if (!en) return false; ea = 1; return true; }
     if (kind === 'otter') { if (!otn) return false; ota = 1; return true; }                                     // Phase 78
     if (kind === 'otterlog') { if (!otn || !otLog) return false; otlt[0] = 0.6; otm[0] = 2; ott[0] = 30; ota = 1; otterLogXY(0, olog); otx[0] = olog[0]; return true; }
+    if (kind === 'seal') { if (!sen) return false; sea_ = 1; return true; }                                   // Phase 79
+    if (kind === 'sealin') { for (var si = 0; si < sen; si++) if (sem[si] === 0) { set_[si] = 0; return true; } return false; }
+    if (kind === 'cormorant') { if (!cmn) return false; cma = 1; return true; }
+    if (kind === 'cormdive') { for (var ci = 0; ci < cmn; ci++) if (cmm[ci] === 2) { cmt[ci] = 0; return true; } for (ci = 0; ci < cmn; ci++) if (cmm[ci] === 0) { cmt[ci] = 0; cma = 1; return true; } return false; }
     var map = { ducks: dk, heron: hr, kingfisher: kf, loon: ln, frog: fr, deer: dr, beaver: bv, fox: fo };
     if (map[kind] && A[kind] && !map[kind].on) { map[kind].wait = 0; return hrs(A[kind].hours, ab.h) || (kind === 'heron' && ab.lim > 0.5 && ab.night); }
     return false;
@@ -1455,6 +1696,9 @@ G.scene.life = (function () {
       reaches: byReach(), silt: sn, threats: tn, lastReact: +react.lastDelay.toFixed(3), waits: { dart: +dart.wait.toFixed(1), turtle: +turtle.wait.toFixed(1), eel: +eel.wait.toFixed(1) }, ms: +stats.ms.toFixed(3), bedMs: +stats.bedMs.toFixed(3), waterMs: +stats.waterMs.toFixed(3) };
     for (var i = 0; i < cn; i++) out.cray.push({ x: +cxs[i].toFixed(1), y: +cys[i].toFixed(1), mode: ['walk', 'rest', 'back'][cmode[i]], dir: cdir[i], react: creact[i] >= 0 ? +creact[i].toFixed(3) : -1 });
     for (i = 0; i < nn; i++) out.snails.push({ x: +nx[i].toFixed(1), y: +ny[i].toFixed(1), hidden: nhide[i] > 0 });
+    out.kinds = { walkers: crabs ? 'crab' : 'cray', climbers: stars ? 'star' : 'snail' }; // Phase 79
+    out.flats = []; out.flatLifts = flLifts;
+    for (i = 0; i < fln; i++) out.flats.push({ x: +flx[i].toFixed(1), mode: ['lie', 'glide', 'settle'][flm[i]] });
     for (var q = 0; q < qn; q++) {
       var a0 = k0[q], a1 = a0 + kn[q], mxd = 0, ov = 0, k, j;
       for (k = a0; k < a1; k++) {
@@ -1471,7 +1715,7 @@ G.scene.life = (function () {
   // ---- Phase 50.1: for the gallery ---------------------------------------------------------
   // Every sprite baked (by name: {w, h, cv, fl}), and the drawn-in-code creatures posed from
   // the gallery's own scratch records, never the live ones. World px, the ctx at the view's scale.
-  var ARTS = [crayArt, snailArt, turtleArt, tadArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt, ospreyArt, eagleArt, otterArt, otterSitArt];
+  var ARTS = [crayArt, snailArt, turtleArt, tadArt, crabArt, starArt, sealArt, sealHeadArt, sealSwimArt, cormArt, cormFlyArt, cormSwimArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt, ospreyArt, eagleArt, otterArt, otterSitArt];
   function sprites() { for (var i = 0; i < ARTS.length; i++) ARTS[i](); return spr; }
   var gH = { x: 0, dir: 1, mode: 0, reach: 0, ph: 0, lift: 0, a: 1, fish: 0 }, gB = { dir: 1, mode: 0, t: 0 };
   var gEx = new Float32Array(EELN), gEy = new Float32Array(EELN);
