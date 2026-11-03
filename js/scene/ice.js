@@ -123,9 +123,9 @@ G.scene.ice = (function () {
     var A = G.gfx.paint, w = L.width * HI, h = SHEET_H * HI, rng = new G.core.rng.Rng(L.seed * 31 + 301), x, y, k;
     A.reset();
     A.area(c, 0, 0, w, h, function (xx, yy) {
-      var d = Math.sin(xx * 0.011 + Math.sin(xx * 0.003) * 2) * 3 + Math.sin(xx * 0.037) * 1.5, band = (yy + d) % 22;
-      if (band < 1.2) return 'snow_lit';                                           // a drift's crest
-      if (band < 4) return 'snow_dark';                                            // its lee
+      var d = Math.sin(xx * 0.009 + Math.sin(xx * 0.0023) * 3) * 7 + Math.sin(xx * 0.031) * 2.5, band = (yy + d + (yy >> 4) * 9) % 30, seg = A.hash2((xx / 70) | 0, (yy / 30) | 0);
+      if (seg > 0.45 && band < 1.2) return 'snow_lit';                             // a drift's crest (here and there)
+      if (seg > 0.45 && band < 3 + seg * 2) return A.hash2(xx, yy) < 0.7 ? 'snow' : 'snow_dark'; // its lee
       return A.hash2(xx, yy) < 0.13 ? 'snow' : 'snow_hi';
     });
     for (k = 0; k < w / 90; k++) {                                                 // the scoured patches
@@ -143,7 +143,7 @@ G.scene.ice = (function () {
       sheetCv[L.id] = G.gfx.bake.cached('ice:sheet:' + L.id, function () { return G.gfx.bake.layer(L.width * HI, SHEET_H * HI, function (c) { paintSheet(c, L); }); });
       sheetNight[L.id] = G.gfx.bake.cached('ice:sheet:' + L.id + ':night', function () {
         return G.gfx.bake.layer(L.width * HI, SHEET_H * HI, function (c) {
-          c.drawImage(sheetCv[L.id], 0, 0); c.globalCompositeOperation = 'source-atop'; c.globalAlpha = 0.6; c.fillStyle = P.night_deep; c.fillRect(0, 0, L.width * HI, SHEET_H * HI);
+          c.drawImage(sheetCv[L.id], 0, 0); c.globalCompositeOperation = 'source-atop'; c.globalAlpha = 0.72; c.fillStyle = P.night_deep; c.fillRect(0, 0, L.width * HI, SHEET_H * HI);
           c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
         });
       });
@@ -153,7 +153,7 @@ G.scene.ice = (function () {
   function drawSheet(ctx, run, camPx, y, band, night) {
     var L = loc(), i, sh = run.ice.holes, cv = sheet(L), sx0 = Math.round(camPx * HI), hh = Math.min(band, SHEET_H);
     ctx.drawImage(cv, sx0, 0, 320 * HI, hh * HI, 0, y, 320, hh);
-    if (night > 0.02) { ctx.globalAlpha = night * 0.9; ctx.drawImage(sheetNight[L.id], sx0, 0, 320 * HI, hh * HI, 0, y, 320, hh); ctx.globalAlpha = 1; }
+    if (night > 0.02) { ctx.globalAlpha = night; ctx.drawImage(sheetNight[L.id], sx0, 0, 320 * HI, hh * HI, 0, y, 320, hh); ctx.globalAlpha = 1; }
     var sc = G.scene.sailing.scenery();
     if (sc && sc.sheet) sc.sheet(ctx, run, camPx, y, band, night);                // Phase 82: the scenery's own marks on the ice
     for (i = 0; i < sh.length; i++) {

@@ -401,7 +401,7 @@ function validateLocations(G, err) {
 // read; `above` with known creatures, hours as [from, to] pairs in 0..24, places inside the
 // world or the named layer, perches above the water. Shore layers' features are known kinds.
 const UNDER_KEYS = ['cray', 'snail', 'fry', 'tad', 'turtle', 'eel', 'mussel', 'caddis', 'litter', 'roots', 'tree', 'ribbon', 'fern', 'lily', 'algae'];
-const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls', 'osprey', 'eagle', 'otter', 'seal', 'cormorant']; // Phase 77: the osprey and the eagle; Phase 78: the otter; Phase 79: the seal and the cormorant
+const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls', 'osprey', 'eagle', 'otter', 'seal', 'cormorant', 'hare', 'raven']; // Phase 77: the osprey and the eagle; Phase 78: the otter; Phase 79: the seal and the cormorant; Phase 82: the hare and the raven
 const SHORE_KINDS = { bank: ['posts', 'moored', 'lodge', 'duckbox'], zigzag: ['pot', 'chair', 'table', 'door'] };
 function validateLife(L, p, err) {
   const life = L.life, num = v => typeof v === 'number' && isFinite(v);
@@ -422,6 +422,8 @@ function validateLife(L, p, err) {
     if (u.flat > 4) err(p + 'life.under.flat: at most 4');
     if (u.flat > 0 && L.underwater.rockBed && !(L.underwater.rockBed.reduce((a, r) => a - (r[1] - r[0]), L.width) > 60)) err(p + 'life.under.flat: no sand for the flatfish');
   }
+  // Phase 82: under the ice, winter: no crayfish, tadpoles, turtles, eels or lilies (the ten (Ice) fish, a few snails and fry).
+  if (u && L.ice && ['cray', 'tad', 'lily'].some(k => u[k] > 0) || (u && L.ice && (u.turtle || u.eel))) err(p + 'life.under: nothing of summer under the ice');
   const a = life.above;
   if (!a) { err(p + 'life.above'); return; }
   const hoursOk = hs => Array.isArray(hs) && hs.length && hs.every(h => Array.isArray(h) && h.length === 2 && h.every(v => num(v) && v >= 0 && v <= 24) && h[0] !== h[1]);
@@ -444,6 +446,13 @@ function validateLife(L, p, err) {
     if ((k === 'ducks' || k === 'loon') && !(c.p > 0 && c.p <= 1)) err(q + 'p (parallax)');
     // Phase 77: the osprey nests on a landmark with a nest above the water, and fishes inside the world
     if (k === 'osprey') { const lm = (L.landmarks || []).find(m => m.id === c.landmark); if (!(lm && lm.nest && inW(lm.nest.x) && num(lm.nest.y) && lm.nest.y > 0)) err(q + 'landmark with a nest {x, y}'); if (!c.x) err(q + 'x (the water it fishes)'); }
+    // Phase 82: the winter animals: hares (1-3) on a layer, ravens (1-3) with a height range, both on the ice only; a white fox there too.
+    if ((k === 'hare' || k === 'raven') && !L.ice) err(q + 'a winter animal, on the ice only');
+    if (k === 'hare' && !(c.n >= 1 && c.n <= 3 && lay && c.x)) err(q + 'n (1-3), layer and x');
+    if (k === 'raven' && !(c.n >= 1 && c.n <= 3 && c.x && Array.isArray(c.y) && c.y[0] > 0 && c.y[0] < c.y[1])) err(q + 'n (1-3), x, y [lo, hi] above the ice');
+    if (k === 'fox' && c.white && !L.ice) err(q + 'a white fox lives on the ice');
+    if (k === 'fox' && lay && !num(lay.base)) err(q + 'its layer needs a base (the ground it stands on)');
+    if (L.ice && ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'beaver', 'otter', 'seal', 'cormorant'].includes(k)) err(q + 'nothing of open water lives on the ice');
     if (k === 'otter' && !(c.n >= 1 && c.n <= 3 && c.x && (!c.log || (L.landmarks || []).some(m => m.id === c.log && m.len > 0)))) err(q + 'n (1-3), x, and log: a landmark with len');
     // Phase 79: seals haul out on spots above the water (at least one) and swim inside x; the
     // cormorant perches above the water and fishes inside x. Both at sea only.

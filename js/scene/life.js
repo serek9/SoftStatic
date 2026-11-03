@@ -496,7 +496,8 @@ G.scene.life = (function () {
     loonV: 1.5, loonR: 55, loonDive0: 20, loonDive1: 45, loonUV: 12, loonCall0: 40, loonCall1: 90,
     flyV: 40, frogR: 50, deerR: 70, deerWalk: 3, beaverV: 4, beaverR: 50, foxV: 6, gullR: 45, gullBack: 80,
     ospV: 26, ospY: 46, ospDrop: 80, ospCatch: 0.5, osp0: 18, osp1: 45,     // Phase 77: px/s, its hover's height, px/s down, its luck, s on the nest
-    otterV: 6, otterUV: 11, otterR: 45                                          // Phase 78: px/s swimming and under, px from the boat that sends one under
+    otterV: 6, otterUV: 11, otterR: 45,                                         // Phase 78: px/s swimming and under, px from the boat that sends one under
+    hareHop: 14, hareR: 55, hareFlee: 30, ravenV: 9                             // Phase 82: px/s a hop and a flight off, px (on screen) that sends one off; px/s a raven flies
   };
   var ab = { loc: null, T: {}, lim: 0, ghost: 0, mirror: false, night: false, h: 0, lilies: [], layer: {}, lodge: -1, moored: [] };
   function hrs(list, h) {
@@ -567,6 +568,32 @@ G.scene.life = (function () {
   function foxArt() {
     var m = { r: 'rust', p: 'paper', k: 'ink', h: 'rust_hi' };
     return sprite('fox', m, [
+      ['.........r.r.', '.........rrrk', 'rr.rhhhrrrrp.', 'pr.rrrrrrrr..', '...rrrrrrr...', '...k.k..k.k..'],
+      ['.........r.r.', '.........rrrk', 'rr.rhhhrrrrp.', 'pr.rrrrrrrr..', '...rrrrrrr...', '....kk..kk...'],
+      ['.........r.r.', '.........rrrk', '.........rrp.', '........rrr..', '..pr..rrrrr..', '...rrrrrrrk..']
+    ]);
+  }
+  // Phase 82: the winter animals. A snowshoe hare in its white coat (dark ear tips, a dark eye):
+  // sitting, and stretched out mid-hop.
+  function hareArt() {
+    var m = { w: 'paper', s: 'stone_hi', k: 'ink', e: 'ink' };
+    return sprite('hare', m, [
+      ['.......k..', '.......wk.', '......wwe.', '..wwwwwww.', '.wwwwwwws.', '.swwwwws..', '..ss..ss..'],
+      ['..........', '........kk', '.......wwe', 'swwwwwwww.', '.wwwwwwws.', 'ss.....ss.', '..........']
+    ]);
+  }
+  // A raven: black, a heavy bill and a wedge tail; wings up and down.
+  function ravenArt() {
+    var m = { k: 'ink', b: 'night_deep', g: 'stone_dark' };
+    return sprite('raven', m, [
+      ['k.........k...', '.kk......kk....', '..kkkbkkkk.....', '....kkkkkkkg...', '...kk..........'],
+      ['..............', '...............', '..kkkbkkkkkkg..', '.kk.kkkkk......', 'k........k.....']
+    ]);
+  }
+  // Phase 82: the snow fox in its winter white (A.fox.white).
+  function foxWhiteArt() {
+    var m = { r: 'paper', p: 'bone', k: 'ink', h: 'fog_light' };
+    return sprite('foxWhite', m, [
       ['.........r.r.', '.........rrrk', 'rr.rhhhrrrrp.', 'pr.rrrrrrrr..', '...rrrrrrr...', '...k.k..k.k..'],
       ['.........r.r.', '.........rrrk', 'rr.rhhhrrrrp.', 'pr.rrrrrrrr..', '...rrrrrrr...', '....kk..kk...'],
       ['.........r.r.', '.........rrrk', '.........rrp.', '........rrr..', '..pr..rrrrr..', '...rrrrrrrk..']
@@ -682,7 +709,11 @@ G.scene.life = (function () {
   // out, 2 swimming, 3 under, 4 flying home; y px above the water or depth under it).
   var SEMAX = 4, sex = new Float32Array(SEMAX), setx = new Float32Array(SEMAX), set_ = new Float32Array(SEMAX), seph = new Float32Array(SEMAX), sedir = new Int8Array(SEMAX), sem = new Uint8Array(SEMAX), sespot = new Int8Array(SEMAX), sen = 0, sea_ = 0;
   var CMMAX = 2, cmx = new Float32Array(CMMAX), cmy = new Float32Array(CMMAX), cmtx = new Float32Array(CMMAX), cmt = new Float32Array(CMMAX), cmph = new Float32Array(CMMAX), cmdir = new Int8Array(CMMAX), cmm = new Uint8Array(CMMAX), cmwing = new Float32Array(CMMAX), cmuvx = new Float32Array(CMMAX), cmdeep = new Float32Array(CMMAX), cmdives = new Uint8Array(CMMAX), cmn = 0, cma = 0;
-  var acts = { strikes: 0, takes: 0, dives: 0, plops: 0, calls: 0, slaps: 0, plunges: 0, fish: 0, otterDives: 0, sealDives: 0, hauls: 0, cormDives: 0 }; // dbg: how often each has happened
+  // Phase 82: up to HAMAX snowshoe hares on a shore layer (mode 0 sitting, 1 hopping, 2 bounding
+  // off into the woods) and up to RVMAX ravens (x world px, y px above the ice, wandering flight).
+  var HAMAX = 3, hax = new Float32Array(HAMAX), hat = new Float32Array(HAMAX), haph = new Float32Array(HAMAX), hadir = new Int8Array(HAMAX), ham = new Uint8Array(HAMAX), haa = new Float32Array(HAMAX), han = 0, haA = 0;
+  var RVMAX = 3, rvx_ = new Float32Array(RVMAX), rvy = new Float32Array(RVMAX), rvtx = new Float32Array(RVMAX), rvty = new Float32Array(RVMAX), rvph = new Float32Array(RVMAX), rvdir = new Int8Array(RVMAX), rvcall = new Float32Array(RVMAX), rvn = 0, rva = 0;
+  var acts = { hareFlee: 0, ravenCalls: 0, strikes: 0, takes: 0, dives: 0, plops: 0, calls: 0, slaps: 0, plunges: 0, fish: 0, otterDives: 0, sealDives: 0, hauls: 0, cormDives: 0 }; // dbg: how often each has happened
 
   function aboveSetup(loc, set) {
     var A = (loc.life && loc.life.above) || {}, r = G.vrng, i;
@@ -720,6 +751,10 @@ G.scene.life = (function () {
     }
     cmn = A.cormorant ? Math.min(CMMAX, A.cormorant.perches.length) : 0; cma = 0;
     for (i = 0; i < cmn; i++) { cmx[i] = A.cormorant.perches[i].x; cmy[i] = A.cormorant.perches[i].y; cmm[i] = 0; cmt[i] = r.range(8, 40); cmph[i] = r.range(0, 6); cmdir[i] = i & 1 ? -1 : 1; cmwing[i] = r.next() < 0.5 ? r.range(5, 15) : 0; cmdives[i] = 0; }
+    han = A.hare ? Math.min(HAMAX, A.hare.n || 1) : 0; haA = 0;                    // Phase 82
+    for (i = 0; i < han; i++) { hax[i] = r.range(A.hare.x[0], A.hare.x[1]); ham[i] = 0; hat[i] = r.range(2, 8); haph[i] = r.range(0, 6); hadir[i] = r.next() < 0.5 ? -1 : 1; haa[i] = 1; }
+    rvn = A.raven ? Math.min(RVMAX, A.raven.n || 1) : 0; rva = 0;
+    for (i = 0; i < rvn; i++) { rvx_[i] = rvtx[i] = r.range(A.raven.x[0], A.raven.x[1]); rvy[i] = rvty[i] = r.range(A.raven.y[0], A.raven.y[1]); rvph[i] = r.range(0, 6); rvdir[i] = 1; rvcall[i] = r.range(10, 40); }
     gn = A.gulls ? Math.min(GMAX, A.gulls.n, A.gulls.perches.length) : 0; ga = 0;
     for (i = 0; i < gn; i++) { gper[i] = i; gx[i] = A.gulls.perches[i].x; gy[i] = A.gulls.perches[i].y; gmode[i] = 0; gt[i] = 0; gph[i] = r.range(0, 6); }
     for (var q in acts) acts[q] = 0;
@@ -793,6 +828,42 @@ G.scene.life = (function () {
     if (otn) otterStep(A.otter, dt, b, h, r, loc);
     if (sen) sealStep(A.seal, dt, b, h, r, loc);
     if (cmn) cormStep(A.cormorant, dt, b, h, r, loc);
+    if (han) hareStep(A.hare, dt, cam, bs, h, r);                               // Phase 82
+    if (rvn) ravenStep(A.raven, dt, b, h, r);
+  }
+
+  // Phase 82: snowshoe hares sit in the snow at the edge of the woods, hop a few lengths now and
+  // then, and bound off into the trees when the machine comes within hareR px on screen (they
+  // come back, one by one, a while after it has gone). On a layer (A.hare.layer), at its parallax.
+  function hareStep(T, dt, cam, bs, h, r) {
+    var want = hrs(T.hours, h), p = ab.layer[T.layer] ? ab.layer[T.layer].parallax : 1;
+    haA = toward(haA, want ? 1 : 0, dt / LA.fade);
+    for (var i = 0; i < han; i++) {
+      var sx = hax[i] - cam * p;
+      haph[i] += dt; hat[i] -= dt;
+      if (ham[i] === 2) {                                                        // bounding off
+        hax[i] += hadir[i] * LA.hareFlee * dt; haa[i] = Math.max(0, haa[i] - dt / 1.2);
+        if (hat[i] <= 0) { ham[i] = 0; haa[i] = 0; hat[i] = r.range(25, 60); hax[i] = r.range(T.x[0], T.x[1]); }
+        continue;
+      }
+      if (haa[i] < 1 && ham[i] === 0 && hat[i] <= 0) haa[i] = Math.min(1, haa[i] + dt / 2);  // coming back out of the trees
+      if (Math.abs(sx - bs) < LA.hareR && haa[i] > 0.3) { ham[i] = 2; hadir[i] = sx > bs ? 1 : -1; hat[i] = 1.4; acts.hareFlee++; continue; }
+      if (ham[i] === 1) { hax[i] += hadir[i] * LA.hareHop * dt; if (hat[i] <= 0) { ham[i] = 0; hat[i] = r.range(3, 9); } }
+      else if (hat[i] <= 0 && haa[i] >= 1) { ham[i] = 1; hat[i] = r.range(0.4, 1.2); hadir[i] = r.next() < 0.5 ? -1 : 1; }
+      if (hax[i] < T.x[0]) { hax[i] = T.x[0]; hadir[i] = 1; } else if (hax[i] > T.x[1]) { hax[i] = T.x[1]; hadir[i] = -1; }
+    }
+  }
+  // Phase 82: ravens wander over the ice and the woods in slow loose lines, now and then a deep
+  // croak; they keep well up (A.raven.y) and turn away from the machine.
+  function ravenStep(T, dt, b, h, r) {
+    rva = toward(rva, hrs(T.hours, h) ? 1 : 0, dt / LA.fade);
+    for (var i = 0; i < rvn; i++) {
+      rvph[i] += dt;
+      var dx = rvtx[i] - rvx_[i], dy = rvty[i] - rvy[i], d = Math.sqrt(dx * dx + dy * dy), st = LA.ravenV * dt;
+      if (d <= st + 0.5) { rvtx[i] = r.range(T.x[0], T.x[1]); rvty[i] = r.range(T.y[0], T.y[1]); if (Math.abs(rvtx[i] - b.x) < 40) rvtx[i] = clamp(b.x + sgn(rvtx[i] - b.x) * 60, T.x[0], T.x[1]); }
+      else { rvx_[i] += dx / d * st; rvy[i] += dy / d * st; rvdir[i] = dx < 0 ? -1 : 1; }
+      if ((rvcall[i] -= dt) <= 0) { rvcall[i] = r.range(25, 70); if (rva > 0.5) { G.audio.engine.cue('raven', rvx_[i]); acts.ravenCalls++; } }
+    }
   }
 
   // Phase 79: seals lie out on their rocks; the boat within sealR slides them into the water,
@@ -1372,9 +1443,14 @@ G.scene.life = (function () {
       if (ga_ > 0.01) { c.globalAlpha = dr.a * ga_; img(c, deerArt(), frame, dr.dir < 0, dr.x - ox, wyS - (Ly.height || 4) + 1.5); c.globalAlpha = 1; }
     }
     if (A.beaver && A.beaver.layer === id && bv.on) drawBeaver(c, bv.x - ox, wyS, bv);
+    if (A.hare && A.hare.layer === id && haA > 0) {                               // Phase 82: the hares
+      var HA = hareArt();
+      for (i = 0; i < han; i++) { if (haa[i] <= 0) continue; c.globalAlpha = haA * haa[i]; img(c, HA, ham[i] ? (Math.floor(haph[i] * 8) & 1) : 0, hadir[i] < 0, hax[i] - ox, wyS - (Ly.height || 4) + 1.5 - (ham[i] ? Math.abs(Math.sin(haph[i] * 12)) * 1.5 : 0)); }
+      c.globalAlpha = 1;
+    }
     if (A.fox && A.fox.layer === id && fo.on && fo.a > 0) {
       c.globalAlpha = fo.a;
-      img(c, foxArt(), fo.mode === 1 ? 2 : (Math.floor(fo.ph * 6) & 1), fo.dir < 0, fo.x - ox, wyS - (ab.loc.waterY - Ly.base) - 0.5);
+      img(c, A.fox.white ? foxWhiteArt() : foxArt(), fo.mode === 1 ? 2 : (Math.floor(fo.ph * 6) & 1), fo.dir < 0, fo.x - ox, wyS - (ab.loc.waterY - Ly.base) - 0.5);
       c.globalAlpha = 1;
     }
     // A moored boat's lantern at night (its glow reflects with the rest of the layer).
@@ -1410,6 +1486,12 @@ G.scene.life = (function () {
   // After the landmarks: the heron, the kingfisher, the gulls, the dragonflies (all at parallax 1).
   function drawNear(c, camPx, wyS) {
     var i;
+    if (rvn && rva > 0) {                                                        // Phase 82: the ravens
+      var RV = ravenArt();
+      c.globalAlpha = rva;
+      for (i = 0; i < rvn; i++) { var RX = rvx_[i] - camPx; if (RX > -12 && RX < 332) img(c, RV, Math.floor(rvph[i] * 3) & 1, rvdir[i] < 0, RX, wyS - rvy[i]); }
+      c.globalAlpha = 1;
+    }
     if (en && ea > 0) {                                                          // Phase 77: the eagles, high up
       var E = eagleArt();
       c.globalAlpha = ea;
@@ -1652,6 +1734,8 @@ G.scene.life = (function () {
     if (A.otter) { o.otter = { a: +ota.toFixed(2), log: otLog ? otLog.id : '', otters: [] }; for (var q = 0; q < otn; q++) o.otter.otters.push({ x: +otx[q].toFixed(1), fromBoat: scr(otx[q], 1), mode: ['swim', 'under', 'log'][otm[q]] }); }
     if (A.seal) { o.seal = { a: +sea_.toFixed(2), seals: [] }; for (var sI = 0; sI < sen; sI++) o.seal.seals.push({ x: +sex[sI].toFixed(1), fromBoat: scr(sex[sI], 1), mode: ['out', 'up', 'under'][sem[sI]], spot: sespot[sI] }); }
     if (A.cormorant) { o.cormorant = { a: +cma.toFixed(2), birds: [] }; for (var cI = 0; cI < cmn; cI++) o.cormorant.birds.push({ x: +cmx[cI].toFixed(1), y: +cmy[cI].toFixed(1), fromBoat: scr(cmx[cI], 1), mode: ['perch', 'out', 'swim', 'under', 'home'][cmm[cI]], wings: cmwing[cI] > 0 && cmm[cI] === 0 }); }
+    if (A.hare) { o.hare = { a: +haA.toFixed(2), hares: [] }; for (var hI = 0; hI < han; hI++) o.hare.hares.push({ x: +hax[hI].toFixed(1), mode: ['sit', 'hop', 'off'][ham[hI]], seen: +haa[hI].toFixed(2) }); } // Phase 82
+    if (A.raven) { o.raven = { a: +rva.toFixed(2), birds: [] }; for (var rI = 0; rI < rvn; rI++) o.raven.birds.push({ x: +rvx_[rI].toFixed(1), y: +rvy[rI].toFixed(1), fromBoat: scr(rvx_[rI], 1) }); }
     o.reaches = byReach();
     if (A.gulls) { o.gulls = { a: +ga.toFixed(2), birds: [] }; for (var i = 0; i < gn; i++) o.gulls.birds.push({ x: +gx[i].toFixed(1), y: +gy[i].toFixed(1), fromBoat: scr(gx[i], 1), mode: ['sit', 'fly', 'back'][gmode[i]] }); }
     return o;
@@ -1665,6 +1749,7 @@ G.scene.life = (function () {
     if (os.on && os.a > 0) o.push('osprey'); if (en && ea > 0) o.push('eagle'); // Phase 77
     if (otn && ota > 0) o.push('otter');                                         // Phase 78
     if (sen && sea_ > 0) o.push('seal'); if (cmn && cma > 0) o.push('cormorant'); // Phase 79
+    if (han && haA > 0) o.push('hare'); if (rvn && rva > 0) o.push('raven');     // Phase 82
     return o;
   }
   // dbg.lifeSpawn for the life above: brings one on now, or makes it act now. False if it cannot.
@@ -1683,6 +1768,8 @@ G.scene.life = (function () {
     if (kind === 'seal') { if (!sen) return false; sea_ = 1; return true; }                                   // Phase 79
     if (kind === 'sealin') { for (var si = 0; si < sen; si++) if (sem[si] === 0) { set_[si] = 0; return true; } return false; }
     if (kind === 'cormorant') { if (!cmn) return false; cma = 1; return true; }
+    if (kind === 'hare') { if (!han) return false; haA = 1; for (var hi = 0; hi < han; hi++) haa[hi] = 1; return true; }   // Phase 82
+    if (kind === 'raven') { if (!rvn) return false; rva = 1; return true; }
     if (kind === 'cormdive') { for (var ci = 0; ci < cmn; ci++) if (cmm[ci] === 2) { cmt[ci] = 0; return true; } for (ci = 0; ci < cmn; ci++) if (cmm[ci] === 0) { cmt[ci] = 0; cma = 1; return true; } return false; }
     var map = { ducks: dk, heron: hr, kingfisher: kf, loon: ln, frog: fr, deer: dr, beaver: bv, fox: fo };
     if (map[kind] && A[kind] && !map[kind].on) { map[kind].wait = 0; return hrs(A[kind].hours, ab.h) || (kind === 'heron' && ab.lim > 0.5 && ab.night); }
@@ -1715,7 +1802,7 @@ G.scene.life = (function () {
   // ---- Phase 50.1: for the gallery ---------------------------------------------------------
   // Every sprite baked (by name: {w, h, cv, fl}), and the drawn-in-code creatures posed from
   // the gallery's own scratch records, never the live ones. World px, the ctx at the view's scale.
-  var ARTS = [crayArt, snailArt, turtleArt, tadArt, crabArt, starArt, sealArt, sealHeadArt, sealSwimArt, cormArt, cormFlyArt, cormSwimArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt, ospreyArt, eagleArt, otterArt, otterSitArt];
+  var ARTS = [hareArt, ravenArt, foxWhiteArt, crayArt, snailArt, turtleArt, tadArt, crabArt, starArt, sealArt, sealHeadArt, sealSwimArt, cormArt, cormFlyArt, cormSwimArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt, ospreyArt, eagleArt, otterArt, otterSitArt];
   function sprites() { for (var i = 0; i < ARTS.length; i++) ARTS[i](); return spr; }
   var gH = { x: 0, dir: 1, mode: 0, reach: 0, ph: 0, lift: 0, a: 1, fish: 0 }, gB = { dir: 1, mode: 0, t: 0 };
   var gEx = new Float32Array(EELN), gEy = new Float32Array(EELN);

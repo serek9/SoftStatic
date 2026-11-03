@@ -324,6 +324,7 @@ G.audio.engine = (function () {
       // and the slush welling up the hole when it breaks through.
       case 'drill': for (var di = 0; di < 12; di++) playBuf(pick(KIT.knock), 0.006, panAt(x), 2.6 + 0.4 * G.vrng.next(), null, di * 0.16); playBuf(KIT.hiss, 0.008, panAt(x), 0.6, null, 0); note('drill'); break;
       case 'slush': waterSplash(0.04, x, 'slush'); note('slush'); break;
+      case 'raven': tone('sawtooth', 330, 230, 0.22, 0.004, panAt(x), 0, bus.water, 0.02); tone('sawtooth', 300, 210, 0.2, 0.0035, panAt(x), 0.32, bus.water, 0.02); note('raven'); break; // Phase 82: a deep double croak, far off
       case 'strike': waterSplash(0.12, x, 'strike'); break;
       case 'dive': waterSplash(0.08, x, 'dive'); break;
       case 'plop': waterSplash(0.05, x, 'plop'); break;
@@ -751,8 +752,9 @@ G.audio.engine = (function () {
     // it builds, muffled in the shop and gone in the cabin (the thunder is its own cue).
     var sk = G.scene.sailing.stormK ? G.scene.sailing.stormK() : 0, inShop = G.core.state.sceneName() === 'shop';
     stormHeard = sk * (outside ? 1 : (inShop ? 0.3 : 0));
-    set(amb.storm.gain, 0.05 * stormHeard, 1.2);
-    set(amb.wind.gain, 0.012 + 0.025 * L.grey + 0.035 * stormHeard);
+    var iceOut = run.boat && run.boat.ice; // Phase 82: a blizzard is wind, not a rain wash
+    set(amb.storm.gain, iceOut ? 0 : 0.05 * stormHeard, 1.2);
+    set(amb.wind.gain, 0.012 + 0.025 * L.grey + (iceOut ? 0.07 : 0.035) * stormHeard);
     set(amb.lap.gain, outside && !(run.boat && run.boat.ice) ? 0.004 + Math.min(1, vx / 42) * 0.06 : 0, 0.15); // Phase 81: no water lapping under the ice
     set(amb.water.gain, run.boat && run.boat.ice && outside ? 0.006 : 0.03 + 0.01 * Math.sin(t * 0.8));
     var b = run.boat;

@@ -1,6 +1,6 @@
 # SoftStatic: The Ice and the Pond, Phases 80–85
 
-**Date:** 2026-11-03. **Repo state:** Phases 1–79 and 79b done (PLAN.md §8.1).
+**Date:** 2026-11-03. **Repo state:** Phases 1–79 and 79b done when planned; Phases 80–82 done since (PLAN.md §8.1).
 **Status:** Asked for by the user on 2026-11-03. Each phase starts only when the user says so.
 
 > An ice-fishing water for the ten "(Ice)" species, and the cabin valley's pond … PLAN IT. In the cabin pond you can have the species in the pond you kept, just like in cast n chill. make a research in the whole wiki https://castnchill.unpack.wiki/ and take decisions based in how the dynamics of cast n chill work.

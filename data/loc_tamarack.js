@@ -10,7 +10,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // ice: the ice's thickness (px; 1.5 m), the most holes open at once, and how long a hole left
 // behind takes to skin over (game hours: 3 game minutes). No current: the drift is nil.
 // Phase 80 paints it with the existing layer kinds in snow colours; Phase 82 gives it its own
-// scenery (js/scene/ice.js).
+// scenery (js/scene/winter.js): snowy woods of spruce and bare tamaracks, the shanties far off
+// (lit at night), the landing, the pressure ridge, the frozen falls, the snow and the blizzard,
+// and its winter life (snowshoe hares, a snow fox, ravens).
 G.data = G.data || {};
 G.data.locations = G.data.locations || {};
 G.data.locations.tamarack = {
@@ -25,6 +27,7 @@ G.data.locations.tamarack = {
   start: 170, // just past the landing's reach, so arriving does not open its panel
   dock: { x: 96, reach: 60 },
   water: 'lake',
+  scenery: 'tamarack', // Phase 82 (js/scene/winter.js)
   ice: { thick: 6, holes: 6, freeze: 3 / 60 },
   reaches: [
     { id: 'the_flats', name: 'The Flats', x: [0, 460] },
@@ -38,12 +41,14 @@ G.data.locations.tamarack = {
   layers: [
     { id: 'peaks', kind: 'mountains', parallax: 0.06, base: 92, amp: 34, color: 'mount_far', lit: 'snow_dark', dark: 'night_deep', haze: 'mount_haze', snow: 'snow_hi', snowDark: 'snow' },
     { id: 'fog_far', kind: 'fog', parallax: 0.16, y: 88, h: 14, color: 'snow_dark', alpha: 0.2, drift: 0.6 },
-    { id: 'far_woods', kind: 'forest', parallax: 0.26, base: 105, height: 20, gap: [2, 5], mix: { spruce: 0.6, pine: 0.4 },
-      keys: { pine: { dark: 'pine_dark', mid: 'snow_deep', lit: 'snow_dark', trunk: 'pine_dark' } } },
+    // Phase 82: the far woods and the near woods in snow (spruce, bare winter tamaracks), the
+    // shanties out on the far ice ([x, w] layer px each), the snowbank of the shore (base: where
+    // the fox and the hares stand on it).
+    { id: 'far_woods', kind: 'snowwoods', parallax: 0.26, base: 105, height: 20, gap: [3, 6], mix: { tamarack: 0.3 } },
     { id: 'fog_near', kind: 'fog', parallax: 0.42, y: 100, h: 9, color: 'snow', alpha: 0.1, drift: 1.2 },
-    { id: 'woods', kind: 'forest', parallax: 0.5, base: 110, height: 34, gap: [10, 40], mix: { spruce: 0.5, pine: 0.3, dead: 0.2 }, place: 4141,
-      keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'snow_dark', trunk: 'pine_dark' } } },
-    { id: 'shore', kind: 'bank', parallax: 0.6, height: 4, reeds: 0, rockEvery: 40, place: 4157, pads: 0, trunks: 0, cattails: 0, ground: 'snow_dark',
+    { id: 'woods', kind: 'snowwoods', parallax: 0.5, base: 109, height: 34, gap: [8, 26], mix: { tamarack: 0.35 }, place: 4141 },
+    { id: 'shanties', kind: 'shanties', parallax: 0.55, lift: 5, at: [[180, 9], [212, 7], [430, 8], [610, 10], [628, 7], [840, 8]] },
+    { id: 'shore', kind: 'bank', parallax: 0.6, height: 4, base: 110, reeds: 0, rockEvery: 40, place: 4157, pads: 0, trunks: 0, cattails: 0, ground: 'snow_dark',
       rock: { dark: 'snow_deep', mid: 'snow_dark', lit: 'snow_hi' }, features: [{ kind: 'posts', x: 70, n: 3 }] },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
@@ -52,12 +57,22 @@ G.data.locations.tamarack = {
   mist: { h: 5, alpha: 0.08, drift: 1.4 },
   life: {
     under: { cray: 0, snail: 3, fry: 4, tad: 0, turtle: false, eel: false, mussel: 4, caddis: false, litter: ['lure'], roots: 0, tree: 0, ribbon: 0.01, fern: 0, lily: 0, algae: 0.1 },
-    above: {}
+    // Phase 82 (82.3): winter life: snowshoe hares at the edge of the woods, a snow fox crossing the
+    // shore at dusk and dawn, ravens over the ice. Under the ice only the ten (Ice) fish and a few
+    // snails and fry (no crayfish, frogs or turtles in winter).
+    above: {
+      hare: { n: 3, layer: 'shore', x: [120, 900], hours: [[16, 9]] },
+      fox: { layer: 'shore', x: [60, 940], hours: [[4.5, 8.5], [16.5, 21]], white: true },
+      raven: { n: 2, x: [0, 1400], y: [34, 72], hours: [[6.5, 17.5]] }
+    }
   },
 
   landmarks: [
+    // Phase 82: the landing (painted by the scenery as a ramp down the snowbank: the dock), the
+    // pressure ridge across the ice (half, h world px), the frozen falls over the granite step.
     { id: 'pier', kind: 'pier', x: 96, seed: 4102, from: 'left' },
-    { id: 'marker_a', kind: 'marker', x: 700 }
+    { id: 'ridge', kind: 'ridge', x: 690, half: 70, h: 11 },
+    { id: 'falls', kind: 'falls', x: 1250, half: 60, h: 30 }
   ],
 
   underwater: {

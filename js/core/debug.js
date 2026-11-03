@@ -138,6 +138,9 @@ G.core.debug = (function () {
     // dbg.ice() (Phase 81): on the ice, the holes {x, catches, freezing 0..1, n}, the one he is
     // at and the one he fishes, the drill (0..1, -1 idle), and drilled, frozen and catches; null elsewhere.
     ice: function () { return G.scene.sailing.ice(); },
+    // dbg.winter() (Phase 82): on the ice, the snow's fall (0..1), the blizzard (the storm, 0..1),
+    // the flakes drawn last frame, and the flashes and thunder (none on the ice); null elsewhere.
+    winter: function () { return G.scene.sailing.winter(); },
     // dbg.money(n) adds n coins (negative takes them); returns the balance.
     money: function (n) { G.state.save.coins = Math.max(0, G.state.save.coins + (n || 0)); return G.state.save.coins; },
     // dbg.buy(kind) buys the next 'rod' | 'reel' | 'line', or dbg.buy('bait', id, n).
