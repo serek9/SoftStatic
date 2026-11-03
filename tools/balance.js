@@ -314,14 +314,13 @@ function validateLocations(G, err) {
     if (new Set(R.map(r => r.id)).size !== R.length) err(p + 'two reaches share an id');
     if (!(L.dock && num(L.dock.x) && L.dock.x > 0 && L.dock.x < L.width && L.dock.reach > 0)) err(p + 'dock {x, reach} inside the world');
     else if (!(L.landmarks || []).some(m => m.kind === 'pier' && m.x === L.dock.x)) err(p + 'no pier landmark at the dock');
-    // Phase 76 (PLAN_WATERS.md 4.3): a signpost at every pier, beside its shore end, with the
-    // CABIN board where the pier's panel offers The Cabin, and The Cabin at Fogbound only.
+    // Phase 76: The Cabin at Fogbound's pier only. The user's fixes (2026-11-03): no signposts,
+    // and every pier runs out from the shore (from 'left' or 'right'), its water end on its side.
     if (L.dock) {
-      const sg = (L.landmarks || []).filter(m => m.kind === 'sign');
-      if (sg.length !== 1) err(p + 'needs one signpost (sign landmark) at its pier, has ' + sg.length);
-      else if (Math.abs(sg[0].x - L.dock.x) > 80) err(p + 'the signpost at ' + sg[0].x + ' is not beside the pier at ' + L.dock.x);
-      else if (!!sg[0].cabin !== !!L.dock.cabin) err(p + 'the signpost\'s CABIN board and the dock\'s cabin disagree');
       if (!!L.dock.cabin !== (id === 'fog')) err(p + 'The Cabin is offered at Fogbound\'s pier only');
+      if ((L.landmarks || []).some(m => m.kind === 'sign')) err(p + 'no signposts at the piers');
+      const pr = (L.landmarks || []).find(m => m.kind === 'pier' && m.x === L.dock.x);
+      if (pr && !(pr.from === 'left' ? pr.x < L.width / 2 : pr.from === 'right' && pr.x > L.width / 2)) err(p + 'the pier must run out from the nearer shore (from: left or right)');
     }
     if (!(L.start > 0 && L.start < L.width)) err(p + 'start');
     if (L.drift) {
@@ -440,7 +439,7 @@ function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
   const save = G.core.save.defaults();
   const school = S.fish_ai.createSchool(data), bite = S.bite.create(), fight = S.fight.create();
-  const fx = {}, lure = { active: false, x: (opts && opts.x) || P.lureX, y: 0, bait: 'worm' }, latched = {}; // Phase 75: --tackle fishes each reach (opts.x)
+  const fx = {}, lure = { active: false, x: (opts && opts.x) || P.lureX, y: 0, bait: 'worm', work: 1 }, latched = {}; // Phase 75: --tackle fishes each reach (opts.x); work: the model works every lure as it should be (the user's fixes)
   const uIn = { loc: 'fog', still: true, atShop: false }, bIn = { reel: false, auto: false }, fIn = { reel: false };
   Object.assign(school.ctx, { loc: 'fog', maxDepthPx: data.locations.fog.maxDepth, latched });
   const st = { phase: 'cast', t: 0, time: 0, hash: 7, catches: 0, attempts: 0, events: [], plan: 0, hookUid: 0, willHook: false, cur: null, mix: {}, coinsAt: [],

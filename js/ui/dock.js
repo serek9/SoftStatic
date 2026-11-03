@@ -8,7 +8,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // sailing off closes it. Choosing a place fades to black and walks him up (the scene changes,
 // as the map's travel does); leaving the shop or the cabin brings him back to the boat at the
 // pier. The water's `dock` ({x, reach} in world px) says where. Presentation and input only.
-// Phase 76 (PLAN_WATERS.md 4.3): every water has its pier and its signpost. The panel offers
+// Phase 76 (PLAN_WATERS.md 4.3): every water has its pier (no signposts since the user's fixes, 2026-11-03). The panel offers
 // the Bait Shop and staying everywhere, The Cabin only where the dock says `cabin` (Fogbound);
 // the shop leaves the run as it was, so he comes back to the boat at the pier he left from.
 G.ui = G.ui || {};
@@ -113,12 +113,12 @@ G.ui.dock = (function () {
     // The map's trips to the shop and the cabin start from the pier too (Phase 67): no panel
     // until the boat leaves the pier and comes back.
     disarm: function () { armed = false; on = false; },
-    // dbg.dock(): where the pier is, its signpost and its rows (Phase 76), and whether the
-    // boat is at it.
+    // dbg.dock(): where the pier is, which shore it runs out from, its rows (Phase 76), and
+    // whether the boat is at it.
     info: function () {
-      var run = G.state.run, loc = run && run.loc ? G.data.locations[run.loc] : null, k, sign = null;
-      for (k = 0; loc && k < loc.landmarks.length; k++) if (loc.landmarks[k].kind === 'sign') sign = loc.landmarks[k].x;
-      return { loc: run ? run.loc : '', pier: loc && loc.dock ? loc.dock.x : null, sign: sign, rows: menuOf(loc).rows.slice(), boat: run && run.boat ? +run.boat.x.toFixed(1) : null, at: at(run, loc), open: on, row: on ? ROWS[sel] : '', armed: armed };
+      var run = G.state.run, loc = run && run.loc ? G.data.locations[run.loc] : null, k, from = '';
+      for (k = 0; loc && k < loc.landmarks.length; k++) if (loc.landmarks[k].kind === 'pier') from = loc.landmarks[k].from || '';
+      return { loc: run ? run.loc : '', pier: loc && loc.dock ? loc.dock.x : null, from: from, rows: menuOf(loc).rows.slice(), boat: run && run.boat ? +run.boat.x.toFixed(1) : null, at: at(run, loc), open: on, row: on ? ROWS[sel] : '', armed: armed };
     },
     choose: function (i) { if (!on) return false; choose(i); return true; }
   };

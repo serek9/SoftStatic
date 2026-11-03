@@ -51,8 +51,7 @@ G.data.locations.wreck = {
   landmarks: [
     { id: 'wreck', kind: 'wreck', x: 380 },
     { id: 'buoy_a', kind: 'marker', x: 640 },
-    { id: 'pier', kind: 'pier', x: 1304, seed: 4802 },
-    { id: 'sign', kind: 'sign', x: 1350, flip: true } // Phase 76: the signpost at the pier's shore end
+    { id: 'pier', kind: 'pier', x: 1304, seed: 4802, from: 'right' },
   ],
 
   underwater: {

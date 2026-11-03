@@ -16,7 +16,7 @@ G.data.locations.pines = {
   maxDepth: 112,
   seed: 6271,
   start: 200,
-  dock: { x: 330, reach: 60 }, // Phase 74: its pier, the same pier as Fogbound's (js/ui/dock.js)
+  dock: { x: 96, reach: 60 }, // Phase 74: its pier, the same pier as Fogbound's (js/ui/dock.js); since the user's fixes (2026-11-03) at the west shore
   // Phase 20: the surface's swell (view px; see loc_fog.js): a medium chop.
   swell: { amp: 1.6, mirror: 0.9, waves: [[80, 11, 0.5], [37, -8, 0.3], [19, 6, 0.2]] },
   // Phase 22: a slow wind drift (G.data.lakeDrift in loc_fog.js).
@@ -56,7 +56,7 @@ G.data.locations.pines = {
       dragonflies: { n: 4, x: [[20, 220], [1100, 1280]], hours: [[9, 17]] },
       frog: { hours: [[8, 1]] },
       striders: { n: 5, x: [[20, 200], [1100, 1280]], hours: [[8, 18]] },
-      gulls: { n: 3, perches: [{ x: 302, y: 13 }, { x: 313, y: 13 }, { x: 323, y: 13 }, { x: 361, y: 26 }], hours: [[6, 19.5]] },
+      gulls: { n: 3, perches: [{ x: 8, y: 13 }, { x: 18, y: 13 }, { x: 28, y: 13 }, { x: 126, y: 26 }], hours: [[6, 19.5]] }, // on the pier's rail and its lamp (the user's fixes, 2026-11-03)
       fox: { layer: 'farshore', x: [270, 360], hours: [[21, 4.5]] }
     }
   },
@@ -65,8 +65,7 @@ G.data.locations.pines = {
   // signal: blinks every `period` s; within `lead` game hours of a clock window it speeds up
   // toward `fast`, and inside a window it blinks at `fast`.
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 330, seed: 3301 },
-    { id: 'sign', kind: 'sign', x: 284 }, // Phase 76: the signpost at the pier's shore end
+    { id: 'pier', kind: 'pier', x: 96, seed: 3301, from: 'left' },
     { id: 'signal', kind: 'signal', x: 640, period: 1.4, fast: 0.45, lead: 1 },
     { id: 'road', kind: 'road', x: 900 },
     { id: 'owl_branch', kind: 'owl_branch', x: 1170 }
@@ -78,7 +77,7 @@ G.data.locations.pines = {
   },
 
   spots: [
-    { id: 'pier_shade', kind: 'open', x: 330, r: 36 },
+    { id: 'pier_shade', kind: 'open', x: 96, r: 36 },
     { id: 'under_light', kind: 'open', x: 640, r: 30 },
     { id: 'lane_deep', kind: 'open', x: 770, r: 22, attract: 1.3 },
     { id: 'drowned_road', kind: 'open', x: 900, r: 34 },

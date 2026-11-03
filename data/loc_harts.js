@@ -63,8 +63,7 @@ G.data.locations.harts = {
   // Phase 78: birches along the Weedbed and the far shore, Birch Point (half its width and its
   // height, world px), the buoy off its drop, the old bench with the rowboat drawn up by it.
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 96, seed: 9102 },
-    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
+    { id: 'pier', kind: 'pier', x: 96, seed: 9102, from: 'left' },
     { id: 'birches_a', kind: 'birches', x: 300, n: 4, half: 34 },
     { id: 'point', kind: 'point', x: 690, half: 44, h: 6 },
     { id: 'marker_a', kind: 'marker', x: 880 },

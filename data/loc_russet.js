@@ -65,8 +65,7 @@ G.data.locations.russet = {
   // Phase 78: Reed Flats' reed beds and drowned stumps; the buoy over the old channel; Mink
   // Cove's deadfall (dir: which way it lies, len world px).
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 96, seed: 6602 },
-    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
+    { id: 'pier', kind: 'pier', x: 96, seed: 6602, from: 'left' },
     { id: 'reeds_a', kind: 'reeds', x: 205, half: 36 },
     { id: 'snag_a', kind: 'snag', x: 420 },
     { id: 'stumps', kind: 'stumps', x: 480, half: 70, n: 8 },

@@ -91,8 +91,7 @@ G.data.locations.fog = {
 
   // On the water at the boat's distance (parallax 1): x is where the landmark is centred.
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 96, seed: 3301 }, // the same pier stands in The Pines (11.4); Phase 67: at the west end
-    { id: 'sign', kind: 'sign', x: 50, cabin: true }, // Phase 67: the signpost at its shore end (76: with its CABIN board)
+    { id: 'pier', kind: 'pier', x: 96, seed: 3301, from: 'left' }, // the same pier stands in The Pines (11.4); Phase 67: at the west end
     { id: 'marker_a', kind: 'marker', x: 560 },
     { id: 'wreck', kind: 'wreck', x: 770 },
     { id: 'marker_b', kind: 'marker', x: 985 }

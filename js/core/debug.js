@@ -398,6 +398,8 @@ G.core.debug = (function () {
     shop: function () { return G.ui.shop.info(); },
     // dbg.shopWalk('RRRUU') walks him through the shop a tile per letter (U, D, L, R), by the walk's rules.
     // dbg.dock(): Phase 67, the pier and the boat; dbg.dock(i) chooses row i of its open panel.
+    // dbg.bite(): the user's fixes: how the fish at the lure takes it (style, the feel, the tip's load now), or null.
+    bite: function () { return G.scene.sailing.biteFeel(); },
     dock: function (i) { if (i !== undefined) return G.ui.dock.choose(i); return G.ui.dock.info(); },
     // dbg.mapNav(): Phase 66, the map's arrows checked from every stop.
     mapNav: function () { return G.ui.map.nav(); },

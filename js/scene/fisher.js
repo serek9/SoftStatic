@@ -223,10 +223,13 @@ G.scene.fisher = (function () {
     return fs.beerRest > 0 ? 'thermos' : 'beer';
   }
 
-  // The act for a mode: preparing the lure or a drink between casts; a rest or a drink while waiting.
+  // The act for a mode: a drink between casts; a rest or a drink while waiting. The user's fixes
+  // (2026-11-03): he no longer prepares the lure as an idle; he ties one on only when it is
+  // changed (the 'tie' act, queued by the setup panel: sailing.queueTackle).
   function choose(fs, mode, night, rng) {
-    var d = drink(fs, night), other = mode === 'casts' ? 'lure' : 'rest';
-    return rng.next() < (fs.can && night ? 0.65 : 0.5) ? d : other;
+    var d = drink(fs, night);
+    if (mode === 'casts') return d;
+    return rng.next() < (fs.can && night ? 0.65 : 0.5) ? d : 'rest';
   }
 
   var quietCtx = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
