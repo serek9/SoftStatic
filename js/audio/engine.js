@@ -320,6 +320,10 @@ G.audio.engine = (function () {
       // under, a frog plopping in, a beaver's tail slap (the loudest, still under a lure's).
       // Phase 55: thunder, a: how far off (0 near .. 1 far): a low rumble that rises slowly.
       case 'thunder': thunder(a || 0); note('thunder'); break;
+      // Phase 81: the hand auger grinding through the ice (2 s of soft knocks and the bit's hiss),
+      // and the slush welling up the hole when it breaks through.
+      case 'drill': for (var di = 0; di < 12; di++) playBuf(pick(KIT.knock), 0.006, panAt(x), 2.6 + 0.4 * G.vrng.next(), null, di * 0.16); playBuf(KIT.hiss, 0.008, panAt(x), 0.6, null, 0); note('drill'); break;
+      case 'slush': waterSplash(0.04, x, 'slush'); note('slush'); break;
       case 'strike': waterSplash(0.12, x, 'strike'); break;
       case 'dive': waterSplash(0.08, x, 'dive'); break;
       case 'plop': waterSplash(0.05, x, 'plop'); break;
@@ -749,10 +753,10 @@ G.audio.engine = (function () {
     stormHeard = sk * (outside ? 1 : (inShop ? 0.3 : 0));
     set(amb.storm.gain, 0.05 * stormHeard, 1.2);
     set(amb.wind.gain, 0.012 + 0.025 * L.grey + 0.035 * stormHeard);
-    set(amb.water.gain, 0.03 + 0.01 * Math.sin(t * 0.8));
-    set(amb.lap.gain, outside ? 0.004 + Math.min(1, vx / 42) * 0.06 : 0, 0.15);
+    set(amb.lap.gain, outside && !(run.boat && run.boat.ice) ? 0.004 + Math.min(1, vx / 42) * 0.06 : 0, 0.15); // Phase 81: no water lapping under the ice
+    set(amb.water.gain, run.boat && run.boat.ice && outside ? 0.006 : 0.03 + 0.01 * Math.sin(t * 0.8));
     var b = run.boat;
-    if (b) amb.motor.update(b.rpm, b.throttle, outside && b.motor, outside && b.startT >= 0, ac.currentTime);
+    if (b) amb.motor.update(b.rpm * (b.ice ? 1.7 : 1), b.throttle, outside && b.motor, outside && b.startT >= 0, ac.currentTime); // Phase 81: the Snow Machine's higher two-stroke whine
     set(amb.stream.gain, STREAM[loc] || 0);
     set(amb.rain.gain, G.scene.sailing.rain ? (outside ? 0.035 : (G.core.state.sceneName() === 'shop' ? 0.03 : 0)) * G.scene.sailing.rain() : 0, 0.8); // Phase 39: on the shop's glass, muffled
     set(amb.drone.gain, (0.025 + 0.025 * L.night) * (loc === 'pines' ? 0.6 : 1));

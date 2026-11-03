@@ -570,10 +570,14 @@ G.scene.underwater = (function () {
   //   a popper ('top'): its pops, or skittered along
   //   slow (a dropshot, a wacky worm): nearly still is right; reeled fast it is wrong
   //   a float rig (live bait under a float) and live bait: always 1
-  var WK = { tau: 1.2, tauGo: 3, still: 2, steadyFull: 0.5, goFull: 0.6, popFull: 0.4, sinkWork: 0.6, sinkLift: 0.9 };
+  // Phase 81 (PLAN_WINTER.md 2.3): on the ice every lure is jigged (style 'jig'): short lifts and
+  // pauses, scored by how often it changes between moving and still (as stop-and-go) and marked
+  // down when it is lifted too long at a time (moving more than jigLong of the time).
+  var WK = { tau: 1.2, tauGo: 3, still: 2, steadyFull: 0.5, goFull: 0.6, popFull: 0.4, sinkWork: 0.6, sinkLift: 0.9, jigLong: 0.55, jigK: 2.5 };
   var STYLE = { dive: 'steady', mid: 'steady', glide: 'steady', lift: 'stopgo', flutter: 'stopgo', top: 'top', dropshot: 'slow', wacky: 'slow' };
   function workStep(run, dt) {
     var c = run.cast, gx = run.gearFx, lure = gx.lure && c.bait === gx.bait, st = lure ? STYLE[gx.swim] : '';
+    if (st && G.scene.sailing.loc().ice) st = 'jig';                             // Phase 81: through the ice
     if (!st) { c.work = 1; return; }
     var moving = (c.rv || 0) > RV.still ? 1 : 0, k = Math.min(1, dt / WK.tau), kg = Math.min(1, dt / WK.tauGo);
     c.wm = (c.wm || 0) + (moving - (c.wm || 0)) * k;
@@ -582,9 +586,10 @@ G.scene.underwater = (function () {
     var popNow = (c.pops || 0) - (c.pops0 || 0); c.pops0 = c.pops || 0;
     c.wpop = (c.wpop || 0) + (popNow / dt - (c.wpop || 0)) * kg;
     var w;
-    if (run.fsm === 'sinking') w = st === 'stopgo' ? WK.sinkLift : (st === 'top' ? 0.3 : WK.sinkWork);
+    if (run.fsm === 'sinking') w = st === 'stopgo' || st === 'jig' ? WK.sinkLift : (st === 'top' ? 0.3 : WK.sinkWork);
     else if (st === 'steady') w = c.wm / WK.steadyFull;
     else if (st === 'stopgo') w = c.wgo / WK.goFull;
+    else if (st === 'jig') w = c.wgo / WK.goFull * (1 - Math.max(0, c.wm - WK.jigLong) * WK.jigK);
     else if (st === 'top') w = Math.max(c.wpop / WK.popFull, 0.6 * c.wm);
     else w = 1 - 0.85 * c.wm;                                                   // slow
     c.work = w < 0 ? 0 : (w > 1 ? 1 : w);
@@ -597,6 +602,8 @@ G.scene.underwater = (function () {
     // gx.maxDepthM m; a popper ('top') stays on the surface; a plug ('dive') dives as it is reeled.
     // Phase 69: a dropshot's hook hangs gx.dropM m over its weight on the bed.
     var gx = run.gearFx, lure = gx.lure && c.bait === gx.bait, sinkK = lure ? gx.sink : 1, floorPx = lure ? Math.min(bottom - gx.dropM * 4, gx.maxDepthM * 4) : bottom;
+    var ice = loc.ice; // Phase 81: straight down a hole: the float rig's bait hangs its depth under the ice, not in it
+    if (ice && lure && gx.swim === 'float') floorPx = Math.min(bottom - 2, gx.maxDepthM * 4 + ice.thick);
     if (run.fsm === 'sinking') {
       if (inp.pressed('action') || (lure && sinkK === 0)) { if (lure && sinkK === 0) c.ly = wy + (gx.swim === 'top' ? 0.5 : FLOAT); c.rv = 0; c.tight = 0; G.core.state.go(run, 'waiting'); return; }
       var depth = c.ly - wy;
@@ -650,6 +657,7 @@ G.scene.underwater = (function () {
           vx = toward * v * (0.7 + 0.3 * Math.abs(sg));
           vy = far ? clamp((floorPx - depth0) * 1.5, -UW.reelUp, UW.reelUp) + sg * v * 0.35 : -UW.reelUp;
         }
+        if (ice) { vx = 0; if (sw !== 'lift') vy = -v; far = false; }               // Phase 81: up the hole, nothing sideways
         var gap = Math.abs(home - c.x1);
         c.x1 += clamp(vx * dt, -gap, gap);
         c.ly += vy * dt;
@@ -670,7 +678,7 @@ G.scene.underwater = (function () {
           // (the line's length from the tip held), then straight down on a slack one; a live
           // bait only swings while the line is tight, then hangs where it is.
           var sv = UW.sinkV * (lure ? gx.sink : 0.6) * (sw === 'flutter' ? 0.55 : 0.75), ny = Math.min(wy + floorPx, c.ly + sv * dt);
-          if (c.tight > 0) { var R = L, h = ny - TIPW[1]; if (R > h + 1) { var nx = TIPW[0] - (dx >= 0 ? 1 : -1) * Math.sqrt(R * R - h * h); c.x1 += clamp(nx - c.x1, -sv * dt * 2, sv * dt * 2); } }
+          if (c.tight > 0 && !ice) { var R = L, h = ny - TIPW[1]; if (R > h + 1) { var nx = TIPW[0] - (dx >= 0 ? 1 : -1) * Math.sqrt(R * R - h * h); c.x1 += clamp(nx - c.x1, -sv * dt * 2, sv * dt * 2); } }
           c.ly = ny;
         }
       }
@@ -1128,6 +1136,8 @@ G.scene.underwater = (function () {
     h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false; // wet: 1 until it leaves the water
     fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
+    h.hx = run.cast.x1; h.side = f.x >= h.hx ? 1 : -1;                            // Phase 81: the hole it was hooked through, and the way it runs
+    if (G.scene.sailing.loc().ice) h.dist = Math.max(8, Math.abs(f.x - h.hx) + h.depth * 0.5);
     h.depth = f.y;
     h.q = G.sim.economy.hookQ(sp, run.cast.bait, G.rng.next(), G.data); // Phase 44: the size curve; Phase 68: in the lure's sizes
     G.sim.economy.size(sp, h.q, h);
@@ -1148,6 +1158,7 @@ G.scene.underwater = (function () {
       h.lift = Math.min(1, h.lift + dt / LAND_TIME);
       var u = h.lift * h.lift * (3 - 2 * h.lift);
       tx = b.x + b.facing * 18; ty = -12;
+      if (loc.ice) { tx = h.x0; ty = -8; }                                       // Phase 81: lifted straight up out of the hole onto the ice
       h.x = h.x0 + (tx - h.x0) * u;
       h.y = h.y0 + (ty - h.y0) * u;
       h.face = b.x > h.x ? 1 : -1;
@@ -1159,6 +1170,10 @@ G.scene.underwater = (function () {
       var frac = F.D / F.D0;
       tx = b.x + b.facing * (UW.reach + Math.min(frac * h.dist, 140)); // 140 px: boat and fish share the screen
       ty = h.depth * Math.min(1, frac);
+      // Phase 81: through a hole the line pivots at the hole: the fish runs off sideways under
+      // the ice (the way it took the lure) and is always led back to the hole, rising to it.
+      var ice = loc.ice, T = ice ? ice.thick + 3 : 0;
+      if (ice) { tx = h.hx + h.side * Math.min(frac * h.dist, 120); ty = T + (h.depth - T) * Math.min(1, frac) + (1 - Math.min(1, frac * 4)) * -T * 0.5; }
       if (F.mode === 'pull') {
         // Phase 29: a run bores up and down in slow arcs and dives while the fish is fresh (it
         // used to shake ±3 px at 2 Hz; the head shakes are drawn on the body now).
@@ -1168,12 +1183,13 @@ G.scene.underwater = (function () {
       }
       // Phase 23: a jump lifts it clear of the water in an arc and drops it back.
       var jl = G.data.gear.fight.jumpLen;
-      if (F.jump > 0) ty = -14 * Math.sin(Math.PI * (1 - F.jump / jl));
+      if (F.jump > 0 && !ice) ty = -14 * Math.sin(Math.PI * (1 - F.jump / jl)); // Phase 81: no leaping under the ice
       h.x += (tx - h.x) * Math.min(1, 5 * dt);
       // Phase 29: a jump cut short (the fight turned tired mid-leap) falls back, not snaps.
       var yb = h.y;
       h.y += (ty - h.y) * Math.min(1, (F.jump > 0 || yb < 0 ? 14 : 4) * dt);
-      h.y = clamp(h.y, F.jump > 0 ? -16 : Math.min(2, yb), bottomAt(loc, h.x) - 2);
+      h.y = clamp(h.y, F.jump > 0 && !ice ? -16 : Math.min(2, yb), bottomAt(loc, h.x) - 2);
+      if (ice && Math.abs(h.x - h.hx) > 2.5 && h.y < T) h.y = T;                    // the ice over it, except in the hole
       var air = h.y < 0;
       if (air !== h.air) { // out of the water, or back in: a splash and a dent in the surface
         h.air = air;
@@ -1216,6 +1232,7 @@ G.scene.underwater = (function () {
       if (run.fight.slipped) { fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); G.gfx.surface.poke(run.hook.x, 0.5); } // the soft slip sound: audio/engine.js
       if (res === F.WIN) {
         run.hook.x0 = run.hook.x; run.hook.y0 = run.hook.y;
+        if (loc.ice) G.scene.ice.landed(run); // Phase 81: the hole counts it (released or not)
         G.core.state.go(run, 'landing');
       } else if (res === F.SNAP || res === F.ESCAPE) {
         release(run);

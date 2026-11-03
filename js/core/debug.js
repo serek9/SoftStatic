@@ -135,6 +135,9 @@ G.core.debug = (function () {
       if (r === E.OK) G.core.save.autosave('purchase');
       return { bought: r, snow: !!s.gear.snow, iceRod: s.gear.iceRod, rods: s.gear.rods.slice(), seaSeen: !!s.flags.seaSeen, iceAll: E.iceAll(s, G.data), unlock: ['ok', 'open', 'poor', 'locked', 'unknown'][E.canUnlock(s, 'tamarack', G.data)] };
     },
+    // dbg.ice() (Phase 81): on the ice, the holes {x, catches, freezing 0..1, n}, the one he is
+    // at and the one he fishes, the drill (0..1, -1 idle), and drilled, frozen and catches; null elsewhere.
+    ice: function () { return G.scene.sailing.ice(); },
     // dbg.money(n) adds n coins (negative takes them); returns the balance.
     money: function (n) { G.state.save.coins = Math.max(0, G.state.save.coins + (n || 0)); return G.state.save.coins; },
     // dbg.buy(kind) buys the next 'rod' | 'reel' | 'line', or dbg.buy('bait', id, n).

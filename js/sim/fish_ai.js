@@ -121,6 +121,7 @@ G.sim.fish_ai = (function () {
         attract: 1, // gear and cast spot: attract shortens the wait between arrivals
         cover: 1,   // Phase 69: the share of the fish here the hook is sized for (speciesWeights)
         maxDepthPx: 0, floorAt: null, // floorAt(x) -> bottom depth in px; null uses maxDepthPx
+        ceilPx: 0,  // Phase 81: the ice's thickness (px): fish keep under it
         flowAt: null // Phase 28: flowAt(x, depth px) -> px/s of current; null is still water
       }
     };
@@ -148,7 +149,7 @@ G.sim.fish_ai = (function () {
   function bedDepth(school, f, rng) { return clampDepth(school, f, floor(school, f.x) - rng.range(1, 4)); }
 
   function clampDepth(school, f, y) {
-    var lo = 3, hi = floor(school, f.x) - 2;
+    var lo = 3 + (school.ctx.ceilPx || 0), hi = floor(school, f.x) - 2; // Phase 81: under the ice
     return y < lo ? lo : (y > hi ? hi : y);
   }
 

@@ -638,8 +638,9 @@ function session(G, seed, opts) {
 // Phase 74: nine waters, each with the rod of its stage (by cost: the fibreglass at Fogbound,
 // the graphite at the creek and Copperbend, the lacquered at the Pines, Hartsmere and
 // Stonehorn, the long rod at Russetwood and the seas).
-const TACKLE_WATERS = { fog: 1, creek: 2, copper: 2, pines: 3, harts: 3, stone: 3, russet: 4, sound: 4, wreck: 4 };
-function tackleHooks(d) { return ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)); }
+// Phase 81: and Tamarack Lake on the Ice Rod (index 6), with only the hooks that go down a hole.
+const TACKLE_WATERS = { fog: 1, creek: 2, copper: 2, pines: 3, harts: 3, stone: 3, russet: 4, sound: 4, wreck: 4, tamarack: 6 };
+function tackleHooks(d, w) { return ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)).filter(id => !w || !d.locations[w].ice || d.ICE_TYPES.indexOf((d.gear.lures.find(l => l.id === id) || {}).type || 'float') >= 0); }
 // Phase 75: a water is fished reach by reach (each at its middle), and a hook is judged at a
 // water by its best reach, as a player fishes it where it works. In each reach it is fished at
 // the depth its takers live at (the median of the middles of their homes' depths there; the
@@ -652,7 +653,7 @@ function tackleTakers(G, hk, w, reach) {
 }
 function tackleWater(w) {
   const G = load(), d = G.data, L = d.locations[w], out = {};
-  for (const hk of tackleHooks(d)) {
+  for (const hk of tackleHooks(d, w)) {
     for (const R of L.reaches) {
       const tk = tackleTakers(G, hk, w, R.id);
       if (!tk.length) continue;
