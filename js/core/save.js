@@ -8,6 +8,9 @@ G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
   var VERSION = 9;
   var PREFIX = 'SS1';
+  // `?tour`: every water open on the chart for a look round, and nothing written to the save
+  // while it is on (persist() below), so a tour never spends, unlocks or moves the real one.
+  var TOUR = typeof location !== 'undefined' && /[?&]tour(=|&|$)/.test(location.search);
 
   // migrations[v](save) returns the save reshaped for version v + 1; migrate() bumps the number.
   var migrations = {
@@ -231,6 +234,7 @@ G.core.save = (function () {
   }
 
   function persist(save) {
+    if (TOUR) { status = 'tour: not saved'; return false; }
     var ls = storage();
     if (!ls || lost) return false;
     save.lastSeen = Date.now();
@@ -243,7 +247,7 @@ G.core.save = (function () {
   function autosave(reason) {
     var ok = G.state.save ? persist(G.state.save) : false;
     if (ok) status = 'autosaved (' + reason + ')';
-    if (G.core.debug) G.core.debug.log('autosave: ' + reason + (ok ? '' : ' FAILED'));
+    if (G.core.debug) G.core.debug.log('autosave: ' + reason + (ok ? '' : (TOUR ? ' (tour: not saved)' : ' FAILED')));
     return ok;
   }
 
@@ -255,6 +259,7 @@ G.core.save = (function () {
   return {
     KEY: KEY, VERSION: VERSION, migrations: migrations, RED_REFUND: RED_REFUND,
     defaults: defaults, migrate: migrate, load: load, persist: persist, autosave: autosave,
+    tour: function () { return TOUR; },
     exportString: encode, importString: decode, claim: claim,
     lost: function () { return lost; },
     status: function () { return status; }

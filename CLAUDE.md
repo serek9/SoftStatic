@@ -39,4 +39,4 @@ node tools/balance.js --homes                    # where each species lives, aga
 node tools/icon.js --check                       # the home-screen icon files match the grid they are painted from (Phase 61)
 ```
 
-On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`.
+On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`, `?tour` (every water open on the map, nothing saved).

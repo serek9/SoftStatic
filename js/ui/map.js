@@ -217,7 +217,7 @@ G.ui.map = (function () {
   function verdict(s) {
     if (s.kind !== 'loc') return 'travel';
     if (s.id === G.state.run.loc) return 'here';
-    if (G.state.save.unlocks[s.id]) return 'travel';
+    if (G.state.save.unlocks[s.id] || G.core.save.tour()) return 'travel'; // ?tour: every water open
     if (!stocked(s.id)) return '';
     return E.canUnlock(G.state.save, s.id, G.data) === E.OK ? 'buy' : '';
   }
@@ -233,7 +233,7 @@ G.ui.map = (function () {
     if (s.kind === 'shop') { info.status = 'Up the path from the Fogbound pier. Coffee is on the house.' + far; info.hint = 'go in'; return; }
     if (s.kind === 'cabin') { info.status = 'Yours, up the path from the pier. ' + G.data.gear.cabin[save.cabinLevel].name + '.' + far; info.hint = 'go in'; return; }
     if (v === 'here') { info.status = 'You are here. ' + Math.round(L.maxDepth * 0.25) + ' m at its deepest.'; return; }
-    if (v === 'travel') { info.status = 'Open water, ' + Math.round(L.maxDepth * 0.25) + ' m at its deepest.' + far; info.hint = 'travel'; return; }
+    if (v === 'travel') { info.status = (G.core.save.tour() && !save.unlocks[s.id] ? 'Open for the tour (nothing is saved), ' : 'Open water, ') + Math.round(L.maxDepth * 0.25) + ' m at its deepest.' + far; info.hint = 'travel'; return; }
     if (!stocked(s.id)) { info.status = 'The water is still settling. Nothing lives here yet.'; info.key = 'rust'; return; }
     var r = E.canUnlock(save, s.id, G.data);
     if (r === E.LOCKED) { info.status = (L.need && L.need.text) || 'It opens to someone who has fished while the owl calls.'; info.key = 'rust'; return; }
