@@ -66,8 +66,7 @@ G.data.locations.stone = {
   // Phase 77: Boulder Run's boulders (r world px; foam: the current breaks on them) and the
   // bluff (half its width, its height, world px) with the osprey's nest (x, px above the water).
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 96, seed: 8402 },
-    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
+    { id: 'pier', kind: 'pier', x: 96, seed: 8402, from: 'left' },
     { id: 'boulder_a', kind: 'boulder', x: 236, r: 11, foam: true },
     { id: 'boulder_b', kind: 'boulder', x: 352, r: 14, foam: true },
     { id: 'boulder_c', kind: 'boulder', x: 452, r: 8, foam: true },

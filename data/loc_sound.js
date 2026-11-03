@@ -54,8 +54,7 @@ G.data.locations.sound = {
   },
 
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 1404, seed: 5502 },
-    { id: 'sign', kind: 'sign', x: 1450, flip: true }, // Phase 76: the signpost at the pier's shore end
+    { id: 'pier', kind: 'pier', x: 1404, seed: 5502, from: 'right' },
     { id: 'buoy_a', kind: 'marker', x: 300 },
     { id: 'buoy_b', kind: 'marker', x: 760 }
   ],

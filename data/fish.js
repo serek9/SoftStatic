@@ -635,6 +635,23 @@ G.data.fish.forEach(function (f) {
 
 // Phase 75: species f's home in water loc at reach (a reach id, or '' for anywhere in it): the
 // home listing that reach, else one for the whole water; null if it does not live there.
+// The user's fixes (2026-11-03): how a species takes the hook, felt in the rod and seen in the
+// line (presentation only: the hook window is the same for all, sim/bite.js). By family, a
+// species' own `bite` first:
+//   tap: quick light taps (a perch, a sunfish, the small minnows and the shoal fish)
+//   thump: one solid knock, then a heavy weight (the black bass, the walleye, the bottom fish)
+//   slam: no pecking; it hits and turns, and the rod goes down (the pike, the trout and salmon)
+//   mouth: slow bobs and a pull that builds (the suckers, carp, catfish, sturgeon, the burbot)
+G.data.BITE_BY_FAMILY = {
+  'perches': 'tap', 'sunfish & bass': 'tap', 'temperate bass': 'slam', 'pikes': 'slam', 'trout & salmon': 'slam',
+  'whitefish': 'tap', 'suckers': 'mouth', 'carp & minnows': 'tap', 'catfish': 'mouth', 'cod': 'mouth', 'sturgeon': 'mouth',
+  'mooneyes': 'tap', 'herring & shad': 'tap', 'smelt': 'tap', 'greenlings': 'slam', 'flatfish': 'thump', 'rockfish': 'thump'
+};
+G.data.BITE_OWN = { walleye: 'thump', smallmouth_bass: 'thump', largemouth_bass: 'thump', common_carp: 'mouth', northern_pikeminnow: 'slam', american_shad: 'slam' };
+G.data.biteStyle = function (f) {
+  return (f && (f.bite || G.data.BITE_OWN[f.id] || G.data.BITE_BY_FAMILY[f.family])) || 'tap';
+};
+
 G.data.homeOf = function (f, loc, reach) {
   var hs = f.homes, whole = null;
   for (var i = 0; i < hs.length; i++) {

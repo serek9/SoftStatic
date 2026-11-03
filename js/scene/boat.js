@@ -69,23 +69,6 @@ G.scene.boat = (function () {
   function put(ctx, cv, x, y) { ctx.drawImage(cv, x, y, cv.width / HI, cv.height / HI); }
 
   var P_SPEED = 42; // px/s, the speed at which the dog's ears stream fully (P.maxV)
-  var halo = null;
-
-  // A soft round glow in dusk_high (the ceiling), baked once; drawn at low alpha at night.
-  function bakeHalo() {
-    var R = 30, cv = G.gfx.bake.canvas(R * 2 + 1, R * 2 + 1), ctx = cv.getContext('2d');
-    ctx.fillStyle = S.PALETTE.dusk_high;
-    for (var y = -R; y <= R; y++) {
-      for (var x = -R; x <= R; x++) {
-        var d = Math.sqrt(x * x + y * y) / R;
-        if (d > 1) continue;
-        ctx.globalAlpha = Math.round((1 - d) * (1 - d) * 4) / 10; // 4 stepped rings, 0.4 at most
-        ctx.fillRect(x + R, y + R, 1, 1);
-      }
-    }
-    ctx.globalAlpha = 1;
-    return cv;
-  }
 
   // Phase 24: what the boat does on top of its speed (presentation only; step() is unchanged).
   var M = {
@@ -335,13 +318,7 @@ G.scene.boat = (function () {
       ctx.fillRect(px, y - 18, 1, 15);
       ctx.fillRect(f > 0 ? px - 2 : px, y - 18, 3, 1 / HI);
       ctx.fillStyle = P.wood; ctx.fillRect(px, y - 18, 1 / HI, 15);
-      var lx = px - f * 2;
-      if (gear.night > 0) {
-        if (!halo) halo = bakeHalo();
-        ctx.globalAlpha = gear.night;
-        ctx.drawImage(halo, lx - 15, y - 30, 30.5, 30.5);
-        ctx.globalAlpha = 1;
-      }
+      var lx = px - f * 2; // the user's fixes (2026-11-03): no glow round it for now, to come back with its light
       put(ctx, img('lantern', false), lx - 1.5, y - 17.5);
       y = ly0;
     }

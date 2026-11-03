@@ -258,7 +258,9 @@ G.scene.underwater = (function () {
   function prepare(loc) {
     var set = sets[loc.id];
     if (set) return set;
-    var u = loc.underwater, w = loc.width, H = loc.maxDepth + 24, key = 'loc:' + loc.id + ':uw_';
+    // The user's fixes (2026-11-03): at least down to the view's bottom with the camera at the
+    // surface, so a shallow water (the rivers) shows its bed there and not the water behind it.
+    var u = loc.underwater, w = loc.width, H = Math.max(loc.maxDepth + 24, VIEW_H - loc.waterY + 8), key = 'loc:' + loc.id + ':uw_';
     var WH = w * HI, HH = H * HI, A = G.gfx.paint;
     var prof = makeProfile(loc), rng = new G.core.rng.Rng(loc.seed * 31 + 201);
     set = sets[loc.id] = { id: loc.id, H: H, prof: prof, camMax: Math.max(0, loc.waterY + loc.maxDepth + UW.bottomPad - VIEW_H) };
@@ -468,7 +470,37 @@ G.scene.underwater = (function () {
   // Sinking: it falls to the bottom; tapping action stops it at its depth (-> waiting).
   // Waiting: holding action reels it up and in; at the surface it is out (-> sailing).
   // A location with a current (11.1, loc.drift) carries it downstream the whole time.
+  // The user's fixes (2026-11-03): how well the lure is being worked, 0..1 (cast.work, the fish
+  // read it: sim/fish_ai.js W.workMin ...). From the reel (cast.rv against UW.reelIn): m, the
+  // share of the time it is moving (smoothed over WK.tau s); go, how often it changes between
+  // moving and still (per s, smoothed over WK.tauGo); pop, the popper's pops per s. By style:
+  //   steady (a crank's dive, a spinner's or swimbait's 'mid', a glide): reeled along, m
+  //   stop-and-go (a jig's or blade's lift, a spoon's flutter): go, and a fall counts
+  //   a popper ('top'): its pops, or skittered along
+  //   slow (a dropshot, a wacky worm): nearly still is right; reeled fast it is wrong
+  //   a float rig (live bait under a float) and live bait: always 1
+  var WK = { tau: 1.2, tauGo: 3, still: 2, steadyFull: 0.5, goFull: 0.6, popFull: 0.4, sinkWork: 0.6, sinkLift: 0.9 };
+  var STYLE = { dive: 'steady', mid: 'steady', glide: 'steady', lift: 'stopgo', flutter: 'stopgo', top: 'top', dropshot: 'slow', wacky: 'slow' };
+  function workStep(run, dt) {
+    var c = run.cast, gx = run.gearFx, lure = gx.lure && c.bait === gx.bait, st = lure ? STYLE[gx.swim] : '';
+    if (!st) { c.work = 1; return; }
+    var moving = (c.rv || 0) > RV.still ? 1 : 0, k = Math.min(1, dt / WK.tau), kg = Math.min(1, dt / WK.tauGo);
+    c.wm = (c.wm || 0) + (moving - (c.wm || 0)) * k;
+    var flip = moving !== (c.wasMv || 0) ? 1 / dt : 0; c.wasMv = moving;
+    c.wgo = (c.wgo || 0) + (flip - (c.wgo || 0)) * kg;
+    var popNow = (c.pops || 0) - (c.pops0 || 0); c.pops0 = c.pops || 0;
+    c.wpop = (c.wpop || 0) + (popNow / dt - (c.wpop || 0)) * kg;
+    var w;
+    if (run.fsm === 'sinking') w = st === 'stopgo' ? WK.sinkLift : (st === 'top' ? 0.3 : WK.sinkWork);
+    else if (st === 'steady') w = c.wm / WK.steadyFull;
+    else if (st === 'stopgo') w = c.wgo / WK.goFull;
+    else if (st === 'top') w = Math.max(c.wpop / WK.popFull, 0.6 * c.wm);
+    else w = 1 - 0.85 * c.wm;                                                   // slow
+    c.work = w < 0 ? 0 : (w > 1 ? 1 : w);
+  }
+
   function lureStep(run, dt, loc) {
+    workStep(run, dt);
     var c = run.cast, inp = G.core.input, wy = loc.waterY, bottom = bottomAt(loc, c.x1);
     // Phase 43: a lure fishes its own depth: it sinks at gx.sink of a bait's speed, down to
     // gx.maxDepthM m; a popper ('top') stays on the surface; a plug ('dive') dives as it is reeled.
@@ -489,7 +521,7 @@ G.scene.underwater = (function () {
       if (c.bubT <= 0) { c.bubT = 0.4; fx.emit('bubbles', c.lx, c.ly - 2, 1); }
     } else if (run.fsm === 'waiting' || run.fsm === 'interest') {
       if (lure && gx.swim === 'top' && inp.pressed('action') && run.bite.slot < 0) { // the popper pops: a spit and a ring
-        fx.ripple(c.x1, wy + 1, 1, 6, 0.6); G.gfx.surface.poke(c.x1, 0.2, 1); body.kick = 0.3;
+        fx.ripple(c.x1, wy + 1, 1, 6, 0.6); G.gfx.surface.poke(c.x1, 0.2, 1); body.kick = 0.3; c.pops = (c.pops || 0) + 1;
       }
       // Phase 65: the retrieve. The reel spins up and down (inertia), and the lure is drawn
       // along the line toward the rod tip: deep and close it climbs steeply, far out it runs
@@ -898,25 +930,6 @@ G.scene.underwater = (function () {
     }
   }
 
-  // P2-3: the boat's lantern at night throws a faint cone down into the water from the bow,
-  // in four flat steps of alpha.
-  var cone = null, CONE_HW = 30; // half its width at the bottom, world px
-  function drawCone(ctx, loc, camPx, wyS, alpha) {
-    var g = G.state.save.gear, run = G.state.run;
-    if (!g.lantern || G.sim.clock.isGrey(G.state.save.clock || 0)) return;
-    if (!cone) cone = B.layer(CONE_HW * 2 * HI + 1, 70 * HI, function (c) {
-      c.fillStyle = P.water_hi;
-      var CH = 70 * HI, mid = CONE_HW * HI;
-      for (var y = 0; y < CH; y++) {
-        var hw = 4 + Math.round(y * 0.42);
-        c.globalAlpha = [0.3, 0.22, 0.14, 0.07][Math.floor(y * 4 / CH)];
-        c.fillRect(mid - hw, y, hw * 2 + 1, 1);
-      }
-    });
-    ctx.globalAlpha = alpha;
-    ctx.drawImage(cone, Math.round((run.boat.x + run.boat.facing * 13 - camPx) * HI) / HI - CONE_HW, wyS, cone.width / HI, cone.height / HI);
-  }
-
   // A HI-res layer (a location's width) scrolled to camPx, drawn at screen y wyS.
   function drawLayer(ctx, cv, camPx, wyS, H) {
     ctx.drawImage(cv, Math.round(camPx * HI), 0, VIEW_W * HI, H * HI, 0, wyS, VIEW_W, H);
@@ -971,7 +984,6 @@ G.scene.underwater = (function () {
     if (fw < VW) ctx.drawImage(set.far, 0, 0, VW - fw, HH, fw / HI, wyS, (VW - fw) / HI, H);
     ctx.globalAlpha = alpha * 0.3;
     drawShoals(ctx, camPx, wyS);
-    drawCone(ctx, loc, camPx, wyS, alpha);
     ctx.globalAlpha = alpha;
     drawLayer(ctx, set.bottom, camPx, wyS, H);
     drawCaustics(ctx, loc, camPx, wyS, alpha, t);
@@ -1389,6 +1401,7 @@ G.scene.underwater = (function () {
   // Phase 32: whether the line is being reeled in the fight this step (the reel's handle turns).
   function fightReel() { return fightIn.reel; }
 
+  function run0() { return G.state.run; }
   // dbg.lureBody(): the name of the reach at world x in this water (Phase 77).
   function reachName(x) {
     var R = G.data.locations[G.state.run.loc].reaches || [];
@@ -1412,6 +1425,7 @@ G.scene.underwater = (function () {
         glide: bd.glide, pitch: +bd.pitch.toFixed(3), pitchRaw: bd.pitch + bd.jerk, frame: a.fr, mode: ['swim', 'shake', 'roll'][bd.mode], speed: +bd.spd.toFixed(2), vy: +bd.vy.toFixed(2), len: +bd.len.toFixed(1) };
     }, drawLure: drawLure, drawFloat: drawFloat, lureImg: lureImg, lureFrame: lureFrame, hookIds: hookIds, hookKind: hookKind, BAITS: BAITS, DIRS: DIRS,
     body: function () { var c = G.state.run.cast; return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3), sink: +body.sink.toFixed(2), reach: reachName(c.x1), // Phase 77
+      work: +(c.work === undefined ? 1 : c.work).toFixed(2), style: (run0().gearFx.lure && c.bait === run0().gearFx.bait && STYLE[run0().gearFx.swim]) || 'bait', // the user's fixes
       retrieve: +(c.rv || 0).toFixed(2), swing: !!c.swing, action: (hookIds(), LURE_OF[c.bait || G.state.run.gearFx.bait] ? (LURE_OF[c.bait || G.state.run.gearFx.bait].vary || LURE_OF[c.bait || G.state.run.gearFx.bait].swim) : 'bait'), frame: LURE_OF[c.bait || G.state.run.gearFx.bait] ? body.frame : -1, frames: LURE_OF[c.bait || G.state.run.gearFx.bait] ? LG.frames(c.bait || G.state.run.gearFx.bait) : 0, depthM: +((c.ly - G.data.locations[G.state.run.loc].waterY) * 0.25).toFixed(2) }; },
     UW: UW, UNDER: UNDER, stats: stats, prepare: prepare, galleryBed: galleryBed, bottomAt: bottomAt, deepestX: deepestX,
     lureStep: lureStep, viewStep: viewStep, draw: draw, setLure: setLure,

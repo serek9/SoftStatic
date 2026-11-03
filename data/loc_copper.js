@@ -68,8 +68,7 @@ G.data.locations.copper = {
   // Phase 77: The Split's bridge (half its span and its deck's height above the water, world
   // px) and gravel bars; Lodge Pool's dam; Hollow Reach's maples leaning out (dir).
   landmarks: [
-    { id: 'pier', kind: 'pier', x: 96, seed: 7302 },
-    { id: 'sign', kind: 'sign', x: 50 }, // Phase 76: the signpost at the pier's shore end
+    { id: 'pier', kind: 'pier', x: 96, seed: 7302, from: 'left' },
     { id: 'gravel_a', kind: 'gravel', x: 182, half: 20, h: 3.5 },
     { id: 'bridge', kind: 'bridge', x: 290, half: 66, h: 23 },
     { id: 'gravel_b', kind: 'gravel', x: 424, half: 28, h: 4 },

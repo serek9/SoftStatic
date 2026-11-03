@@ -80,7 +80,7 @@ G.scene.sailing = (function () {
     var v = G.vrng;
     storm.next = STORM.gapMin + (STORM.gapMax - STORM.gapMin) * v.next();
     storm.t = 0; storm.n++; storm.bolt = v.next() < 0.5; storm.bx = 30 + v.next() * (VIEW_W - 60);
-    storm.seed = (v.next() * 1e9) | 0; storm.dist = v.next(); storm.thunder = 1 + 3 * storm.dist;
+    storm.seed = (v.next() * 1e9) | 0; storm.dist = v.next(); storm.thunder = 0.3 + 2.7 * storm.dist; // the user's fixes: sooner after the flash
     if (G.core.debug) G.core.debug.log('lightning (' + (storm.dist * 10).toFixed(1) + ' km)');
   }
   // One step: the flash fades, the thunder comes, and the next flash counts down with the storm.
@@ -187,13 +187,27 @@ G.scene.sailing = (function () {
     }
   };
 
+  // The pier's ends in layer px (the user's fixes, 2026-11-03): from the world's left edge (or
+  // its right) out to 68 layer px past the landmark's x on the water side; a pier with no
+  // `from` stands 68 either side of x, as before. Allocation-free (into out).
+  var PIER_EXT = [0, 0];
+  function pierExtent(lm, out) {
+    var X = lm.x * HI;
+    if (lm.from === 'left') { out[0] = 0; out[1] = X + 68; }
+    else if (lm.from === 'right') { out[0] = X - 68; out[1] = loc.width * HI; }
+    else { out[0] = X - 68; out[1] = X + 68; }
+    return out;
+  }
+
   // Landmarks stand on the water at the boat's distance; each paints in layer pixels around
   // x and returns its extent [x0, x1] in layer pixels.
   var LANDMARKS = {
     // The pier: posts braced in X, a deck of planks with gaps and missing boards, a rail,
-    // and a lamp post at the end with a rusted head.
-    pier: function (ctx, x, wy, rng) {
-      var x0 = x - 68, x1 = x + 68, deck = wy - 14, px, q;
+    // and a lamp post at the end with a rusted head. The user's fixes (2026-11-03): a pier runs
+    // out from the shore (lm.from 'left' or 'right': from that edge of the world, the rail at
+    // its shore end and the lamp at its water end), never standing alone in the water.
+    pier: function (ctx, x, wy, rng, lm) {
+      var e = pierExtent(lm, PIER_EXT), x0 = e[0], x1 = e[1], right = lm && lm.from === 'right', deck = wy - 14, px, q;
       for (px = x0 + 4; px <= x1 - 6; px += 16) {
         A.slab(ctx, px, deck + 4, 5, wy - deck - 3, WOOD);
         if (px + 16 <= x1 - 6) for (q = 0; q < 9; q++) { A.px(ctx, 'wood_dark', px + 5 + q, deck + 5 + q * 0.5 | 0); A.px(ctx, 'wood_dark', px + 15 - q, deck + 5 + q * 0.5 | 0); }
@@ -204,32 +218,19 @@ G.scene.sailing = (function () {
         var k = rng.next() < 0.3 ? 'wood_hi' : 'wood_mid';
         A.box(ctx, k, px, deck, 6, 3); A.box(ctx, 'wood_lit', px, deck, 6, 1); A.box(ctx, 'wood', px + 5, deck + 1, 1, 2);
       }
-      for (px = x0 + 8; px <= x1 - 16; px += 24) if (rng.next() > 0.25) { A.slab(ctx, px, deck - 12, 3, 12, WOOD); }
-      A.box(ctx, 'wood_mid', x0 + 8, deck - 11, 48, 2); A.box(ctx, 'wood_hi', x0 + 8, deck - 11, 48, 1);
-      A.slab(ctx, x1 - 7, deck - 38, 3, 38, STONES);
-      A.box(ctx, 'stone', x1 - 15, deck - 38, 10, 2);
-      A.slab(ctx, x1 - 18, deck - 37, 7, 5, RUSTY); A.box(ctx, 'fog_dark', x1 - 17, deck - 33, 5, 2);
-      return [x0, x1];
-    },
-    // Phase 67: the signpost at the pier's shore end: a leaning post with two boards pointing
-    // up the path, BAIT SHOP and CABIN, and a lantern hook. Phase 76: every water's pier has
-    // one; the CABIN board only where lm.cabin (Fogbound's), and lm.flip turns the boards to
-    // point west (the seas' piers stand at the east end).
-    sign: function (ctx, x, wy, rng, lm) {
-      var deck = wy - 14, FN = G.gfx.sprites.fine, y0 = deck - 40, fl = !!(lm && lm.flip), cab = !!(lm && lm.cabin);
-      A.slab(ctx, x - 2, y0, 4, wy - y0 + 2, WOOD); A.box(ctx, 'wood_lit', x - 2, y0, 1, wy - y0);
-      var B = ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit'];
-      // a board w wide with its point 3 px past the post's side (x + 18, or mirrored about the
-      // post for fl), its text tx px in from the tail
-      function board(by, w, txt, tx) {
-        var x0 = fl ? x - 18 : x + 18 - w, tip = fl ? x - 21 : x + 18;
-        A.slab(ctx, x0, by, w, 11, B); A.box(ctx, 'outline', tip, by + 2, 3, 7); A.px(ctx, 'wood_mid', fl ? tip + 2 : tip, by + 5);
-        FN.drawText(ctx, txt, fl ? x0 + w - tx - FN.measure(txt) : x0 + tx, by + 2, 'paper_dark');
+      var r0 = right ? x1 - 56 : x0 + 8;                                // the rail, at the shore end
+      for (px = r0; px <= r0 + 48; px += 24) if (rng.next() > 0.25) { A.slab(ctx, px, deck - 12, 3, 12, WOOD); }
+      A.box(ctx, 'wood_mid', r0, deck - 11, 48, 2); A.box(ctx, 'wood_hi', r0, deck - 11, 48, 1);
+      if (right) {                                                      // the lamp post at the water end
+        A.slab(ctx, x0 + 4, deck - 38, 3, 38, STONES);
+        A.box(ctx, 'stone', x0 + 5, deck - 38, 10, 2);
+        A.slab(ctx, x0 + 11, deck - 37, 7, 5, RUSTY); A.box(ctx, 'fog_dark', x0 + 12, deck - 33, 5, 2);
+      } else {
+        A.slab(ctx, x1 - 7, deck - 38, 3, 38, STONES);
+        A.box(ctx, 'stone', x1 - 15, deck - 38, 10, 2);
+        A.slab(ctx, x1 - 18, deck - 37, 7, 5, RUSTY); A.box(ctx, 'fog_dark', x1 - 17, deck - 33, 5, 2);
       }
-      board(y0 + 2, 44, 'BAIT SHOP', 3);
-      if (cab) board(y0 + 15, 38, 'CABIN', 6);
-      A.reset();
-      return fl ? [x - 22, x + 25] : [x - 26, x + 21];
+      return [x0, x1];
     },
     // A rusted channel buoy: a float at the waterline, a lattice cage, a dead lamp, a bell.
     marker: function (ctx, x, wy, rng) {
@@ -467,7 +468,7 @@ G.scene.sailing = (function () {
     // Phase 28: the current carries the fish as it carries the lure (the same pure function).
     run.school.ctx.flowAt = loc.drift ? function (x, depth) { return G.scene.underwater.flow(loc, depth); } : null;
     G.scene.underwater.bottomAt(loc, 0); // bakes the cross-section now
-    run.lureIn = { active: false, x: 0, y: 0, bait: '', lure: false };
+    run.lureIn = { active: false, x: 0, y: 0, bait: '', lure: false, work: 1 };
     run.uneaseIn = { loc: id, still: true, atShop: false };
     run.bite = G.sim.bite.create();
     run.fight = G.sim.fight.create();
@@ -500,6 +501,7 @@ G.scene.sailing = (function () {
     li.y = c.ly - loc.waterY;
     li.bait = c.bait || gx.bait;
     li.lure = G.sim.economy.isLure(li.bait, G.data); // Phase 43
+    li.work = c.work === undefined ? 1 : c.work;      // the user's fixes: how well it is worked (underwater.workStep)
     ctx.loc = loc.id;
     ctx.depthM = li.y * 0.25;
     if (li.lure && gx.swim === 'top') ctx.depthM = Math.max(ctx.depthM, gx.topDepthM); // Phase 43: fish rise to a surface lure
@@ -536,6 +538,7 @@ G.scene.sailing = (function () {
     c.dist = Math.abs(c.x1 - b.x);
     c.seed = G.rng.int(1, 0x7fffffff);
     c.n++;
+    c.work = 0; c.wm = 0; c.wgo = 0; c.wpop = 0; c.wasMv = 0; c.pops = 0; c.pops0 = 0; // the user's fixes: a fresh retrieve
     c.t = 0;
     c.flying = false;
     G.core.state.go(run, 'casting');
@@ -617,7 +620,7 @@ G.scene.sailing = (function () {
     var c = run.cast, inp = G.core.input;
     switch (run.fsm) {
       case 'sailing':
-        if (inp.pressed('action') && run.boat.stopped) startCharge(run);
+        if (inp.pressed('action') && run.boat.stopped && !dg.up) startCharge(run); // the user's fixes: not before the lure is reeled up
         break;
       case 'charging':
         if (inp.move() !== 0) { G.core.state.go(run, 'sailing'); break; } // steering cancels the charge
@@ -687,10 +690,8 @@ G.scene.sailing = (function () {
         out[0] = CAST.waitAngle; out[1] = 0.02 + 0.07 * Math.max(0, tickT) / TICK; // the line's own weight; a nibble ticks the tip
         // Bite cue (7.1, P1-4): the fish mouths the bait in tugs, sharp in and slower out, 2.6 a
         // second, and pulls harder as it takes it. The hands keep still: the tip does the nodding.
-        if (run.bite.slot >= 0) {
-          u = (run.bite.t * 2.6) % 1;
-          out[1] = 0.1 + Math.min(0.15, run.bite.t * 0.2) + 0.3 * (u < 0.08 ? u / 0.08 : Math.exp(-(u - 0.08) * 7));
-        }
+        // The user's fixes: in the way of the species (FEEL, feelLoad).
+        if (run.bite.slot >= 0) out[1] = feelLoad(feelOf(run).style, run.bite.t);
         out[1] *= run.gearFx.lineFeel || 1; // Phase 53: a line without stretch (braid) carries every touch to the tip
     }
     if (run.fisher && run.fisher.angle !== null) out[0] = run.fisher.angle; // Phase 33: in the holder, or raised in an act
@@ -703,6 +704,41 @@ G.scene.sailing = (function () {
   // how straight the line hangs, its sag against the line out (SAG_K px plus SAG_R of the span
   // for half the load), never under the line's weight.
   var ROD_K = 3, SAG_K = 1, SAG_R = 0.05, TICK = 0.12, tickT = 0;
+  // The user's fixes (2026-11-03): each species takes the hook in its own way (G.data.biteStyle),
+  // felt in the rod tip, seen in the line and the float, heard in the knock. load(t): the tip's
+  // load t s into the bite; dip: px the line dips; wob: its shiver; nib: how much it pecks before
+  // (0: never, it hits at once), gap: s between pecks; knock: the bite's knock up the line.
+  var FEEL = {
+    tap: { dip: 1, wob: 30, nib: 1, gap: [0.1, 0.22], knock: 0.025, ticks: 4, float: 5 },
+    thump: { dip: 3, wob: 8, nib: 0.5, gap: [0.4, 0.7], knock: 0.065, ticks: 1, float: 1 },
+    slam: { dip: 4, wob: 14, nib: 0, gap: [0.6, 0.9], knock: 0.075, ticks: 2, float: 0 },
+    mouth: { dip: 2, wob: 4, nib: 0.8, gap: [0.5, 0.9], knock: 0.03, ticks: 0, float: 0.6 }
+  };
+  // How far the float goes under (0..1): a tap bobs it, a thump and a slam take it down, a mouth draws it slowly under.
+  function floatDip(run) {
+    var st = feelOf(run).style, t = run.bite.t, f = FEEL[st] || FEEL.tap;
+    if (st === 'tap') return 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(t * f.float * 6.28));
+    if (st === 'mouth') return Math.min(1, 0.15 + t * 0.45);
+    return Math.min(1, (st === 'slam' ? 0.7 : 0.45) + t * 3);
+  }
+  function feelLoad(style, t) {
+    var u;
+    if (style === 'tap') { u = (t * 5.5) % 1; return 0.05 + Math.min(0.08, t * 0.06) + 0.16 * (u < 0.1 ? u / 0.1 : Math.exp(-(u - 0.1) * 9)); }
+    if (style === 'thump') return 0.22 + 0.45 * Math.exp(-t * 5) + Math.min(0.1, t * 0.05) + 0.05 * Math.sin(t * 5.6);
+    if (style === 'slam') return 0.42 + 0.25 * Math.min(1, t * 3) + 0.08 * Math.sin(t * 31) * Math.sin(t * 7.3);
+    return 0.06 + Math.min(0.25, t * 0.2) + 0.12 * (0.5 + 0.5 * Math.sin(t * 6.9 - 1.6));   // mouth
+  }
+  // The fish biting (or, with none, the one pecking at it) and its style, no allocation.
+  var feelNow = { style: '', uid: 0, biting: false };
+  function feelOf(run) {
+    var fish = run.school.fish, i, f = null;
+    if (run.bite.slot >= 0) f = fish[run.bite.slot];
+    else for (i = 0; i < fish.length; i++) if (fish[i].active && fish[i].state === 'nibble') { f = fish[i]; break; }
+    feelNow.biting = run.bite.slot >= 0;
+    if (!f) { feelNow.style = ''; feelNow.uid = 0; return feelNow; }
+    if (f.uid !== feelNow.uid) { feelNow.uid = f.uid; feelNow.style = G.data.biteStyle(G.data.fish[f.sp]); }
+    return feelNow;
+  }
   var REEL_TURNS = 10, SHAKE_KICK = 5; // handle turns a second per unit of reel speed; a head shake's kick (rad/s at the tip)
   function rodStep(run, dt) {
     var b = run.boat, st = rope.st, dx = 0, dy = 1, load;
@@ -739,16 +775,46 @@ G.scene.sailing = (function () {
   // and stops), damped. An act can pay line out or reel it in (fisher.line) and take the lure
   // in hand (fisher.held): then it is where his near hand is, and when he lets go it swings
   // from there. ox, oy: the lure's offset from the tip (world px), what the draw and the cast read.
-  var DG = { len: 3, g: 40, damp: 1.4, out: 14, reelIn: 10, aMax: 3000, aK: 0.4 }; // aK: the share of the tip's acceleration the lure feels (the boat's arcade starts would flip it)
-  var dg = { on: false, th: 0, om: 0, len: 3, ox: 0, oy: 3, tx: 0, ty: 0, vx: 0, vy: 0, init: false };
+  var DG = { len: 3, g: 40, damp: 1.4, out: 14, reelIn: 10, aMax: 3000, aK: 0.4, upV: 9, upMax: 70 }; // aK: the share of the tip's acceleration the lure feels (the boat's arcade starts would flip it)
+  // The user's fixes (2026-11-03): a lure reeled out of the water comes out on all the line
+  // between the tip and where it broke the surface, swinging (`up`); holding the reel winds it
+  // up at upV px/s to the tip (DG.len), letting go leaves it hanging, and no cast starts until
+  // it is up. upMax: the longest it can hang.
+  var dg = { on: false, th: 0, om: 0, len: 3, ox: 0, oy: 3, tx: 0, ty: 0, vx: 0, vy: 0, init: false, up: false, lastFsm: '', outX: 0 };
   var dgTip = [0, 0];
   function dangleStep(run, dt) {
     var fsm = run.fsm, fs = run.fisher, b = run.boat;
+    // out of the water from a retrieve (not from a fight's landing or a lost fish): it comes up long
+    if (fsm === 'sailing' && (dg.lastFsm === 'waiting' || dg.lastFsm === 'interest' || dg.lastFsm === 'sinking')) { dg.init = false; dg.up = true; dg.outX = run.cast.x1; }
+    dg.lastFsm = fsm;
     var on = rope.st.mode === rope.OFF && (fsm === 'sailing' || fsm === 'charging' || fsm === 'card');
     if (fsm === 'casting' && !run.cast.flying) on = true;
+    if (fsm !== 'sailing') dg.up = false;
     boat.rodTip(b, b.x, loc.waterY, dgTip);
-    if (!on) { dg.on = false; dg.init = false; return; }
-    if (!dg.init) { dg.th = 0; dg.om = 0; dg.len = DG.len; dg.tx = dgTip[0]; dg.ty = dgTip[1]; dg.vx = 0; dg.vy = 0; dg.init = true; }
+    if (!on) { dg.on = false; if (!dg.up) dg.init = false; return; }
+    if (!dg.init) {
+      dg.th = 0; dg.om = 0; dg.len = DG.len; dg.tx = dgTip[0]; dg.ty = dgTip[1]; dg.vx = 0; dg.vy = 0; dg.init = true;
+      if (dg.up) {
+        var ux = dg.outX - dgTip[0], uy = loc.waterY - dgTip[1];
+        dg.len = Math.max(DG.len, Math.min(DG.upMax, Math.sqrt(ux * ux + uy * uy)));
+        dg.th = Math.atan2(ux, uy); dg.om = 0;
+        if (dg.len <= DG.len + 0.5) dg.up = false;
+      }
+    }
+    if (dg.up) {                                                             // winding the lure up out of the water
+      dg.on = true;
+      var vx0 = (dgTip[0] - dg.tx) / dt, vy0 = (dgTip[1] - dg.ty) / dt;
+      var ax0 = DG.aK * Math.max(-DG.aMax, Math.min(DG.aMax, (vx0 - dg.vx) / dt)), ay0 = DG.aK * Math.max(-DG.aMax, Math.min(DG.aMax, (vy0 - dg.vy) / dt));
+      dg.tx = dgTip[0]; dg.ty = dgTip[1]; dg.vx = vx0; dg.vy = vy0;
+      var reel = G.core.input.held('action') && !G.ui.setup.isOpen() && !G.ui.dock.isOpen(), u0 = dg.len;
+      if (reel) dg.len = Math.max(DG.len, dg.len - DG.upV * dt);
+      var dlu = (dg.len - u0) / dt;
+      dg.om += dt * ((-(DG.g + ay0) * Math.sin(dg.th) - ax0 * Math.cos(dg.th)) / dg.len - 2 * dlu * dg.om / dg.len - DG.damp * dg.om);
+      dg.th += dt * dg.om;
+      dg.ox = Math.sin(dg.th) * dg.len; dg.oy = Math.cos(dg.th) * dg.len;
+      if (dg.len <= DG.len) dg.up = false;
+      return;
+    }
     var vx = (dgTip[0] - dg.tx) / dt, vy = (dgTip[1] - dg.ty) / dt;
     var ax = DG.aK * Math.max(-DG.aMax, Math.min(DG.aMax, (vx - dg.vx) / dt)), ay = DG.aK * Math.max(-DG.aMax, Math.min(DG.aMax, (vy - dg.vy) / dt));
     dg.tx = dgTip[0]; dg.ty = dgTip[1]; dg.vx = vx; dg.vy = vy;
@@ -827,7 +893,7 @@ G.scene.sailing = (function () {
     }
     if (c.ly - loc.waterY < 1.5) ly = Math.min(ly, Math.round(floatY(c.x1) * HI) / HI);  // just in, the lure rides the surface
     if (fsm !== 'sinking') lx += Math.round(Math.sin(b.t * 1.3) * 1.5);                   // the lure sways once it stops
-    if (run.bite.slot >= 0) ly += 2 + Math.round(Math.sin(run.bite.t * 18));             // bite cue: the line dips
+    if (run.bite.slot >= 0) { var fl = FEEL[feelOf(run).style] || FEEL.tap; ly += fl.dip + Math.round(Math.sin(run.bite.t * fl.wob)); } // bite cue: the line dips, in the species' way
     else if (G.sim.fish_ai.interestLevel(run.school) >= 0.85) lx += Math.round(Math.sin(b.t * 40)); // nibbles
     out[0] = lx; out[1] = ly;
     return out;
@@ -872,9 +938,10 @@ G.scene.sailing = (function () {
         r = r > belly ? r - (r - belly) * Math.min(1, ROPE.takeUp * dt) : Math.max(r, span * 1.01);
       }
       nibT -= dt;
-      if (run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85 && nibT <= 0) {
-        nibT = 0.25 + 0.3 * G.vrng.next();
-        rope.twitch(6, (G.vrng.next() - 0.5) * 1.2, 0.8);                             // a nibble twitches the end
+      var pk = run.bite.slot < 0 ? FEEL[feelOf(run).style] : null;                      // the user's fixes: pecks in the species' way
+      if (pk && pk.nib > 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85 && nibT <= 0) {
+        nibT = pk.gap[0] + (pk.gap[1] - pk.gap[0]) * G.vrng.next();
+        rope.twitch(6, (G.vrng.next() - 0.5) * 1.2 * pk.nib, 0.8 * pk.nib);           // a nibble twitches the end
         tickT = TICK;                                                                    // and ticks the rod tip
         G.audio.engine.cue('nibble');                                                    // and ticks up the rod (Phase 25)
       }
@@ -936,7 +1003,7 @@ G.scene.sailing = (function () {
     else return;
     if (end && isFloat(run)) {                                                          // Phase 65: the float, its leader and the worm
       var hx = c.x1 - camPx + (fsm !== 'sinking' ? Math.round(Math.sin(b.t * 1.1) * 1) : 0), hy = c.ly - camPy;
-      G.scene.underwater.drawFloat(ctx, lx, ly, hx, hy, run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85, run.bite.slot >= 0 ? Math.min(1, 0.4 + run.bite.t * 3) : 0, b.t, run.gearFx.bait); // Phase 69: the Bobber or the Deep Bobber
+      G.scene.underwater.drawFloat(ctx, lx, ly, hx, hy, run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85, run.bite.slot >= 0 ? floatDip(run) : 0, b.t, run.gearFx.bait); // Phase 69: the Bobber or the Deep Bobber
       return;
     }
     G.scene.underwater.drawLure(ctx, c.bait || run.gearFx.bait, lx, ly); // Phase 22: the bait's own body
@@ -1550,7 +1617,7 @@ G.scene.sailing = (function () {
     if (G.ui.setup.isOpen()) return 'PICK';
     if (G.ui.dock.isOpen()) return 'GO';
     switch (run.fsm) {
-      case 'sailing': return run.boat.stopped ? 'CAST' : '';
+      case 'sailing': return dg.up ? 'REEL' : (run.boat.stopped ? 'CAST' : '');
       case 'charging': return 'CAST';
       case 'sinking': case 'waiting': case 'interest': return run.bite.slot >= 0 ? 'HOOK' : 'REEL';
       case 'hooked': case 'fighting': return 'REEL';
@@ -1814,13 +1881,14 @@ G.scene.sailing = (function () {
 
   // Phase 20: the pier's posts stand in the water. Each gets a foam collar where the surface
   // meets it and a dark wet band just above, both riding the surface's height there. The
-  // posts are where LANDMARKS.pier paints them: every 16 layer px from x - 64, 5 px wide.
+  // posts are where LANDMARKS.pier paints them: every 16 layer px from its start + 4, 5 px wide.
   function drawPosts(c, wy) {
     var lms = loc.landmarks, surf = G.gfx.surface;
     for (var j = 0; j < lms.length; j++) {
       if (lms[j].kind !== 'pier' || (scen.landmarks && scen.landmarks.pier)) continue;
-      for (var k = 0; k < 8; k++) {
-        var px = lms[j].x + (-64 + 16 * k) / HI, sx = px - camPx;
+      var e = pierExtent(lms[j], PIER_EXT), e0 = e[0], e1 = e[1];
+      for (var lp = e0 + 4; lp <= e1 - 6; lp += 16) {
+        var px = lp / HI, sx = px - camPx;
         if (sx < -4 || sx > VIEW_W + 4) continue;
         var sy = Math.round((wy - surf.at(px + 1.25) / HI) * HI) / HI;
         c.globalAlpha = 0.45; c.fillStyle = P.wood_deep; c.fillRect(sx, sy - 1, 2.5, 1);
@@ -1910,7 +1978,10 @@ G.scene.sailing = (function () {
     loc: function () { return loc; },
     night: function () { return fisherIn.night; }, // Phase 35: what the idle director takes as dusk or night
     sail: function (dir, secs) { sail.dir = dir < 0 ? -1 : 1; sail.t = secs === undefined ? 1 : +secs; return sail; },
-    dangle: function () { return { on: dg.on, th: +dg.th.toFixed(3), om: +dg.om.toFixed(3), len: +dg.len.toFixed(2), off: [+dg.ox.toFixed(2), +dg.oy.toFixed(2)] }; }, // dbg.dangle (Phase 34)
+    dangle: function () { return { on: dg.on, up: dg.up, th: +dg.th.toFixed(3), om: +dg.om.toFixed(3), len: +dg.len.toFixed(2), off: [+dg.ox.toFixed(2), +dg.oy.toFixed(2)] }; }, // dbg.dangle (Phase 34); up: being reeled out of the water
+    reelingUp: function () { return dg.up && G.core.input.held('action'); },
+    // The user's fixes: how the fish on the lure takes it now (dbg.bite(); the audio's knock).
+    biteFeel: function () { var run = G.state.run, f = run && run.school ? feelOf(run) : null; return f && f.style ? { style: f.style, biting: f.biting, feel: FEEL[f.style], load: f.biting ? +feelLoad(f.style, run.bite.t).toFixed(3) : 0 } : null; },
     scenery: function () { return scen === NO_SCENERY ? null : scen; },
     landmarkBounds: function (id) { return boundsByLoc[loc.id] && boundsByLoc[loc.id][id]; },
     // dbg.shore() (Phase 49): for each layer of this water, the kinds its painter painted and its bake's ms (on its first bake).

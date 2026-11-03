@@ -16,6 +16,7 @@ G.audio.engine = (function () {
   var ac = null, master = null, limiter = null, bus = {}, ambLP = null, uwLP = null, reverb = null, revSend = null, revLoc = '';
   var noiseBuf = null, clickBuf = null;
   var amb = {};                                  // the always-running ambience nodes
+  var stormHeard = 0;                            // the user's fixes: how much of the storm is heard (0..1)
   var voices = 0, log = [], LOG_N = 24;
   var prev = { dog: '', fsm: '', bite: -1, mode: '', owlT: 0, heavy: 0, coins: -1, loc: '', cycles: 0, pl: false, menu: '', D: 0, ly: 0, sig: false, scene: '', shake: false, dragT: -9, creakT: 0, lx: 0, cly: 0 };
   var dragAcc = 0, reelInfo = { tier: 0, turns: 0, clickRate: 0, whirHz: 0, dragRate: 0, load: 0 };
@@ -381,6 +382,7 @@ G.audio.engine = (function () {
     amb.lap = gain(0, bus.amb); src.connect(filter('bandpass', 720, 1.3, amb.lap));
     amb.stream = gain(0, bus.amb); src.connect(filter('bandpass', 1900, 0.6, amb.stream));
     amb.rain = gain(0, bus.amb); src.connect(filter('highpass', 3200, 0.5, amb.rain)); // the drizzle (P3-1)
+    amb.storm = gain(0, bus.amb); src.connect(filter('bandpass', 900, 0.35, amb.storm)); // the user's fixes: a storm's heavy rain wash
     amb.stat = gain(0, bus.sfx);
     amb.statBP = filter('bandpass', 2600, 0.5, amb.stat); src.connect(amb.statBP);
     // The drone: two low tones and a third that drifts out of tune as unease rises (V10.1).
@@ -422,19 +424,31 @@ G.audio.engine = (function () {
   // second and rolls away over 3-5 s, with a slow wobble in its filter; nearer, a little
   // louder and with a soft crack of higher noise on top. On the ambience bus (muffled indoors),
   // under the master limiter, and never louder than a big splash (no sudden loud sound, §0.14).
-  var lastThunder = { dist: -1, g: 0 };
-  function thunder(dist) {
-    if (voices >= VOICE_MAX) return;
-    var t0 = ac.currentTime, up = 0.25 + 0.5 * dist, dur = 3 + 2 * dist, g = 0.06 * (1 - 0.6 * dist);
-    var s = ac.createBufferSource(), f = ac.createBiquadFilter(), e = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
-    s.buffer = noiseBuf; s.loop = true; f.type = 'lowpass'; f.Q.value = 0.9; f.frequency.value = 170 - 80 * dist;
-    lfo.frequency.value = 1.3 + G.vrng.next(); lg.gain.value = 50 - 20 * dist; lfo.connect(lg); lg.connect(f.frequency);
+  // The user's fixes (2026-11-03): it was too quiet to hear on most speakers. Now two bands, a
+  // deep rumble and a band in the low mids that small speakers can play, each rolling in two or
+  // three swells (the echo off the hills), and a soft crack for a near strike; its peak (0.16 +
+  // 0.07 at its nearest) stays under a big splash's (0.17 + 0.11).
+  var lastThunder = { dist: -1, g: 0, rolls: 0 };
+  function rumble(type, freq, q, wob, g, up, dur, at) {
+    var t0 = ac.currentTime + at, s = ac.createBufferSource(), f = ac.createBiquadFilter(), e = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+    s.buffer = noiseBuf; s.loop = true; f.type = type; f.Q.value = q; f.frequency.value = freq;
+    lfo.frequency.value = 1.1 + G.vrng.next() * 1.2; lg.gain.value = wob; lfo.connect(lg); lg.connect(f.frequency);
     e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(g, t0 + up);
     e.gain.setTargetAtTime(0, t0 + up, dur / 4);
     s.connect(f); f.connect(e); e.connect(out(0, bus.amb));
     voices++; s.onended = done; s.start(t0, G.vrng.next() * 1.5); s.stop(t0 + up + dur + 0.1); lfo.start(t0); lfo.stop(t0 + up + dur + 0.1);
-    if (dist < 0.35) hiss('bandpass', 900, 300, 0.8, 0.9, 0.01 * (1 - dist), 0, 0.02);
-    lastThunder.dist = dist; lastThunder.g = g;
+  }
+  function thunder(dist) {
+    if (voices >= VOICE_MAX - 4) return;
+    var up = 0.2 + 0.5 * dist, dur = 3.5 + 2.5 * dist, g = 0.16 * (1 - 0.55 * dist), rolls = 2 + (G.vrng.next() < 0.5 ? 1 : 0), at = 0;
+    for (var i = 0; i < rolls; i++) {
+      var k = i ? 0.55 - 0.15 * i : 1;                                          // each echo softer
+      rumble('lowpass', 150 - 70 * dist, 0.9, 50 - 20 * dist, g * k, up, dur * (i ? 0.7 : 1), at);
+      rumble('bandpass', 260 - 80 * dist, 0.7, 60, g * k * 0.45, up, dur * (i ? 0.6 : 0.8), at);
+      at += 0.7 + G.vrng.next() * 1.1;
+    }
+    if (dist < 0.4) hiss('bandpass', 1500, 400, 0.8, 0.7, 0.07 * (1 - dist), 0, 0.03);  // the near crack
+    lastThunder.dist = dist; lastThunder.g = g; lastThunder.rolls = rolls;
   }
 
   // A tone from f0 to f1 over dur seconds with a soft attack (never under 5 ms).
@@ -634,7 +648,11 @@ G.audio.engine = (function () {
     }
     if (run.bite.slot >= 0 && prev.bite < 0) {
       // The bite: a firm knock up the line and the rod tip ticking; near the surface, a pop.
-      playBuf(pick(KIT.knock), 0.05, boatPan); playBuf(pick(KIT.tick), 0.02, boatPan, 1, null, 0.12); playBuf(pick(KIT.tick), 0.015, boatPan, 1.1, null, 0.22);
+      // The user's fixes (2026-11-03): in the species' way (sailing.biteFeel): a tap's knock is light
+      // with a run of ticks after it, a thump's one solid knock, a slam's hard knock, a mouth's soft one.
+      var bf = G.scene.sailing.biteFeel ? G.scene.sailing.biteFeel() : null, kf = bf ? bf.feel : null;
+      playBuf(pick(KIT.knock), kf ? kf.knock : 0.05, boatPan, bf && bf.style === 'slam' ? 0.85 : 1);
+      for (var tk = 0; tk < (kf ? kf.ticks : 2); tk++) playBuf(pick(KIT.tick), 0.018 - tk * 0.002, boatPan, 1 + 0.1 * tk, null, 0.1 + tk * (bf && bf.style === 'tap' ? 0.08 : 0.12));
       if (c.ly - G.scene.sailing.loc().waterY < 8) { var bs = spotAt(c.x1); playBuf(pick(KIT.pop), 0.03 * bs.att, bs.pan, 1, bus.water); }
       note('bite');
     }
@@ -668,7 +686,8 @@ G.audio.engine = (function () {
       if (held) { turns = F.mode === 'tired' ? 2.2 : 0.7; load = Math.min(1, 0.4 + F.T); }
     } else if (fsm === 'sinking' || fsm === 'waiting' || fsm === 'interest') {
       if (c.ly < prev.ly - 0.01) { turns = 2.2; load = 0.3 + 0.7 * G.gfx.rope.st.taut; }
-    } else if (run.fisher && run.fisher.reel > 0) { turns = run.fisher.reel; load = 0.15; } // Phase 34: reeling the hanging lure up
+    } else if (fsm === 'sailing' && G.scene.sailing.reelingUp && G.scene.sailing.reelingUp()) { turns = 2.2; load = 0.2; } // the user's fixes: winding the lure up out of the water
+    else if (run.fisher && run.fisher.reel > 0) { turns = run.fisher.reel; load = 0.15; } // Phase 34: reeling the hanging lure up
     prev.D = F.D; prev.ly = c.ly;
     set(amb.whirO.frequency, Math.max(20, turns * 26), 0.05);
     set(amb.whirBP.frequency, TR.whir[0], 0.05); amb.whirBP.Q.value = TR.whir[1];
@@ -724,7 +743,12 @@ G.audio.engine = (function () {
   function ambience(save, run, dt, outside) {
     var loc = run.loc || 'fog', h = G.sim.clock.wrap(save.clock || 0), L = lightShares(h);
     var u = G.sim.unease.get(save, loc), vx = run.boat ? Math.abs(run.boat.vx) : 0;
-    set(amb.wind.gain, 0.012 + 0.025 * L.grey);
+    // The user's fixes (2026-11-03): a storm is heard: a heavy rain wash and a stronger wind as
+    // it builds, muffled in the shop and gone in the cabin (the thunder is its own cue).
+    var sk = G.scene.sailing.stormK ? G.scene.sailing.stormK() : 0, inShop = G.core.state.sceneName() === 'shop';
+    stormHeard = sk * (outside ? 1 : (inShop ? 0.3 : 0));
+    set(amb.storm.gain, 0.05 * stormHeard, 1.2);
+    set(amb.wind.gain, 0.012 + 0.025 * L.grey + 0.035 * stormHeard);
     set(amb.water.gain, 0.03 + 0.01 * Math.sin(t * 0.8));
     set(amb.lap.gain, outside ? 0.004 + Math.min(1, vx / 42) * 0.06 : 0, 0.15);
     var b = run.boat;
@@ -768,7 +792,8 @@ G.audio.engine = (function () {
         kit: { ms: +kitMs.toFixed(1), splash: KIT.splash.length + ' sizes x ' + KIT.splash[0].length, rise: KIT.rise.length, drip: KIT.drip.length, pop: KIT.pop.length,
           click: KIT.click.length + ' reels x ' + KIT.click[0].length, twang: KIT.twang.length, tick: KIT.tick.length, knock: KIT.knock.length, ir: Object.keys(KIT.ir).join(',') },
         reel: reelInfo, underwater: { lowpass: Math.round(uwLP.frequency.value), bed: +amb.uwBed.gain.value.toFixed(4) },
-        reverb: { loc: revLoc, seconds: +(KIT.ir[revLoc].duration).toFixed(2) }, lastCue: lastCue, voiceMax: VOICE_MAX
+        reverb: { loc: revLoc, seconds: +(KIT.ir[revLoc].duration).toFixed(2) }, lastCue: lastCue, voiceMax: VOICE_MAX,
+        storm: { heard: +stormHeard.toFixed(2), wash: +amb.storm.gain.value.toFixed(4), thunder: lastThunder } // the user's fixes
       };
     },
     cue: cue, meter: meterCmd, TIER: TIER, KIT: function () { return KIT; },

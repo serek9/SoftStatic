@@ -111,22 +111,6 @@ G.ui.hud = (function () {
     F.drawText(ctx, s, x, y, key);
   }
 
-  // Depth finder (V8): ticks every `bands` metres down the left edge, labelled every other one.
-  // Labels stay below the clock and coins.
-  var bandLabels = [];
-  function drawBands(ctx, run, waterY, bands) {
-    var top = (waterY - run.cam.y) * 2, step = bands * 8; // view px per band (4 world px a metre)
-    ctx.fillStyle = S.PALETTE.fog_mid;
-    for (var i = 1; top + i * step < 360; i++) {
-      var y = Math.round(top + i * step);
-      ctx.fillRect(0, y, i % 2 ? 4 : 8, 1);
-      if (i % 2 === 0 && y > Y + 40) {
-        if (!bandLabels[i]) bandLabels[i] = (i * bands) + 'm';
-        F.drawText(ctx, bandLabels[i], 11, y - 4, 'fog_mid');
-      }
-    }
-  }
-
   function draw(ctx, run, waterY) {
     if (G.ui.card.isOpen() || G.core.compact || still) return;
     V.begin(ctx, true);
@@ -145,7 +129,6 @@ G.ui.hud = (function () {
     if (reachT > 0 && reachName) { ctx.globalAlpha = Math.min(1, reachT, (REACH - reachT) * 2) * 0.9; label(ctx, reachName, 320 - (reachW >> 1), Y + 22, 'bone'); ctx.globalAlpha = 1; } // Phase 75
 
     if (G.scene.underwater.UNDER[run.fsm]) {
-      if (run.gearFx.depthBands && run.uw.alpha >= 1) drawBands(ctx, run, waterY, run.gearFx.depthBands);
       s = depthText(Math.max(0, run.cast.ly - waterY));
       // Phase 58: in touch mode the depth goes under the top-right row of buttons
       var dy = G.core.device.touch() ? Math.max(Y, G.core.input.layout().rowBottom + 4) : Y;
