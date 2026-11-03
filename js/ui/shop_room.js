@@ -37,7 +37,7 @@ G.ui.shopRoom = (function () {
     { id: 'rack', c: 1, r: 1, w: 2, h: 1, block: true, talk: 'rack' },        // rods, reels and lines
     { id: 'jar', c: 3, r: 1, w: 1, h: 1, block: true, talk: 'jar' },          // the low shelf and the unlabelled jar
     { id: 'case', c: 4, r: 1, w: 1, h: 1, block: true, talk: 'lures' },       // Phase 43: the lure case under the window
-    { id: 'gear', c: 6, r: 1, w: 1, h: 1, block: true, talk: 'gear' },        // lantern and depth finder
+    { id: 'gear', c: 6, r: 1, w: 1, h: 1, block: true, talk: 'gear' },        // the gear shelf (Phase 79b: nothing sold on it now)
     { id: 'counter', c: 8, r: 2, w: 1, h: 2, block: true, talk: 'rusty' },
     { id: 'counter2', c: 9, r: 3, w: 2, h: 1, block: true, talk: 'rusty' },
     { id: 'behind', c: 8, r: 1, w: 3, h: 1, block: true, talk: '' },         // Rusty's side of the counter
@@ -305,8 +305,8 @@ G.ui.shopRoom = (function () {
   }
 
   // What the shelves hold (Phase 38): every rod not yet his on the rack (Phase 43), the
-  // lantern and the finder unless bought, the minnows and crickets left this visit.
-  var shown = { rods: 0, lantern: false, finder: false, minnows: 0, crickets: 0 };
+  // minnows and crickets left this visit (Phase 79b: the lantern and the finder are gone).
+  var shown = { rods: 0, minnows: 0, crickets: 0 };
   function drawStock(ctx, stock, t, ox, oy) {
     var x0 = ox + tx(1), y0 = oy + ty(1), i, n = 0, rods = G.data.gear.rods;
     for (i = 1; i < rods.length; i++) {
@@ -320,13 +320,6 @@ G.ui.shopRoom = (function () {
       n++;
     }
     shown.rods = n;
-    var gx = ox + tx(6), gy = oy + ty(1);
-    shown.lantern = !stock.lantern; shown.finder = !stock.finder;
-    if (shown.lantern) {
-      ctx.fillStyle = P.outline; ctx.fillRect(gx + 7, gy - 27, 10, 13); ctx.fillStyle = P.rust; ctx.fillRect(gx + 8, gy - 26, 8, 2); ctx.fillRect(gx + 8, gy - 17, 8, 2);
-      ctx.fillStyle = P.lamp_glow; ctx.fillRect(gx + 9, gy - 24, 6, 7); ctx.fillStyle = P.flame; ctx.fillRect(gx + 11, gy - 21, 2, 3);
-    }
-    if (shown.finder) { ctx.fillStyle = P.outline; ctx.fillRect(gx + 17, gy - 11, 11, 9); ctx.fillStyle = P.chrome_dark; ctx.fillRect(gx + 18, gy - 10, 9, 7); ctx.fillStyle = P.teal_dark; ctx.fillRect(gx + 19, gy - 9, 7, 4); ctx.fillStyle = P.neon_teal; ctx.fillRect(gx + 20, gy - 7, 1, 1); ctx.fillRect(gx + 23, gy - 6, 1, 1); }
     // Minnows in the tank, crickets in the cage now and then hopping.
     var mx = ox + tx(1) + 5, my = oy + ty(5) - 1;
     shown.minnows = stock.minnows;

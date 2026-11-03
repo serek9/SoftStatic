@@ -11,7 +11,6 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 //   line:  strength (how fast tension builds against a pulling fish, V4); Phase 53: the tiers
 //          are the line's test (6 lb up to 25 lb), and lineTypes the line itself (below)
 //   bait:  attract (fish turn up sooner); as: the bait fish take it as (Phase 68)
-//   lantern: deep fish show in colour at night; depth finder: depth bands on the HUD
 // Costs are tuned with `node tools/balance.js --pacing` against the V8 targets.
 G.data = G.data || {};
 G.data.gear = {
@@ -103,9 +102,9 @@ G.data.gear = {
   ],
   // Phase 69: an old save's lure counts go to the nearest new lure (core/save.js v7 -> v8).
   oldLures: { spinner: 'spinnerbait', plug: 'crankbait', grub: 'wacky_worm', popper: 'topwater', jig: 'jighead', bobber: 'bobber', spoon: 'small_spoon' },
-  lantern: { id: 'lantern', name: 'Storm Lantern', cost: 250, nightDepth: 999 },     // px: no night silhouettes
-  depthFinder: { id: 'depth_finder', name: 'Depth Finder', cost: 180, bands: 4 },  // m between bands on the HUD
-  nightDepth: 56, // px (14 m): without the lantern, fish deeper than this show only as silhouettes at night
+  // Phase 79b (the user's word, 2026-11-03): the Storm Lantern and the Depth Finder are no longer
+  // sold, and are gone from the game; save v10 pays back their price.
+  nightDepth: 56, // px (14 m): fish deeper than this show only as silhouettes at night
 
   // The fight model's constants (V4); sim/fight.js reads these.
   fight: {

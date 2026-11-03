@@ -130,7 +130,7 @@ G.core.debug = (function () {
     rod: function (kg) { return G.scene.sailing.setRodMax(kg); },
     // dbg.money(n) adds n coins (negative takes them); returns the balance.
     money: function (n) { G.state.save.coins = Math.max(0, G.state.save.coins + (n || 0)); return G.state.save.coins; },
-    // dbg.buy(kind) buys the next 'rod' | 'reel' | 'line' | 'lantern' | 'depthFinder', or dbg.buy('bait', id, n).
+    // dbg.buy(kind) buys the next 'rod' | 'reel' | 'line', or dbg.buy('bait', id, n).
     buy: function (kind, id, n) {
       var E = G.sim.economy, save = G.state.save;
       var r = kind === 'bait' || kind === 'lure' ? E.buyBait(save, id, n || 10, G.data) : (kind === 'rod' && id !== undefined ? E.buyRod(save, +id, G.data) : E.buy(save, kind, G.data));

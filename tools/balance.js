@@ -254,8 +254,8 @@ function validate(G, opts) {
   // Phase 47: the looks (four fishers, four dogs): their shapes and every key in the palette.
   if (d.looks) d.validateLooks(d.looks, PAL).forEach(e => err('look ' + e));
   else err('looks: data/looks.js is not loaded');
-  if (!(g.lantern.nightDepth > g.nightDepth)) err('lantern: must show deeper fish than without it');
-  if (!(g.depthFinder.bands > 0)) err('depth finder: needs depth bands');
+  if (g.lantern || g.depthFinder) err('the lantern and the depth finder are gone (Phase 79b)'); // the user's word, 2026-11-03
+  if (!(g.nightDepth > 0)) err('nightDepth: fish deeper than this are silhouettes at night');
   ['pull0', 'pull1', 'tired0', 'tired1', 'pullRise', 'easeFall', 'run', 'tiredRise', 'release', 'recover', 'slipT', 'slipD', 'escape', 'd0',
     'holdLate', 'slackT', 'holdLoss', 'jumpLoss', 'shakeLen0', 'shakeLen1', 'shakeGap0', 'shakeGap1', 'shakeRise', 'jumpRate', 'jumpLen', 'jumpHigh', 'jumpSpike']
     .forEach(k => { if (!(typeof g.fight[k] === 'number' && g.fight[k] > 0)) err('fight constant ' + k); });
@@ -472,7 +472,7 @@ const P = {
 // Phase 53: 'fluoro' buys the fluorocarbon spool and puts it on (line-shy fish then bite).
 // Phase 74: the Red Room is retired; the model opens Russetwood in its place (the same cost,
 // the same step in V8's pacing: location 4 of the model's route) and stops there.
-const PLAN = ['line', 'reel', 'rod', 'lantern', 'depthFinder', 'creek', 'fluoro', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'russet', 'line', 'rod', 'reel'];
+const PLAN = ['line', 'reel', 'rod', 'creek', 'fluoro', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'russet', 'line', 'rod', 'reel'];
 
 function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
@@ -842,6 +842,11 @@ const OLD_SAVES = [
     baits: { spinner: 3, plug: 1, grub: 8, popper: 2, jig: 4, bobber: 6, spoon: 5, minnow: 9 }, journal: { yellow_perch: { caught: 5, bestLen: 22, bestW: 0.2, hints: [], seen: true, phantom: false, took: ['worm', 'grub', 'spinner', 'spoon'] } }, kept: [], cabinLevel: 1, unlocks: { fog: true }, loc: 'fog', unease: {}, clock: 20, lastSeen: 0,
     flags: { windowCatch: {}, lines: {}, shopVisits: 4, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 9 },
     baits: { spinnerbait: 3, crankbait: 1, wacky_worm: 8, topwater: 2, jighead: 4, bobber: 6, small_spoon: 5, minnow: 9 }, bait: 'small_spoon' }
+,
+  // Phase 79b: a v9 save with the lantern and the finder bought: 250 + 180 come back, both go.
+  { from: 'Phase 79 (d24232d), v9 with the lantern and the finder', save: { version: 9, coins: 1000, gear: { rod: 1, rods: [0, 1], reel: 1, line: 1, lineType: 'mono', lineTypes: ['mono'], lantern: true, depthFinder: true, bait: 'worm' },
+    baits: {}, journal: {}, kept: [], cabinLevel: 1, unlocks: { fog: true, creek: true }, loc: 'creek', unease: {}, clock: 12, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 2, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 9 } }
 ];
 
 function savesCheck() {
@@ -872,7 +877,8 @@ function savesCheck() {
         for (const id in G.data.locations) E.canUnlock(s, id, G.data);
         for (const id in s.journal) if (!G.data.fish.some(f => f.id === id)) probs.push('journal species ' + id + ' no longer exists');
         s.kept.forEach(k => { if (!G.data.fish.some(f => f.id === k.id)) probs.push('kept species ' + k.id + ' no longer exists'); }); // Phase 68
-        const coins = o.save.coins + (o.save.unlocks && o.save.unlocks.red ? SV.RED_REFUND : 0);                          // Phase 74: the Red Room's cost comes back
+        const og = o.save.gear || {}, coins = o.save.coins + (o.save.unlocks && o.save.unlocks.red ? SV.RED_REFUND : 0) + (og.lantern ? SV.LANTERN_REFUND : 0) + (og.depthFinder ? SV.FINDER_REFUND : 0); // Phase 74: the Red Room's cost comes back; Phase 79b: the lantern's and the finder's
+        if ('lantern' in s.gear || 'depthFinder' in s.gear) probs.push('the lantern or the finder is still in the save');
         if (s.coins !== coins) probs.push('coins ' + s.coins + ' (saved ' + o.save.coins + ', want ' + coins + ')');      // Phase 68: dropping the old fish keeps the coins
         if (s.unlocks.red || (s.unease && 'red' in s.unease) || s.flags.heavy.red || s.flags.dogStare.red) probs.push('the Red Room is still in the save');
         if (o.save.loc === 'red' && s.loc !== 'fog') probs.push('a save in the Red Room resumes at ' + s.loc + ', not Fogbound');

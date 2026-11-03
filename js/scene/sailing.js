@@ -1787,10 +1787,10 @@ G.scene.sailing = (function () {
 
   function drawDog(c, x, y, flip, wind) { dog.draw(c, G.state.run.dog, x, y, flip, wind); }
 
-  var gearLook = { rod: 0, lantern: false, finder: false, night: 0, fisher: null, lineKey: 'fog_light', lineA: 0.6 };
+  var gearLook = { rod: 0, night: 0, fisher: null, lineKey: 'fog_light', lineA: 0.6 };
   function drawBoat(c, fisher) {
     var run = G.state.run, g = G.state.save.gear, fsm = run.fsm;
-    gearLook.rod = g.rod || 0; gearLook.lantern = !!g.lantern; gearLook.finder = !!g.depthFinder;
+    gearLook.rod = g.rod || 0;
     gearLook.night = 1 - greyF(hourNow());
     gearLook.fisher = run.fisher; // Phase 33: P2-2's thermos is one of his idle acts now
     // Phase 31: the line along the rod in the same colour as the line out (drawCast).
@@ -2030,7 +2030,7 @@ if (G.core.debug) G.core.debug.addLine(function () {
   var s = G.state.save, g = s.gear, fx = G.state.run.gearFx;
   if (!fx) return 'gear: -';
   return 'coins ' + s.coins + '  rod ' + g.rod + ' reel ' + g.reel + ' line ' + g.line + '  bait ' + fx.bait +
-    (fx.bait !== 'worm' ? ' x' + (s.baits[fx.bait] || 0) : '') + (g.lantern ? '  lantern' : '') + (g.depthFinder ? '  finder' : '') +
+    (fx.bait !== 'worm' ? ' x' + (s.baits[fx.bait] || 0) : '') +
     '  open ' + Object.keys(s.unlocks).join(',') + '  caught ' + Object.keys(s.journal).length;
 });
 
