@@ -163,6 +163,7 @@ G.core.save = (function () {
       settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true, textSize: 'normal', tips: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone); textSize: Phase 90; tips: Phase 88
       look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)
       pond: { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 }, // Phase 84 (caught, watch: Phase 85): the Back Pond (js/sim/pond.js)
+      tipsDone: {},          // Phase 88: first-time tip id -> true once done ('landed': fish landed while the fight was said, up to 3)
       rng: null              // G.rng state, restored on load unless ?seed is given
     };
   }

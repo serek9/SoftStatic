@@ -1475,7 +1475,7 @@ G.scene.underwater = (function () {
     var inp = G.core.input, fsm = run.fsm, F = G.sim.fight;
     if (fsm === 'waiting' || fsm === 'interest') {
       if (loc.pond && run.bite.slot < 0 && trashTouch(run, loc)) return;            // Phase 84: the lure on a piece of trash
-      biteIn.reel = inp.held('action');
+      biteIn.reel = inp.held('action') || inp.pressed('action'); // Phase 88: a tap shorter than a step still sets the hook
       var biting = run.bite.slot >= 0;
       if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
       else if (!biting && run.bite.slot >= 0) { // audit P1-4: a ring where the line goes in, and a dent (Phase 20)
@@ -1495,12 +1495,15 @@ G.scene.underwater = (function () {
         G.core.state.go(run, 'landing');
       } else if (res === F.SNAP || res === F.ESCAPE) {
         release(run);
+        // Phase 88.2: why it got away, said once on the HUD (the lure's loss with it).
+        var why = res === F.SNAP ? 'The line snapped. Let go when it runs hard.' : (run.fight.thrown ? 'It threw the hook on a slack line. Keep a little tension.' : 'It ran off. Reel while it is tired.');
         // Phase 43: a snapped line takes the lure with it (a thrown hook does not).
         if (res === F.SNAP && G.sim.economy.loseLure(G.state.save, run.cast.bait, G.data)) {
           var lb = G.sim.economy.baitById(run.cast.bait, G.data), left = G.state.save.baits[lb.id] || 0;
-          G.ui.hud.say('Lost the ' + lb.name + '. ' + (left ? left + ' left.' : 'None left: worms next.'));
+          why = 'The line snapped: lost the ' + lb.name + '. ' + (left ? left + ' left.' : 'None left: worms next.');
           G.core.save.autosave('lure');
         }
+        G.ui.hud.say(why);
         fx.splash(run.hook.x, loc.waterY, 0.3);
         if (G.core.debug) G.core.debug.log(res === F.SNAP ? 'the line snapped' : 'it slipped away');
         G.core.state.go(run, 'sailing');

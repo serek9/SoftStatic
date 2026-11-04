@@ -26,6 +26,7 @@ G.ui.hud = (function () {
 
   function update(dt, run) {
     var save = G.state.save;
+    if (G.ui.tips) G.ui.tips.update(dt, run);                                       // Phase 88
     idle += dt;
     if (noteT > 0) noteT -= dt;
     if (G.core.input.pressed('still')) still = !still;

@@ -180,6 +180,7 @@ G.ui.shop = (function () {
   // ---- Scene ----------------------------------------------------------------------------
   var row = 0, col = 0, t = 0, line_ = null;
   var R = G.ui.shopRoom, walk = null, faced = '';
+  var RETRIEVE_OF = { dive: 'steady', mid: 'steady', glide: 'steady', lift: 'stopgo', flutter: 'stopgo', top: 'top', dropshot: 'slow', wacky: 'slow' }; // Phase 88.4: how each is worked
   var txt = { name: [], icon: '', price: '', desc: [], status: [], msg: [], msgKey: 'fog_light', coins: '', pos: '', posSel: -1, posLen: -1 }, lastCoins = -1;
   var uneaseIn = { loc: 'fog', still: true, atShop: true };
   // Phase 37: what is open over the room: '' (walking), 'box' (Rusty talking), 'choice'
@@ -307,7 +308,7 @@ G.ui.shop = (function () {
       if (b.unlimited) desc = 'Free, and they never run out. Most fish take them.';
       else if (b.swim) { // Phase 43: a lure
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
-        desc = SWIM_SAYS[b.vary || b.swim] + ' ' + (b.sizes.length > 1 ? 'Sizes ' + b.sizes[0] + '-' + b.sizes[b.sizes.length - 1] : 'Size ' + b.sizes[0]) + '. Lost if the line snaps.'; // Phase 69: its action and the fish sizes it is made for
+        desc = SWIM_SAYS[b.vary || b.swim] + ' ' + (G.ui.tips && RETRIEVE_OF[b.swim] ? G.ui.tips.RETRIEVE[RETRIEVE_OF[b.swim]] + ' ' : '') + (b.sizes.length > 1 ? 'Sizes ' + b.sizes[0] + '-' + b.sizes[b.sizes.length - 1] : 'Size ' + b.sizes[0]) + '. Lost if the line snaps.'; // Phase 69: its action and the fish sizes it is made for
       } else {
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
         if (b.label === false) desc = 'No label. The jar is warm.';

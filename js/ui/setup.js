@@ -140,11 +140,14 @@ G.ui.setup = (function () {
     if (!usable(save, b)) return 'None left.';
     if (!downHole(save, b)) return 'Needs open water.';
     if (!E().isLure(b.id, G.data)) return b.unlimited ? 'Live bait. Never runs out.' : 'Live bait. One a cast.';
-    return (SWIM_SAYS[b.vary || b.swim] || 'A lure.') + ' ' + b.sizes[0] + (b.sizes.length > 1 ? '-' + b.sizes[b.sizes.length - 1] : ''); // Phase 69: its action and sizes
+    var how = G.ui.tips ? G.ui.tips.RETRIEVE[E().onIce(save, G.data) ? 'jig' : RETRIEVE_OF[b.swim]] : '';    // Phase 88.4: how to work it
+    return (SWIM_SAYS[b.vary || b.swim] || 'A lure.') + ' ' + (how ? how + ' ' : '') + b.sizes[0] + (b.sizes.length > 1 ? '-' + b.sizes[b.sizes.length - 1] : ''); // Phase 69: its action and sizes
   }
   var SWIM_SAYS = { mid: 'Swims mid water.', dive: 'Dives as you reel.', top: 'Stays on the top.', lift: 'Sinks fast, lifts and falls.',
     float: 'A worm under a float.', flutter: 'Falls fluttering.', dropshot: 'Worm held over a weight.', wacky: 'Sinks slow and level.',
     glide: 'Glides side to side.', rattle: 'Lift it sharp; it shivers.', kick: 'Its paddle tail kicks.' };
+
+  var RETRIEVE_OF = { dive: 'steady', mid: 'steady', glide: 'steady', lift: 'stopgo', flutter: 'stopgo', top: 'top', dropshot: 'slow', wacky: 'slow' };
 
   var LINE_SAYS = { mono: 'Stretches and forgives. Fish see it.', fluoro: 'Shy fish cannot see it. Sinks.', braid: 'No stretch: every touch shows. Seen.' };
 

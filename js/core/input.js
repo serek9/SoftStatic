@@ -109,6 +109,7 @@ G.core.input = (function () {
     OPEN.length = 0;
     if (cur === 'pause') OPEN.push(U.menu.rect());
     else if (cur === 'look') OPEN.push(U.look.rect());
+    else if (cur === 'controls') OPEN.push(U.controls.rect());
     else if (cur === 'map') addAll(U.map.rects());
     else if (cur === 'journal') addAll(U.journal.rects());
     if (sc === 'sailing') {
