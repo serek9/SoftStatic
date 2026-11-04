@@ -233,6 +233,12 @@ G.core.debug = (function () {
       var sc = G.scene.sailing;
       return G.scene.underwater.setLure(G.state.run, sc.loc(), m, x);
     },
+    // dbg.bed() reads what the lake bed holds here (2026-11-04): counts of each structure, where
+    // the sunken rowboat lies, the bed behind's width and parallax, and the depth tint's steps.
+    bed: function () {
+      var U = G.scene.underwater, set = U.prepare(G.scene.sailing.loc());
+      return { counts: set.bedCount, boatAt: set.boatAt === undefined ? null : Math.round(set.boatAt), back: { w: set.backW, parallax: U.BED.BACK_P, alpha: U.BED.BACK_A }, tint: { stepM: U.BED.TINT_STEP * 0.25, per: U.BED.TINT_PER, max: U.BED.TINT_MAX } };
+    },
     // dbg.tp(x) moves the boat to world x, stops it and snaps the camera.
     tp: function (x) { return G.scene.sailing.tp(x); },
     // dbg.caught(n) records one catch of each of the first n species in the journal (no coins).

@@ -43,6 +43,9 @@ G.scene.underwater = (function () {
   var CN = 22, cx = new Float32Array(CN), cy = new Float32Array(CN), cl = new Float32Array(CN);
   var stats = { ms: 0, fishMs: 0 };
   var FAR_W = 640; // the far underwater layer wraps every FAR_W px (Phase 15)
+  // The far motes (2026-11-04): placed by a hash, not G.vrng, so no other visual's stream moves.
+  var FMN = 28, fmx = new Float32Array(FMN), fmy = new Float32Array(FMN);
+  for (var fm = 0; fm < FMN; fm++) { fmx[fm] = S.hash(fm, 71) % 3200 / 10; fmy[fm] = S.hash(fm, 73) % 4000 / 10; }
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
@@ -180,6 +183,212 @@ G.scene.underwater = (function () {
         A.px(ctx, 'stone_hi', lx2 - 1, ly2 + 3); A.px(ctx, 'stone_hi', lx2, ly2 + 4); // the hook
       }
     }
+  }
+
+  // ---- The lake bed, deeper (user request 2026-11-04) --------------------------------------
+  // What a real lake's floor has besides boulders and weed: rock shelves stepping down the
+  // drop-offs, drowned stumps and standing timber, sunken logs, cobble patches, ripples in the
+  // shallow sand, bushy weed clumps and (on a lake) one old rowboat gone down. Each from its own
+  // seeded stream (seed × 31 + 211), so every older layout stays where it was. Lakes get all of
+  // it, rivers the logs, shelves and cobble, the seas the shelves and cobble only.
+  var BEDK = { lake: { ledge: 1, stump: 1, log: 1, gravel: 1, ripple: 1, clump: 1, boat: 1 }, river: { ledge: 1, log: 1, gravel: 1, ripple: 1 }, sea: { ledge: 1, gravel: 1 } };
+  function bedKind(loc) {
+    var k = BEDK[loc.water] || BEDK.lake;
+    return loc.pond ? { ledge: 1, gravel: 1, ripple: 1, clump: 1 } : k;
+  }
+  function structures(ctx, loc, set, top, WH, HH) {
+    var u = loc.underwater, A = G.gfx.paint, r = new G.core.rng.Rng(loc.seed * 31 + 211), w = loc.width, K = bedKind(loc), i, k, X, y;
+    var RK = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' }, rim = S.shift(RK.dark, -1), ramp = [RK.dark, RK.mid, RK.lit];
+    var BARK = ['wood_deep', 'wood_dark', 'wood', 'wood_mid'], sand = u.sand || 'wood', sandLit = u.sand ? S.shift(sand, 1) : 'wood_mid';
+    var n = { ledge: 0, stump: 0, timber: 0, log: 0, gravel: 0, ripple: 0, clump: 0, boat: 0 };
+    function topAt(X) { return top[clamp(Math.round(X), 0, WH - 1)]; }
+    function slope(X) { return (topAt(X + 10) - topAt(X - 10)) / 20; }
+    // Rock shelves on the drop-offs: flat slabs stepping out from the bank toward the deep side,
+    // outlined, lit along the top, with the dark of an undercut beneath.
+    if (K.ledge) for (X = 24; X < WH - 24; X += r.int(28, 70)) {
+      var sl = slope(X);
+      if (Math.abs(sl) < 0.55) continue;
+      var dir = sl > 0 ? 1 : -1, len = r.int(12, 30), th = r.int(4, 8), yy = topAt(X) - 1, sx = X - dir * 6;
+      var cx0 = sx + dir * (len >> 1);
+      A.blob(ctx, cx0, yy + (th >> 1) + 2, (len >> 1) + 1, 2, ['ink']); // the undercut's shadow
+      A.blob(ctx, cx0, yy, (len >> 1) + 1, (th >> 1) + 1, [rim]);
+      A.blob(ctx, cx0, yy, len >> 1, th >> 1, ramp, { rim: 0.25, ly: 1.2 });
+      A.line(ctx, rim, cx0 - (len >> 2), yy + 1, cx0 + (len >> 3), yy); // a crack along the slab
+      if (r.next() < 0.5) A.box(ctx, u.weedDark, cx0 - (len >> 2), yy - (th >> 1) - 1, len >> 1, 1);
+      n.ledge++;
+    }
+    // Cobble: patches of small stones on the bed's top, a few lit.
+    if (K.gravel) for (i = 0; i < w / 110; i++) {
+      var gx = r.int(10, w - 10) * HI, gw = r.int(16, 50), gn = r.int(8, 18);
+      for (k = 0; k < gn; k++) {
+        var px = gx + r.int(-gw, gw), pr = r.range(1, 2.2), py = topAt(px) + 1;
+        A.blob(ctx, px, py, pr + 0.6, pr * 0.7 + 0.6, [rim]);
+        A.blob(ctx, px, py, pr, pr * 0.7, ramp, { rim: 0 });
+      }
+      n.gravel++;
+    }
+    // Ripples in the shallow sand (to 6 m): small lit humps on the rim, in sets.
+    if (K.ripple) for (X = r.int(0, 20); X < WH - 8; X += 7 + (A.hash2(X, 5) * 4 | 0)) {
+      if (topAt(X) > 24 * HI || Math.abs(slope(X)) > 0.35) continue;
+      y = topAt(X);
+      A.box(ctx, sandLit, X, y - 1, 3, 1); A.px(ctx, sandLit, X + 1, y - 2);
+      A.box(ctx, S.shift(sand, -1), X + 3, y, 2, 1);
+      n.ripple++;
+    }
+    // Drowned stumps (a flooded wood) and now and then a standing dead trunk, broken off, its
+    // branch stubs reaching sideways: bark in four keys, a root flare into the bed.
+    if (K.stump) for (i = 0; i < Math.round(w / 170); i++) {
+      X = r.int(30, w - 30) * HI;
+      var foot = topAt(X) + 2, tall = r.next() < 0.3 && foot > 60 * HI, hS = tall ? r.int(Math.round(foot * 0.45), Math.round(foot * 0.8)) : r.int(10, 26), tw = tall ? r.int(5, 7) : r.int(8, 13), lean = r.range(-0.12, 0.12);
+      for (k = 0; k < 4; k++) { // the root flare
+        var rd = k < 2 ? -1 : 1, rl = r.int(6, 14);
+        A.line(ctx, BARK[0], X + (rd > 0 ? tw : 0), foot - 4 + (k & 1) * 2, X + (rd > 0 ? tw : 0) + rd * rl, topAt(X + rd * rl) + 1);
+        A.line(ctx, BARK[1], X + (rd > 0 ? tw - 1 : 1), foot - 5 + (k & 1) * 2, X + (rd > 0 ? tw : 0) + rd * (rl - 1), topAt(X + rd * rl));
+      }
+      var jag = r.int(0, 3);
+      for (y = 0; y < hS; y++) {
+        var ox = Math.round(lean * y), yy2 = foot - y, wdt = tw - (tall ? Math.round(2 * y / hS) : 0);
+        if (y < 4) wdt += (4 - y); // flaring into the roots
+        if (y > hS - 7) { var cut = (y - (hS - 7)) + ((((X >> 1) + jag + y) % 3) === 0 ? 3 : 0); wdt -= cut; if (wdt < 1) continue; } // the broken, splintered top
+        ox -= y < 4 ? (4 - y) >> 1 : 0;
+        A.box(ctx, BARK[0], X + ox - 1, yy2, wdt + 2, 1);
+        A.box(ctx, BARK[1], X + ox, yy2, wdt, 1);
+        A.box(ctx, BARK[2], X + ox, yy2, Math.max(1, wdt - 2), 1);
+        A.px(ctx, BARK[3], X + ox, yy2);
+        if (y % 7 === 3 && wdt > 4) A.box(ctx, BARK[1], X + ox + 2, yy2, 1, 2); // furrows in the bark
+        if (tall && y > 14 && y % 26 === 13) { // a branch stub
+          var sd = (y / 26 | 0) % 2 ? 1 : -1, bl = r.int(6, 14), bx0 = X + ox + (sd > 0 ? wdt : -1);
+          A.line(ctx, BARK[0], bx0, yy2 + 1, bx0 + sd * bl, yy2 - (bl >> 1) + 1);
+          A.line(ctx, BARK[2], bx0, yy2, bx0 + sd * bl, yy2 - (bl >> 1));
+        }
+      }
+      if (r.next() < 0.6) A.box(ctx, u.weedDark, X + Math.round(lean * hS) - 1, foot - hS + 1, (tw >> 1) + 1, 2); // moss on the top
+      n[tall ? 'timber' : 'stump']++;
+    }
+    // Sunken logs lying along the bed: a shaded capsule, its sawn end showing rings, branch stubs
+    // and a coat of weed along the top.
+    if (K.log) for (i = 0; i < Math.round(w / 260); i++) {
+      X = r.int(30, w - 60) * HI;
+      var ll = r.int(30, 70), rr = r.int(3, 5), xa = X, xb = X + ll, ya = topAt(xa) - rr + 2, yb = topAt(xb) - rr + 2;
+      A.limb(ctx, xa, ya, xb, yb, rr + 1, ['wood_deep'], 0);
+      A.limb(ctx, xa, ya, xb, yb, rr, BARK, 0);
+      A.blob(ctx, xb, yb, Math.max(2, rr - 1), rr, ['wood_dark', 'wood_mid', 'wood_lit'], { rim: 0.4, lx: -0.6 }); // the sawn end
+      A.px(ctx, 'wood_deep', xb, yb);
+      for (k = 1; k < 3; k++) { var sf = k / 3, sbx = Math.round(xa + (xb - xa) * sf), sby = Math.round(ya + (yb - ya) * sf) - rr; A.line(ctx, BARK[0], sbx, sby, sbx - 2, sby - r.int(3, 6)); }
+      for (k = 0; k < ll; k += 2) if (A.hash2(X + k, 11) < 0.5) { var t2 = k / ll; A.px(ctx, A.hash2(X + k, 12) < 0.3 ? u.weed : u.weedDark, Math.round(xa + (xb - xa) * t2), Math.round(ya + (yb - ya) * t2) - rr - 1); }
+      n.log++;
+    }
+    // Bushy weed clumps (coontail): short stems in a mound, whorls of needles every other row.
+    if (K.clump) for (i = 0; i < Math.round(w / 90); i++) {
+      X = r.int(10, w - 10) * HI;
+      if (topAt(X) > 90 * HI) continue; // too deep for light
+      var ns = r.int(3, 6), ch = r.int(8, 18), lit = S.shift(u.weed, 1);
+      for (k = 0; k < ns; k++) {
+        var sx2 = X + r.int(-6, 6), sh = Math.round(ch * r.range(0.6, 1)), base = topAt(sx2) + 1, ph = r.range(0, 6.28);
+        for (y = 0; y < sh; y++) {
+          var dx = Math.round(Math.sin(y * 0.2 + ph) * 1.2), yy3 = base - 1 - y, wv = y % 3 === 0 ? Math.max(1, Math.round(4 * (1 - y / sh)) + 1) : 0;
+          A.px(ctx, u.weedDark, sx2 + dx, yy3);
+          if (wv) { A.box(ctx, u.weedDark, sx2 + dx - wv, yy3, wv * 2 + 1, 1); A.px(ctx, u.weed, sx2 + dx - wv + 1, yy3 - 1); A.px(ctx, lit, sx2 + dx + wv - 1, yy3 - 1); }
+        }
+      }
+      n.clump++;
+    }
+    set.bedCount = n;
+  }
+  // After the boulders and the bed's things, so it lies on top of them.
+  function rowboat(ctx, loc, set, top, WH) {
+    var u = loc.underwater, A = G.gfx.paint, r = new G.core.rng.Rng(loc.seed * 31 + 213), w = loc.width, K = bedKind(loc), n = set.bedCount, X;
+    function topAt(X) { return top[clamp(Math.round(X), 0, WH - 1)]; }
+    // An old rowboat on the bed of the deep water, half sunk in the silt: its side's planks gone
+    // grey, a seam between each, the gunwale, a hole stove in, weed on the bow.
+    if (K.boat && w > 600) {
+      var best = 0, bx = 0;
+      for (X = 80 * HI; X < WH - 80 * HI; X += 8) { var d = topAt(X) + A.hash2(X >> 4, 13) * 40; if (d > best) { best = d; bx = X; } }
+      var brx = 14 * HI, bry = 5 * HI, by = topAt(bx) - 5, bd = r.next() < 0.5 ? -1 : 1, PL = ['stone', 'wood_dark', 'stone_dark', 'wood'];
+      A.area(ctx, bx - brx - 4, by - bry - 6, brx * 2 + 9, bry * 2 + 12, function (x, y) {
+        if (y > topAt(x) + 1) return '';
+        var nx = (x - bx) / brx, rise = Math.max(0, nx * bd) * Math.max(0, nx * bd) * 6, gun = by - bry + 1 - rise; // the bow sweeps up
+        if (y < gun || Math.abs(nx) > 1) return '';
+        var ny = (y - gun) / (bry * 2), keel = 1 - Math.pow(Math.abs(nx), 2.6);
+        if (ny > keel) return '';
+        if (y < gun + 2) return y < gun + 1 ? 'wood_mid' : 'wood_deep';
+        if (ny > keel - 0.08) return 'ink';
+        if (Math.abs(nx + bd * 0.25) < 0.14 && ny > 0.15 && ny < 0.6) return ((x >> 1) % 4 === 0) ? 'wood_dark' : 'ink'; // the hole and the ribs in it
+        if (((y - gun) % 5) === 0) return 'wood_deep';
+        var h = A.hash2(x >> 2, (y - gun) / 5 | 0);
+        if (h < 0.08 && nx * bd > 0.4) return u.weedDark;
+        return PL[(h * 4) | 0];
+      });
+      n.boat = 1; set.boatAt = bx / HI;
+    }
+  }
+
+  // The deeper the bed, the more of the water's own dark lies over it: steps of 2 m, each a little
+  // more, over what is painted only (source-atop), so the far bed recedes and the shallows read
+  // bright. Baked: nothing per frame.
+  var TINT_STEP = 8, TINT_PER = 0.035, TINT_MAX = 0.5;
+  function depthTint(ctx, WH, HH, q) { // q: the layer's px per world px (HI unless given)
+    q = q || HI;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = P.water_dark;
+    for (var j = 1; j * TINT_STEP * q < HH; j++) {
+      ctx.globalAlpha = Math.min(TINT_MAX, j * TINT_PER);
+      ctx.fillRect(0, j * TINT_STEP * q, WH, TINT_STEP * q);
+    }
+    ctx.restore();
+    G.gfx.paint.reset();
+  }
+
+  // The bed behind: the lake's floor further off, on a slower parallax (BACK_P), so the water
+  // has room in it. A smoothed copy of the near bed lifted a little, with its own boulders,
+  // stumps and weed, hazed by the water's own gradient laid over it at BACK_A when baked (drawn
+  // with alpha every frame it cost 4-5 ms in a software raster). Its own stream (× 31 + 212).
+  var BACK_P = 0.85, BACK_A = 0.5;
+  function backBed(loc, set, prof, key, H) {
+    var w = loc.width, BW = Math.ceil(w * BACK_P + VIEW_W + 4), u = loc.underwater, A = G.gfx.paint;
+    var sum = new Float64Array(w + 1), R = 50, x;
+    for (x = 0; x < w; x++) sum[x + 1] = sum[x] + prof[x];
+    var back = new Int16Array(BW), r = new G.core.rng.Rng(loc.seed * 31 + 212), p1 = r.range(0, 6.28), p2 = r.range(0, 6.28);
+    for (x = 0; x < BW; x++) {
+      var mx0 = clamp(Math.round((x - VIEW_W / 2) / BACK_P + VIEW_W / 2), 0, w - 1), lo = Math.max(0, mx0 - R), hi = Math.min(w, mx0 + R + 1);
+      var sm = (sum[hi] - sum[lo]) / (hi - lo), lift = (8 + 12 * (0.5 + 0.5 * Math.sin(x * 0.011 + p1)) + 5 * Math.sin(x * 0.037 + p2)) * clamp(sm / 40, 0.2, 1);
+      back[x] = Math.round(Math.max(3, sm - lift));
+    }
+    set.backW = BW;
+    // Baked at the world's pixels, not HI: a fourth HI layer the size of the bed pushed the frame
+    // past the canvas texture budget (draw 0.3 -> 4.5 ms, headless Chromium); far and hazed, the
+    // coarser grain suits it.
+    return B.cached(key + 'back', function () {
+      return B.layer(BW, H, function (ctx) {
+        var silt = u.silt, sand = u.sand || 'wood', RK = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' }, ramp = [RK.dark, RK.mid, RK.lit], i, k;
+        A.reset();
+        A.area(ctx, 0, 0, BW, H, function (x, y) { var d = y - back[x]; return d < 0 ? '' : (d < 1 ? sand : (d < 5 ? silt : S.shift(silt, -1))); });
+        function bt(X) { return back[clamp(Math.round(X), 0, BW - 1)]; }
+        for (i = 0; i < BW / 30; i++) { // boulders
+          var bx = r.int(4, BW - 4), rw = r.int(4, 11), rh = r.int(2, 5);
+          A.blob(ctx, bx, bt(bx) + 1 - Math.round(rh * 0.3), rw, rh, ramp, { rim: 0.3 });
+        }
+        for (i = 0; i < BW / 90; i++) { // stumps, tapering a little, broken off at the top, roots spread
+          var sx = r.int(4, BW - 4), f = bt(sx) + 1, sh = r.int(5, 11), sw = r.int(3, 5);
+          for (k = 0; k < sh; k++) {
+            var ww = sw - (k > sh - 3 ? (k - sh + 3) + ((sx + k) & 1) : 0);
+            if (ww < 1) continue;
+            A.box(ctx, 'wood_deep', sx, f - k, ww, 1); if (ww > 2) A.box(ctx, 'wood_dark', sx, f - k, ww - 1, 1);
+          }
+          A.line(ctx, 'wood_deep', sx - 1, f, sx - 4, bt(sx - 4)); A.line(ctx, 'wood_deep', sx + sw, f, sx + sw + 3, bt(sx + sw + 3));
+        }
+        for (i = 0; i < BW * u.weedDensity * 1.5; i++) { // weed, still
+          var wx = r.int(2, BW - 2), wh = r.int(4, 18), ph = r.range(0, 6.28), kk = r.next() < 0.5 ? u.weed : u.weedDark;
+          for (k = 0; k < wh; k++) A.px(ctx, kk, wx + Math.round(Math.sin(k * 0.12 + ph) * k / wh), bt(wx) - k);
+        }
+        depthTint(ctx, BW, H, 1);
+        ctx.save(); ctx.globalCompositeOperation = 'source-atop'; ctx.globalAlpha = BACK_A;
+        ctx.drawImage(set.grad, 0, 0, 1, H * HI, 0, 0, BW, H); // the haze
+        ctx.restore();
+        A.reset();
+      });
+    });
   }
 
   // The new weeds: ribbon weed (long twisting blades in clumps), a fern-like weed (a stem with
@@ -349,6 +558,7 @@ G.scene.underwater = (function () {
           if (seam < 1 && band > 0 && A.hash2(Math.floor(x / 9), band) < 0.4) return band < 2 ? SAND[0] : silt;
           return band < 2 ? silt : siltDark;
         });
+        structures(ctx, loc, set, top, WH, HH); // the lake bed, deeper (2026-11-04)
         // Boulders, outlined and shaded in flat clusters, lit from the top left; some carry moss.
         var RK = u.rocks || { dark: u.rock, mid: 'stone', lit: 'stone_hi' }, rim = S.shift(RK.dark, -1);
         var ramp = [RK.dark, RK.mid, RK.lit], i, n;
@@ -427,9 +637,12 @@ G.scene.underwater = (function () {
           }
         }
         bedThings(ctx, loc, set, top, WH, HH);
+        rowboat(ctx, loc, set, top, WH);
+        depthTint(ctx, WH, HH);
         A.reset();
       });
     });
+    set.back = backBed(loc, set, prof, key, H);
 
     // Weed strands, baked in three lean frames (-1, 0, 1) and cycled slowly: a stem two
     // pixels wide, lit on one side, with blades that alternate up it.
@@ -488,6 +701,7 @@ G.scene.underwater = (function () {
             }
             paintPlants(ctx, u, plants, lean);
             paintKelp(ctx, kelps, lean);
+            depthTint(ctx, WH, HH);
             A.reset();
           });
         };
@@ -1083,6 +1297,16 @@ G.scene.underwater = (function () {
     if (fw < VW) ctx.drawImage(set.far, 0, 0, VW - fw, HH, fw / HI, wyS, (VW - fw) / HI, H);
     ctx.globalAlpha = alpha * 0.3;
     drawShoals(ctx, camPx, wyS);
+    // The far motes (2026-11-04): a slower, dimmer drift of specks behind the near ones.
+    ctx.fillStyle = P.water_hi;
+    ctx.globalAlpha = alpha * 0.3;
+    for (var m = 0; m < FMN; m++) {
+      var fxm = ((fmx[m] + t * 0.6 - camPx * 0.5) % VIEW_W + VIEW_W) % VIEW_W, fym = ((fmy[m] + t * 0.8) % (H - 4) + (H - 4)) % (H - 4);
+      ctx.fillRect(Math.round(fxm * HI) / HI, Math.round((wyS + 2 + fym) * HI) / HI, 0.5, 0.5);
+    }
+    // The bed behind (2026-11-04), hazed, on its slower parallax.
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(set.back, Math.round(camPx * BACK_P), 0, VIEW_W, H, 0, wyS, VIEW_W, H);
     ctx.globalAlpha = alpha;
     drawLayer(ctx, set.bottom, camPx, wyS, H);
     drawCaustics(ctx, loc, camPx, wyS, alpha, t);
@@ -1574,6 +1798,7 @@ G.scene.underwater = (function () {
     body: function () { var c = G.state.run.cast; return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3), sink: +body.sink.toFixed(2), reach: reachName(c.x1), // Phase 77
       work: +(c.work === undefined ? 1 : c.work).toFixed(2), style: (run0().gearFx.lure && c.bait === run0().gearFx.bait && STYLE[run0().gearFx.swim]) || 'bait', // the user's fixes
       retrieve: +(c.rv || 0).toFixed(2), swing: !!c.swing, action: (hookIds(), LURE_OF[c.bait || G.state.run.gearFx.bait] ? (LURE_OF[c.bait || G.state.run.gearFx.bait].vary || LURE_OF[c.bait || G.state.run.gearFx.bait].swim) : 'bait'), frame: LURE_OF[c.bait || G.state.run.gearFx.bait] ? body.frame : -1, frames: LURE_OF[c.bait || G.state.run.gearFx.bait] ? LG.frames(c.bait || G.state.run.gearFx.bait) : 0, depthM: +((c.ly - G.data.locations[G.state.run.loc].waterY) * 0.25).toFixed(2) }; },
+    BED: { BACK_P: BACK_P, BACK_A: BACK_A, TINT_STEP: TINT_STEP, TINT_PER: TINT_PER, TINT_MAX: TINT_MAX }, // 2026-11-04
     UW: UW, UNDER: UNDER, stats: stats, prepare: prepare, galleryBed: galleryBed, bottomAt: bottomAt, deepestX: deepestX,
     lureStep: lureStep, viewStep: viewStep, draw: draw, setLure: setLure,
     createCatch: createCatch, catchStep: catchStep, resetHeavy: resetHeavy, drawHooked: drawHooked, mouth: mouth
