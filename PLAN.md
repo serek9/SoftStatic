@@ -1392,7 +1392,7 @@ Phase 87 checks: `--validate` OK (0 warnings); `--replay 12345` still `241795125
 
 ### 8.6 Next task
 
-PLAN_WINTER.md is done (Phases 80–85), Phase 86 went over the ice's looks the user asked about, 86b keeps the lure at the tip from spinning, and Phase 87 gives the waters' beds depth, room and structure. Nothing is planned next: waiting on the user. Still open with the user as before: #45 and #46 (the fish's and lures' art), #54 and #55 (the seas' and the ice's looks), #34 and #53 (play it on a real phone).
+PLAN_WINTER.md is done (Phases 80–85), Phase 86 went over the ice's looks the user asked about, 86b keeps the lure at the tip from spinning, and Phase 87 gives the waters' beds depth, room and structure. Nothing is planned next: waiting on the user. Proposed on 2026-11-04 and not started: [PLAN_PLAYABILITY.md](PLAN_PLAYABILITY.md) (Phases 88–97: an audit against the Cast n Chill wiki and a plan for playability, UX and UI on desktop and phone), with eight questions for the user in its §6. Still open with the user as before: #45 and #46 (the fish's and lures' art), #54 and #55 (the seas' and the ice's looks), #34 and #53 (play it on a real phone).
 
 ---
 
