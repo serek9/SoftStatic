@@ -858,6 +858,17 @@ G.scene.sailing = (function () {
   // between the tip and where it broke the surface, swinging (`up`); holding the reel winds it
   // up at upV px/s to the tip (DG.len), letting go leaves it hanging, and no cast starts until
   // it is up. upMax: the longest it can hang.
+  // The user's fix (2026-11-04): the lure could swing over the tip and spin round it (reeled up
+  // short, the swing sped up as the line shortened; under way, the boat's and the rod's kicks
+  // outweighed gravity on 3 px of line). A line can pull but never push, so the swing is kept
+  // under the tip: dgLimit holds θ within DG.thMax of straight down (a light bounce off it),
+  // the swing's speed within DG.omMax, and shortening line no longer speeds it up.
+  DG.thMax = 1.25; DG.omMax = 7; DG.bounce = 0.25;
+  function dgLimit() {
+    if (dg.om > DG.omMax) dg.om = DG.omMax; else if (dg.om < -DG.omMax) dg.om = -DG.omMax;
+    if (dg.th > DG.thMax) { dg.th = DG.thMax; if (dg.om > 0) dg.om = -dg.om * DG.bounce; }
+    else if (dg.th < -DG.thMax) { dg.th = -DG.thMax; if (dg.om < 0) dg.om = -dg.om * DG.bounce; }
+  }
   var dg = { on: false, th: 0, om: 0, len: 3, ox: 0, oy: 3, tx: 0, ty: 0, vx: 0, vy: 0, init: false, up: false, lastFsm: '', outX: 0 };
   var dgTip = [0, 0];
   function dangleStep(run, dt) {
@@ -875,7 +886,7 @@ G.scene.sailing = (function () {
       if (dg.up) {
         var ux = dg.outX - dgTip[0], uy = loc.waterY - dgTip[1];
         dg.len = Math.max(DG.len, Math.min(DG.upMax, Math.sqrt(ux * ux + uy * uy)));
-        dg.th = Math.atan2(ux, uy); dg.om = 0;
+        dg.th = Math.atan2(ux, uy); dg.om = 0; dgLimit();
         if (dg.len <= DG.len + 0.5) dg.up = false;
       }
     }
@@ -887,8 +898,8 @@ G.scene.sailing = (function () {
       var reel = G.core.input.held('action') && !G.ui.setup.isOpen() && !G.ui.dock.isOpen(), u0 = dg.len;
       if (reel) dg.len = Math.max(DG.len, dg.len - DG.upV * dt);
       var dlu = (dg.len - u0) / dt;
-      dg.om += dt * ((-(DG.g + ay0) * Math.sin(dg.th) - ax0 * Math.cos(dg.th)) / dg.len - 2 * dlu * dg.om / dg.len - DG.damp * dg.om);
-      dg.th += dt * dg.om;
+      dg.om += dt * ((-(DG.g + ay0) * Math.sin(dg.th) - ax0 * Math.cos(dg.th)) / dg.len - 2 * Math.max(0, dlu) * dg.om / dg.len - DG.damp * dg.om);
+      dg.th += dt * dg.om; dgLimit();
       dg.ox = Math.sin(dg.th) * dg.len; dg.oy = Math.cos(dg.th) * dg.len;
       if (dg.len <= DG.len) dg.up = false;
       return;
@@ -911,8 +922,8 @@ G.scene.sailing = (function () {
     else if (dg.len > want) dg.len = Math.max(want, dg.len - DG.reelIn * dt);
     var dl = (dg.len - l0) / dt;
     // θ from straight down, toward +x; y is down. The pivot's acceleration swings it.
-    dg.om += dt * ((-(DG.g + ay) * Math.sin(dg.th) - ax * Math.cos(dg.th)) / dg.len - 2 * dl * dg.om / dg.len - DG.damp * dg.om);
-    dg.th += dt * dg.om;
+    dg.om += dt * ((-(DG.g + ay) * Math.sin(dg.th) - ax * Math.cos(dg.th)) / dg.len - 2 * Math.max(0, dl) * dg.om / dg.len - DG.damp * dg.om);
+    dg.th += dt * dg.om; dgLimit();
     dg.ox = Math.sin(dg.th) * dg.len; dg.oy = Math.cos(dg.th) * dg.len;
   }
 
