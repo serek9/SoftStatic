@@ -24,7 +24,7 @@ G.ui.dock = (function () {
   var M = WITH, ROWS = M.rows, DEST = M.dest, SAYS = M.says; // the open panel's rows (Phase 76)
   function menuOf(loc) { return loc && loc.pond ? POND : (loc && loc.dock && loc.dock.cabin ? WITH : PLAIN); }
   var on = false, sel = 0, armed = false, phase = '', t = 0, dest = '', FADE = 0.35, near = false;
-  var R = [0, 0, 0, 0], RECTS = [R];
+  var R = [0, 0, 0, 0], RECTS = [R], RH = 12, lv = -1, openT = 0, HINT_R = [0, 0, 0, 0]; // Phase 90: row height, layout version, fade, the shut panel's hint
 
   // True when the boat sits by the pier of water loc (stopped or not).
   function at(run, loc) {
@@ -36,11 +36,13 @@ G.ui.dock = (function () {
     var U = G.ui.panel, w = 0, i;
     for (i = 0; i < ROWS.length; i++) w = Math.max(w, F.measure(ROWS[i]));
     w = Math.max(w + 2 * U.PAD + 16, U.hintW('SPACE', 'go') + U.hintW('ESC', 'stay') + 2 * U.PAD + 8, 170);
-    var h = U.TAB + U.PAD + ROWS.length * U.ROW + 4 + U.ROW + U.KEY_H + U.PAD;
+    RH = U.rowH();
+    var h = U.TAB + U.PAD + ROWS.length * RH + 4 + U.ROW + (U.touch() ? U.PAD : U.KEY_H + U.PAD);
     U.place(w, h, 'top', R); R[1] += 34;
     R[2] = w; R[3] = h;
+    lv = U.ver();
   }
-  function open(loc) { M = where === 'stream' ? STREAM : menuOf(loc); msg = ''; ROWS = M.rows; DEST = M.dest; SAYS = M.says; layout(); on = true; sel = 0; armed = false; }
+  function open(loc) { M = where === 'stream' ? STREAM : menuOf(loc); msg = ''; ROWS = M.rows; DEST = M.dest; SAYS = M.says; layout(); on = true; sel = 0; armed = false; openT = G.ui.panel.now(); }
   function close() { on = false; }
 
   // One step from the sailing scene, before it casts or sails. Returns true while the dock has
@@ -85,40 +87,54 @@ G.ui.dock = (function () {
     G.core.save.autosave('travel');
   }
 
-  function draw(ctx) {
+  // The shut panel's hint ("W the pier"), centred over the picture a little under the top.
+  function hintRect() {
+    var U = G.ui.panel, p = U.pic(), lab = G.core.device && G.core.device.touch && G.core.device.touch() ? 'TAP' : 'W', w = U.hintW(lab, where === 'stream' ? 'the stream' : 'the pier');
+    HINT_R[0] = p[0] + ((p[2] - w) >> 1); HINT_R[1] = p[1] + 66; HINT_R[2] = w; HINT_R[3] = U.KEY_H;
+    return lab;
+  }
+
+  function draw(ctx0) {
     var U = G.ui.panel, run = G.state.run, i;
     if (!on && phase !== 'out' && !near) return;
-    G.core.view.begin(ctx, true);                                                   // the panel draws in the 640×360 view's pixels
-    if (phase === 'out') { G.ui.menu.dim(ctx, t / FADE); }
+    var ctx = U.begin(ctx0);                                                        // the panel draws on the UI layer (Phase 90)
+    if (phase === 'out') { G.core.view.begin(ctx0, true); G.ui.menu.dim(ctx0, t / FADE); }
     if (!on) {
       // At the pier with the panel shut: a quiet hint where to step off.
-      if (near && run && run.fsm === 'sailing' && run.boat.stopped && !G.ui.setup.isOpen() && !G.ui.menu.current()) U.hint(ctx, G.core.device && G.core.device.touch && G.core.device.touch() ? 'TAP' : 'W', where === 'stream' ? 'the stream' : 'the pier', 280, 66);
+      if (near && run && run.fsm === 'sailing' && run.boat.stopped && !G.ui.setup.isOpen() && !G.ui.menu.current()) { var lab = hintRect(); U.hint(ctx, lab, where === 'stream' ? 'the stream' : 'the pier', HINT_R[0], HINT_R[1]); }
       return;
     }
-    var x = R[0], y = R[1];
+    if (lv !== U.ver()) layout();
+    var a = U.fadeIn(openT), x = R[0], y = R[1] + Math.round((1 - a) * 4), off = (RH - U.ROW) >> 1;
+    ctx.globalAlpha = a;
     U.frame(ctx, x, y, R[2], R[3], M.title || 'THE PIER');
     for (i = 0; i < ROWS.length; i++) {
-      var ry = U.top(y) + i * U.ROW, here = i === sel;
-      if (here) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, R[2] - 6, U.ROW); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 1, U.ROW); }
+      var ry = U.top(y) + i * RH + off, here = i === sel;
+      if (here) U.row(ctx, x + 3, ry + 1, R[2] - 6, RH);
       F.drawText(ctx, ROWS[i], U.left(x) + 6, ry + 1, here ? 'signal_amber' : 'bone');
     }
     var say = msg || (DEST[sel] === 'clear' ? G.data.pond.streamCost + 'c. You have ' + G.state.save.coins + '.' : '') || (DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.') : SAYS[sel]);
-    F.drawText(ctx, say, U.left(x), U.top(y) + ROWS.length * U.ROW + 4, 'fog_mid');
-    var hx = U.left(x), hy = y + R[3] - U.PAD - U.KEY_H;
-    hx += U.hint(ctx, 'SPACE', 'go', hx, hy);
-    U.hint(ctx, 'ESC', 'stay', hx, hy);
+    F.drawText(ctx, say, U.left(x), U.top(y) + ROWS.length * RH + 4, 'fog_mid');
+    if (!U.touch()) {
+      var hx = U.left(x), hy = y + R[3] - U.PAD - U.KEY_H;
+      hx += U.hint(ctx, 'SPACE', 'go', hx, hy);
+      U.hint(ctx, 'ESC', 'stay', hx, hy);
+    }
+    ctx.globalAlpha = 1;
   }
 
   // A touch: a row by the row rule (the first tap selects, a tap on the selected row goes);
   // the hint "the pier" opens it; anything else, nothing.
-  function tap(gx, gy) {
-    var U = G.ui.panel;
+  function tap(gx0, gy0) {
+    var U = G.ui.panel, gx = U.ux(gx0), gy = U.uy(gy0); // Phase 90: UI px
     if (!on) {
-      if (near && gx >= 280 && gx < 280 + U.hintW('TAP', 'the pier') && gy >= 62 && gy < 80) { var r = G.state.run; open(r && r.loc ? G.data.locations[r.loc] : null); return 'none'; }
+      hintRect();
+      if (near && gx >= HINT_R[0] - 6 && gx < HINT_R[0] + HINT_R[2] + 6 && gy >= HINT_R[1] - 8 && gy < HINT_R[1] + HINT_R[3] + 8) { var r = G.state.run; open(r && r.loc ? G.data.locations[r.loc] : null); return 'none'; }
       return '';
     }
+    if (lv !== U.ver()) layout();
     if (gx < R[0] || gx >= R[0] + R[2] || gy < R[1] || gy >= R[1] + R[3]) return '';
-    var i = Math.floor((gy - U.top(R[1]) + 1) / U.ROW);
+    var i = Math.floor((gy - U.top(R[1]) + 1) / RH);
     if (i < 0 || i >= ROWS.length) return 'none';
     if (i !== sel) { sel = i; return 'none'; }
     return 'action';

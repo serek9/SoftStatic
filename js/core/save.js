@@ -160,7 +160,7 @@ G.core.save = (function () {
       // seaSeen (Phase 80): true once he has been out on a sea (it opens the ice).
       flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: false },
       tapes: [],
-      settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone)
+      settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true, textSize: 'normal', tips: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone); textSize: Phase 90; tips: Phase 88
       look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)
       pond: { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 }, // Phase 84 (caught, watch: Phase 85): the Back Pond (js/sim/pond.js)
       rng: null              // G.rng state, restored on load unless ?seed is given

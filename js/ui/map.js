@@ -202,6 +202,22 @@ G.ui.map = (function () {
   // Phase 46: the place card, a small panel (G.ui.panel) at the bottom left, over the chart.
   var CARD = G.ui.panel.place(240, 74, 'bl', [0, 0, 240, 74]);
   CARD[0] += 10; CARD[1] -= 10; // Phase 54: inside the chart's panel
+  // Phase 90: the card on the UI layer (at the picture's bottom left), laid out again when the
+  // layer changes; on a phone its two actions are buttons a thumb can take (GO_B, SHUT_B).
+  var lv = -1, KH = 11, GO_B = [0, 0, 0, 0], SHUT_B = [0, 0, 0, 0], CARD_RECTS = [CARD];
+  function lay() {
+    var U = G.ui.panel;
+    if (lv === U.ver()) return;
+    lv = U.ver(); KH = U.btnH();
+    var h = U.touch() ? 74 - U.KEY_H + KH : 74;
+    // on the layer the card is bigger, so it keeps to the side away from the chosen stop
+    U.place(240, h, U.on() && STOPS[sel] && STOPS[sel].x < 320 ? 'br' : 'bl', CARD); CARD[2] = 240; CARD[3] = h;
+    if (!U.on()) { CARD[0] += 10; CARD[1] -= 10; }
+    var by = CARD[1] + CARD[3] - U.PAD - KH, bw = 92;
+    SHUT_B[0] = CARD[0] + CARD[2] - U.PAD - 64; SHUT_B[1] = by; SHUT_B[2] = 64; SHUT_B[3] = KH;
+    GO_B[0] = SHUT_B[0] - 6 - bw; GO_B[1] = by; GO_B[2] = bw; GO_B[3] = KH;
+    if (info.status) info.lines = F.wrap(info.status, CARD[2] - 2 * U.PAD);
+  }
 
   function stopName(s) {
     if (s.kind === 'shop') return 'Bait Shop';
@@ -232,6 +248,7 @@ G.ui.map = (function () {
   }
 
   function describe() {
+    lv = -1; lay();
     describeStop();
     info.lines = F.wrap(info.status, CARD[2] - 2 * G.ui.panel.PAD);
   }
@@ -358,14 +375,22 @@ G.ui.map = (function () {
     ctx.fillStyle = P.signal_amber;
     ctx.fillRect(bx - 10, by - 10, 6, 2); ctx.fillRect(bx + 5, by - 10, 6, 2); ctx.fillRect(bx - 10, by - 10, 2, 5); ctx.fillRect(bx + 9, by - 10, 2, 5);
     ctx.fillRect(bx - 10, by + 9, 6, 2); ctx.fillRect(bx + 5, by + 9, 6, 2); ctx.fillRect(bx - 10, by + 6, 2, 5); ctx.fillRect(bx + 9, by + 6, 2, 5);
-    var x = CARD[0], y = CARD[1];
-    U.frame(ctx, x, y, CARD[2], CARD[3], info.name);
-    for (i = 0; i < info.lines.length && i < 3; i++) F.drawText(ctx, info.lines[i], U.left(x), U.top(y) + i * U.ROW, info.key === 'rust' ? 'rust_hi' : 'fog_light');
-    var hx = U.left(x), hy = y + CARD[3] - U.PAD - U.KEY_H;
-    if (info.hint) hx += U.hint(ctx, 'SPACE', info.hint, hx, hy);
-    U.hint(ctx, 'M', 'close', hx, hy);
+    lay();
+    var c = U.begin(ctx), x = CARD[0], y = CARD[1];                                  // Phase 90: the card on the UI layer
+    U.frame(c, x, y, CARD[2], CARD[3], info.name);
+    for (i = 0; i < info.lines.length && i < 3; i++) F.drawText(c, info.lines[i], U.left(x), U.top(y) + i * U.ROW, info.key === 'rust' ? 'rust_hi' : 'fog_light');
+    if (U.touch()) {                                                                  // a thumb's buttons: go (or buy), close
+      if (info.hint) U.button(c, GO_WORDS[info.hint] || 'GO', GO_B[0], GO_B[1], GO_B[2], GO_B[3], G.core.input.held('action') ? 2 : 1);
+      U.button(c, 'CLOSE', SHUT_B[0], SHUT_B[1], SHUT_B[2], SHUT_B[3], 0);
+    } else {
+      var hx = U.left(x), hy = y + CARD[3] - U.PAD - U.KEY_H;
+      if (info.hint) hx += U.hint(c, 'SPACE', info.hint, hx, hy);
+      U.hint(c, 'M', 'close', hx, hy);
+    }
+    G.core.view.begin(ctx, true);
     if (phase === 'out') M.dim(ctx, t / FADE);
   }
+  var GO_WORDS = { 'go in': 'GO IN', travel: 'TRAVEL', 'pay and travel': 'BUY & GO' };
 
   // Phase 59.2: a touch on the map. A stop (its mark or its name) by the row rule: the first
   // tap selects it, a tap on the selected stop goes; the card's SPACE hint goes too, its M
@@ -382,10 +407,17 @@ G.ui.map = (function () {
         return 'action';
       }
     }
+    lay();
+    var ux = U.ux(gx), uy = U.uy(gy);                                              // Phase 90: the card is in UI px
+    if (U.touch()) {
+      if (info.hint && U.inside(GO_B, ux, uy)) return 'action';
+      if (U.inside(SHUT_B, ux, uy)) return 'back';
+      return 'none';
+    }
     var hx = U.left(CARD[0]), hy = CARD[1] + CARD[3] - U.PAD - U.KEY_H;
-    if (gy >= hy - 2 && gy < hy + U.KEY_H + 2) {
-      if (info.hint) { var w = U.hintW('SPACE', info.hint); if (gx >= hx && gx < hx + w) return 'action'; hx += w; }
-      if (gx >= hx && gx < hx + U.hintW('M', 'close')) return 'back';
+    if (uy >= hy - 2 && uy < hy + U.KEY_H + 2) {
+      if (info.hint) { var w = U.hintW('SPACE', info.hint); if (ux >= hx && ux < hx + w) return 'action'; hx += w; }
+      if (ux >= hx && ux < hx + U.hintW('M', 'close')) return 'back';
     }
     return 'none';
   }
@@ -393,7 +425,7 @@ G.ui.map = (function () {
   return {
     native: true, CARD: CARD, tap: tap,
     // The on-screen ESC key keeps off what is open (8.4 #38): the chart's panel.
-    rects: function () { return MAP_RECTS; },
+    rects: function () { lay(); return G.ui.panel.on() ? CARD_RECTS : MAP_RECTS; },
     open: open, update: update, draw: draw, STOPS: STOPS, verdict: verdict, stocked: stocked,
     // dbg: travel to a stop id through the same path as the menu (fade included).
     travel: function (id) {

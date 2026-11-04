@@ -9,7 +9,6 @@ G.ui = G.ui || {};
 // native for itself, since the sailing scene that calls it draws in world pixels).
 G.ui.hud = (function () {
   var S = G.gfx.sprites, F = S.fine, V = G.core.view;
-  var X = 8, Y = 8;
   var lastTenths = -1, depthStr = '';
   var lastMin = -1, clockStr = '';
   var lastCoins = -1, coinStr = '';
@@ -111,9 +110,11 @@ G.ui.hud = (function () {
     F.drawText(ctx, s, x, y, key);
   }
 
-  function draw(ctx, run, waterY) {
+  function draw(ctx0, run, waterY) {
     if (G.ui.card.isOpen() || G.core.compact || still) return;
-    V.begin(ctx, true);
+    var ov = G.ui.menu.current();
+    if (G.ui.panel.on() && (ov === 'map' || ov === 'journal' || ov === 'controls')) return; // Phase 90: the layer is above the full-screen overlays
+    var Pn = G.ui.panel, ctx = Pn.begin(ctx0), pic = Pn.pic(), X = pic[0] + 8, Y = pic[1] + 8, RX = pic[0] + pic[2] - 8; // Phase 90: on the UI layer, on the picture
     var save = G.state.save, s = clockText(save.clock || 0), cx = X + F.measure(s) + 9, a = alpha();
     if (a > 0) {
       ctx.globalAlpha = a;
@@ -126,23 +127,25 @@ G.ui.hud = (function () {
       ctx.globalAlpha = 1;
     }
     if (noteT > 0) { ctx.globalAlpha = Math.min(1, noteT); label(ctx, note, X, Y + 28, 'paper'); ctx.globalAlpha = 1; }
-    if (reachT > 0 && reachName) { ctx.globalAlpha = Math.min(1, reachT, (REACH - reachT) * 2) * 0.9; label(ctx, reachName, 320 - (reachW >> 1), Y + 22, 'bone'); ctx.globalAlpha = 1; } // Phase 75
+    if (reachT > 0 && reachName) { ctx.globalAlpha = Math.min(1, reachT, (REACH - reachT) * 2) * 0.9; label(ctx, reachName, pic[0] + (pic[2] >> 1) - (reachW >> 1), Y + 22, 'bone'); ctx.globalAlpha = 1; } // Phase 75
 
-    if (a > 0 && run.loc && G.data.locations[run.loc] && G.data.locations[run.loc].pond && save.pond) pondLine(ctx, save.pond, a, G.data.locations[run.loc]); // Phase 84
+    if (a > 0 && run.loc && G.data.locations[run.loc] && G.data.locations[run.loc].pond && save.pond) pondLine(ctx, save.pond, a, G.data.locations[run.loc], X, Y); // Phase 84
     if (G.scene.underwater.UNDER[run.fsm]) {
       s = depthText(Math.max(0, run.cast.ly - waterY));
-      // Phase 58: in touch mode the depth goes under the top-right row of buttons
+      // Phase 58: in touch mode the depth goes under the column of keys where it lies over the picture
       var dy = G.core.device.touch() ? Math.max(Y, G.core.input.layout().rowBottom + 4) : Y;
-      label(ctx, s, 632 - F.measure(s), dy, 'fog_light');
+      var kx = G.core.device.touch() && G.core.input.layout().inPic ? Math.min(RX, G.core.input.layout().buttons[0].x - 6) : RX;
+      label(ctx, s, kx - F.measure(s), dy, 'fog_light');
     }
-    V.begin(ctx, false);
+    if (G.ui.tips) G.ui.tips.draw(ctx, run, X, Y, pic);                              // Phase 88: a first-time tip, by the boat
+    V.begin(ctx0, false);
   }
 
   // Phase 84 (PLAN_WINTER.md 2.4): at the Back Pond, a quiet line under the hook: the cleanup
   // meter (the pieces out and the stream, as a bar of segments) until the water is clear, then
   // (Phase 85) how many fish it holds of its capacity. Strings rebuilt only when they change.
   var pondKey = '', pondStr = '';
-  function pondLine(ctx, p, a, L) {
+  function pondLine(ctx, p, a, L, X, Y) {
     var Pd = G.sim.pond, P = S.PALETTE, clean = Pd.clean(p, G.data), n = clean ? (p.stock || []).length : Pd.done(p, G.data), key = (clean ? 'p' : 'c') + n;
     if (key !== pondKey) { pondKey = key; pondStr = clean ? 'Pond ' + n + ' / ' + L.pond.cap : 'Cleanup'; }
     ctx.globalAlpha = a * 0.85;
@@ -229,35 +232,59 @@ G.ui.hud = (function () {
     return '';
   }
 
-  function drawTouch(ctx) {
-    var I = G.core.input, L = I.layout(), i;
-    if (!L.mode) return;
-    V.begin(ctx, true);
-    // on the boat the controls fade with the HUD's idle fade (P1-7), never below 0.35
+  // 90.3: the keys' icons (12×12, palette keys, baked once): an open book, a folded chart, a
+  // tackle box, the menu's bars and a cross for ESC; and the words under them, the short one
+  // when the long one does not fit the key.
+  var ICONS = {
+    journal: [['paper', 1, 2, 5, 8], ['paper', 6, 2, 5, 8], ['paper_dark', 6, 2, 1, 8], ['fog_mid', 2, 4, 3, 1], ['fog_mid', 2, 6, 3, 1], ['fog_mid', 7, 4, 3, 1], ['fog_mid', 7, 6, 3, 1], ['wood', 0, 9, 12, 1]],
+    map: [['paper', 1, 2, 3, 8], ['paper_dark', 4, 1, 4, 8], ['paper', 8, 2, 3, 8], ['water_mid', 2, 5, 2, 2], ['water_mid', 5, 4, 2, 3], ['neon_red', 9, 5, 1, 1]],
+    setup: [['rust', 1, 4, 10, 7], ['rust_hi', 1, 4, 10, 1], ['brass_hi', 5, 6, 2, 2], ['wood_dark', 4, 2, 4, 1], ['wood_dark', 3, 2, 1, 2], ['wood_dark', 8, 2, 1, 2]],
+    pause: [['paper', 2, 3, 8, 2], ['paper', 2, 6, 8, 2], ['paper', 2, 9, 8, 2]],
+    back: [['paper', 2, 2, 2, 2], ['paper', 4, 4, 2, 2], ['paper', 6, 6, 2, 2], ['paper', 8, 8, 2, 2], ['paper', 8, 2, 2, 2], ['paper', 2, 8, 2, 2], ['paper', 4, 6, 2, 2], ['paper', 6, 4, 2, 2]]
+  };
+  var WORDS = { journal: ['Journal', 'Book'], map: ['Chart', 'Map'], setup: ['Tackle', 'Gear'], pause: ['Menu', 'Menu'], back: ['Close', 'Esc'] };
+  var iconImgs = {};
+  function iconImg(act) {
+    if (iconImgs[act]) return iconImgs[act];
+    var parts = ICONS[act] || [];
+    return (iconImgs[act] = G.gfx.bake.layer(12, 12, function (c) { for (var i = 0; i < parts.length; i++) { var r = parts[i]; if (r[3] && r[4]) { c.fillStyle = S.PALETTE[r[0]]; c.fillRect(r[1], r[2], r[3], r[4]); } } }));
+  }
+  function wordFor(act, w) { var ws = WORDS[act] || ['', '']; return F.measure(ws[0]) <= w - 4 ? ws[0] : ws[1]; }
+
+  function drawTouch(ctx0) {
+    var I = G.core.input, L = I.layout(), i, Pn = G.ui.panel;
+    if (!L.mode || !Pn) return;
+    var ctx = Pn.begin(ctx0);
+    // on the boat the controls fade with the HUD's idle fade (P1-7): never below 0.35, and
+    // lighter still where they lie over the picture (no margin), so the water shows through
     var a = L.mode === 'boat' ? 0.35 + 0.65 * alpha() : 1;
-    ctx.globalAlpha = a;
     for (i = 0; i < L.buttons.length; i++) {
       var b = L.buttons[i];
       if (!b.on) continue;
-      var on = I.held(b.act);
+      var on = I.held(b.act), w = wordFor(b.act, b.w), ic = iconImg(b.act);
+      ctx.globalAlpha = a * (L.inPic && L.mode === 'boat' ? 0.8 : 1);
       keyBox(ctx, b.x, b.y, b.w, b.h, on);
-      F.drawText(ctx, b.label, b.x + ((b.w - F.measure(b.label)) >> 1), b.y + ((b.h - F.FONT_H) >> 1), on ? 'signal_amber' : 'fog_light');
+      var iy = b.y + Math.max(2, ((b.h - 12 - 2 - F.FONT_H) >> 1));
+      ctx.drawImage(ic, b.x + ((b.w - 12) >> 1), iy + (on ? 1 : 0));
+      F.drawText(ctx, w, b.x + ((b.w - F.measure(w)) >> 1), iy + 14, on ? 'signal_amber' : 'fog_light');
     }
     for (i = 0; i < L.pad.length; i++) {
       var p = L.pad[i];
       if (!p.on) continue;
       var held = I.held(p.act);
+      ctx.globalAlpha = a * 0.85;
       keyBox(ctx, p.x, p.y, p.w, p.h, held);
       arrow(ctx, p, p.act, held ? 'signal_amber' : 'fog_light');
     }
     if (L.act.on) {
-      var r = L.act, w = word(), down = I.held('action');
-      ctx.globalAlpha = a * (w ? 0.85 : 0.4);
+      var r = L.act, wd = word(), down = I.held('action');
+      ctx.globalAlpha = a * (wd ? 0.85 : 0.4);
       ctx.drawImage(roundImg(r.w, down), r.x, r.y);
-      if (w) F.bold(ctx, w, r.x + ((r.w - F.measureBold(w)) >> 1), r.y + ((r.h - F.FONT_H) >> 1), down ? 'signal_amber' : 'bone');
+      if (!wd && L.mode === 'room') wd = 'WALK';                                    // 90.4: never an empty circle in a room
+      if (wd) F.bold(ctx, wd, r.x + ((r.w - F.measureBold(wd)) >> 1), r.y + ((r.h - F.FONT_H) >> 1), down ? 'signal_amber' : (word() ? 'bone' : 'fog_mid'));
     }
     ctx.globalAlpha = 1;
-    V.begin(ctx, false);
+    V.begin(ctx0, false);
   }
 
   // What the HUD shows right now (dbg checks compare these against the save).
@@ -267,5 +294,5 @@ G.ui.hud = (function () {
 
   return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, reach: function () { return { name: reachName, shown: reachT > 0 }; }, alpha: alpha, drawButtons: drawButtons, word: word,
     // Phase 60.2: the touch layout's pieces for the gallery's touch page.
-    touchParts: { keyBox: keyBox, arrow: arrow, round: roundImg }, isStill: function () { return still; }, draw: draw, shown: shown };
+    touchParts: { keyBox: keyBox, arrow: arrow, round: roundImg, icon: iconImg, wordFor: wordFor }, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

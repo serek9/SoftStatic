@@ -149,6 +149,7 @@
   G.core.state.register('cabin', G.ui.cabin);
   G.core.state.register('gallery', G.core.debug.gallery);
   G.core.state.change(q.has('gallery') ? 'gallery' : 'sailing');
+  G.core.device.fit(); // Phase 90: again, now the save's settings and the scene are known (the UI layer's size)
 
   // Another tab owns the save (12.5): this one waits, and a click or key brings it back here.
   function reclaim() { if (G.core.save.lost()) { G.core.save.claim(); location.reload(); } }
@@ -166,9 +167,10 @@
   // An open overlay (pause, journal, map, look picker) takes the step and the scene waits (9.2).
   var warmed = false;
   G.core.loop.start({
-    update: function (dt) { if (!G.ui.menu.update(dt)) G.core.state.update(dt); G.audio.engine.step(dt); },
+    update: function (dt) { G.ui.panel.step(dt); if (!G.ui.menu.update(dt)) G.core.state.update(dt); G.audio.engine.step(dt); },
     // Each part draws in its own space (G.core.view): the scene, the overlay, the buttons.
     draw: function (ctx) {
+      G.ui.panel.frameStart(); // Phase 90: the UI layer starts clear each frame
       V.begin(ctx, G.core.state.native()); G.core.state.draw(ctx);
       V.begin(ctx, G.ui.menu.native()); G.ui.menu.draw(ctx);
       V.begin(ctx, false); G.ui.hud.drawButtons(ctx);

@@ -27,6 +27,34 @@ G.ui.journal = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu;
   var COLS = 5, ROWS = 5, CW = 52, CH = 46, GAP = 6, GX = 322, GY = 46; // Phase 54: the grid in the right panel
   var NOTES_W = 286, NOTES_MAX = 14, WHERE_W = 276;
+  // Phase 90: the layout for the UI layer. On a PC at the normal text size it is Phase 54's,
+  // number for number. On the layer (a phone, or large text) the two panels share the screen
+  // when they fit (four columns of tiles on a phone); when they do not, one panel shows the grid
+  // and Space or a tap on the chosen tile turns to its page (`reading`), Esc turns back.
+  var narrow = false, reading = false, lv = -1, openT = 0;
+  function lay() {
+    var U = G.ui.panel;
+    if (lv === U.ver()) return false;
+    lv = U.ver();
+    if (!U.on()) {
+      LP[0] = 8; LP[1] = 8; LP[2] = 300; LP[3] = 344; RP[0] = 316; RP[1] = 8; RP[2] = 316; RP[3] = 344;
+      COLS = 5; ROWS = 5; GX = 322; GY = 46; NOTES_W = 286; NOTES_MAX = 14; WHERE_W = 276; narrow = false;
+    } else {
+      var p = U.pic(), insL = U.layer.insL, insR = U.layer.insR, bx = Math.max(insL, p[0] - 40) + 8, bw = Math.min(U.VW() - insR, p[0] + p[2] + 40) - 8 - bx, by = 8, bh = U.VH() - 16;
+      var gridW = function (c) { return 2 * U.PAD + c * (CW + GAP) - GAP + 14; };
+      COLS = bw >= 300 + 8 + gridW(5) ? 5 : 4;
+      var rw = gridW(COLS), lw = bw - rw - 8;
+      narrow = lw < 250;
+      if (narrow) { COLS = Math.max(3, Math.floor((bw - 2 * U.PAD - 14 + GAP) / (CW + GAP))); rw = bw; lw = bw; }
+      RP[0] = narrow ? bx : bx + lw + 8; RP[1] = by; RP[2] = rw; RP[3] = bh;
+      LP[0] = bx; LP[1] = by; LP[2] = lw; LP[3] = bh;
+      GX = RP[0] + U.PAD; GY = by + 38;
+      ROWS = Math.max(2, Math.floor((bh - 38 - 34) / (CH + GAP)));
+      NOTES_W = lw - 2 * U.PAD - 2; WHERE_W = NOTES_W - 10;
+      NOTES_MAX = Math.max(3, Math.floor((bh - (U.TAB + U.PAD + PLATE_H + 6 + 3 * U.ROW + 4) - U.PAD - (U.touch() ? 0 : U.KEY_H)) / F.LINE_H));
+    }
+    return true;
+  }
   var FAMILIES = ['all'];  // Phase 68: 'all' and every family with a species in some water, in data order
   // Phase 68: what each lure type is called in the notes.
   var TYPE_NAMES = { float: 'a float', crank: 'crankbaits', spinner: 'spinnerbaits', spoon: 'spoons', dropshot: 'a dropshot',
@@ -224,6 +252,7 @@ G.ui.journal = (function () {
   var ICE_SAYS = { common: 'Comes to a hole often enough.', rare: 'Comes to a hole now and then.', epic: 'Seldom comes to a hole. Worth the wait.' };
 
   function open() {
+    lv = -1; lay(); reading = false; openT = G.ui.panel.now();
     buildLocs();
     var here = locs.indexOf(G.state.run.loc);
     locIdx = here >= 0 ? here : 0;
@@ -243,7 +272,11 @@ G.ui.journal = (function () {
 
   function update() {
     var inp = G.core.input;
+    if (lay()) select(sel);                                                        // Phase 90: re-wrapped for a new layout
+    if (narrow && reading && (inp.pressed('back') || inp.pressed('left') || inp.pressed('right') || inp.pressed('up') || inp.pressed('down'))) { if (inp.pressed('back')) { reading = false; return true; } }
+    if (narrow && reading && inp.pressed('action') && !stockRow.show) { reading = false; return true; }
     if (inp.pressed('journal') || inp.pressed('back')) { close(); return false; }
+    if (narrow && !reading && focus === 2 && inp.pressed('action') && list.length) { reading = true; return true; } // Phase 90: one panel: turn to the page
     var lr = M.axis('left', 'right'), ud = M.axis('up', 'down');
     if (focus < 2) {
       if (lr && focus === 0) { locIdx = (locIdx + lr + locs.length) % locs.length; sel = 0; top = 0; filter(); stockState(); }
@@ -266,7 +299,7 @@ G.ui.journal = (function () {
   // handwriting that degrades with unease), and on the right the JOURNAL with the count, the
   // two filters as key caps and the grid of species with its scrollbar. The open book of
   // Phase 17 is gone; its colours are mapped onto the panel's (INK below).
-  var LP = [8, 8, 300, 344], RP = [316, 8, 316, 344], J_RECTS = [LP, RP];
+  var LP = [8, 8, 300, 344], RP = [316, 8, 316, 344], J_RECTS = [LP, RP], J_ONE = [RP];
   // Phase 70: the plate holds a portrait at its native size (the real fish are painted at most
   // 104×60, PLAN_SPECIES.md 3.5), never scaled: PORT_W × PORT_H, on a plate PLATE_H tall.
   var PLATE_H = 68, PORT_W = 104, PORT_H = 60;
@@ -294,9 +327,17 @@ G.ui.journal = (function () {
     return U.key(ctx, s, x, y, on);
   }
 
-  function draw(ctx) {
-    var U = G.ui.panel, jt = jitter(), i, x, y;
+  function draw(ctx0) {
+    var U = G.ui.panel, ctx = U.begin(ctx0), jt = jitter(), i, x, y, a = U.fadeIn(openT);
+    if (lv !== U.ver()) { lay(); }
+    ctx.globalAlpha = a;
+    if (!narrow || reading) drawEntry(ctx, jt);
+    if (!narrow || !reading) drawGrid(ctx, jt);
+    ctx.globalAlpha = 1;
+  }
 
+  function drawEntry(ctx, jt) {
+    var U = G.ui.panel, i, x, y;
     // The left panel: the entry.
     x = LP[0]; y = LP[1];
     U.frame(ctx, x, y, LP[2], LP[3], page.name || ' ', selIsNew ? 'NEW' : (page.family || ''), selIsNew ? 'neon_red' : 'fog_light');
@@ -332,6 +373,11 @@ G.ui.journal = (function () {
       for (i = 0; i < tl.length && i < 2; i++) F.drawText(ctx, tl[i], lx + kw + 8, sy - 3 + i * (F.LINE_H), stockRow.ok ? 'teal_lit' : 'fog_light');
     }
 
+    if (narrow) { var bh0 = y + LP[3] - U.PAD - U.KEY_H; if (!stockRow.show && !U.touch()) U.hint(ctx, 'ESC', 'back to the grid', lx, bh0); }
+  }
+
+  function drawGrid(ctx, jt) {
+    var U = G.ui.panel, i, x, y;
     // The right panel: the count, the filters, the grid and its scrollbar.
     x = RP[0]; y = RP[1];
     U.frame(ctx, x, y, RP[2], RP[3], 'JOURNAL', title.shown, 'bone');
@@ -350,14 +396,18 @@ G.ui.journal = (function () {
     if (heavyNote) F.drawText(ctx, HEAVY_NOTE, rx, GY + trackH + 6, 'dusk_high', Math.max(jt, 0.2), 47);
     var hx = rx, hy = y + RP[3] - U.PAD - U.KEY_H;
     hx += U.hint(ctx, 'W/S A/D', 'browse', hx, hy);
+    if (narrow) hx += U.hint(ctx, 'SPACE', 'read', hx, hy);
     U.hint(ctx, 'J', 'close', hx, hy);
   }
 
   // Phase 59.2: a touch on the journal. A filter key turns it (as D does with it focused); a
   // tile reads its page; the scrollbar's upper or lower half pages the grid up or down; the J
   // hint closes. The entry panel and anywhere else, nothing.
-  function tap(gx, gy) {
-    var U = G.ui.panel, rx = U.left(RP[0]), fy = U.top(RP[1]), w0 = U.keyW(title.loc), w1 = U.keyW(title.rar), i;
+  function tap(gx0, gy0) {
+    var U = G.ui.panel, gx = U.ux(gx0), gy = U.uy(gy0);                            // Phase 90: UI px
+    if (lay()) select(sel);
+    if (narrow && reading) { if (stockRow.show) return 'action'; reading = false; return 'none'; } // one panel: a tap on the page turns back (or stocks)
+    var rx = U.left(RP[0]), fy = U.top(RP[1]), w0 = U.keyW(title.loc), w1 = U.keyW(title.rar), i;
     if (gy >= fy - 2 && gy < fy + U.KEY_H + 2) {
       if (gx >= rx && gx < rx + w0) { focus = 0; return 'right'; }
       if (gx >= rx + w0 + 6 && gx < rx + w0 + 6 + w1) { focus = 1; return 'right'; }
@@ -365,7 +415,7 @@ G.ui.journal = (function () {
     var end = Math.min(list.length, (top + ROWS) * COLS);
     for (i = top * COLS; i < end; i++) {
       var c = i - top * COLS, x = GX + (c % COLS) * (CW + GAP), y = GY + Math.floor(c / COLS) * (CH + GAP);
-      if (gx >= x && gx < x + CW && gy >= y && gy < y + CH) { focus = 2; if (i !== sel) { select(i); stockRow.idx = 0; stockRow.said = ''; stockState(); } return 'none'; }
+      if (gx >= x && gx < x + CW && gy >= y && gy < y + CH) { focus = 2; if (i !== sel) { select(i); stockRow.idx = 0; stockRow.said = ''; stockState(); } else if (narrow) reading = true; return 'none'; }
     }
     var trackH = ROWS * (CH + GAP) - GAP, sx = GX + COLS * (CW + GAP) - GAP + 4;
     if (list.length && gx >= sx - 4 && gx < sx + 10 && gy >= GY && gy < GY + trackH) {
@@ -399,12 +449,12 @@ G.ui.journal = (function () {
   return {
     native: true,
     open: open, update: update, draw: draw, render: render, tap: tap, warm: warm,
-    rects: function () { return J_RECTS; }, // 8.4 #38: what the ESC key keeps off
+    rects: function () { lay(); return narrow ? J_ONE : J_RECTS; }, // 8.4 #38: what the ESC key keeps off
     jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close, // Phase 68: a comment had swallowed these since Phase 61
     lastLate: function () { return lastLate; },
     stock: function () { stockState(); return { show: stockRow.show, ok: stockRow.ok, cls: stockRow.cls, text: stockRow.text }; }, // Phase 85
     stockOne: stockOne,
-    state: function () { return { loc: locs[locIdx], family: FAMILIES[famIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
+    state: function () { return { narrow: narrow, reading: reading, cols: COLS, rows: ROWS, loc: locs[locIdx], family: FAMILIES[famIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
   };
 })();
 

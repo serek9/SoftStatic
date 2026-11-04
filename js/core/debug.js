@@ -471,6 +471,21 @@ G.core.debug = (function () {
     // dbg.device() (Phase 57): touch mode, the viewport, the fit and how much of the screen it
     // fills, the safe insets, portrait, full screen (asked once, its result) and the audio's state.
     device: function () { return G.core.device.report(); },
+    // Phase 90 (PLAN_PLAYABILITY.md 90.1-90.2): the UI layer's sizes in CSS px against the
+    // targets: capitals >= 9, thumb buttons and the touch controls >= 44, tappable rows >= 28.
+    // Opens what it measures (the card is measured from its layout without a fish).
+    uiCheck: function () {
+      var U = G.ui.panel, c = U.css(), out = [], ok = true, L = G.core.input.layout(), i;
+      function want(name, px, min) { var v = +(px * c).toFixed(1); out.push(name + ' ' + v + (v >= min ? ' >= ' : ' < ') + min); if (v < min) ok = false; }
+      if (!G.core.device.touch()) return { touch: false, note: 'touch mode is off: a PC keeps the keyboard sizes' };
+      want('capitals', 7, 9);
+      for (i = 0; i < L.buttons.length; i++) if (L.buttons[i].on) want(L.buttons[i].act + ' key', Math.min(L.buttons[i].w, L.buttons[i].h), 44);
+      for (i = 0; i < L.pad.length; i++) if (L.pad[i].on) want(L.pad[i].act + ' pad', Math.min(L.pad[i].w, L.pad[i].h), 44);
+      if (L.act.on) want('action button', L.act.w, 44);
+      want('card keys', U.btnH(), 44);
+      want('list rows', U.rowH(), 28);
+      return { touch: true, pass: ok, layout: L.mode, sizes: out };
+    },
     // dbg.budget(n) holds the phone's frame budget at n (0 full, 1, 2; Phase 60.1), dbg.budget(null)
     // gives it back to the frame rate, dbg.budget() reads it.
     budget: function (n) { return G.core.device.budget(n); },
@@ -504,6 +519,7 @@ G.core.debug = (function () {
       pages.push('small', 'swim', 'sprites', 'baits', 'lures', 'lure swim:0', 'lure swim:12', 'fx', 'shop', 'panel', 'fishers', 'dogs', 'looks top'); // small: Phase 44; panel: Phase 46; looks: Phase 47
       pages.push('tackle', 'setup', 'life under', 'bed', 'life above', 'shore'); // Phase 50.1
       pages.push('touch', 'notice'); // Phase 60.2: the phone's controls; the portrait notice and the icon
+      pages.push('ui'); // Phase 90.5: the shared button's states, the three text sizes, the icons, the rows
       page = 0; t = 0;
     }
 
@@ -894,6 +910,30 @@ G.core.debug = (function () {
           if (WORDS[k]) F.bold(ctx, WORDS[k], bx + ((ad - F.measureBold(WORDS[k])) >> 1), by + ((ad - F.FONT_H) >> 1), on ? 'signal_amber' : 'bone');
         }
         F.drawText(ctx, 'keys ' + bs + ' px, pad ' + ps + ', button ' + ad + ' at ' + G.core.device.scale().toFixed(2) + ' CSS px a game px; held: P, the right arrow, HOOK', 8, 344, 'fog_light');
+      } else if (name === 'ui') {
+        // Phase 90.5 (PLAN_PLAYABILITY.md §7): the one button in its four states, at a PC's key
+        // height and a thumb's; the three text sizes; the keys' icons with their words; a list's
+        // chosen and hovered rows.
+        var Un = G.ui.panel, ST = ['idle', 'chosen', 'pressed', 'disabled'], q;
+        Un.frame(ctx, 8, 24, 300, 150, 'BUTTONS');
+        for (q = 0; q < 4; q++) {
+          Un.button(ctx, 'SELL 7c', 16 + q * 72, 48, 64, Un.KEY_H, q);
+          Un.button(ctx, 'KEEP', 16 + q * 72, 70, 64, 30, q);
+          F.drawText(ctx, ST[q], 16 + q * 72, 108, 'fog_mid');
+        }
+        Un.frame(ctx, 320, 24, 312, 150, 'TEXT');
+        F.bold(ctx, 'Title: the bold weight', 328, 48, 'bone');
+        F.drawText(ctx, 'Body: the fine font, 7 px capitals.', 328, 64, 'fog_light');
+        F.drawText(ctx, 'Small: hints and old values.', 328, 80, 'fog_mid');
+        F.drawText(ctx, 'Good', 328, 100, 'moss_lit'); F.drawText(ctx, 'Too dear', 370, 100, 'rust_hi'); F.drawText(ctx, '250c', 430, 100, 'signal_amber');
+        var IA = ['journal', 'map', 'setup', 'pause', 'back'];
+        Un.frame(ctx, 8, 186, 300, 80, 'ICONS');
+        for (q = 0; q < IA.length; q++) { ctx.drawImage(G.ui.hud.touchParts.icon(IA[q]), 20 + q * 56, 210); F.drawText(ctx, G.ui.hud.touchParts.wordFor(IA[q], 60), 16 + q * 56, 228, 'fog_light'); }
+        Un.frame(ctx, 320, 186, 312, 80, 'ROWS');
+        Un.row(ctx, 326, 210, 140); F.drawText(ctx, 'Chosen row', 332, 210, 'signal_amber');
+        ctx.fillStyle = P.night_deep; ctx.fillRect(326, 222, 140, 11); F.drawText(ctx, 'Hovered row', 332, 224, 'fog_light');
+        Un.row(ctx, 480, 210, 140, 21); F.drawText(ctx, 'A thumb\'s row', 486, 210, 'signal_amber');
+        F.drawText(ctx, 'UI layer ' + (Un.on() ? 'on' : 'off') + ', capitals ' + Un.textPx() + ' CSS px', 8, 344, 'fog_light');
       } else if (name === 'notice') {
         // Phase 60.2: the portrait notice as a phone held upright sees it, and the home-screen icon.
         ctx.fillStyle = P.dusk_violet; ctx.fillRect(0, 18, 640, 170);
