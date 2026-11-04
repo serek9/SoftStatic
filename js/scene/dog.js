@@ -64,17 +64,25 @@ G.scene.dog = (function () {
       A.px(c, L.coat[0], x, y); A.px(c, L.coat[2], x - 1, y - 1);
     }
   }
+  // Phase 86: a sitting dog built as one: the back sloping from the withers down to the rump,
+  // the haunch round over a folded hind leg with its paw forward on the floor, a deep chest,
+  // a neck up to the head, and both forelegs straight down to their paws (the far one a step
+  // darker, just behind). The boat's hull and the box sled's side hide the lower rows.
   function sitting(c, o) {
-    var b = L.bulk;
+    var b = L.bulk, cx = o.cx || 16, cy = o.cy || 11, LEG = L.paleLegs ? L.muzzle : DOG, FARK = [DOG[0], DOG[0], DOG[1]];
     tail(c, o.t0, o.t1);                                                                     // the tail
-    A.blob(c, 8, 13, 6.5 * b, 4.5 * b, DOG, { bias: -0.05 });
-    A.blob(c, 6, 14.5, 4.5 * b, 3.5 * b, DOG, { bias: 0.05 });
-    A.blob(c, o.cx || 16, o.cy || 11, 4.5 * b, 5.5 * b, DOG, { bias: 0.15 });
-    A.box(c, L.chest, (o.cx || 16) + 1, (o.cy || 11) - 1, b > 1 ? 3 : 2, b > 1 ? 5 : 4);       // the pale chest
-    if (L.curly) curls(c, o.cx || 16, o.cy || 11);
-    var LEG = L.paleLegs ? L.muzzle : DOG;
+    A.limb(c, 13.5, 18, 13.5, 13, 1.2 * b, FARK, 0);                                         // the far foreleg
+    A.box(c, DOG[0], 13, 18, 3, 1);
+    A.blob(c, 7.5, 14, 5.5 * b, 4.6 * b, DOG, { bias: -0.05 });                              // the haunch
+    A.limb(c, 6, 10.5, cx - 1, cy - 2.5, 3.6 * b, DOG, 0.05);                                 // the back, withers high
+    A.blob(c, cx, cy, 3.8 * b, 4.8 * b, DOG, { bias: 0.15 });                                 // the chest
+    A.limb(c, cx, cy - 3, o.hx - 1, o.hy + 1.5, 2.4 * b, DOG, 0.15);                          // the neck
+    A.box(c, L.chest, cx + 1, cy - 1, b > 1 ? 3 : 2, b > 1 ? 5 : 4);                          // the pale chest
+    if (L.curly) curls(c, cx, cy);
+    A.limb(c, 8.5, 16, 11, 18.4, 1.3, DOG, 0); A.box(c, DOG[1], 10, 18, 4, 2);                // the hind paw, forward
+    A.px(c, DOG[0], 13, 19);
     if (o.leg) A.limb(c, o.leg[0], o.leg[1], o.leg[2], o.leg[3], 1.4, LEG, 0.1);
-    else A.limb(c, 17, 13, 17, 18, 1.4, LEG, 0.1);
+    else { A.limb(c, 17, 13, 17, 18, 1.4, LEG, 0.1); A.box(c, LEG[1], 16, 18, 3, 2); A.px(c, LEG[0], 18, 19); } // the near foreleg and its paw
     head(c, o.hx, o.hy, o);
   }
   var PAINTERS = {

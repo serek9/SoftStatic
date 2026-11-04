@@ -1634,7 +1634,7 @@ G.scene.sailing = (function () {
   // still do what they always do on this step: the director only reads them.
   var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'up', 'down', 'back', 'still', 'setup'];
   var voiceIn = { on: true, block: false }; // Phase 42
-  var fisherIn = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
+  var fisherIn = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0, bars: false }, dogP = [0, 0];
   function fisherStep(run, dt) {
     var inp = G.core.input, any = false;
     for (var i = 0; i < KEYS_ANY.length; i++) if (inp.held(KEYS_ANY[i]) || inp.pressed(KEYS_ANY[i])) { any = true; break; }
@@ -1647,7 +1647,8 @@ G.scene.sailing = (function () {
     // swings with the turn (the boat's acceleration) and the throttle.
     var b = run.boat;
     fisherIn.helm = run.fsm === 'sailing' && (!b.stopped || b.startT >= 0 || (run.move !== 0 && b.motor));
-    fisherIn.cord = b.startT >= 0 ? b.startT / boat.M.start : -1;
+    fisherIn.cord = b.startT >= 0 && !b.ice ? b.startT / boat.M.start : -1; // Phase 86: the Snow Machine has no pull cord to show
+    fisherIn.bars = b.ice;                                                  // Phase 86: his hands on the handlebar
     fisherIn.steer = Math.max(-1, Math.min(1, b.ax * 0.01 + 0.4 * b.throttle));
     tackleStep(run, any);
     G.scene.fisher.step(run.fisher, dt, fisherIn, G.vrng);
@@ -1708,8 +1709,8 @@ G.scene.sailing = (function () {
     var run = G.state.run, b = run && run.boat;
     if (!b || !loc || G.core.state.sceneName() !== 'sailing' || run.fsm !== 'sailing' || !b.stopped || G.ui.setup.isOpen()) return false;
     if (G.ui.menu.current()) return false;
-    var sx = Math.round(b.x - run.cam.x), y = loc.waterY - camPy + boat.bob(b);
-    var dx = b.facing < 0 ? sx - 16 : sx + 4, dy = y - 14 + boat.shear(b, 10);
+    boat.dogAt(b, Math.round(b.x - run.cam.x), loc.waterY - camPy, dogP); // Phase 86: in the bow, or in the box sled on the ice
+    var dx = dogP[0], dy = dogP[1];
     var wx = gx / HI, wy = gy / HI;
     return wx >= dx - 2 && wx < dx + 14 && wy >= dy - 2 && wy < dy + 12;
   }

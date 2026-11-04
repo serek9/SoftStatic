@@ -18,6 +18,12 @@ G.scene.boat = (function () {
   // Phase 81 (PLAN_WINTER.md 2.3): on the ice the boat is the Snow Machine: the same steering
   // and speed curve, faster (a fast vehicle across the ice) and without the idle drift.
   var SLED = { speed: 1.5, accel: 1.3 };
+  // Phase 86: where he sits on the ice (presentation only). ride: px his seat line stands over
+  // the ice on the machine's seat; sit: on his bucket by the hole; back: px the machine stands
+  // behind him while he sits (its nose clear of his back); rate: how fast he gets off and sits
+  // down, or gets back on (1/s). The ankles (local to the seat line): on the running board, and
+  // out before the bucket on the ice. The bucket's middle (local x): on the rear rack, and under him.
+  var ICE = { ride: 7, sit: 4, back: 31, rate: 2.2, ankRide: [1.5, 1.5], ankSit: [6, 2], rack: -14.5, under: -1.5 };
 
   function rep(ch, n) { var s = ''; while (n-- > 0) s += ch; return s; }
 
@@ -49,46 +55,111 @@ G.scene.boat = (function () {
       for (var x = 12; x < 52; x += 13) A.px(c, 'stone_hi', x, 6);                   // oarlock and rivets
       A.box(c, 'wood_deep', 20, 2, 3, 2); A.box(c, 'wood_dark', 20, 1, 3, 1);          // an oarlock
     } },
-    // Phase 81: the Snow Machine (64×18 view px, facing right): the track and its bogie wheels
-    // under a black tunnel, the seat, a red cowl with a lit flank and a white stripe, the
-    // windscreen, the handlebar, and the ski out in front on its strut.
-    sled: { w: 64, h: 18, paint: function (c) {
-      var RED = ['rust_dark', 'rust', 'rust_hi'], TR = ['ink', 'stone_dark', 'stone'];
-      A.slab(c, 4, 11, 38, 6, TR);                                                    // the track
-      for (var k = 0; k < 6; k++) { A.blob(c, 8 + k * 6.2, 14, 2.2, 2.2, ['stone_dark', 'stone', 'stone_hi']); }
-      for (k = 4; k < 42; k += 3) A.px(c, 'stone_hi', k, 16);                         // its lugs
-      A.box(c, 'ink', 2, 9, 44, 2);                                                   // the tunnel
-      A.box(c, 'wood_dark', 6, 6, 20, 3); A.box(c, 'wood', 6, 6, 20, 1);             // the seat
-      A.area(c, 26, 2, 30, 10, function (x, y) {                                       // the cowl
-        var u = x - 26, top = Math.round(7 - u * 0.25 + Math.max(0, u - 18) * 0.5);
-        if (y < top || y > 11 || u > 29 - Math.max(0, 9 - y) * 1.2) return '';
-        if (y === top) return 'rust_hi';
-        if (y === 8) return 'bone';                                                    // the stripe
-        return y > 9 ? 'rust_dark' : 'rust';
+    // Phase 81, repainted in Phase 86: the Snow Machine (84×32 view px, 42×16 world, facing
+    // right; its nose at x 83, the ice at y 32). From the back: the snow flap and the tail
+    // light, the rear rack where his bucket rides, the long black seat, the tunnel over the
+    // track (its rear idler raised, three bogie wheels, the drive sprocket, lugs on its tread),
+    // the running board his boots stand on, the red hood with a lit crown, a cream stripe, a
+    // vent and the headlight, the smoked windscreen swept back, the handlebar on its riser,
+    // and the ski out in front on its A-arm and shock, its tip turned up.
+    sled: { w: 84, h: 32, paint: function (c) {
+      var x, TRK = ['ink', 'stone_dark', 'stone'], WHEEL = ['stone_dark', 'stone', 'stone_hi', 'stone_lit'];
+      // The track: rear idler raised, so the tread climbs to the back.
+      A.area(c, 3, 20, 51, 12, function (u, v) {
+        var bot = u < 15 ? Math.round(31 - (15 - u) * 0.45) : 31, top = 21;
+        if (v < top || v > bot) return '';
+        if (v === bot) return u % 3 === 0 ? 'stone' : 'ink';                               // the lugs on the tread
+        if (v === top || u === 3 || u === 53) return 'ink';
+        return v > bot - 2 ? 'ink' : 'stone_dark';
       });
-      A.line(c, 'ice_hi', 30, 5, 34, 0); A.line(c, 'ice_lit', 31, 5, 35, 0); A.line(c, 'fog_light', 32, 5, 36, 0); // the windscreen
-      A.box(c, 'ink', 27, 3, 2, 3); A.box(c, 'stone_hi', 25, 3, 5, 1);                // the handlebar
-      A.box(c, 'ink', 50, 12, 2, 4);                                                   // the ski's strut
-      A.box(c, 'stone_lit', 40, 16, 20, 1); A.box(c, 'stone', 40, 17, 20, 1);         // the ski
-      A.px(c, 'stone_lit', 60, 15); A.px(c, 'stone_lit', 61, 14);
-      RED.length = 0; TR.length = 0;
-    } },
-    // Phase 81: the box sled the dog rides in (30×12 view px): plank sides, a lit rim, runners.
-    box: { w: 30, h: 12, paint: function (c) {
-      A.slab(c, 1, 3, 28, 7, WOOD); A.box(c, 'wood_lit', 1, 3, 28, 1);
-      for (var x = 6; x < 28; x += 7) A.box(c, 'wood_dark', x, 4, 1, 6);
-      A.box(c, 'stone_lit', 0, 10, 30, 1); A.px(c, 'stone_lit', 29, 9);
-    } },
-    // Phase 81: his bucket by the hole: a dented white pail with a lid (12×14 view px).
-    bucket: { w: 12, h: 14, paint: function (c) {
-      A.area(c, 0, 0, 12, 14, function (x, y) {
-        var inset = Math.round(y * 0.12);
-        if (x < 1 + inset || x > 10 - inset + (y > 2 ? 0 : 0)) return '';
-        if (y < 2) return y === 0 ? 'fog_light' : 'stone_hi';
-        if (x === 1 + inset) return 'stone';
-        return (x + y) % 9 === 0 ? 'stone_hi' : 'fog_light';
+      A.line(c, 'stone', 10, 29, 50, 29);                                                 // the slide rail
+      A.blob(c, 9, 26, 3.2, 3.2, WHEEL, { bias: 0.1 });                                     // the rear idler
+      for (x = 19; x < 46; x += 9) A.blob(c, x, 27, 2.6, 2.6, WHEEL, { bias: 0.1 });         // the bogie wheels
+      A.blob(c, 50, 24, 2.4, 2.4, WHEEL, { bias: 0.1 });                                    // the drive sprocket
+      for (x = 9; x < 50; x += 9) A.px(c, 'ink', x, 27);                                    // their hubs
+      // The tunnel over it, riveted, and the snow flap and tail light at its back.
+      A.box(c, 'ink', 1, 17, 52, 4); A.box(c, 'stone_dark', 1, 17, 52, 1);
+      for (x = 5; x < 50; x += 6) A.px(c, 'stone', x, 19);
+      A.box(c, 'ink', 0, 18, 2, 11); A.box(c, 'stone_dark', 1, 19, 1, 9);                   // the flap
+      A.box(c, 'crimson', 1, 15, 3, 2); A.px(c, 'rust_hi', 1, 15);                        // the tail light
+      // The rear rack: a tube rail behind the seat.
+      A.line(c, 'stone_hi', 3, 13, 16, 13); A.box(c, 'stone_dark', 3, 14, 1, 3); A.box(c, 'stone_dark', 15, 14, 1, 3);
+      // The seat: long, grey vinyl, its back end raised a little, lit along its top, stitched.
+      A.area(c, 15, 10, 34, 8, function (u, v) {
+        var top = u < 20 ? 12 : 13, bot = 17;
+        if (u > 45) top = 13 + (u - 45);
+        if (v < top || v > bot) return '';
+        if (v === top) return 'stone_lit';
+        if (v === bot) return 'ink';
+        if (v === top + 2 && u % 4 === 0) return 'stone_dark';
+        return v === top + 1 ? 'stone_hi' : 'stone';
       });
-      A.box(c, 'stone', 1, 2, 10, 1);
+      // The running board, where his boots stand (its top 3.5 world px off the ice).
+      A.box(c, 'stone_lit', 24, 25, 26, 1); A.box(c, 'stone', 24, 26, 26, 1); A.box(c, 'ink', 24, 27, 26, 1);
+      // The front suspension: the A-arm and its shock to the ski's spindle.
+      A.line(c, 'ink', 52, 26, 67, 28); A.line(c, 'stone_dark', 52, 25, 67, 27);
+      A.line(c, 'stone_hi', 61, 20, 65, 27); A.box(c, 'ink', 66, 26, 2, 4);
+      // The ski: its tip turned up, a grab loop on it.
+      A.box(c, 'stone_lit', 56, 30, 25, 1); A.box(c, 'stone', 56, 31, 25, 1);
+      A.px(c, 'stone_lit', 81, 29); A.px(c, 'stone_lit', 82, 28); A.px(c, 'stone_lit', 82, 27); A.px(c, 'stone', 81, 30); A.px(c, 'stone', 83, 28);
+      A.line(c, 'stone_hi', 80, 26, 82, 26); A.px(c, 'stone_hi', 79, 27);
+      // The windscreen, smoked, swept back from the hood (drawn before it, the hood over its foot).
+      for (var v = 1; v <= 11; v++) {
+        var x0 = Math.round(49 + (v - 1) * 0.55), w = v < 3 ? 2 : 4;
+        A.box(c, 'ice', x0, v, w, 1); A.px(c, 'ice_lit', x0 + w, v); A.px(c, 'ice_dark', x0, v);
+        if (v >= 3 && v <= 7) A.px(c, 'fog_light', x0 + 1 + ((v - 3) >> 1), v);            // a glint
+      }
+      A.box(c, 'ice_lit', 49, 0, 3, 1);
+      // The hood: red, its crown lit, a cream stripe along its flank, a vent, the headlight.
+      A.area(c, 44, 9, 40, 19, function (u, v) {
+        var top = u < 52 ? 17 - (u - 44) * 0.85 : (u < 58 ? 10 + (u - 52) * 0.2 : 11.2 + (u - 58) * 0.3);
+        if (u > 80) top += (u - 80) * 1.5;
+        var bot = u < 72 ? 27 : 27 - (u - 72) * 0.55;
+        top = Math.round(top); bot = Math.round(bot);
+        if (v < top || v > bot || u > 83) return '';
+        if (v === bot) return 'ink';
+        if (v >= bot - 2 && u > 47) return 'stone_dark';                                  // the black belly pan
+        if (v === top) return u > 52 && u < 70 ? 'cream' : 'rust_hi';                      // the crown, catching the light
+        if (v === top + 1) return 'rust_hi';
+        if (v === top + 4 && u > 50 && u < 80) return 'bone';                               // the stripe
+        if (v === top + 5 && u > 52 && u < 78) return 'rust_dark';
+        if (u > 57 && u < 65 && (v === top + 8 || v === top + 10) && u % 2 === 0) return 'ink'; // the vent
+        if (u > 75 && u < 80 && (v === top + 1 || v === top + 2)) return v === top + 1 ? 'cream' : 'lamp_glow'; // the headlight
+        return v > bot - 5 ? 'rust_dark' : 'rust';
+      });
+      A.box(c, 'stone_dark', 75, 16, 6, 1);                                                 // the headlight's brow
+      A.line(c, 'stone_hi', 80, 24, 83, 22); A.px(c, 'stone_dark', 81, 25);                // the bumper
+      // The handlebar on its riser, the grip where his near hand goes (world local 4, -12).
+      A.line(c, 'ink', 51, 14, 47, 9); A.line(c, 'stone_dark', 52, 14, 48, 9);
+      A.box(c, 'ink', 44, 7, 4, 2); A.px(c, 'stone_hi', 48, 7); A.px(c, 'stone_lit', 50, 6);
+      TRK.length = 0;
+    } },
+    // Phase 81, rebuilt in Phase 86: the box sled the dog rides in (36×16 view px, its tow end at
+    // the right): plank sides on stanchions with a rope rail over their tops, a lit rail, and
+    // runners that curl up at the front. The dog is drawn before it, so it sits inside.
+    box: { w: 36, h: 16, paint: function (c) {
+      A.slab(c, 1, 4, 33, 8, WOOD); A.box(c, 'wood_lit', 1, 4, 33, 1);
+      A.box(c, 'wood_deep', 1, 8, 33, 1);                                                   // the gap between the planks
+      for (var x = 2; x < 34; x += 10) { A.box(c, 'wood_dark', x, 2, 2, 11); A.px(c, 'wood_hi', x, 2); }
+      A.line(c, 'cream', 3, 2, 12, 3); A.line(c, 'cream', 12, 3, 22, 2); A.line(c, 'paper_dark', 22, 2, 32, 3);
+      for (x = 6; x < 32; x += 11) A.box(c, 'ink', x, 12, 1, 2);                             // the struts
+      A.box(c, 'stone_lit', 0, 14, 34, 1); A.box(c, 'stone', 0, 15, 34, 1);                  // the runners
+      A.px(c, 'stone_lit', 34, 13); A.px(c, 'stone_lit', 35, 12); A.px(c, 'stone_lit', 35, 11);
+    } },
+    // Phase 81, repainted in Phase 86: his bucket (12×12 view px): a white pail, ribbed, its
+    // bail handle, under a padded lid he sits on.
+    bucket: { w: 12, h: 12, paint: function (c) {
+      A.area(c, 0, 2, 12, 10, function (x, y) {
+        var inset = Math.round((y - 2) * 0.12);
+        if (x < 1 + inset || x > 10 - inset) return '';
+        if (y === 11) return 'stone';
+        if (y === 4 || y === 8) return 'stone_hi';                                          // the ribs
+        if (x === 1 + inset) return 'stone_hi';
+        if (x === 10 - inset) return 'stone';
+        return 'fog_light';
+      });
+      A.box(c, 'stone_dark', 0, 0, 12, 2); A.box(c, 'stone', 1, 0, 10, 1);                 // the padded lid
+      A.px(c, 'stone_dark', 2, 5); A.px(c, 'stone_dark', 9, 5); A.line(c, 'stone', 3, 6, 8, 6); // the bail
     } },
     motor: { w: 10, h: 16, paint: function (c) {
       A.blob(c, 5, 4, 4.5, 3.8, STONES, { bias: 0.15 }); A.box(c, 'stone_dark', 1, 6, 8, 2);
@@ -129,7 +200,7 @@ G.scene.boat = (function () {
   function create(x, ice) {
     return { x: x, vx: 0, t: 0, facing: 1, stopped: true, ice: !!ice, parked: false, // Phase 81: ice, the Snow Machine; parked, at a hole (he sits on his bucket)
       pitch: 0, pv: 0, wave: 0, show: 0, heave: 0, hv: 0, ax: 0, prevVx: 0, lean: 0, wakeA: 0, wakeHit: false,
-      throttle: 0, rpm: 0, motor: false, startT: -1, restT: 0, puff: 0, starts: 0 };
+      throttle: 0, rpm: 0, motor: false, startT: -1, restT: 0, puff: 0, starts: 0, sit: 0 }; // Phase 86: sit, 0 on the machine .. 1 on the bucket
   }
 
   // Phase 24 (Phase 26: before step(), so the boat waits for the motor): the outboard. A
@@ -170,6 +241,7 @@ G.scene.boat = (function () {
     b.wakeHit = b.hv > M.liftHit && hv0 <= M.liftHit;
     if (b.wakeHit) b.wakeA = Math.min(1, b.hv / 3);
     b.lean = Math.max(-1, Math.min(1, -b.ax * 0.012));   // the fisher leans back on throttle
+    if (b.ice) b.sit += Math.max(-ICE.rate * dt, Math.min(ICE.rate * dt, (b.parked ? 1 : 0) - b.sit)); // Phase 86: off the machine and down on the bucket
   }
 
   // The vertical shift (world px) of a point dx px along the hull from its centre (toward the
@@ -200,7 +272,23 @@ G.scene.boat = (function () {
   }
 
   // Phase 24: the heave on the surface (it was a 1 px sine), in view pixels; down positive.
-  function bob(b) { return -Math.round(b.heave * HI) / HI; }
+  // Phase 86: on the ice there is no heave; his seat line stands over the ice (seatUp).
+  function bob(b) { return b.ice ? -seatUp(b) : -Math.round(b.heave * HI) / HI; }
+  function sitE(b) { var e = Math.max(0, Math.min(1, b.sit)); return e * e * (3 - 2 * e); }
+  function seatUp(b) { return Math.round((ICE.ride + (ICE.sit - ICE.ride) * sitE(b)) * HI) / HI; }
+
+  // Phase 86: where the dog is drawn (the top left of its 12×10 painting) for a boat at screen x
+  // sx over the waterline wy, into out: in the bow, or in the box sled behind the Snow Machine.
+  function dogAt(b, sx, wy, out) {
+    if (b.ice) {
+      var mx = sx - b.facing * Math.round(ICE.back * sitE(b) * HI) / HI;
+      out[0] = b.facing < 0 ? mx + 26.5 : mx - 38.5; out[1] = wy - 13.5;
+      return out;
+    }
+    var y = wy + bob(b);
+    out[0] = b.facing < 0 ? sx - 16 : sx + 4; out[1] = y - 14 + shear(b, 10);
+    return out;
+  }
 
   // The rod (Phase 31): G.gfx.rod bends it in update(); this places and draws it. The hands
   // hold it ROD.baseX px ahead of the boat's centre and ROD.baseY px above the waterline.
@@ -341,23 +429,43 @@ G.scene.boat = (function () {
     }
   }
 
-  // Phase 81: the Snow Machine on the ice, with the dog's box sled behind. Riding, he sits astride
-  // it; parked at a hole (b.parked), the machine stands 20 px behind him and he sits on his
-  // bucket, the rod over the hole. No hull, motor or wash: a shadow on the snow under it.
+  // Phase 81, redrawn in Phase 86: the Snow Machine on the ice, the dog in the box sled behind
+  // it. Riding, he sits astride the seat, his boots on the running board and his hands on the
+  // handlebar; stopped at a hole (b.parked), he gets off and sits on his bucket by it (b.sit
+  // eases 0..1), the machine standing ICE.back px behind him and the bucket brought from its
+  // rack; his legs bend down to the ice. No hull, motor or wash: shadows on the snow.
+  var dp = [0, 0];
+  function shadow(ctx, x0, x1, y, a) {
+    ctx.globalAlpha = a; ctx.fillRect(Math.round(x0 * HI) / HI, y - 0.5, Math.round((x1 - x0) * HI) / HI, 1); ctx.globalAlpha = 1;
+  }
   function drawSled(ctx, b, sx, wy, withFisher, drawDog, gear) {
-    var flip = b.facing < 0, f = b.facing, y = wy, P = S.PALETTE, back = b.parked ? 20 : 0;
-    var mx = sx - f * back, scv = img('sled', flip), bcv = img('box', flip);
-    ctx.globalAlpha = 0.45; ctx.fillStyle = P.snow_deep;
-    ctx.fillRect(Math.min(mx - 18, mx - 37 * f) + (flip ? -16 : 0), wy - 0.5, 56, 1);
-    ctx.globalAlpha = 1;
-    var bx = flip ? mx + 20 : mx - 35;
-    put(ctx, bcv, bx, y - 6);                                                           // the box sled
-    ctx.fillStyle = P.ink; ctx.fillRect(flip ? mx + 13 : mx - 20, y - 2.5, 7, 0.5);      // the hitch
-    if (drawDog) drawDog(ctx, flip ? mx + 21 : mx - 33, y - 15, flip, Math.abs(b.vx) / P_SPEED);
-    put(ctx, scv, flip ? mx - 14 : mx - 18, y - 9);
+    var flip = b.facing < 0, f = b.facing, P = S.PALETTE, e = sitE(b), back = Math.round(ICE.back * e * HI) / HI;
+    var mx = sx - f * back, scv = img('sled', flip), bcv = img('box', flip), Y = wy + bob(b);
+    ctx.fillStyle = P.snow_deep;
+    shadow(ctx, flip ? mx - 23 : mx - 19, flip ? mx + 19 : mx + 23, wy + 0.5, 0.45);            // under the machine
+    shadow(ctx, flip ? mx + 22 : mx - 40, flip ? mx + 40 : mx - 22, wy + 0.5, 0.35);           // under the box sled
+    // The dog in the box sled, and the box's side over its legs; the tow bar to the machine.
+    if (drawDog) { dogAt(b, sx, wy, dp); drawDog(ctx, dp[0], dp[1], flip, Math.abs(b.vx) / P_SPEED); }
+    put(ctx, bcv, flip ? mx + 22 : mx - 40, wy - 8);
+    ctx.fillStyle = P.ink; ctx.fillRect(flip ? mx + 18.5 : mx - 22.5, wy - 2.5, 4, 0.5);
+    put(ctx, scv, flip ? mx - 23 : mx - 19, wy - 16);
     if (!withFisher) return;
-    if (gear && gear.fisher) G.scene.fisher.draw(ctx, gear.fisher, sx, y, f, b.lean, 0, b.t, 0);
-    if (b.parked) put(ctx, img('bucket', flip), sx - 3, y - 7);
+    // His bucket: on the rack behind the seat, carried to under him as he sits down.
+    var bkx = (mx + f * ICE.rack) * (1 - e) + (sx + f * ICE.under) * e, bky = (wy - 7.5) * (1 - e) + wy * e;
+    if (e > 0) shadow(ctx, bkx - 3 * e, bkx + 3 * e, wy + 0.5, 0.4 * e);
+    put(ctx, img('bucket', flip), Math.round((bkx - 3) * HI) / HI, Math.round((bky - 6) * HI) / HI);
+    var fs = gear && gear.fisher;
+    // A rod set down while he waits stands in a holder stuck in the snow by the hole.
+    if (fs && fs.rodAt === 'holder' && e > 0.5) {
+      var hx = Math.round((sx + f * G.scene.fisher.HOLDER[0]) * HI) / HI, hy = Y + G.scene.fisher.HOLDER[1];
+      ctx.fillStyle = P.wood_dark; ctx.fillRect(hx - 0.5, hy, 1, wy - hy);
+      ctx.fillStyle = P.wood_hi; ctx.fillRect(flip ? hx : hx - 0.5, hy, 0.5, wy - hy);
+    }
+    if (fs) {
+      var ax = ICE.ankRide[0] + (ICE.ankSit[0] - ICE.ankRide[0]) * e, ay = (wy - 5.5) * (1 - e) + (wy - 2) * e - Y;
+      G.scene.fisher.drawLegs(ctx, sx, Y, f, ax, ay);
+      G.scene.fisher.draw(ctx, fs, sx, Y, f, b.lean, 0, b.t, 0);
+    }
     drawRod(ctx, b, sx, wy, gear ? gear.rod : 0, gear && gear.lineKey, gear ? gear.lineA : 0.6);
     drawReel(ctx, b, sx, wy);
   }
@@ -392,10 +500,10 @@ G.scene.boat = (function () {
   }
 
   // World x of the stern, where the wake starts.
-  function stern(b) { return b.x - b.facing * 19; }
+  function stern(b) { return b.x - b.facing * 19 - (b.ice ? b.facing * ICE.back * sitE(b) : 0); }
 
   // World x of the bow.
   function bow(b) { return b.x + b.facing * 17; }
 
-  return { P: P, M: M, ROD: ROD, create: create, step: step, outboard: outboard, motion: motion, shear: shear, draw: draw, bob: bob, stern: stern, bow: bow, rodBase: rodBase, rodTip: rodTip };
+  return { P: P, M: M, ROD: ROD, create: create, step: step, outboard: outboard, motion: motion, shear: shear, draw: draw, bob: bob, dogAt: dogAt, ICE: ICE, stern: stern, bow: bow, rodBase: rodBase, rodTip: rodTip };
 })();
