@@ -96,9 +96,13 @@ G.scene.sailing = (function () {
   }
   // How bright the flash is now (0..1): a flicker, a second stronger one, then it fades; the
   // further off, the dimmer.
+  // Phase 92.2: Reduce flashes: no flicker, a slow soft swell to a quarter of the flash, in
+  // dusk_high (so the sky never goes brighter than its brightest key) and no bolt.
+  function reduced() { var st = G.state.save && G.state.save.settings; return !!(st && st.reduceFlashes); }
   function flashF() {
     var t = storm.t;
     if (t < 0) return 0;
+    if (reduced()) return 0.25 * Math.sin(Math.PI * Math.min(1, t / STORM.flashLen)) * (1 - 0.5 * storm.dist);
     var f = t < 0.06 ? 0.7 : (t < 0.12 ? 0.2 : (t < 0.2 ? 1 : Math.exp(-(t - 0.2) * 6)));
     return f * (1 - 0.5 * storm.dist);
   }
@@ -111,9 +115,9 @@ G.scene.sailing = (function () {
     c.fillStyle = P.night_ink; c.globalAlpha = STORM.dark * k;
     c.fillRect(0, -camPy, VIEW_W, wy + camPy);
     if (f > 0) {
-      c.fillStyle = P.fog_light; c.globalAlpha = STORM.skyA * f;
+      c.fillStyle = P[reduced() ? 'dusk_high' : 'fog_light']; c.globalAlpha = STORM.skyA * f;
       c.fillRect(0, -camPy, VIEW_W, wy + camPy);
-      if (storm.bolt && storm.t < 0.35) {
+      if (storm.bolt && storm.t < 0.35 && !reduced()) {
         var x = storm.bx, y = -camPy + 6, n = 9, dy = (wy - 34 - y) / n, bx = 0, by = 0;
         c.globalAlpha = Math.min(1, 1.6 * f);
         for (var i = 0; i < n; i++) {
@@ -132,7 +136,7 @@ G.scene.sailing = (function () {
     var f = flashF();
     if (f <= 0) return;
     var wy = loc.waterY - camPy;
-    c.fillStyle = P.fog_light; c.globalAlpha = STORM.waterA * f;
+    c.fillStyle = P[reduced() ? 'dusk_high' : 'fog_light']; c.globalAlpha = STORM.waterA * f;
     c.fillRect(0, wy, VIEW_W, VIEW_H - wy);
     c.globalAlpha = 1;
   }
@@ -1146,7 +1150,8 @@ G.scene.sailing = (function () {
 
   function camStep(run, dt) {
     var c = run.cam;
-    c.x += (camTarget(run) - c.x) * (1 - Math.exp(-CAM.k * dt));
+    var st = G.state.save.settings;
+    c.x += (camTarget(run) - c.x) * (1 - Math.exp(-CAM.k * (st.reduceMotion ? 0.5 : 1) * dt)); // Phase 92.2: a gentler camera under Reduce motion
     c.x = clamp(c.x, 0, loc.width - VIEW_W);
   }
 

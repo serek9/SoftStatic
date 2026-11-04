@@ -324,6 +324,16 @@ G.core.input = (function () {
     return true;
   }
 
+  // Phase 92.2: Reel by toggle. While the scene says it applies (a fight, with settings.reel
+  // 'toggle'), a press of action flips a latch and held('action') reads the latch, so a tap starts
+  // reeling and the next tap stops it; outside a fight, or set to hold, nothing changes.
+  var reelLatch = { active: false, on: false, flips: 0 };
+  function reelToggle(active) {
+    if (!active) { reelLatch.active = false; reelLatch.on = false; return; }
+    if (!reelLatch.active) { reelLatch.active = true; reelLatch.on = false; }
+    if (acts.action.pressed) { reelLatch.on = !reelLatch.on; reelLatch.flips++; }
+  }
+
   function endStep() {
     for (var i = 0; i < NAMES.length; i++) {
       var a = acts[NAMES[i]];
@@ -334,7 +344,8 @@ G.core.input = (function () {
 
   return {
     NAMES: NAMES, acts: acts, attach: attach, inject: inject, key: key, endStep: endStep, releaseAll: releaseAll,
-    held: function (name) { return acts[name].held; },
+    held: function (name) { return name === 'action' && reelLatch.active ? reelLatch.on : acts[name].held; },
+    reelToggle: reelToggle, reelLatch: function () { return { active: reelLatch.active, on: reelLatch.on, flips: reelLatch.flips }; }, // Phase 92.2
     pressed: function (name) { return acts[name].pressed; },
     released: function (name) { return acts[name].released; },
     // The `move` action as an axis: -1 left, 0 none or both, 1 right.

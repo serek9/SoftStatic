@@ -71,7 +71,9 @@ G.ui.menu = (function () {
   // The panel grows a row for each, and on a short screen shows a window of the rows, scrolled
   // to the chosen one, with marks for more above and below.
   // Phase 91.3: 'Vibration' in touch mode. The list is built from ALL, keeping the rows that apply.
-  var ALL = ['Resume', 'Volume', 'Sound', 'Dog barks', 'Full screen', 'Vibration', 'Text size', 'Tips', 'Controls', 'Fisher & dog', 'Export save', 'Import save'];
+  // Phase 92: Music, World and Effects under the master Volume; Reduce flashes, Reduce motion and Reel (hold or toggle).
+  var ALL = ['Resume', 'Volume', 'Music', 'World', 'Effects', 'Sound', 'Dog barks', 'Full screen', 'Vibration', 'Text size', 'Reduce flashes', 'Reduce motion', 'Reel', 'Tips', 'Controls', 'Fisher & dog', 'Export save', 'Import save'];
+  var SLIDER = { Volume: 'volume', Music: 'music', World: 'world', Effects: 'effects' };
   var ITEMS = [];
   function buildItems() {
     var D = G.core.device, fs = D && D.canFullscreen(), t = D && D.touch();
@@ -95,11 +97,14 @@ G.ui.menu = (function () {
   var reminded = 0, sel = 0, msg = '', msgLines = [], msgKey = 'fog_light', dirty = false, lastExport = '';
 
   // Volume as tenths so the shown bar and the stored value always agree.
-  function volume(d) {
-    var st = G.state.save.settings, v = Math.round(st.volume * 10) + d;
-    st.volume = (v < 0 ? 0 : (v > 10 ? 10 : v)) / 10;
+  function volume(d, key) {
+    var st = G.state.save.settings, k = key || 'volume', cur = typeof st[k] === 'number' ? st[k] : 1, v = Math.round(cur * 10) + d;
+    st[k] = (v < 0 ? 0 : (v > 10 ? 10 : v)) / 10;
     dirty = true;
   }
+  function sliderLevel(row) { var st = G.state.save.settings, k = SLIDER[row], v = typeof st[k] === 'number' ? st[k] : 1; return st.mute ? 0 : Math.round(v * 10); }
+  function flip(k) { var st = G.state.save.settings; st[k] = !st[k]; dirty = true; }
+  function reelMode() { var st = G.state.save.settings; st.reel = st.reel === 'toggle' ? 'hold' : 'toggle'; dirty = true; }
 
   function say(s, key) { msg = s; msgLines = s ? S.fine.wrap(s, PRECT[2] - 2 * G.ui.panel.PAD) : []; msgKey = key || 'fog_light'; }
 
@@ -173,7 +178,10 @@ G.ui.menu = (function () {
       sel = (sel + axis('up', 'down') + ITEMS.length) % ITEMS.length;
       if (sel !== was) { scrollTo(); G.audio.engine.play('uiMove'); }
       var lr = axis('left', 'right');
-      if (ITEMS[sel] === 'Volume' && lr) volume(lr);
+      if (SLIDER[ITEMS[sel]] && lr) volume(lr, SLIDER[ITEMS[sel]]);
+      if (ITEMS[sel] === 'Reduce flashes' && lr) flip('reduceFlashes');
+      if (ITEMS[sel] === 'Reduce motion' && lr) flip('reduceMotion');
+      if (ITEMS[sel] === 'Reel' && lr) reelMode();
       if (ITEMS[sel] === 'Sound' && lr) { st.mute = !st.mute; dirty = true; }
       if (ITEMS[sel] === 'Dog barks' && lr) { st.dogBark = !st.dogBark; dirty = true; }
       if (ITEMS[sel] === 'Full screen' && lr) fullscreen();
@@ -190,6 +198,9 @@ G.ui.menu = (function () {
         case 'Text size': textSize(); break; // Phase 90
         case 'Tips': tips(); break; // Phase 88
         case 'Vibration': vibration(); break; // Phase 91.3
+        case 'Reduce flashes': flip('reduceFlashes'); break; // Phase 92.2
+        case 'Reduce motion': flip('reduceMotion'); break;
+        case 'Reel': reelMode(); break;
         case 'Controls': pause.close(); open('controls'); return true; // Phase 88.5
         case 'Fisher & dog': pause.close(); open('look', 'pause'); return true; // Phase 47: the picker is the overlay now
         case 'Export save': exportSave(); break;
@@ -210,9 +221,9 @@ G.ui.menu = (function () {
       var i = TOP + k;
       if (k < 0 || k >= SHOW || i >= ITEMS.length || gx < X + 3 || gx >= X + W - 3) return 'none';
       if (i !== sel) { sel = i; say(''); G.audio.engine.play('uiMove'); return 'none'; }
-      if (ITEMS[i] === 'Volume') {
+      if (SLIDER[ITEMS[i]]) {
         if (gx < X + VAL_X - 4) return 'none';
-        var level = G.state.save.settings.mute ? 0 : Math.round(G.state.save.settings.volume * 10);
+        var level = sliderLevel(ITEMS[i]);
         return gx < X + VAL_X + level * 5 - 1 ? 'left' : 'right';
       }
       return 'action';
@@ -235,9 +246,10 @@ G.ui.menu = (function () {
         F.drawText(ctx, ITEMS[i], U.left(X) + 3, y, key);
         if (k === 0 && TOP > 0) F.drawText(ctx, '^', X + W - U.PAD - 6, y, 'fog_mid');
         if (k === SHOW - 1 && TOP + SHOW < ITEMS.length) F.drawText(ctx, 'v', X + W - U.PAD - 6, y, 'fog_mid');
-        if (ITEMS[i] === 'Volume') {
+        if (SLIDER[ITEMS[i]]) {
+          var lvl = sliderLevel(ITEMS[i]);
           for (var t = 0; t < 10; t++) {
-            ctx.fillStyle = P[t < Math.round(st.volume * 10) && !st.mute ? key : 'fog_dark'];
+            ctx.fillStyle = P[t < lvl ? key : 'fog_dark'];
             ctx.fillRect(X + VAL_X + t * 5, y + 1, 3, 6);
           }
         } else if (ITEMS[i] === 'Sound') F.drawText(ctx, st.mute ? 'off' : 'on', X + VAL_X, y, key);
@@ -245,6 +257,9 @@ G.ui.menu = (function () {
         else if (ITEMS[i] === 'Full screen') F.drawText(ctx, G.core.device.isFullscreen() ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Text size') F.drawText(ctx, st.textSize === 'large' ? 'large' : 'normal', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Tips') F.drawText(ctx, st.tips === false ? 'off' : 'on', X + VAL_X, y, key);
+        else if (ITEMS[i] === 'Reduce flashes') F.drawText(ctx, st.reduceFlashes ? 'on' : 'off', X + VAL_X, y, key);
+        else if (ITEMS[i] === 'Reduce motion') F.drawText(ctx, st.reduceMotion ? 'on' : 'off', X + VAL_X, y, key);
+        else if (ITEMS[i] === 'Reel') F.drawText(ctx, st.reel === 'toggle' ? 'tap on/off' : 'hold', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Vibration') F.drawText(ctx, st.vibration === false ? 'off' : (G.core.device.canVibrate() ? 'on' : 'on (none here)'), X + VAL_X, y, key);
         else if ((ITEMS[i] === 'Fisher & dog' || ITEMS[i] === 'Controls') && !(k === SHOW - 1 && TOP + SHOW < ITEMS.length)) F.drawText(ctx, '>', X + W - U.PAD - 6, y, key);
       }

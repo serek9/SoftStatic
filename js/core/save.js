@@ -161,7 +161,8 @@ G.core.save = (function () {
       // exportAt, remindAt (Phase 91.2): when the save was last exported, and when the pause list last said to (ms).
       flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: false, exportAt: 0, remindAt: 0 },
       tapes: [],
-      settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true, textSize: 'normal', tips: true, vibration: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone); textSize: Phase 90; tips: Phase 88; vibration: Phase 91.3
+      settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true, textSize: 'normal', tips: true, vibration: true,
+        music: 1, world: 1, effects: 1, reduceFlashes: false, reduceMotion: false, reel: 'hold' }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone); textSize: Phase 90; tips: Phase 88; vibration: Phase 91.3; music..reel: Phase 92
       look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)
       pond: { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 }, // Phase 84 (caught, watch: Phase 85): the Back Pond (js/sim/pond.js)
       tipsDone: {},          // Phase 88: first-time tip id -> true once done ('landed': fish landed while the fight was said, up to 3)

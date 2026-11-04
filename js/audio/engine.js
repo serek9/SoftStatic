@@ -598,6 +598,7 @@ G.audio.engine = (function () {
     return L;
   }
 
+  function vol(v) { return typeof v === 'number' ? Math.max(0, Math.min(1, v)) : 1; }
   // Called after every fixed step (index.html), whether or not the world moved.
   function step(dt) {
     if (!ac) return;
@@ -608,7 +609,11 @@ G.audio.engine = (function () {
     var lost = G.core.save.lost();
     set(master.gain, st.mute || lost ? 0 : st.volume * BASE, 0.08);
     // Under the pause menu the effects duck; indoors the ambience is heard through the walls.
-    set(bus.sfx.gain, BUS.sfx * (menu === 'pause' ? 0.3 : 1), 0.1);
+    // Phase 92.1: Music, World (the ambience: weather, wildlife, the lake) and Effects (the reel,
+    // splashes, the dog, the UI), each 0..1 under the master (settings.music, world, effects).
+    set(bus.sfx.gain, BUS.sfx * vol(st.effects) * (menu === 'pause' ? 0.3 : 1), 0.1);
+    set(bus.music.gain, BUS.music * vol(st.music), 0.1);
+    set(bus.amb.gain, BUS.amb * vol(st.world), 0.1);
     set(ambLP.frequency, scene === 'sailing' ? 18000 : 520, 0.3);
 
     if (menu !== prev.menu) { if (menu) play('page'); prev.menu = menu; }
