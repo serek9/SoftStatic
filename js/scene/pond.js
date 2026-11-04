@@ -72,13 +72,14 @@ G.scene.scenery = G.scene.scenery || {};
 
   // ---- The pond's state --------------------------------------------------------------------------
 
-  // The stream runs once cleared (Phase 84: save.pond.stream); the murk, 1 brown to 0 clear.
+  // The stream runs once cleared (Phase 84: save.pond.stream); the murk, 1 brown to 0 clear
+  // (G.sim.pond.murk).
   function pondSave() { return (G.state.save && G.state.save.pond) || null; }
   function streamOpen() { var p = pondSave(); return !!(p && p.stream); }
   function murk() {
     var p = pondSave();
     if (!p || !G.sim.pond) return 1;
-    return G.sim.pond.murk(p, G.state.save.clock);
+    return G.sim.pond.murk(p, G.data);
   }
 
   // ---- Live parts ------------------------------------------------------------------------------
@@ -149,6 +150,44 @@ G.scene.scenery = G.scene.scenery || {};
     c.globalAlpha = 1;
   }
 
+  // ---- Phase 84: the trash ------------------------------------------------------------------------
+  // Each kind painted once at view px (1 px a view pixel, half a world px), lying as it lies on
+  // the bed: a bottle with its neck, a tin can, a boot, a tyre on its side, a crate, a bicycle
+  // with bent wheels, a shopping cart. Drawn on the bed in the cross-section where a piece is
+  // still there, hooked on the line, and on its card.
+  var ART = {}, SIZE = { bottle: [12, 5], can: [6, 6], boot: [10, 8], tyre: [16, 7], crate: [14, 10], bike: [24, 13], cart: [24, 16] };
+  function rect(c, k, x, y, w, h) { c.fillStyle = P[k]; c.fillRect(x, y, w, h); }
+  function ring(c, k, cx, cy, r) { for (var a = 0; a < 24; a++) { var t = a / 24 * 6.2832; rect(c, k, Math.round(cx + Math.cos(t) * r), Math.round(cy + Math.sin(t) * r), 1, 1); } }
+  var PAINT = {
+    bottle: function (c) { rect(c, 'moss_dark', 4, 0, 8, 5); rect(c, 'moss', 5, 1, 6, 1); rect(c, 'moss_dark', 1, 1, 3, 3); rect(c, 'ink', 0, 1, 1, 3); rect(c, 'moss_hi', 6, 1, 2, 1); rect(c, 'umber_dark', 4, 4, 8, 1); },
+    can: function (c) { rect(c, 'chrome_dark', 0, 0, 6, 6); rect(c, 'chrome', 1, 0, 1, 6); rect(c, 'rust', 3, 1, 2, 4); rect(c, 'rust_dark', 0, 5, 6, 1); rect(c, 'chrome_hi', 1, 0, 4, 1); },
+    boot: function (c) { rect(c, 'umber_dark', 1, 0, 4, 5); rect(c, 'umber_dark', 1, 4, 9, 3); rect(c, 'umber', 2, 1, 1, 4); rect(c, 'umber', 5, 5, 4, 1); rect(c, 'ink', 0, 7, 10, 1); rect(c, 'umber_deep', 1, 0, 4, 1); },
+    tyre: function (c) { rect(c, 'ink', 2, 0, 12, 7); rect(c, 'ink', 0, 1, 16, 5); rect(c, 'stone_dark', 2, 1, 12, 1); rect(c, 'stone_dark', 1, 3, 14, 1); rect(c, 'night_deep', 4, 2, 8, 1); for (var x = 2; x < 14; x += 3) rect(c, 'stone', x, 5, 1, 1); },
+    crate: function (c) { rect(c, 'wood_dark', 0, 0, 14, 10); for (var y = 1; y < 10; y += 3) rect(c, 'wood', 1, y, 12, 2); rect(c, 'wood_deep', 0, 0, 1, 10); rect(c, 'wood_deep', 13, 0, 1, 10); rect(c, 'wood_mid', 2, 1, 4, 1); rect(c, 'chrome_dark', 3, 2, 1, 1); rect(c, 'chrome_dark', 10, 5, 1, 1); },
+    bike: function (c) { ring(c, 'ink', 5, 8, 4); ring(c, 'ink', 18, 8, 4); ring(c, 'stone_dark', 5, 8, 3); rect(c, 'rust', 5, 8, 7, 1); rect(c, 'rust', 11, 4, 1, 5); rect(c, 'rust', 8, 4, 8, 1); rect(c, 'rust_hi', 12, 4, 3, 1); rect(c, 'rust', 15, 4, 1, 4); rect(c, 'rust', 16, 7, 2, 1); rect(c, 'ink', 9, 3, 4, 1); rect(c, 'chrome_dark', 15, 1, 1, 3); rect(c, 'chrome_dark', 14, 1, 3, 1); },
+    cart: function (c) { rect(c, 'chrome_dark', 2, 0, 22, 1); rect(c, 'chrome_dark', 2, 0, 1, 10); rect(c, 'chrome_dark', 23, 0, 1, 10); rect(c, 'chrome_dark', 4, 10, 18, 1);
+      for (var x = 4; x < 23; x += 3) rect(c, 'chrome', x, 1, 1, 9); for (var y = 3; y < 10; y += 3) rect(c, 'chrome', 3, y, 20, 1);
+      rect(c, 'chrome_dark', 0, 0, 3, 1); rect(c, 'chrome_dark', 6, 11, 1, 3); rect(c, 'chrome_dark', 19, 11, 1, 3); rect(c, 'ink', 5, 14, 3, 2); rect(c, 'ink', 18, 14, 3, 2); rect(c, 'umber_dark', 3, 9, 20, 1); }
+  };
+  function trashImg(kind) {
+    if (ART[kind]) return ART[kind];
+    var sz = SIZE[kind];
+    return (ART[kind] = G.gfx.bake.layer(sz[0], sz[1], function (c) { PAINT[kind](c); }));
+  }
+  // A piece at screen (x, y): x its middle, y where its bottom lies, in world px.
+  function drawPiece(c, kind, x, y) { var im = trashImg(kind); c.drawImage(im, Math.round((x - im.width / (2 * HI)) * HI) / HI, Math.round((y - im.height / HI) * HI) / HI, im.width / HI, im.height / HI); }
+  // The pieces still on the bed (from save.pond.got), half sunk in the silt.
+  function drawTrash(c, loc, camPx, wyS) {
+    var p = pondSave(), Pc = G.data.pond.pieces, U = G.scene.underwater;
+    if (!p) return;
+    for (var i = 0; i < Pc.length; i++) {
+      if (G.sim.pond.has(p, i)) continue;
+      var x = Pc[i][1], sx = x - camPx;
+      if (sx < -16 || sx > 336) continue;
+      drawPiece(c, Pc[i][0], sx, wyS + U.bottomAt(loc, x) + 2);
+    }
+  }
+
   function things(loc) {
     var o = [{ kind: 'reeds and lilies', x: [0, loc.width] }];
     for (var i = 0; i < loc.landmarks.length; i++) {
@@ -161,9 +200,9 @@ G.scene.scenery = G.scene.scenery || {};
 
   function debugLine(run) {
     var loc = G.data.locations[run.loc], x = run.boat.x;
-    return 'The Back Pond  bed ' + (G.scene.underwater.bottomAt(loc, x) / 4).toFixed(1) + ' m  murk ' + murk().toFixed(2) + '  stream ' + (streamOpen() ? 'running' : 'jammed');
+    return 'The Back Pond  bed ' + (G.scene.underwater.bottomAt(loc, x) / 4).toFixed(1) + ' m  murk ' + murk().toFixed(2) + '  stream ' + (streamOpen() ? 'running' : 'jammed') + (pondSave() ? '  meter ' + G.sim.pond.done(pondSave(), G.data) + '/' + G.sim.pond.parts(G.data) + '  trash ' + G.sim.pond.left(pondSave(), G.data) : '');
   }
 
   G.scene.scenery.pond = { landmarks: { backwall: backwall, stream: stream }, afterLayer: afterLayer, surface: surface, things: things, debugLine: debugLine };
-  G.scene.pondLook = { murk: murk, streamOpen: streamOpen };
+  G.scene.pondLook = { murk: murk, streamOpen: streamOpen, trashImg: trashImg, drawPiece: drawPiece, drawTrash: drawTrash };
 })();

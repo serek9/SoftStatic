@@ -47,8 +47,8 @@ G.data.locations.pond = {
   sky: { moonX: 120, glowX: 220 },
   mist: { h: 6, alpha: 0.12, drift: 1.6 },
   life: {
-    // Its own fry and tadpoles; no crayfish until it is clean (js/scene/life.js asks the pond).
-    under: { cray: 0, snail: 5, fry: 3, tad: 3, turtle: false, eel: false, mussel: 4, caddis: true, litter: [], roots: 1, tree: 0, ribbon: 0.03, fern: 0.03, lily: 6, algae: 0.8 },
+    // Its own fry and tadpoles; no crayfish until it is clean, then crayClean (js/scene/life.js asks the pond).
+    under: { cray: 0, crayClean: 4, snail: 5, fry: 3, tad: 3, turtle: false, eel: false, mussel: 4, caddis: true, litter: [], roots: 1, tree: 0, ribbon: 0.03, fern: 0.03, lily: 6, algae: 0.8 },
     above: {
       ducks: { p: 0.9, x: [60, 300], young: 3, hours: [[5, 21]] },
       heron: { x: [40, 140], hours: [[4.5, 9]] },                               // at dawn

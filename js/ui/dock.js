@@ -18,6 +18,9 @@ G.ui.dock = (function () {
   var PLAIN = { rows: ['Bait Shop', 'Stay on the water'], dest: ['shop', ''], says: ['Rusty has the coffee on.', 'The boat knocks against the posts.'] };
   // Phase 83: the Back Pond's dock: up the steps to the cabin's back door, or stay.
   var POND = { rows: ['The Cabin', 'Stay on the water'], dest: ['cabin', ''], says: ['', 'The boat bumps the dock.'] };
+  // Phase 84: at the Back Pond's stream (its lip, while the jam is in it): pay to clear the jam.
+  var STREAM = { title: 'THE STREAM', rows: ['Clear the jam', 'Leave it'], dest: ['clear', ''], says: ['', 'Brown water lies still behind it.'] }, STREAM_R = 50;
+  var where = 'pier', msg = '';
   var M = WITH, ROWS = M.rows, DEST = M.dest, SAYS = M.says; // the open panel's rows (Phase 76)
   function menuOf(loc) { return loc && loc.pond ? POND : (loc && loc.dock && loc.dock.cabin ? WITH : PLAIN); }
   var on = false, sel = 0, armed = false, phase = '', t = 0, dest = '', FADE = 0.35, near = false;
@@ -37,7 +40,7 @@ G.ui.dock = (function () {
     U.place(w, h, 'top', R); R[1] += 34;
     R[2] = w; R[3] = h;
   }
-  function open(loc) { M = menuOf(loc); ROWS = M.rows; DEST = M.dest; SAYS = M.says; layout(); on = true; sel = 0; armed = false; }
+  function open(loc) { M = where === 'stream' ? STREAM : menuOf(loc); msg = ''; ROWS = M.rows; DEST = M.dest; SAYS = M.says; layout(); on = true; sel = 0; armed = false; }
   function close() { on = false; }
 
   // One step from the sailing scene, before it casts or sails. Returns true while the dock has
@@ -49,7 +52,10 @@ G.ui.dock = (function () {
       if (t >= FADE) { phase = ''; on = false; G.core.state.change(dest); }
       return true;
     }
-    near = at(run, loc);
+    var wh = at(run, loc) ? 'pier' : (atStream(run, loc) ? 'stream' : '');            // Phase 84: or the stream's lip
+    if (wh && wh !== where && on) close();
+    if (wh) where = wh;
+    near = !!wh;
     if (!near) { armed = true; if (on) close(); return false; }
     if (on) {
       if (run.fsm !== 'sailing') { close(); return false; }
@@ -62,8 +68,19 @@ G.ui.dock = (function () {
     if (run.fsm === 'sailing' && run.boat.stopped && (armed || inp.pressed('up'))) { open(loc); return true; }
     return false;
   }
+  // Phase 84: by the stream's lip with the jam still in it.
+  function atStream(run, loc) {
+    var p = G.state.save.pond;
+    return !!(loc && loc.pond && p && !p.stream && run && run.boat && Math.abs(run.boat.x - loc.pond.stream) <= STREAM_R);
+  }
   function choose(i) {
     if (!DEST[i]) { close(); return; }
+    if (DEST[i] === 'clear') {                                                     // Phase 84: pay to clear the jam
+      var r = G.sim.pond.clearStream(G.state.save, G.data);
+      if (r === G.sim.pond.OK) { close(); G.core.save.autosave('purchase'); G.ui.hud.say('The jam drags free. The stream runs into the pond.'); G.audio.engine.cue('plop', G.state.run.boat.x); }
+      else msg = r === G.sim.pond.POOR ? 'Not enough coins.' : 'It runs already.';
+      return;
+    }
     dest = DEST[i]; phase = 'out'; t = 0;
     G.core.save.autosave('travel');
   }
@@ -75,17 +92,17 @@ G.ui.dock = (function () {
     if (phase === 'out') { G.ui.menu.dim(ctx, t / FADE); }
     if (!on) {
       // At the pier with the panel shut: a quiet hint where to step off.
-      if (near && run && run.fsm === 'sailing' && run.boat.stopped && !G.ui.setup.isOpen() && !G.ui.menu.current()) U.hint(ctx, G.core.device && G.core.device.touch && G.core.device.touch() ? 'TAP' : 'W', 'the pier', 280, 66);
+      if (near && run && run.fsm === 'sailing' && run.boat.stopped && !G.ui.setup.isOpen() && !G.ui.menu.current()) U.hint(ctx, G.core.device && G.core.device.touch && G.core.device.touch() ? 'TAP' : 'W', where === 'stream' ? 'the stream' : 'the pier', 280, 66);
       return;
     }
     var x = R[0], y = R[1];
-    U.frame(ctx, x, y, R[2], R[3], 'THE PIER');
+    U.frame(ctx, x, y, R[2], R[3], M.title || 'THE PIER');
     for (i = 0; i < ROWS.length; i++) {
       var ry = U.top(y) + i * U.ROW, here = i === sel;
       if (here) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, R[2] - 6, U.ROW); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 1, U.ROW); }
       F.drawText(ctx, ROWS[i], U.left(x) + 6, ry + 1, here ? 'signal_amber' : 'bone');
     }
-    var say = DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.') : SAYS[sel];
+    var say = msg || (DEST[sel] === 'clear' ? G.data.pond.streamCost + 'c. You have ' + G.state.save.coins + '.' : '') || (DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.') : SAYS[sel]);
     F.drawText(ctx, say, U.left(x), U.top(y) + ROWS.length * U.ROW + 4, 'fog_mid');
     var hx = U.left(x), hy = y + R[3] - U.PAD - U.KEY_H;
     hx += U.hint(ctx, 'SPACE', 'go', hx, hy);
@@ -120,7 +137,7 @@ G.ui.dock = (function () {
     info: function () {
       var run = G.state.run, loc = run && run.loc ? G.data.locations[run.loc] : null, k, from = '';
       for (k = 0; loc && k < loc.landmarks.length; k++) if (loc.landmarks[k].kind === 'pier') from = loc.landmarks[k].from || '';
-      return { loc: run ? run.loc : '', pier: loc && loc.dock ? loc.dock.x : null, from: from, rows: menuOf(loc).rows.slice(), boat: run && run.boat ? +run.boat.x.toFixed(1) : null, at: at(run, loc), open: on, row: on ? ROWS[sel] : '', armed: armed };
+      return { stop: where, loc: run ? run.loc : '', pier: loc && loc.dock ? loc.dock.x : null, from: from, rows: (where === 'stream' && loc && loc.pond ? STREAM : menuOf(loc)).rows.slice(), boat: run && run.boat ? +run.boat.x.toFixed(1) : null, at: at(run, loc), open: on, row: on ? ROWS[sel] : '', armed: armed };
     },
     choose: function (i) { if (!on) return false; choose(i); return true; }
   };

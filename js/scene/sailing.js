@@ -531,6 +531,19 @@ G.scene.sailing = (function () {
     fx.clear();
   }
 
+  // Phase 84: the Back Pond's water clears over a game hour once the meter is full (wherever he
+  // is fishing). At the pond the HUD says when the meter fills and when the water has cleared.
+  var pondWas = { full: -1, clean: -1 };
+  function pondStep(save, dt) {
+    var p = save.pond, Pd = G.sim.pond;
+    if (!p) return;
+    Pd.step(p, dt, G.data);
+    var full = Pd.full(p, G.data) ? 1 : 0, clean = Pd.clean(p, G.data) ? 1 : 0;
+    if (loc.pond && pondWas.full === 0 && full) G.ui.hud.say('The last of it is out. The water will clear.');
+    if (loc.pond && pondWas.clean === 0 && clean) { G.ui.hud.say('The pond runs clear. It can be stocked now.'); G.core.save.autosave('pond'); }
+    pondWas.full = full; pondWas.clean = clean;
+  }
+
   // The lure is fishing (fish can spawn, notice and bite) only in these states.
   var FISHING = { sinking: 1, waiting: 1, interest: 1 };
 
@@ -1658,7 +1671,7 @@ G.scene.sailing = (function () {
   // Phase 45: true when a tap at view pixel (gx, gy) is on the dog and he can be petted now
   // (the boat sitting still between casts, no panel open). Reads state only.
   // Phase 58.3: the word on the touch action button, from the state (read only, no strings built).
-  var CARD_WORD = { sell: 'SELL', keep: 'KEEP', release: 'RELEASE' };
+  var CARD_WORD = { sell: 'SELL', keep: 'KEEP', release: 'RELEASE', bin: 'BIN' }; // Phase 84: the trash's bin
   function actionWord() {
     var run = G.state.run;
     if (!run) return '';
@@ -1700,6 +1713,7 @@ G.scene.sailing = (function () {
     G.sim.economy.effects(save, G.data, run.gearFx);
     var hour0 = save.clock;
     G.sim.clock.step(save, null, dt, G.rng, G.data);
+    pondStep(save, dt); // Phase 84: the Back Pond clears once its meter is full
     run.uneaseIn.loc = loc.id;
     run.uneaseIn.still = b.stopped;
     G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);

@@ -423,6 +423,20 @@ G.core.debug = (function () {
     mapNav: function () { return G.ui.map.nav(); },
     // dbg.roomLife(): Phase 64, the live things in the room you are in (the shop or the cabin).
     roomLife: function () { var n = G.core.state.sceneName(); return n === 'shop' ? G.ui.shopRoom.life() : (n === 'cabin' ? G.ui.cabin.life() : 'not in a room'); },
+    // dbg.pond(): Phase 84, the Back Pond: the trash left by kind and in all, where each piece
+    // still lies ([i, kind, x]), the meter [done, of], the stream, how far the water has cleared,
+    // the murk, whether it is clean; Phase 85 adds the stock and Pond Cam. dbg.pond('stream')
+    // pays to clear the stream (as the panel at its lip does).
+    pond: function (what) {
+      var p = G.state.save.pond, Pd = G.sim.pond, D = G.data.pond, o, i;
+      if (!p) return null;
+      if (what === 'stream') { var r = Pd.clearStream(G.state.save, G.data); if (r === Pd.OK) G.core.save.autosave('purchase'); return r; }
+      o = { trash: {}, left: Pd.left(p, G.data), pieces: [], meter: [Pd.done(p, G.data), Pd.parts(G.data)], stream: p.stream, clear: +p.clear.toFixed(3), murk: +Pd.murk(p, G.data).toFixed(3), clean: Pd.clean(p, G.data) };
+      for (i = 0; i < D.kinds.length; i++) o.trash[D.kinds[i].id] = Pd.left(p, G.data, D.kinds[i].id);
+      for (i = 0; i < D.pieces.length; i++) if (!Pd.has(p, i)) o.pieces.push([i, D.pieces[i][0], D.pieces[i][1]]);
+      if (G.scene.pondInfo) G.scene.pondInfo(o);
+      return o;
+    },
     // dbg.cabinWalk('UDLR'): Phase 83, walks him round the cabin a tile a step (R off the tile inside the back door goes out to the pond).
     cabinWalk: function (path) { return G.core.state.sceneName() === 'cabin' ? G.ui.cabin.walkPath(path || '') : 'not in the cabin'; },
     shopWalk: function (path) { return G.core.state.sceneName() === 'shop' ? G.ui.shop.walkPath(path || '') : 'not in the shop'; },

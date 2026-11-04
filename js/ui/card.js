@@ -29,8 +29,16 @@ G.ui.card = (function () {
     };
   }
 
+  // Phase 84: a piece of the Back Pond's trash landed: its name, its line, and one key, BIN.
+  // No coins, nothing in the journal.
+  function buildTrash(i) {
+    var k = G.sim.pond.kindOf(G.data.pond.pieces[i][0], G.data);
+    return { trash: i, kind: k.id, name: k.name, lines: F.wrap(k.card, W - 2 * U.PAD - PW + 8 - 8 - 8) };
+  }
+
   function open(info) {
     cur = info; sel = 0; t = 0; at = 0;
+    if (info.trash !== undefined) { SELL[0] = RECT[0] + U.PAD; SELL[1] = RECT[1] + KEY_Y; SELL[2] = U.keyW('BIN'); return; } // Phase 84
     txt.size = info.len.toFixed(1) + ' cm  ' + (info.w < 0.1 ? Math.round(info.w * 1000) + ' g' : info.w.toFixed(2) + ' kg'); // Phase 44: small fish in grams
     txt.sell = 'SELL ' + info.price + 'c';
     txt.price = info.price + 'c';
@@ -56,12 +64,14 @@ G.ui.card = (function () {
     var inp = G.core.input;
     if (inp.pressed('left')) sel = Math.max(0, sel - 1);
     if (inp.pressed('right')) sel = Math.min(2, sel + 1);
+    if (cur.trash !== undefined) return inp.pressed('action') ? 'bin' : null;       // Phase 84: only the bin
     if (inp.pressed('action')) return CHOICES[sel];
     return null;
   }
 
   // Writes the catch into the save, closes the card and autosaves (§0.12).
   function commit(choice, save) {
+    if (cur.trash !== undefined) { G.sim.pond.bin(save.pond, cur.trash, G.data); cur = null; G.core.save.autosave('catch'); return; } // Phase 84: binned
     G.sim.economy.recordCatch(save, cur, choice);
     cur = null;
     G.core.save.autosave('catch');
@@ -74,6 +84,7 @@ G.ui.card = (function () {
   function draw(ctx) {
     if (!cur) return;
     G.core.view.begin(ctx, true);
+    if (cur.trash !== undefined) { drawTrash(ctx); G.core.view.begin(ctx, false); return; } // Phase 84
     var e = shownBy(), img = G.gfx.fishgen.portrait(cur.spIdx, PW, PH, false), x = RECT[0], y = RECT[1] - Math.round((1 - e) * (H + 12));
     U.frame(ctx, x, y, W, H, cur.name, cur.isNew ? 'NEW!' : (cur.isRecord ? 'RECORD' : ''), cur.isNew ? 'neon_red' : 'teal_lit');
     var ty = U.top(y);
@@ -91,16 +102,31 @@ G.ui.card = (function () {
     G.core.view.begin(ctx, false);
   }
 
+  // Phase 84: the trash's card: the piece painted three times its size in the portrait box,
+  // its line beside it, and BIN.
+  function drawTrash(ctx) {
+    var e = shownBy(), x = RECT[0], y = RECT[1] - Math.round((1 - e) * (H + 12)), im = G.scene.pondLook.trashImg(cur.kind), k = 3;
+    U.frame(ctx, x, y, W, H, cur.name, '', 'teal_lit');
+    var ty = U.top(y);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(im, x + U.PAD + ((PW - im.width * k) >> 1), ty + ((PH - im.height * k) >> 1), im.width * k, im.height * k);
+    var rx = x + U.PAD + PW + 8;
+    for (var i = 0; i < cur.lines.length && i < 4; i++) F.drawText(ctx, cur.lines[i], rx, ty + 1 + i * (U.ROW + 1), i ? 'fog_light' : 'bone');
+    U.key(ctx, 'BIN', SELL[0], y + KEY_Y, true);
+    F.drawText(ctx, 'SPACE', x + W - U.PAD - F.measure('SPACE'), y + KEY_Y + 2, 'fog_mid');
+  }
+
   // Touch and the mouse (Phase 46): a tap on SELL, KEEP or RELEASE chooses it, and the caller presses
   // the action for it. Returns true when (gx, gy) is on one of the two keys.
   function tap(gx, gy) {
     if (!cur) return false;
+    if (cur.trash !== undefined) return U.inside(SELL, gx, gy);                     // Phase 84: BIN
     if (U.inside(SELL, gx, gy)) { sel = 0; return true; }
     if (U.inside(KEEP, gx, gy)) { sel = 1; return true; }
     if (U.inside(FREE, gx, gy)) { sel = 2; return true; }
     return false;
   }
 
-  return { build: build, open: open, isOpen: isOpen, info: info, update: update, tick: tick, shownBy: shownBy, commit: commit, draw: draw, tap: tap,
-    rect: function () { return RECT; }, keys: function () { return { sell: SELL, keep: KEEP, release: FREE }; }, choice: function () { return CHOICES[sel]; } };
+  return { build: build, buildTrash: buildTrash, open: open, isOpen: isOpen, info: info, update: update, tick: tick, shownBy: shownBy, commit: commit, draw: draw, tap: tap,
+    rect: function () { return RECT; }, keys: function () { return { sell: SELL, keep: KEEP, release: FREE }; }, choice: function () { return cur && cur.trash !== undefined ? 'bin' : CHOICES[sel]; } };
 })();

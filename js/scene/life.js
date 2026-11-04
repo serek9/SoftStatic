@@ -153,6 +153,7 @@ G.scene.life = (function () {
     siltKey = S.shift(loc.underwater.silt, 1);
     crabs = (T.crab || 0) > 0; stars = (T.star || 0) > 0;
     cn = Math.min(CMAX, crabs ? T.crab : T.cray);
+    if (loc.pond && G.state.save && G.state.save.pond && G.sim.pond.clean(G.state.save.pond, G.data)) cn = Math.min(CMAX, T.crayClean || 0); // Phase 84: crayfish once the pond is clean
     for (i = 0; i < cn; i++) {
       cxs[i] = r.range(30, loc.width - 30); cys[i] = bed(cxs[i]); cdir[i] = r.next() < 0.5 ? -1 : 1;
       cmode[i] = r.next() < 0.5 ? 0 : 1; ct[i] = r.range(1, 6); cph[i] = r.next(); creact[i] = -1; csilt[i] = r.range(0, 1);

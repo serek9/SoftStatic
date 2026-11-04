@@ -128,6 +128,7 @@ G.ui.hud = (function () {
     if (noteT > 0) { ctx.globalAlpha = Math.min(1, noteT); label(ctx, note, X, Y + 28, 'paper'); ctx.globalAlpha = 1; }
     if (reachT > 0 && reachName) { ctx.globalAlpha = Math.min(1, reachT, (REACH - reachT) * 2) * 0.9; label(ctx, reachName, 320 - (reachW >> 1), Y + 22, 'bone'); ctx.globalAlpha = 1; } // Phase 75
 
+    if (a > 0 && run.loc && G.data.locations[run.loc] && G.data.locations[run.loc].pond && save.pond) pondLine(ctx, save.pond, a, G.data.locations[run.loc]); // Phase 84
     if (G.scene.underwater.UNDER[run.fsm]) {
       s = depthText(Math.max(0, run.cast.ly - waterY));
       // Phase 58: in touch mode the depth goes under the top-right row of buttons
@@ -135,6 +136,25 @@ G.ui.hud = (function () {
       label(ctx, s, 632 - F.measure(s), dy, 'fog_light');
     }
     V.begin(ctx, false);
+  }
+
+  // Phase 84 (PLAN_WINTER.md 2.4): at the Back Pond, a quiet line under the hook: the cleanup
+  // meter (the pieces out and the stream, as a bar of segments) until the water is clear, then
+  // (Phase 85) how many fish it holds of its capacity. Strings rebuilt only when they change.
+  var pondKey = '', pondStr = '';
+  function pondLine(ctx, p, a, L) {
+    var Pd = G.sim.pond, P = S.PALETTE, clean = Pd.clean(p, G.data), n = clean ? (p.stock || []).length : Pd.done(p, G.data), key = (clean ? 'p' : 'c') + n;
+    if (key !== pondKey) { pondKey = key; pondStr = clean ? 'Pond ' + n + ' / ' + L.pond.cap : 'Cleanup'; }
+    ctx.globalAlpha = a * 0.85;
+    label(ctx, pondStr, X, Y + 40, 'fog_light');
+    if (!clean) {
+      var parts = Pd.parts(G.data), bx = X + F.measure(pondStr) + 6, by = Y + 43, full = Pd.full(p, G.data);
+      for (var i = 0; i < parts; i++) {
+        ctx.fillStyle = P.ink; ctx.fillRect(bx + i * 3, by, 3, 5);
+        ctx.fillStyle = P[i < n ? (full ? 'teal_lit' : 'teal_hi') : 'fog_dark']; ctx.fillRect(bx + i * 3, by + 1, 2, 3);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   // 14.6: the on-screen buttons (TAB, J, M, S, P, ESC), over menus too (index.html draws them

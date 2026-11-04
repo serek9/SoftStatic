@@ -18,6 +18,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Phase 53: the line type (gear.lineRise, lineShake, lineHold): a line that does not stretch
 // (braid) builds tension faster and spikes harder in a jump, loses the hook faster on a slack
 // shake, and sets the hook firmer; monofilament is all ones.
+// Phase 84: something that does not swim (fish.steady: the Back Pond's trash) is a slow,
+// steady haul: it never pulls (always tired, so no runs, shakes or jumps), and only its mass
+// slows the reel; the same tension, slip and snap rules apply.
 // Pure: no DOM, no Math.random, no Date. Runs in Node through vm.
 G.sim = G.sim || {};
 G.sim.fight = (function () {
@@ -49,9 +52,10 @@ G.sim.fight = (function () {
     // Phase 43: a fish much smaller than the rod is made for is hooked lightly (a stiff rod
     // tears a small mouth): its hold starts at the rod's smallHook.
     if (gear.smallHook !== undefined && fish.mass < data.gear.rodSmall.frac * gear.maxMass) st.H *= gear.smallHook;
-    st.mode = 'pull';
-    st.modeT = rng.range(k.pull0, k.pull1) * (0.5 + st.S);
-    st.shakeT = rng.range(k.shakeGap0, k.shakeGap1) / st.speed;
+    st.steady = !!fish.steady;
+    st.mode = st.steady ? 'tired' : 'pull';
+    st.modeT = st.steady ? 1e9 : rng.range(k.pull0, k.pull1) * (0.5 + st.S);
+    st.shakeT = st.steady ? 1e9 : rng.range(k.shakeGap0, k.shakeGap1) / st.speed;
     st.ap.mode = ''; st.ap.delay = 0; st.ap.err = 0; st.ap.prev = 0; st.ap.shook = false; st.ap.sdelay = 0;
   }
 

@@ -318,6 +318,25 @@ function validateLocations(G, err) {
       if (d.fish.some(f => f.locations.includes(id))) err(p + 'no wild fish live in the pond (it is stocked)');
       if (!(L.landmarks || []).some(m => m.kind === 'stream' && m.x === Pd.stream)) err(p + 'no stream landmark at pond.stream');
     }
+    // Phase 84: the pond's trash (data/pond.js): 7 kinds, 3 small, 2 medium and 2 large; as many
+    // pieces of each as its n, 21 in all, every one on the bed inside the world and none under
+    // another; weights, pulls and the half-width the lure touches at; the stream's price and the
+    // rod a large piece needs (a rod sold holds it).
+    if (L.pond) {
+      const D = d.pond;
+      if (!D) err(p + 'data/pond.js is not loaded');
+      else {
+        const sz = D.kinds.map(k => k.size).join(',');
+        if (sz !== 'small,small,small,medium,medium,large,large') err(p + 'trash kinds: 3 small, 2 medium, 2 large (' + sz + ')');
+        D.kinds.forEach(k => { if (!(k.n >= 1 && num(k.kg) && k.kg > 0 && k.kg <= 30 && num(k.pull) && k.pull > 0 && k.pull < 1 && k.half >= 1 && typeof k.card === 'string' && k.card)) err(p + 'trash ' + k.id + ': n, kg, pull, half, card'); });
+        const want = D.kinds.reduce((a, k) => a + k.n, 0);
+        if (want !== 21 || D.pieces.length !== want) err(p + 'trash pieces ' + D.pieces.length + ' (want 21, as the kinds\' n)');
+        D.kinds.forEach(k => { if (D.pieces.filter(q => q[0] === k.id).length !== k.n) err(p + 'trash ' + k.id + ': ' + D.pieces.filter(q => q[0] === k.id).length + ' pieces, want ' + k.n); });
+        D.pieces.forEach((q, i) => { const k = D.kinds.find(x => x.id === q[0]); if (!k || !(q[1] - k.half >= 4 && q[1] + k.half <= L.width - 4)) err(p + 'trash piece ' + i + ' (kind, x inside the world)'); });
+        for (let i = 0; i < D.pieces.length; i++) for (let j = 0; j < i; j++) { const a = D.pieces[i], b = D.pieces[j], ka = D.kinds.find(x => x.id === a[0]), kb = D.kinds.find(x => x.id === b[0]); if (ka && kb && Math.abs(a[1] - b[1]) < ka.half + kb.half + 2) err(p + 'trash pieces ' + j + ' and ' + i + ' overlap'); }
+        if (!(D.streamCost > 0 && D.rodKg > 0 && d.gear.rods.some(r => !r.ice && r.maxMass >= D.rodKg) && D.clearHours > 0 && D.shyHours > 0)) err(p + 'pond: streamCost, rodKg (a rod holds it), clearHours, shyHours');
+      }
+    }
     // Phase 74 (PLAN_WATERS.md): a kind of water, reaches that cover the width in order with
     // no gap or overlap, and a pier (dock) inside the world with a pier landmark at it.
     if (!['lake', 'river', 'sea'].includes(L.water)) err(p + 'water must be lake, river or sea');
@@ -919,7 +938,11 @@ const OLD_SAVES = [
   // Phase 80: a v10 save that has opened Coldharbor Sound: it has been out to sea (flags.seaSeen), so the ice is open to it; no Snow Machine yet.
   { from: 'Phase 79b (c183807), v10 out at sea', save: { version: 10, coins: 3100, gear: { rod: 4, rods: [0, 1, 2, 3, 4], reel: 4, line: 4, lineType: 'braid', lineTypes: ['mono', 'braid'], bait: 'minnow' },
     baits: { minnow: 4 }, journal: { striped_bass: { caught: 3, bestLen: 80, bestW: 6.1, hints: [], seen: true, phantom: false } }, kept: [], cabinLevel: 4, unlocks: { fog: true, creek: true, pines: true, russet: true, sound: true }, loc: 'sound', unease: {}, clock: 6, lastSeen: 0,
-    flags: { windowCatch: {}, lines: {}, shopVisits: 30, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 10 }, lineType: 'braid' }
+    flags: { windowCatch: {}, lines: {}, shopVisits: 30, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 10 }, lineType: 'braid' },
+  // Phase 84: a v11 save on the ice with the Snow Machine and the Ice Rod: it gains the Back Pond as it was (all the trash, the stream jammed, nothing stocked).
+  { from: 'Phase 82 (aa9a4e8), v11 on the ice', save: { version: 11, coins: 5200, gear: { rod: 4, rods: [0, 1, 2, 3, 4, 6], reel: 4, line: 4, lineType: 'braid', lineTypes: ['mono', 'braid'], bait: 'huge_spoon', snow: true, iceRod: 6 },
+    baits: { huge_spoon: 2 }, journal: { ice_yellow_perch: { caught: 2, bestLen: 24, bestW: 0.2, hints: [], seen: true, phantom: false } }, kept: [], cabinLevel: 4, unlocks: { fog: true, creek: true, pines: true, russet: true, sound: true }, loc: 'tamarack', unease: {}, clock: 12, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 40, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: true }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 11 }, lineType: 'braid', bait: 'huge_spoon' }
 ];
 
 function savesCheck() {
@@ -957,7 +980,10 @@ function savesCheck() {
         if (o.save.loc === 'red' && s.loc !== 'fog') probs.push('a save in the Red Room resumes at ' + s.loc + ', not Fogbound');
         if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
         const sea = !!(o.save.unlocks && (o.save.unlocks.sound || o.save.unlocks.wreck)); // Phase 80: v11
-        if (s.flags.seaSeen !== sea || s.gear.snow !== false || s.gear.iceRod !== -1) probs.push('v11: seaSeen ' + s.flags.seaSeen + ' (want ' + sea + '), snow ' + s.gear.snow + ', iceRod ' + s.gear.iceRod);
+        if (o.save.version >= 11) { if (s.gear.snow !== o.save.gear.snow || s.gear.iceRod !== o.save.gear.iceRod || s.flags.seaSeen !== o.save.flags.seaSeen) probs.push('v11 fields changed'); }
+        else if (s.flags.seaSeen !== sea || s.gear.snow !== false || s.gear.iceRod !== -1) probs.push('v11: seaSeen ' + s.flags.seaSeen + ' (want ' + sea + '), snow ' + s.gear.snow + ', iceRod ' + s.gear.iceRod);
+        const pd = s.pond; // Phase 84: v12, the Back Pond as it was
+        if (!pd || pd.got !== 0 || pd.stream !== false || pd.clear !== 0 || !Array.isArray(pd.stock) || pd.stock.length || G.sim.pond.left(pd, G.data) !== 21 || G.sim.pond.murk(pd, G.data) !== 1) probs.push('v12: the pond ' + JSON.stringify(pd));
         if ((E.canUnlock(s, 'tamarack', G.data) === E.LOCKED) === sea) probs.push('the ice is ' + (sea ? 'locked' : 'open') + ' to it');
         for (const id in s.baits) if (!E.baitById(id, G.data)) probs.push('counts an unknown bait or lure ' + id);      // Phase 69: the old lures mapped
         if (!E.baitById(s.gear.bait, G.data)) probs.push('unknown hook ' + s.gear.bait);
