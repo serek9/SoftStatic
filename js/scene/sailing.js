@@ -531,6 +531,35 @@ G.scene.sailing = (function () {
     fx.clear();
   }
 
+  // Phase 84: the Back Pond's water clears over a game hour once the meter is full (wherever he
+  // is fishing). At the pond the HUD says when the meter fills and when the water has cleared.
+  var pondWas = { full: -1, clean: -1, stock: -1 };
+  function pondStep(save, dt) {
+    var p = save.pond, Pd = G.sim.pond;
+    if (!p) return;
+    Pd.step(p, dt, G.data);
+    Pd.shyStep(p, dt);                                                            // Phase 85: released pond fish get over it
+    if (loc.pond && pondWas.stock >= 0 && p.stock.length > pondWas.stock) { fx.ripple(loc.dock.x - 14, loc.waterY + 1, 1, 14, 1.4); G.audio.engine.cue('plop', loc.dock.x); } // Phase 85: one swims out from the dock
+    pondWas.stock = p.stock.length;
+    var full = Pd.full(p, G.data) ? 1 : 0, clean = Pd.clean(p, G.data) ? 1 : 0;
+    if (loc.pond && pondWas.full === 0 && full) G.ui.hud.say('The last of it is out. The water will clear.');
+    if (loc.pond && pondWas.clean === 0 && clean) { G.ui.hud.say('The pond runs clear. It can be stocked now.'); G.core.save.autosave('pond'); }
+    pondWas.full = full; pondWas.clean = clean;
+  }
+
+  // Phase 85: at the Back Pond the fish that come are its stocked ones (none until it is clean),
+  // each species as many as are free to bite: not shy, and not already swimming in the school.
+  var PONDN = {}, BUSY = {};
+  function pondFish(run, save, ctx) {
+    if (!loc.pond) { ctx.pondN = null; return; }
+    ctx.pondN = PONDN;
+    var k, f = run.school.fish;
+    for (k in BUSY) BUSY[k] = 0;
+    for (var i = 0; i < f.length; i++) if (f[i].active) { var id = G.data.fish[f[i].sp].id; BUSY[id] = (BUSY[id] || 0) + 1; }
+    if (save.pond && G.sim.pond.clean(save.pond, G.data)) G.sim.pond.available(save.pond, PONDN, BUSY);
+    else for (k in PONDN) PONDN[k] = 0;
+  }
+
   // The lure is fishing (fish can spawn, notice and bite) only in these states.
   var FISHING = { sinking: 1, waiting: 1, interest: 1 };
 
@@ -560,6 +589,7 @@ G.scene.sailing = (function () {
     if (ctx.rodMaxMass !== lastRodMax) { lastRodMax = ctx.rodMaxMass; G.sim.fish_ai.speciesWeights(ctx); }
     ctx.attract = gx.attract * c.boost.attract;
     ctx.maxDepthPx = loc.maxDepth;
+    pondFish(run, save, ctx); // Phase 85
     G.sim.fish_ai.stepSchool(run.school, li, dt, G.rng, G.data);
     var n = G.sim.fish_ai.interested(run.school);
     if (run.fsm === 'waiting' && n > 0) G.core.state.go(run, 'interest');
@@ -1658,7 +1688,7 @@ G.scene.sailing = (function () {
   // Phase 45: true when a tap at view pixel (gx, gy) is on the dog and he can be petted now
   // (the boat sitting still between casts, no panel open). Reads state only.
   // Phase 58.3: the word on the touch action button, from the state (read only, no strings built).
-  var CARD_WORD = { sell: 'SELL', keep: 'KEEP', release: 'RELEASE' };
+  var CARD_WORD = { sell: 'SELL', keep: 'KEEP', release: 'RELEASE', bin: 'BIN' }; // Phase 84: the trash's bin
   function actionWord() {
     var run = G.state.run;
     if (!run) return '';
@@ -1700,6 +1730,7 @@ G.scene.sailing = (function () {
     G.sim.economy.effects(save, G.data, run.gearFx);
     var hour0 = save.clock;
     G.sim.clock.step(save, null, dt, G.rng, G.data);
+    pondStep(save, dt); // Phase 84: the Back Pond clears once its meter is full
     run.uneaseIn.loc = loc.id;
     run.uneaseIn.still = b.stopped;
     G.sim.unease.step(save, run.uneaseIn, dt, G.rng, G.data);

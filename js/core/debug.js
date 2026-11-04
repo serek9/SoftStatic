@@ -423,6 +423,31 @@ G.core.debug = (function () {
     mapNav: function () { return G.ui.map.nav(); },
     // dbg.roomLife(): Phase 64, the live things in the room you are in (the shop or the cabin).
     roomLife: function () { var n = G.core.state.sceneName(); return n === 'shop' ? G.ui.shopRoom.life() : (n === 'cabin' ? G.ui.cabin.life() : 'not in a room'); },
+    // dbg.pond(): Phase 84, the Back Pond: the trash left by kind and in all, where each piece
+    // still lies ([i, kind, x]), the meter [done, of], the stream, how far the water has cleared,
+    // the murk, whether it is clean; Phase 85 adds the stock and Pond Cam. dbg.pond('stream')
+    // pays to clear the stream (as the panel at its lip does). Phase 85: dbg.pond('stock', id, cls)
+    // stocks one as the journal's STOCK row does (returns its verdict); dbg.pond('sizes', id)
+    // reads what the journal holds of the species' sizes and what it comes in.
+    pond: function (what) {
+      var p = G.state.save.pond, Pd = G.sim.pond, D = G.data.pond, o, i;
+      if (!p) return null;
+      if (what === 'stock' || what === 'sizes') {
+        var si = -1; for (i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === arguments[1]) si = i;
+        if (si < 0) return 'no species ' + arguments[1];
+        if (what === 'sizes') return { caught: Pd.caughtSizes(G.state.save, G.data.fish[si], G.data), comesIn: Pd.wanted(G.data.fish[si], G.data), verdict: Pd.canStock(G.state.save, G.data.fish[si], G.data) };
+        var rr = Pd.stock(G.state.save, si, arguments[2], G.data); if (rr === Pd.OK) G.core.save.autosave('stock'); return rr;
+      }
+      if (what === 'stream') { var r = Pd.clearStream(G.state.save, G.data); if (r === Pd.OK) G.core.save.autosave('purchase'); return r; }
+      o = { trash: {}, left: Pd.left(p, G.data), pieces: [], meter: [Pd.done(p, G.data), Pd.parts(G.data)], stream: p.stream, clear: +p.clear.toFixed(3), murk: +Pd.murk(p, G.data).toFixed(3), clean: Pd.clean(p, G.data) };
+      for (i = 0; i < D.kinds.length; i++) o.trash[D.kinds[i].id] = Pd.left(p, G.data, D.kinds[i].id);
+      for (i = 0; i < D.pieces.length; i++) if (!Pd.has(p, i)) o.pieces.push([i, D.pieces[i][0], D.pieces[i][1]]);
+      o.stock = p.stock.map(function (f) { return [f.id, f.cls, f.w, f.len, +f.shy.toFixed(3)]; }); o.cap = Pd.capOf(G.data); // Phase 85
+      o.caughtOwn = p.caught || 0; o.watch = +(p.watch || 0).toFixed(1);
+      return o;
+    },
+    // dbg.cabinWalk('UDLR'): Phase 83, walks him round the cabin a tile a step (R off the tile inside the back door goes out to the pond).
+    cabinWalk: function (path) { return G.core.state.sceneName() === 'cabin' ? G.ui.cabin.walkPath(path || '') : 'not in the cabin'; },
     shopWalk: function (path) { return G.core.state.sceneName() === 'shop' ? G.ui.shop.walkPath(path || '') : 'not in the shop'; },
     // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
     // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
@@ -793,7 +818,7 @@ G.core.debug = (function () {
         // Phase 50.1: Phases 48-49's sprites (every frame at 1x, then 4x, then flipped) and the
         // creatures drawn in code, posed from the gallery's own records (the live ones untouched).
         var LF = G.scene.life, SP = LF.sprites(), under = name === 'life under';
-        var NAMES = under ? ['cray', 'snail', 'turtle', 'tad', 'crab', 'star'] : ['duck', 'duckling', 'duckUnder', 'kingfisher', 'loon', 'frog', 'deer', 'fox', 'gull', 'heron', 'osprey', 'eagle', 'otter', 'otterSit', 'seal', 'sealHead', 'sealSwim', 'cormorant', 'cormFly', 'cormSwim']; // Phase 79: and the sea's
+        var NAMES = under ? ['cray', 'snail', 'turtle', 'tad', 'crab', 'star'] : ['duck', 'duckling', 'duckUnder', 'kingfisher', 'loon', 'frog', 'deer', 'fox', 'gull', 'heron', 'osprey', 'eagle', 'otter', 'otterSit', 'seal', 'sealHead', 'sealSwim', 'cormorant', 'cormFly', 'cormSwim', 'moose']; // Phase 79: and the sea's; Phase 83: the moose
         var Z = under ? 4 : 3, cy0 = 20, cx0 = 8, rowH = 0;
         ctx.imageSmoothingEnabled = false;
         for (var ni = 0; ni < NAMES.length; ni++) {

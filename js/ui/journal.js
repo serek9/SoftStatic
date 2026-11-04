@@ -18,6 +18,10 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // (G.ui.panel), like every other menu: the entry on the left (its picture on a plate, where it
 // lives, how many were caught, the biggest catch, and the notes in handwriting), and the
 // count, the two filters and the grid of species on the right.
+// Phase 85 (PLAN_WINTER.md 2.5): a caught freshwater species' page says which size classes have
+// been caught (counted from Phase 85 on) of those it comes in; at the Back Pond the page has a
+// STOCK row: Space stocks one fish of it in a size caught (the row steps through them), free,
+// once every size is caught and the pond is clean, up to its capacity.
 G.ui = G.ui || {};
 G.ui.journal = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, M = G.ui.menu;
@@ -185,8 +189,37 @@ G.ui.journal = (function () {
     if (j.caught >= 2 && j.hints.indexOf('bait') < 0) note('bait');
     if (j.hints.indexOf('depth') < 0) note('depth');                // Phase 75: where, how deep and when, from the first catch
     if (sp.ice) para(ICE_SAYS[sp.turnUpName] || '', 'wood', true);   // Phase 80: how often it turns up under the ice
+    sizesNote(sp, j, para);
     if (sp.trophyKg && j.bestW >= sp.trophyKg) para('The ice monster. ' + j.bestW.toFixed(2) + ' kg, out of a hole in the ice.', 'rust', true); // Phase 80: the one named trophy
   }
+  // Phase 85: the size classes caught, of those the species comes in; and the STOCK row's state.
+  function sizesNote(sp, j, para) {
+    var Pd = G.sim.pond;
+    if (!Pd.freshwater(sp, G.data)) return;
+    var got = Pd.caughtSizes(G.state.save, sp, G.data), all = Pd.wanted(sp, G.data);
+    para('Sizes caught: ' + (got.length ? got.join(' ') : 'none noted') + ' (of ' + all.join(' ') + ').' + (j.caught > (j.sized || 0) ? ' Catches from before the pond went unsized.' : ''), 'wood', true);
+  }
+  var stockRow = { show: false, ok: false, cls: '', text: '', idx: 0, said: '' };
+  function stockState() {
+    var r = G.state.run, L = r && r.loc ? G.data.locations[r.loc] : null, Pd = G.sim.pond, save = G.state.save;
+    stockRow.show = !!(L && L.pond && list.length && save.pond);
+    if (!stockRow.show) return;
+    var sp = G.data.fish[list[sel]], j = save.journal[sp.id], v = Pd.canStock(save, sp, G.data), got = Pd.caughtSizes(save, sp, G.data);
+    if (!j || !j.caught) { stockRow.show = false; return; }
+    stockRow.ok = v === Pd.OK;
+    stockRow.cls = got.length ? got[stockRow.idx % got.length] : '';
+    stockRow.text = stockRow.said || (v === Pd.OK ? 'Space: one goes in, free. Pond ' + save.pond.stock.length + ' / ' + Pd.capOf(G.data) + '.' :
+      (v === Pd.NOT ? 'Not a fish for the pond.' : (v === Pd.SIZE ? 'Catch it in every size first: still ' + Pd.missingSizes(save, sp, G.data).join(' ') + '.' :
+      (v === Pd.DIRTY ? 'Not until the pond runs clear.' : 'The pond is full.'))));
+  }
+  function stockOne() {
+    var save = G.state.save, Pd = G.sim.pond, sp = G.data.fish[list[sel]];
+    if (!stockRow.show || !stockRow.ok) return;
+    var r = Pd.stock(save, list[sel], stockRow.cls, G.data);
+    if (r === Pd.OK) { stockRow.said = 'In it goes: ' + sp.name + ', size ' + stockRow.cls + '. Pond ' + save.pond.stock.length + ' / ' + Pd.capOf(G.data) + '.'; stockRow.idx++; G.core.save.autosave('stock'); }
+    stockState();
+  }
+
   // Phase 80: the reference's rarity, said as how often it comes to a hole.
   var ICE_SAYS = { common: 'Comes to a hole often enough.', rare: 'Comes to a hole now and then.', epic: 'Seldom comes to a hole. Worth the wait.' };
 
@@ -194,8 +227,9 @@ G.ui.journal = (function () {
     buildLocs();
     var here = locs.indexOf(G.state.run.loc);
     locIdx = here >= 0 ? here : 0;
-    focus = 2; top = 0;
+    focus = 2; top = 0; stockRow.idx = 0; stockRow.said = '';
     filter();
+    stockState();
   }
 
   // Leaving the journal: a page may gain a hint you never found, read next time (10.5).
@@ -212,15 +246,16 @@ G.ui.journal = (function () {
     if (inp.pressed('journal') || inp.pressed('back')) { close(); return false; }
     var lr = M.axis('left', 'right'), ud = M.axis('up', 'down');
     if (focus < 2) {
-      if (lr && focus === 0) { locIdx = (locIdx + lr + locs.length) % locs.length; sel = 0; top = 0; filter(); }
-      if (lr && focus === 1) { famIdx = (famIdx + lr + FAMILIES.length) % FAMILIES.length; sel = 0; top = 0; filter(); }
+      if (lr && focus === 0) { locIdx = (locIdx + lr + locs.length) % locs.length; sel = 0; top = 0; filter(); stockState(); }
+      if (lr && focus === 1) { famIdx = (famIdx + lr + FAMILIES.length) % FAMILIES.length; sel = 0; top = 0; filter(); stockState(); }
       if (ud > 0) focus++;
       if (ud < 0 && focus > 0) focus--;
       return true;
     }
     if (ud < 0 && sel < COLS) { focus = 1; return true; }
     var next = sel + lr + ud * COLS;
-    if ((lr || ud) && next >= 0 && next < list.length) select(next);
+    if ((lr || ud) && next >= 0 && next < list.length) { select(next); stockRow.idx = 0; stockRow.said = ''; stockState(); }
+    if (inp.pressed('action')) stockOne();                                          // Phase 85: STOCK at the pond
     return true;
   }
 
@@ -287,7 +322,15 @@ G.ui.journal = (function () {
     }
     var ny = ry + 3 * U.ROW + 4;
     ctx.fillStyle = P.fog_dark; ctx.fillRect(lx, ny - 4, iw, 1);
-    for (i = 0; i < notes.length && i < NOTES_MAX; i++) F.drawText(ctx, notes[i].s, lx, ny + i * F.LINE_H, INK[notes[i].key] || notes[i].key, jt, sel * 31 + i);
+    var nmax = stockRow.show ? NOTES_MAX - 3 : NOTES_MAX;                       // Phase 85: room for the STOCK row
+    for (i = 0; i < notes.length && i < nmax; i++) F.drawText(ctx, notes[i].s, lx, ny + i * F.LINE_H, INK[notes[i].key] || notes[i].key, jt, sel * 31 + i);
+
+    if (stockRow.show) {                                                           // Phase 85: the STOCK row at the pond
+      var sy = y + LP[3] - U.PAD - U.KEY_H, kw = U.key(ctx, 'STOCK ' + (stockRow.cls || '-'), lx, sy, stockRow.ok);
+      ctx.fillStyle = P.fog_dark; ctx.fillRect(lx, sy - 6, iw, 1);
+      var tl = F.wrap(stockRow.text, iw - kw - 8);
+      for (i = 0; i < tl.length && i < 2; i++) F.drawText(ctx, tl[i], lx + kw + 8, sy - 3 + i * (F.LINE_H), stockRow.ok ? 'teal_lit' : 'fog_light');
+    }
 
     // The right panel: the count, the filters, the grid and its scrollbar.
     x = RP[0]; y = RP[1];
@@ -322,7 +365,7 @@ G.ui.journal = (function () {
     var end = Math.min(list.length, (top + ROWS) * COLS);
     for (i = top * COLS; i < end; i++) {
       var c = i - top * COLS, x = GX + (c % COLS) * (CW + GAP), y = GY + Math.floor(c / COLS) * (CH + GAP);
-      if (gx >= x && gx < x + CW && gy >= y && gy < y + CH) { focus = 2; if (i !== sel) select(i); return 'none'; }
+      if (gx >= x && gx < x + CW && gy >= y && gy < y + CH) { focus = 2; if (i !== sel) { select(i); stockRow.idx = 0; stockRow.said = ''; stockState(); } return 'none'; }
     }
     var trackH = ROWS * (CH + GAP) - GAP, sx = GX + COLS * (CW + GAP) - GAP + 4;
     if (list.length && gx >= sx - 4 && gx < sx + 10 && gy >= GY && gy < GY + trackH) {
@@ -359,6 +402,8 @@ G.ui.journal = (function () {
     rects: function () { return J_RECTS; }, // 8.4 #38: what the ESC key keeps off
     jitter: jitter, HEAVY_NOTE: HEAVY_NOTE, close: close, // Phase 68: a comment had swallowed these since Phase 61
     lastLate: function () { return lastLate; },
+    stock: function () { stockState(); return { show: stockRow.show, ok: stockRow.ok, cls: stockRow.cls, text: stockRow.text }; }, // Phase 85
+    stockOne: stockOne,
     state: function () { return { loc: locs[locIdx], family: FAMILIES[famIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
   };
 })();

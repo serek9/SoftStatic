@@ -848,7 +848,7 @@ G.scene.underwater = (function () {
       swimOne(bodies[i], f.uid, f.sp, f.x, f.y, f.face, false, 0, dt, f);
     }
     var fsm = run.fsm, h = run.hook;
-    if (fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') {
+    if ((fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') && h.trash < 0) {
       // The hooked fish faces where the fight sends it (away pulling, home tired); its beat
       // follows the pull. Its thrash is in its position, so its facing ignores its speed.
       // Phase 29: its beat from the fight: fast while pulling (faster the fresher), slow tired.
@@ -1087,6 +1087,7 @@ G.scene.underwater = (function () {
     drawLayer(ctx, set.bottom, camPx, wyS, H);
     drawCaustics(ctx, loc, camPx, wyS, alpha, t);
     G.scene.life.drawBed(ctx, loc, camPx, wyS, alpha); // Phase 48: crayfish, snails, the eel, silt
+    if (loc.pond) G.scene.pondLook.drawTrash(ctx, loc, camPx, wyS); // Phase 84: the trash still on the pond's bed
     drawLayer(ctx, set.weeds[weedFrame(loc, t)], camPx, wyS, H);
     G.scene.life.drawWater(ctx, loc, camPx, wyS, alpha); // Phase 48: fry, tadpoles, the darting perch, the turtle
     drawHeavy(ctx, loc, camPx, camPy, alpha);
@@ -1125,7 +1126,7 @@ G.scene.underwater = (function () {
 
   function createCatch() {
     return {
-      hook: { sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0, drip: -1, wet: 0, churn: 0, air: false },
+      hook: { trash: -1, sp: -1, uid: 0, x: 0, y: 0, x0: 0, y0: 0, dist: 0, depth: 0, t: 0, lift: 0, thrash: 0, face: 1, len: 0, w: 0, q: 0, drip: -1, wet: 0, churn: 0, air: false },
       heavy: { state: 0, t: 0, x: 0, y: 0, dir: 1, hum: 0 } // 7.7: 0 none yet this cast, 1 passing, 2 done
     };
   }
@@ -1133,7 +1134,7 @@ G.scene.underwater = (function () {
   // The fish on the bite is hooked: roll its size, start the fight, scatter the rest.
   function hook(run) {
     var b = run.bite, f = run.school.fish[b.slot], sp = G.data.fish[f.sp], h = run.hook, boatB = run.boat;
-    h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false; // wet: 1 until it leaves the water
+    h.trash = -1; h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false; // wet: 1 until it leaves the water
     fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
     h.hx = run.cast.x1; h.side = f.x >= h.hx ? 1 : -1;                            // Phase 81: the hole it was hooked through, and the way it runs
@@ -1141,6 +1142,8 @@ G.scene.underwater = (function () {
     h.depth = f.y;
     h.q = G.sim.economy.hookQ(sp, run.cast.bait, G.rng.next(), G.data); // Phase 44: the size curve; Phase 68: in the lure's sizes
     G.sim.economy.size(sp, h.q, h);
+    h.pondK = -1;                                                                    // Phase 85: at the pond, the stocked fish it is
+    if (G.scene.sailing.loc().pond && G.state.save.pond) { var pk = G.sim.pond.pick(G.state.save.pond, sp.id); if (pk >= 0) { h.pondK = pk; h.len = G.state.save.pond.stock[pk].len; h.w = G.state.save.pond.stock[pk].w; } }
     // gearFx: lineStrength, reelSpeed; Phase 23: the hook hold from how long the bite had waited
     G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data, G.sim.bite.hold(b.t, G.data));
     f.active = false;
@@ -1207,8 +1210,39 @@ G.scene.underwater = (function () {
 
   // Lets a lost fish (snap or escape) swim off as an ordinary fish.
   function release(run) {
+    if (run.hook.trash >= 0) return;                                                // Phase 84: a piece of trash sinks back where it was
     var h = run.hook, f = G.sim.fish_ai.spawn(run.school, h.sp, h.x, h.y, h.face, G.rng, G.data);
     if (f) { f.state = 'leave'; f.t = 0; f.missed = 1; }
+  }
+
+  // Phase 84 (PLAN_WINTER.md 2.4): the pond's trash lies on the bed and takes any hook the
+  // moment the lure touches it (G.sim.pond.touch). A large piece needs a rod that holds
+  // data.pond.rodKg (it stays put, and says so once a cast). Hooked, it is a slow, steady haul
+  // (fight.js `steady`: no runs, its mass slows the reel) on the same line, rod and drag.
+  var TRASH = { strength: 0, speed: 0.1, fatigue: 0, mass: 1, jumps: 0, steady: true }, TGEAR = {};
+  function trashTouch(run, loc) {
+    var c = run.cast, p = G.state.save.pond, x = c.x1, depth = c.ly - loc.waterY;
+    if (!p) return false;
+    var i = G.sim.pond.touch(p, G.data, x, depth, bottomAt(loc, x));
+    if (i < 0) return false;
+    var k = G.sim.pond.kindOf(G.data.pond.pieces[i][0], G.data);
+    if (k.size === 'large' && run.gearFx.maxMass < G.data.pond.rodKg) {
+      if (c.trashWarn !== c.n) { c.trashWarn = c.n; G.ui.hud.say('Something big is down there. It needs a rod that holds ' + G.data.pond.rodKg + ' kg.'); }
+      return false;
+    }
+    var h = run.hook, b = run.boat, gx = run.gearFx;
+    h.trash = i; h.pondK = -1; h.sp = -1; h.uid = -1; h.x = x; h.y = depth; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false;
+    h.dist = Math.max(8, Math.abs(x - (b.x + b.facing * UW.reach))); h.hx = x; h.side = 1; h.depth = depth;
+    h.q = 0; h.len = 0; h.w = k.kg;
+    TRASH.strength = k.pull; TRASH.mass = k.kg;
+    TGEAR.lineStrength = gx.lineStrength; TGEAR.reelSpeed = gx.reelSpeed; TGEAR.lineRise = gx.lineRise; TGEAR.lineShake = gx.lineShake; TGEAR.lineHold = 0; TGEAR.maxMass = gx.maxMass; // no small-mouth rule: it has none
+    G.sim.fight.start(run.fight, -1, TRASH, TGEAR, G.rng, G.data, 1);
+    G.sim.fish_ai.scatter(run.school);
+    fx.ripple(x, loc.waterY + 1, 1, 7, 0.6);
+    if (run.fsm === 'waiting') G.core.state.go(run, 'interest');                   // the FSM's way to a hook-set
+    G.core.state.go(run, 'hooked');
+    if (G.core.debug) G.core.debug.log('snagged ' + k.id + ' (' + k.kg + ' kg)');
+    return true;
   }
 
   var DOG_NEAR = 60, DOG_BIG = 2; // Phase 42: px from the boat a jump makes the dog bark; kg (or any rarer fish) a landing does
@@ -1216,6 +1250,7 @@ G.scene.underwater = (function () {
   function catchStep(run, dt, loc) {
     var inp = G.core.input, fsm = run.fsm, F = G.sim.fight;
     if (fsm === 'waiting' || fsm === 'interest') {
+      if (loc.pond && run.bite.slot < 0 && trashTouch(run, loc)) return;            // Phase 84: the lure on a piece of trash
       biteIn.reel = inp.held('action');
       var biting = run.bite.slot >= 0;
       if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
@@ -1250,6 +1285,7 @@ G.scene.underwater = (function () {
     } else if (fsm === 'landing') {
       if (run.hook.lift >= 1) {
         fx.splash(run.hook.x, loc.waterY, 0.4);
+        if (run.hook.trash >= 0) { G.ui.card.open(G.ui.card.buildTrash(run.hook.trash)); G.core.state.go(run, 'card'); return; } // Phase 84: its card, the bin
         G.ui.card.open(G.ui.card.build(run.hook.sp, run.hook, G.state.save, run.cast.latched));
         if (run.hook.w >= DOG_BIG) G.scene.dog.request(run.dog, 'catch'); // Phase 42: a big one (Phase 68: by weight alone)
         G.core.state.go(run, 'card');
@@ -1293,6 +1329,7 @@ G.scene.underwater = (function () {
     var run = G.state.run, fsm = run.fsm;
     if (fsm !== 'hooked' && fsm !== 'fighting' && fsm !== 'landing') return;
     var h = run.hook, FG = G.gfx.fishgen;
+    if (h.trash >= 0) { G.scene.pondLook.drawPiece(ctx, G.data.pond.pieces[h.trash][0], h.x - camPx, loc.waterY - camPy + h.y + 2); return; } // Phase 84
     var bd = bodies[HOOKB];
     if (bd.uid !== h.uid) return;
     var a = bodyArt(bd, 0); // Phase 27: its beat, its turns and its pitch
@@ -1302,7 +1339,9 @@ G.scene.underwater = (function () {
   // Screen position of the hooked fish's mouth (where the line ties on), written into out:
   // on the frame its body draws now, dropped by the pitch at the mouth's column.
   function mouth(loc, camPx, camPy, out) {
-    var h = G.state.run.hook, bd = bodies[HOOKB], on = bd.uid === h.uid, a = on ? bodyArt(bd, 0) : null;
+    var h = G.state.run.hook;
+    if (h.trash >= 0) { var ti = G.scene.pondLook.trashImg(G.data.pond.pieces[h.trash][0]); out[0] = h.x - camPx; out[1] = loc.waterY - camPy + h.y + 2 - ti.height / HI; return out; } // Phase 84: tied on at its top
+    var bd = bodies[HOOKB], on = bd.uid === h.uid, a = on ? bodyArt(bd, 0) : null;
     var cv = G.gfx.fishgen.swimmer(h.sp, a ? a.fr : 0, false, (a ? a.face : h.face) < 0);
     var X0 = Math.round((h.x - camPx - cv.width / (2 * HI)) * HI) / HI, Y0 = Math.round((loc.waterY - camPy + h.y - cv.midY / HI) * HI) / HI;
     out[0] = X0 + (cv.mouthX + 0.5) / HI;

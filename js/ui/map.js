@@ -217,6 +217,9 @@ G.ui.map = (function () {
     return false;
   }
 
+  // Phase 83: the Back Pond is not on the chart: from there you are at the cabin.
+  function hereId() { var l = G.state.run.loc; return l && G.data.locations[l] && G.data.locations[l].pond ? 'cabin' : l; }
+
   // What choosing stop s does now: 'here', 'travel', 'buy', or '' (nothing yet).
   function verdict(s) {
     if (s.kind !== 'loc') return 'travel';
@@ -252,7 +255,7 @@ G.ui.map = (function () {
   // Phase 66: how far a stop is from the water you are on, along the chart.
   function away(s) {
     var h = null;
-    for (var i = 0; i < STOPS.length; i++) if (STOPS[i].id === G.state.run.loc) h = STOPS[i];
+    for (var i = 0; i < STOPS.length; i++) if (STOPS[i].id === hereId()) h = STOPS[i];
     if (!h || h === s) return '';
     var d = Math.hypot(s.x - h.x, s.y - h.y) * KM;
     return ' ' + (d < 1 ? Math.round(d * 10) * 100 + ' m' : d.toFixed(1) + ' km') + ' from here.';
@@ -279,7 +282,7 @@ G.ui.map = (function () {
     if (!chart) chart = G.gfx.bake.cached('map:chart640night', function () { return G.gfx.bake.layer(CW, CH, paintChart); });
     for (var k = 0; k < STOPS.length; k++) { names[k] = stopName(STOPS[k]); nameW[k] = F.measureBold(names[k]); }
     sel = 0;
-    for (var i = 0; i < STOPS.length; i++) if (STOPS[i].id === G.state.run.loc) sel = i;
+    for (var i = 0; i < STOPS.length; i++) if (STOPS[i].id === hereId()) sel = i;
     phase = 'map'; t = 0; dest = null;
     cur.x = STOPS[sel].x; cur.y = STOPS[sel].y;
     describe();
@@ -345,7 +348,7 @@ G.ui.map = (function () {
         ctx.fillStyle = P[open ? 'bone' : 'fog_mid']; ctx.fillRect(s.x - 2, s.y - 2, 5, 5);
         if (open) { ctx.fillStyle = P.night_ink; ctx.fillRect(s.x - 1, s.y - 1, 3, 3); }
       } else ctx.drawImage(mark('house'), s.x - 7, s.y - 10);
-      if (s.id === G.state.run.loc) ctx.drawImage(mark('boat'), s.x - 6, s.y - 18);
+      if (s.id === hereId()) ctx.drawImage(mark('boat'), s.x - 6, s.y - 18);
       var name = names[i], lx = labelX(i), ly = s.y + (s.ry || 8) + 6;
       if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(lx - 4, ly - 2, nameW[i] + 8, 13); ctx.fillStyle = P.signal_amber; ctx.fillRect(lx - 4, ly - 2, 1, 13); }
       F.bold(ctx, name, lx, ly, on ? 'signal_amber' : (open ? 'bone' : 'fog_mid'));
