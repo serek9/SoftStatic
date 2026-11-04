@@ -158,9 +158,10 @@ G.core.save = (function () {
       // stared at its hidden spot (10.3). lateAt: total catches when a journal page last
       // gained a late hint (10.5).
       // seaSeen (Phase 80): true once he has been out on a sea (it opens the ice).
-      flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: false },
+      // exportAt, remindAt (Phase 91.2): when the save was last exported, and when the pause list last said to (ms).
+      flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: false, exportAt: 0, remindAt: 0 },
       tapes: [],
-      settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true, textSize: 'normal', tips: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone); textSize: Phase 90; tips: Phase 88
+      settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true, textSize: 'normal', tips: true, vibration: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone); textSize: Phase 90; tips: Phase 88; vibration: Phase 91.3
       look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)
       pond: { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 }, // Phase 84 (caught, watch: Phase 85): the Back Pond (js/sim/pond.js)
       tipsDone: {},          // Phase 88: first-time tip id -> true once done ('landed': fish landed while the fight was said, up to 3)
@@ -179,6 +180,8 @@ G.core.save = (function () {
     var d = defaults();
     for (var k in d) if (!(k in s)) s[k] = d[k];
     for (k in d.settings) if (!(k in s.settings)) s.settings[k] = d.settings[k]; // Phase 42: settings added later
+    if (!s.flags || typeof s.flags !== 'object') s.flags = {};
+    for (k in d.flags) if (!(k in s.flags)) s.flags[k] = d.flags[k]; // Phase 91.2: flags added later (exportAt, remindAt)
     // Phase 47: save.look is new in v5 saves, filled like any later field; an id that is not a
     // string goes back to the default (an unknown string is drawn as the default, data/looks.js).
     if (!s.look || typeof s.look !== 'object') s.look = d.look;

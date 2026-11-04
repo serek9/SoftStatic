@@ -153,6 +153,17 @@
   G.core.state.change(q.has('gallery') ? 'gallery' : 'sailing');
   G.core.device.fit(); // Phase 90: again, now the save's settings and the scene are known (the UI layer's size)
 
+  // Phase 91.1: offline play through sw.js. Not on localhost or 127.0.0.1 unless ?sw (a PC on
+  // http.server works as before). When the worker has written a new version, the next load says so.
+  var UPD = 'softstatic_updated';
+  try { if (localStorage.getItem(UPD)) { localStorage.removeItem(UPD); G.ui.hud.say('Updated.'); G.core.device.info.updated = true; } } catch (e) {}
+  var local = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(location.hostname);
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && (!local || q.has('sw')) && !q.has('nosw')) {
+    navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.type === 'updated') { try { localStorage.setItem(UPD, '1'); } catch (er) {} } });
+    navigator.serviceWorker.register('sw.js').then(function () { G.core.device.info.sw = 'registered'; }, function (e) { G.core.device.info.sw = 'failed: ' + e.message; });
+    G.core.device.info.sw = 'asked';
+  } else G.core.device.info.sw = 'off';
+
   // Another tab owns the save (12.5): this one waits, and a click or key brings it back here.
   function reclaim() { if (G.core.save.lost()) { G.core.save.claim(); location.reload(); } }
   canvas.addEventListener('mousedown', reclaim);

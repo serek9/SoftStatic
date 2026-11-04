@@ -1736,6 +1736,7 @@ G.scene.sailing = (function () {
 
   function exit() {}
 
+  var buzzWas = { bite: -1, fsm: '' };
   function update(dt) {
     var run = G.state.run, b = run.boat, save = G.state.save, inp = G.core.input;
     var setupOn = setupStep(run); // Phase 45: before the gear's effects, so a pick counts this step
@@ -1812,6 +1813,11 @@ G.scene.sailing = (function () {
     voiceIn.on = save.settings.dogBark !== false;
     voiceIn.block = run.bite.slot >= 0 || run.fsm === 'hooked';
     if (dog.voice(run.dog, dt, voiceIn, G.vrng)) G.audio.engine.cue('bark', b.x, dog.barkPitch()); // Phase 47: the breed's pitch
+    // Phase 91.3: the phone buzzes on a bite, the hook-set and a slip (G.core.device.buzz; Vibration in pause).
+    if (run.bite.slot >= 0 && buzzWas.bite < 0) G.core.device.buzz('bite');
+    if (run.fsm === 'hooked' && buzzWas.fsm !== 'hooked') G.core.device.buzz('hook');
+    if (run.fsm === 'fighting' && run.fight.slipped) G.core.device.buzz('slip');
+    buzzWas.bite = run.bite.slot; buzzWas.fsm = run.fsm;
     G.ui.hud.update(dt, run);
     camStep(run, dt);
     G.scene.underwater.viewStep(run, dt, loc);

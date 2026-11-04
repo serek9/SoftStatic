@@ -1,7 +1,7 @@
 # SoftStatic: Playability, UX and UI, Phases 88–96
 
 **Date:** 2026-11-04. **Repo state audited:** `main` at `de54944` (Phase 87 done, PLAN.md §8).
-**Status:** Phases 90, 88 and 89 are done (2026-11-04, PLAN.md §8.1); the rest wait on the user's word. The user asked (2026-11-04) for "an audit of the whole game, compared against the Cast n Chill wiki (https://castnchill.unpack.wiki/), and a plan for an overall improvement in playability, UX and UI, playable on desktop and on mobile". The user answered §6's questions the same day, and the phases below follow those answers (§6 records them). Each phase starts only on the user's word.
+**Status:** Phases 90, 88, 89 and 91 are done (2026-11-04, PLAN.md §8.1); the user asked the same day for the rest (93, 92, 96, 94). The user asked (2026-11-04) for "an audit of the whole game, compared against the Cast n Chill wiki (https://castnchill.unpack.wiki/), and a plan for an overall improvement in playability, UX and UI, playable on desktop and on mobile". The user answered §6's questions the same day, and the phases below follow those answers (§6 records them). Each phase starts only on the user's word.
 **Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like the other PLAN_*.md files, this one adds phases after the approved spec and does not edit §0–§7 or Appendix V. It replaces nothing in [SOFTSTATIC_IMPROVEMENT_AUDIT.md](SOFTSTATIC_IMPROVEMENT_AUDIT.md). That audit covered the game at Phase 12, and every item in it is done.
 
 Labels: **[V]** verified (seen in the code, in the running game or on the wiki), **[S]** suggestion, **[U]** unverified.

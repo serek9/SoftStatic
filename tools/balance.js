@@ -275,12 +275,36 @@ function validate(G, opts) {
   const shy = d.fish.filter(f => f.lineShy).map(f => f.id);
   lineInfo = 'line-shy species (' + shy.length + '): ' + shy.join(', ');
 
+  // Phase 91.1: sw.js caches exactly what the page needs: index.html, the manifest, its icons
+  // and every script index.html loads, each once, and nothing that is not there.
+  validateWorker(err);
+
   // Phase 52: passive income is gone; nothing may bring it back (V7, D5 retired).
   if (g.passive) err('gear.passive: passive mode was removed in Phase 52');
   if (G.sim.passive) err('js/sim/passive.js: passive mode was removed in Phase 52');
 
   return { errors, warnings };
 }
+
+function validateWorker(err) {
+  const swPath = path.join(ROOT, 'sw.js');
+  if (!fs.existsSync(swPath)) { err('sw.js: missing (Phase 91.1)'); return; }
+  const sw = fs.readFileSync(swPath, 'utf8'), m = sw.match(/var FILES = \[([\s\S]*?)\];/);
+  if (!m) { err('sw.js: no FILES list'); return; }
+  const list = [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const man = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
+  const want = ['./', 'index.html', 'manifest.webmanifest'].concat(man.icons.map(i => i.src), [...html.matchAll(/<(?:script|link)[^>]*(?:src|href)="([^"]+)"/g)].map(x => x[1]));
+  const uniq = [...new Set(want)];
+  uniq.forEach(f => { if (!list.includes(f)) err('sw.js: ' + f + ' is loaded by the page but not cached'); });
+  list.forEach((f, i) => {
+    if (!uniq.includes(f)) err('sw.js: caches ' + f + ', which the page does not load');
+    if (list.indexOf(f) !== i) err('sw.js: ' + f + ' listed twice');
+    if (f !== './' && !fs.existsSync(path.join(ROOT, f))) err('sw.js: ' + f + ' does not exist');
+  });
+  workerInfo = 'sw.js caches ' + list.length + ' files, matching index.html';
+}
+let workerInfo = '';
 
 // Location files (V6, P11): the fields the game reads, spots inside the world, at most one
 // hidden spot, a current that gives finite speeds, and moving structures placed inside the
@@ -1280,6 +1304,7 @@ if (require.main === module) {
     if (looksInfo) console.log('info  ' + looksInfo);
     if (lureArtInfo) console.log('info  ' + lureArtInfo);
     if (lineInfo) console.log('info  ' + lineInfo);
+    if (workerInfo) console.log('info  ' + workerInfo);
     if (lureInfo) console.log('info  ' + lureInfo);
     r.errors.forEach(e => console.log('ERROR ' + e));
     console.log(r.errors.length ? r.errors.length + ' error(s)' : 'validate: OK (' + r.warnings.length + ' warning(s))');
