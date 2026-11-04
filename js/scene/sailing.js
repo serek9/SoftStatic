@@ -858,6 +858,17 @@ G.scene.sailing = (function () {
   // between the tip and where it broke the surface, swinging (`up`); holding the reel winds it
   // up at upV px/s to the tip (DG.len), letting go leaves it hanging, and no cast starts until
   // it is up. upMax: the longest it can hang.
+  // The user's fix (2026-11-04): the lure could swing over the tip and spin round it (reeled up
+  // short, the swing sped up as the line shortened; under way, the boat's and the rod's kicks
+  // outweighed gravity on 3 px of line). A line can pull but never push, so the swing is kept
+  // under the tip: dgLimit holds θ within DG.thMax of straight down (a light bounce off it),
+  // the swing's speed within DG.omMax, and shortening line no longer speeds it up.
+  DG.thMax = 1.25; DG.omMax = 7; DG.bounce = 0.25;
+  function dgLimit() {
+    if (dg.om > DG.omMax) dg.om = DG.omMax; else if (dg.om < -DG.omMax) dg.om = -DG.omMax;
+    if (dg.th > DG.thMax) { dg.th = DG.thMax; if (dg.om > 0) dg.om = -dg.om * DG.bounce; }
+    else if (dg.th < -DG.thMax) { dg.th = -DG.thMax; if (dg.om < 0) dg.om = -dg.om * DG.bounce; }
+  }
   var dg = { on: false, th: 0, om: 0, len: 3, ox: 0, oy: 3, tx: 0, ty: 0, vx: 0, vy: 0, init: false, up: false, lastFsm: '', outX: 0 };
   var dgTip = [0, 0];
   function dangleStep(run, dt) {
@@ -875,7 +886,7 @@ G.scene.sailing = (function () {
       if (dg.up) {
         var ux = dg.outX - dgTip[0], uy = loc.waterY - dgTip[1];
         dg.len = Math.max(DG.len, Math.min(DG.upMax, Math.sqrt(ux * ux + uy * uy)));
-        dg.th = Math.atan2(ux, uy); dg.om = 0;
+        dg.th = Math.atan2(ux, uy); dg.om = 0; dgLimit();
         if (dg.len <= DG.len + 0.5) dg.up = false;
       }
     }
@@ -887,8 +898,8 @@ G.scene.sailing = (function () {
       var reel = G.core.input.held('action') && !G.ui.setup.isOpen() && !G.ui.dock.isOpen(), u0 = dg.len;
       if (reel) dg.len = Math.max(DG.len, dg.len - DG.upV * dt);
       var dlu = (dg.len - u0) / dt;
-      dg.om += dt * ((-(DG.g + ay0) * Math.sin(dg.th) - ax0 * Math.cos(dg.th)) / dg.len - 2 * dlu * dg.om / dg.len - DG.damp * dg.om);
-      dg.th += dt * dg.om;
+      dg.om += dt * ((-(DG.g + ay0) * Math.sin(dg.th) - ax0 * Math.cos(dg.th)) / dg.len - 2 * Math.max(0, dlu) * dg.om / dg.len - DG.damp * dg.om);
+      dg.th += dt * dg.om; dgLimit();
       dg.ox = Math.sin(dg.th) * dg.len; dg.oy = Math.cos(dg.th) * dg.len;
       if (dg.len <= DG.len) dg.up = false;
       return;
@@ -911,8 +922,8 @@ G.scene.sailing = (function () {
     else if (dg.len > want) dg.len = Math.max(want, dg.len - DG.reelIn * dt);
     var dl = (dg.len - l0) / dt;
     // θ from straight down, toward +x; y is down. The pivot's acceleration swings it.
-    dg.om += dt * ((-(DG.g + ay) * Math.sin(dg.th) - ax * Math.cos(dg.th)) / dg.len - 2 * dl * dg.om / dg.len - DG.damp * dg.om);
-    dg.th += dt * dg.om;
+    dg.om += dt * ((-(DG.g + ay) * Math.sin(dg.th) - ax * Math.cos(dg.th)) / dg.len - 2 * Math.max(0, dl) * dg.om / dg.len - DG.damp * dg.om);
+    dg.th += dt * dg.om; dgLimit();
     dg.ox = Math.sin(dg.th) * dg.len; dg.oy = Math.cos(dg.th) * dg.len;
   }
 
@@ -1634,7 +1645,7 @@ G.scene.sailing = (function () {
   // still do what they always do on this step: the director only reads them.
   var KEYS_ANY = ['left', 'right', 'action', 'pause', 'journal', 'map', 'up', 'down', 'back', 'still', 'setup'];
   var voiceIn = { on: true, block: false }; // Phase 42
-  var fisherIn = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
+  var fisherIn = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0, bars: false }, dogP = [0, 0];
   function fisherStep(run, dt) {
     var inp = G.core.input, any = false;
     for (var i = 0; i < KEYS_ANY.length; i++) if (inp.held(KEYS_ANY[i]) || inp.pressed(KEYS_ANY[i])) { any = true; break; }
@@ -1647,7 +1658,8 @@ G.scene.sailing = (function () {
     // swings with the turn (the boat's acceleration) and the throttle.
     var b = run.boat;
     fisherIn.helm = run.fsm === 'sailing' && (!b.stopped || b.startT >= 0 || (run.move !== 0 && b.motor));
-    fisherIn.cord = b.startT >= 0 ? b.startT / boat.M.start : -1;
+    fisherIn.cord = b.startT >= 0 && !b.ice ? b.startT / boat.M.start : -1; // Phase 86: the Snow Machine has no pull cord to show
+    fisherIn.bars = b.ice;                                                  // Phase 86: his hands on the handlebar
     fisherIn.steer = Math.max(-1, Math.min(1, b.ax * 0.01 + 0.4 * b.throttle));
     tackleStep(run, any);
     G.scene.fisher.step(run.fisher, dt, fisherIn, G.vrng);
@@ -1708,8 +1720,8 @@ G.scene.sailing = (function () {
     var run = G.state.run, b = run && run.boat;
     if (!b || !loc || G.core.state.sceneName() !== 'sailing' || run.fsm !== 'sailing' || !b.stopped || G.ui.setup.isOpen()) return false;
     if (G.ui.menu.current()) return false;
-    var sx = Math.round(b.x - run.cam.x), y = loc.waterY - camPy + boat.bob(b);
-    var dx = b.facing < 0 ? sx - 16 : sx + 4, dy = y - 14 + boat.shear(b, 10);
+    boat.dogAt(b, Math.round(b.x - run.cam.x), loc.waterY - camPy, dogP); // Phase 86: in the bow, or in the box sled on the ice
+    var dx = dogP[0], dy = dogP[1];
     var wx = gx / HI, wy = gy / HI;
     return wx >= dx - 2 && wx < dx + 14 && wy >= dy - 2 && wy < dy + 12;
   }

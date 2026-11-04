@@ -43,6 +43,12 @@ G.scene.fisher = (function () {
   // back for the cord's handle and where the pull ends. HELM: each stage's least time (s).
   var CLIPS = [-3.2, -5.1], STOW_ANGLE = 2, TILLER = [-4.3, -6], PIVOT = [-15, -5.4];
   var CORD = { reach: [-5.6, -5.4], pull: [-1, -9.6] }, HELM = { stow: 0.3, reach: 0.25, free: 0.25 };
+  // Phase 86: on the Snow Machine (ctx.bars) the hands take the handlebar ahead of him (BARS: the
+  // near grip, BARS_F: the far one, local) and the rod rides in a holder behind the seat, its
+  // butt by his hip and its tip up and back over the sled (ICE_CLIPS, ICE_STOW degrees).
+  var BARS = [4, -5], BARS_F = [3.2, -5.4], ICE_CLIPS = [-3, -4], ICE_STOW = 150;
+  function clipsOf(fs) { return fs && fs.bars ? ICE_CLIPS : CLIPS; }
+  function stowOf(fs) { return fs && fs.bars ? ICE_STOW : STOW_ANGLE; }
 
   // Poses: the near hand (n) and the far hand (f), local world px.
   var POSES = {
@@ -175,7 +181,7 @@ G.scene.fisher = (function () {
       line: null, reel: 0, bail: false, held: false, tug: false, cue: '',
       can: false, sips: 0, beerRest: 0,
       act: '', step: 0, t: 0, idleT: 0, wait: 0, ret: false, fast: false, acts: 0,
-      helm: 0, helmT: 0, cord: -1, steer: 0, stows: 0, toss: -1 };
+      helm: 0, helmT: 0, cord: -1, steer: 0, stows: 0, toss: -1, bars: false };
   }
 
   function spring(x, v, target, w, dt) {
@@ -232,9 +238,9 @@ G.scene.fisher = (function () {
     return rng.next() < (fs.can && night ? 0.65 : 0.5) ? d : 'rest';
   }
 
-  var quietCtx = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0 };
+  var quietCtx = { mode: null, input: false, night: false, helm: false, cord: -1, steer: 0, bars: false };
   function noActs(ctx) {
-    quietCtx.input = ctx.input; quietCtx.night = ctx.night; quietCtx.helm = ctx.helm; quietCtx.cord = ctx.cord; quietCtx.steer = ctx.steer;
+    quietCtx.input = ctx.input; quietCtx.night = ctx.night; quietCtx.helm = ctx.helm; quietCtx.cord = ctx.cord; quietCtx.steer = ctx.steer; quietCtx.bars = ctx.bars;
     return quietCtx;
   }
 
@@ -242,10 +248,11 @@ G.scene.fisher = (function () {
   // side, foreshortened), and in his hand once he holds it.
   var gp = [0, 0];
   function grip(fs, out) {
+    if (fs.bars) { out[0] = BARS[0] + 0.2 * fs.steer; out[1] = BARS[1] + 0.2 * Math.abs(fs.steer); return out; } // Phase 86: the handlebar, leaning into the throttle
     out[0] = TILLER[0] + 0.5 * fs.steer; out[1] = TILLER[1] - 0.3 * Math.abs(fs.steer);
     return out;
   }
-  function holding(fs) { return fs.helm === 3 || ((fs.helm === 2 || fs.helm === 4) && fs.pose === 'tiller' && near(fs, TILLER)); }
+  function holding(fs) { return fs.helm === 3 || ((fs.helm === 2 || fs.helm === 4) && fs.pose === 'tiller' && near(fs, fs.bars ? BARS : TILLER)); }
 
   function near(fs, pt) { return Math.abs(fs.nx - pt[0]) + Math.abs(fs.ny - pt[1]) < K.grab; }
 
@@ -257,6 +264,8 @@ G.scene.fisher = (function () {
   // the tip-top there (line 1) so it does not swing about under way.
   function helmStep(fs, dt, ctx) {
     fs.steer += ((ctx.helm ? ctx.steer || 0 : 0) - fs.steer) * Math.min(1, 6 * dt);
+    fs.bars = !!ctx.bars;
+    var CL = clipsOf(fs), STOW = stowOf(fs);
     if (!ctx.helm && !fs.helm) return;
     fs.helmT += dt;
     if (ctx.helm) {
@@ -274,19 +283,19 @@ G.scene.fisher = (function () {
           if (near(fs, HOLDER)) { fs.rodAt = 'hand'; fs.helmT = 0; }
           break;
         }
-        fs.pose = 'clips'; fs.rodAt = 'hand'; fs.angle = STOW_ANGLE; fs.line = 1;
-        if (near(fs, CLIPS) && fs.helmT >= HELM.stow) { fs.rodAt = 'clips'; fs.helm = 2; fs.helmT = 0; fs.cue = 'clip'; }
+        fs.pose = 'clips'; fs.rodAt = 'hand'; fs.angle = STOW; fs.line = 1;
+        if (near(fs, CL) && fs.helmT >= HELM.stow) { fs.rodAt = 'clips'; fs.helm = 2; fs.helmT = 0; fs.cue = 'clip'; }
         break;
       case 2:
-        fs.pose = 'tiller'; fs.rodAt = 'clips'; fs.angle = STOW_ANGLE; fs.line = 1;
+        fs.pose = 'tiller'; fs.rodAt = 'clips'; fs.angle = STOW; fs.line = 1;
         if (near(fs, grip(fs, gp)) && fs.helmT >= HELM.reach) { fs.helm = 3; fs.helmT = 0; }
         break;
       case 3:
-        fs.pose = 'tiller'; fs.rodAt = 'clips'; fs.angle = STOW_ANGLE; fs.line = 1;
+        fs.pose = 'tiller'; fs.rodAt = 'clips'; fs.angle = STOW; fs.line = 1;
         break;
       case 4:
-        fs.pose = 'clips'; fs.rodAt = 'clips'; fs.angle = STOW_ANGLE; fs.line = 1;
-        if (near(fs, CLIPS) && (fs.helmT >= HELM.free || fs.fast)) { fs.rodAt = 'hand'; fs.helm = 5; fs.helmT = 0; fs.cue = 'clip'; }
+        fs.pose = 'clips'; fs.rodAt = 'clips'; fs.angle = STOW; fs.line = 1;
+        if (near(fs, CL) && (fs.helmT >= HELM.free || fs.fast)) { fs.rodAt = 'hand'; fs.helm = 5; fs.helmT = 0; fs.cue = 'clip'; }
         break;
       case 5:
         fs.pose = 'rod'; fs.rodAt = 'hand'; fs.angle = null; fs.line = null;
@@ -323,7 +332,8 @@ G.scene.fisher = (function () {
     helmStep(fs, dt, ctx);
     // The hands. Phase 41: on a pull-start the far hand reaches back for the cord, then pulls.
     var p = POSES[fs.pose], w = fs.fast ? K.fast : K.ease, ftx = p.f[0], fty = p.f[1], fw = w, ntx = p.n[0], nty = p.n[1];
-    if (fs.pose === 'tiller') { grip(fs, gp); ntx = gp[0]; nty = gp[1]; }
+    if (fs.pose === 'tiller') { grip(fs, gp); ntx = gp[0]; nty = gp[1]; if (fs.bars) { ftx = BARS_F[0]; fty = BARS_F[1]; } }
+    else if (fs.pose === 'clips' && fs.bars) { ntx = ICE_CLIPS[0]; nty = ICE_CLIPS[1]; }
     fs.cord = fs.helm && ctx.cord >= 0 ? ctx.cord : -1;
     if (fs.cord >= 0) {
       var cp = fs.cord < 0.35 ? CORD.reach : CORD.pull;
@@ -356,7 +366,7 @@ G.scene.fisher = (function () {
   function rodLocal(out) {
     if (!cur) { out[0] = 3; out[1] = -6; return out; }
     if (cur.rodAt === 'holder') { out[0] = HOLDER[0]; out[1] = HOLDER[1]; }
-    else if (cur.rodAt === 'clips') { out[0] = CLIPS[0]; out[1] = CLIPS[1]; }
+    else if (cur.rodAt === 'clips') { var cl = clipsOf(cur); out[0] = cl[0]; out[1] = cl[1]; }
     else { out[0] = cur.nx; out[1] = cur.ny; }
     return out;
   }
@@ -530,6 +540,41 @@ G.scene.fisher = (function () {
     }
   }
 
+  // Phase 86: his legs, for the ice, where nothing hides them: from the hip (HIP, local, under
+  // the coat's hem) through a knee found by two-bone IK (forward and up, as a seated man's is)
+  // to the ankle, and a winter boot on the ground under it. Painted per ankle place (half world
+  // px) in a 36×32 view px canvas, the hip at image (LEG_O), both legs: the far one a step
+  // darker and a little behind. Cached like the arms, so the sitting-down eases through a few.
+  var HIP = [0.5, -2.5], THIGH = 5.5, SHIN = 5, LEG_O = [8, 10];
+  function paintLegs(c, ax, ay, R) {
+    var S = G.gfx.sprites, k = R.L.trousers || 'stone_dark', TR = [S.shift(k, -1), k, S.shift(k, 1)], TF = [S.shift(k, -1), S.shift(k, -1), k];
+    var BOOT = ['ink', 'wood_deep', 'wood_dark'], ox = LEG_O[0], oy = LEG_O[1];
+    var hx = 0, hy = 0, dx = (ax - HIP[0]) * HI, dy = (ay - HIP[1]) * HI, T = THIGH * HI, Sh = SHIN * HI;
+    var d = Math.max(Math.abs(T - Sh) + 0.5, Math.min(T + Sh - 0.05, Math.sqrt(dx * dx + dy * dy) || 0.01));
+    var a = Math.atan2(dy, dx), b = Math.acos(Math.max(-1, Math.min(1, (T * T + d * d - Sh * Sh) / (2 * T * d))));
+    var k1x = Math.cos(a - b) * T, k1y = Math.sin(a - b) * T, k2x = Math.cos(a + b) * T, k2y = Math.sin(a + b) * T;
+    var kx = k1y < k2y ? k1x : k2x, ky = k1y < k2y ? k1y : k2y;                          // the knee comes up
+    for (var far = 1; far >= 0; far--) {
+      var sh = far ? -1.5 : 0, keys = far ? TF : TR;
+      A.limb(c, ox + hx + sh, oy + hy, ox + kx + sh, oy + ky, 3, keys, 0.05);               // the thigh
+      A.limb(c, ox + kx + sh, oy + ky, ox + dx + sh, oy + dy, 2.4, keys, 0);                  // the shin
+      var bx = Math.round(ox + dx + sh), by = Math.round(oy + dy);
+      A.box(c, BOOT[far ? 0 : 1], bx - 2, by - 1, 5, 3);                                     // the boot's felt-lined shaft
+      A.box(c, BOOT[far ? 1 : 2], bx - 2, by - 1, 5, 1);                                     // its cuff
+      A.box(c, 'ink', bx - 2, by + 2, 8, 2); A.box(c, far ? 'ink' : 'stone_dark', bx - 1, by + 2, 6, 1); // the rubber foot, toe forward
+    }
+  }
+  function legsImg(ax, ay, flip, R) {
+    return img('lg' + ax + ',' + ay, flip, function () { return layer(36, 32, function (c) { paintLegs(c, ax, ay, R); }); }, own(R));
+  }
+  // Draws both legs for a seat line y at screen x sx, facing f, the ankle at local (ax, ay):
+  // drawn before draw(), so the coat's hem covers the hips. The boot's sole is 2 px under the ankle.
+  function drawLegs(ctx, sx, y, f, ax, ay, lk) {
+    var R = look(lk), flip = f < 0, qx = Math.round(ax * 2) / 2, qy = Math.round(ay * 2) / 2, cv = legsImg(qx, qy, flip, R);
+    var hx = sx + f * HIP[0], x = flip ? hx - (cv.width - LEG_O[0]) / HI : hx - LEG_O[0] / HI;
+    put(ctx, cv, Math.round(x * HI) / HI, Math.round((y + HIP[1] - LEG_O[1] / HI) * HI) / HI);
+  }
+
   // A 1-view-px line between world points (whole view pixels).
   function vline(ctx, x0, y0, x1, y1) {
     x0 = Math.round(x0 * HI); y0 = Math.round(y0 * HI); x1 = Math.round(x1 * HI); y1 = Math.round(y1 * HI);
@@ -593,7 +638,7 @@ G.scene.fisher = (function () {
 
   return { K: K, POSES: POSES, ACTS: ACTS, HOLDER: HOLDER, HOLDER_ANGLE: HOLDER_ANGLE, create: create, step: step, start: start, abort: abort,
     CLIPS: CLIPS, STOW_ANGLE: STOW_ANGLE, TILLER: TILLER, HELM: HELM,
-    rodLocal: rodLocal, draw: draw, drawHolder: drawHolder, drawHelm: drawHelm, drawCooler: drawCooler, drawCan: drawCan, drink: drink, choose: choose, info: info,
+    rodLocal: rodLocal, draw: draw, drawLegs: drawLegs, BARS: BARS, drawHolder: drawHolder, drawHelm: drawHelm, drawCooler: drawCooler, drawCan: drawCan, drink: drink, choose: choose, info: info,
     prebake: prebake, look: function (lk) { return look(lk).L; }, armImg: function (far, ix, iy, flip, lk) { return armImg(far, ix, iy, flip, look(lk)); }, SH_N: SH_N, SH_F: SH_F,
     armCount: function () { var n = 0, D = own(look()); for (var k in D) if (k[0] === 'a' && k[k.length - 1] !== '<') n++; return n; } };
 })();
