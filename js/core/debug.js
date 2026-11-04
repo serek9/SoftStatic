@@ -426,15 +426,24 @@ G.core.debug = (function () {
     // dbg.pond(): Phase 84, the Back Pond: the trash left by kind and in all, where each piece
     // still lies ([i, kind, x]), the meter [done, of], the stream, how far the water has cleared,
     // the murk, whether it is clean; Phase 85 adds the stock and Pond Cam. dbg.pond('stream')
-    // pays to clear the stream (as the panel at its lip does).
+    // pays to clear the stream (as the panel at its lip does). Phase 85: dbg.pond('stock', id, cls)
+    // stocks one as the journal's STOCK row does (returns its verdict); dbg.pond('sizes', id)
+    // reads what the journal holds of the species' sizes and what it comes in.
     pond: function (what) {
       var p = G.state.save.pond, Pd = G.sim.pond, D = G.data.pond, o, i;
       if (!p) return null;
+      if (what === 'stock' || what === 'sizes') {
+        var si = -1; for (i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === arguments[1]) si = i;
+        if (si < 0) return 'no species ' + arguments[1];
+        if (what === 'sizes') return { caught: Pd.caughtSizes(G.state.save, G.data.fish[si], G.data), comesIn: Pd.wanted(G.data.fish[si], G.data), verdict: Pd.canStock(G.state.save, G.data.fish[si], G.data) };
+        var rr = Pd.stock(G.state.save, si, arguments[2], G.data); if (rr === Pd.OK) G.core.save.autosave('stock'); return rr;
+      }
       if (what === 'stream') { var r = Pd.clearStream(G.state.save, G.data); if (r === Pd.OK) G.core.save.autosave('purchase'); return r; }
       o = { trash: {}, left: Pd.left(p, G.data), pieces: [], meter: [Pd.done(p, G.data), Pd.parts(G.data)], stream: p.stream, clear: +p.clear.toFixed(3), murk: +Pd.murk(p, G.data).toFixed(3), clean: Pd.clean(p, G.data) };
       for (i = 0; i < D.kinds.length; i++) o.trash[D.kinds[i].id] = Pd.left(p, G.data, D.kinds[i].id);
       for (i = 0; i < D.pieces.length; i++) if (!Pd.has(p, i)) o.pieces.push([i, D.pieces[i][0], D.pieces[i][1]]);
-      if (G.scene.pondInfo) G.scene.pondInfo(o);
+      o.stock = p.stock.map(function (f) { return [f.id, f.cls, f.w, f.len, +f.shy.toFixed(3)]; }); o.cap = Pd.capOf(G.data); // Phase 85
+      o.caughtOwn = p.caught || 0; o.watch = +(p.watch || 0).toFixed(1);
       return o;
     },
     // dbg.cabinWalk('UDLR'): Phase 83, walks him round the cabin a tile a step (R off the tile inside the back door goes out to the pond).

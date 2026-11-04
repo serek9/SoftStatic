@@ -246,6 +246,12 @@ G.sim.economy = (function () {
     if (c.len > j.bestLen) j.bestLen = c.len;
     if (c.w > j.bestW) j.bestW = c.w;
     if (c.windowCatch) save.flags.windowCatch[c.windowCatch] = true;
+    if (c.w > 0 && G.data.SIZE_CLASSES) {                                          // Phase 85: the size classes caught (for stocking the pond)
+      var cls = G.data.SIZE_CLASSES[G.data.sizeClass(c.w)].id;
+      if (!j.sizes) j.sizes = [];
+      if (j.sizes.indexOf(cls) < 0) j.sizes.push(cls);
+      j.sized = (j.sized || 0) + 1;
+    }
     if (c.bait) { if (!j.took) j.took = []; if (j.took.indexOf(c.bait) < 0) j.took.push(c.bait); } // Phase 43: what it was caught on
     if (choice === 'sell') save.coins += c.price;
     else if (choice === 'release') j.released = (j.released || 0) + 1;

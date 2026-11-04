@@ -1142,6 +1142,8 @@ G.scene.underwater = (function () {
     h.depth = f.y;
     h.q = G.sim.economy.hookQ(sp, run.cast.bait, G.rng.next(), G.data); // Phase 44: the size curve; Phase 68: in the lure's sizes
     G.sim.economy.size(sp, h.q, h);
+    h.pondK = -1;                                                                    // Phase 85: at the pond, the stocked fish it is
+    if (G.scene.sailing.loc().pond && G.state.save.pond) { var pk = G.sim.pond.pick(G.state.save.pond, sp.id); if (pk >= 0) { h.pondK = pk; h.len = G.state.save.pond.stock[pk].len; h.w = G.state.save.pond.stock[pk].w; } }
     // gearFx: lineStrength, reelSpeed; Phase 23: the hook hold from how long the bite had waited
     G.sim.fight.start(run.fight, f.sp, sp, run.gearFx, G.rng, G.data, G.sim.bite.hold(b.t, G.data));
     f.active = false;
@@ -1229,7 +1231,7 @@ G.scene.underwater = (function () {
       return false;
     }
     var h = run.hook, b = run.boat, gx = run.gearFx;
-    h.trash = i; h.sp = -1; h.uid = -1; h.x = x; h.y = depth; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false;
+    h.trash = i; h.pondK = -1; h.sp = -1; h.uid = -1; h.x = x; h.y = depth; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false;
     h.dist = Math.max(8, Math.abs(x - (b.x + b.facing * UW.reach))); h.hx = x; h.side = 1; h.depth = depth;
     h.q = 0; h.len = 0; h.w = k.kg;
     TRASH.strength = k.pull; TRASH.mass = k.kg;

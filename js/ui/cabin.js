@@ -20,6 +20,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // (data/loc_pond.js): walking out of it, or Space at it, goes down to the pond's dock and the
 // boat moored there; coming in from the pond he stands inside it. The front door always goes
 // out to Fogbound's pier, and Esc or M goes back the way he came in.
+// Phase 85 (PLAN_WINTER.md 2.5): the CRT's second channel: Space on the TV steps off, the game,
+// Pond Cam (a slow view of the pond's stocked fish among the weed), off; the time it is watched
+// counts in save.pond.watch. A kept fish of trophy weight hangs a small brass tag under its plaque.
 G.ui = G.ui || {};
 G.ui.cabin = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, A = G.gfx.paint, X = G.gfx.pix, K = G.ui.roomKit, R = G.ui.room, tone = X.tone;
@@ -366,7 +369,7 @@ G.ui.cabin = (function () {
   var turned = [];    // per mounted trophy: faces the door; decided in enter() only
   var order = [];
   var from = 'front', stored = 0, walk = null, faced = '', held = [], txt = { title: '', next: '', stored: '', coins: '' }, lastCoins = -1, coin = null;
-  var open = '', lines = [], tvOn = false, recordT = -1, chordN = 0, tvT = 0, fanOn = true, lavaOn = true;
+  var open = '', lines = [], tvOn = false, tvMode = 0, recordT = -1, chordN = 0, tvT = 0, fanOn = true, lavaOn = true;
   var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, strange: '', st: 0, flash: 0 };
   var BOX = { x: 24, y: 296, w: 592, h: 56 }, HEAD = { x: 120, y: 316, w: 400, h: 40 };
   var R_BOX = [[BOX.x, BOX.y - 13, BOX.w, BOX.h + 13]], R_HEAD = [[HEAD.x, HEAD.y - 13, HEAD.w, HEAD.h]]; // 8.4 #38
@@ -404,7 +407,7 @@ G.ui.cabin = (function () {
   function enter() {
     var save = G.state.save, kept = save.kept, cap = G.data.gear.cabin[save.cabinLevel].plaques, i, j;
     bakeRoom();
-    t = 0; open = ''; faced = ''; held.length = 0; tvOn = false; recordT = -1; fanOn = true; lavaOn = true;
+    t = 0; open = ''; faced = ''; held.length = 0; tvOn = false; tvMode = 0; recordT = -1; fanOn = true; lavaOn = true;
     from = G.state.run.loc === 'pond' ? 'back' : 'front';                         // Phase 83: which door he came in by
     walk = from === 'back' ? WK.create({ c: BACK[0], r: BACK[1], face: 'left', dc: BACK[0] - 1, dr: BACK[1] }) : WK.create();
     R.prebake('fisher'); R.prebake('dog');                                          // so no step bakes a frame
@@ -415,7 +418,7 @@ G.ui.cabin = (function () {
     mounted.length = 0; turned.length = 0;
     for (i = 0; i < ord.length && i < cap; i++) {
       var k = kept[ord[i]], sp = speciesIndex(k.id);
-      mounted.push({ spIdx: sp, img: G.gfx.fishgen.portrait(sp, PLQ_W - 6, PLQ_H - 8, false), flipImg: G.gfx.fishgen.portraitFlipped(sp, PLQ_W - 6, PLQ_H - 8), name: G.data.fish[sp].name, len: Math.round(k.len) + ' cm' });
+      mounted.push({ trophy: k.w >= G.sim.pond.trophyKg(G.data.fish[sp]), spIdx: sp, img: G.gfx.fishgen.portrait(sp, PLQ_W - 6, PLQ_H - 8, false), flipImg: G.gfx.fishgen.portraitFlipped(sp, PLQ_W - 6, PLQ_H - 8), name: G.data.fish[sp].name, len: Math.round(k.len) + ' cm' });
       turned.push(false);
     }
     stored = ord.length - mounted.length;
@@ -479,7 +482,7 @@ G.ui.cabin = (function () {
     if (what === 'guitar') { G.audio.engine.cue('strum', 0, chordN++ % 4); if (lv < 2) say('A chord. Two strings are dead and the rest are flat.'); return; }
     if (what === 'keys') { if (lv < 3) { say(lv < 1 ? 'Junk. Someday.' : 'Something under a tarp. Not yet.'); return; } G.audio.engine.cue('keys', 0, chordN++ % 4); return; }
     if (what === 'records') { if (lv < 3) { say(lv < 1 ? 'A heap of junk.' : 'Crates of old records. Nothing to play them on yet.'); return; } if (recordT < 0) { recordT = t; G.audio.engine.cue('record'); } else recordT = -1; return; }
-    if (what === 'tv') { if (lv < 3) { say('Boxes.'); return; } tvOn = !tvOn; tvT = t; return; }
+    if (what === 'tv') { if (lv < 3) { say('Boxes.'); return; } tvMode = (tvMode + 1) % 3; tvOn = tvMode > 0; tvT = t; return; } // Phase 85: off, the game, Pond Cam
     // Phase 64.
     if (what === 'fan') { if (lv < 2) { say('A crate of something heavy.'); return; } fanOn = !fanOn; return; }
     if (what === 'lava') { if (lv < 1) { say('An upturned crate.'); return; } if (lv < 3) { say('A candle in a jam jar. It gutters when you breathe.'); return; } lavaOn = !lavaOn; return; }
@@ -502,6 +505,7 @@ G.ui.cabin = (function () {
     G.sim.clock.step(G.state.save, null, dt, G.rng, G.data);
     envStep(dt);
     if (recordT >= 0 && t - recordT > 9) recordT = -1;                               // the side ends
+    if (tvMode === 2 && G.state.save.pond) G.state.save.pond.watch = (G.state.save.pond.watch || 0) + dt; // Phase 85: Fishwatch
     if (open) {
       if (inp.pressed('map')) { open = ''; return; }
       if (inp.pressed('back')) { open = ''; return; }
@@ -544,6 +548,11 @@ G.ui.cabin = (function () {
     for (i = 0; i < mounted.length; i++) {
       var m = mounted[i], im = turned[i] ? m.flipImg : m.img, cx = ox + plaqueX(i) + (PLQ_W >> 1), cy = oy + plaqueY(i) + 7;
       ctx.drawImage(im, cx - (im.width >> 1), cy - (im.height >> 1));
+      if (m.trophy) {                                                              // Phase 85: the trophy's brass tag under its plaque
+        var tgx = ox + plaqueX(i) + PLQ_W - 9, tgy = oy + plaqueY(i) + PLQ_H + 1;
+        ctx.fillStyle = P.outline; ctx.fillRect(tgx + 3, tgy - 1, 1, 2); ctx.fillRect(tgx - 1, tgy + 1, 9, 5);
+        ctx.fillStyle = P.brass_hi; ctx.fillRect(tgx, tgy + 2, 7, 3); ctx.fillStyle = P.rust; ctx.fillRect(tgx + 1, tgy + 3, 5, 1);
+      }
     }
     // The record turning, the CRT's screen.
     if (level >= 3) K.record(ctx, ox + tx(3) + 4, oy + ty(1) - 3, t, recordT >= 0);
@@ -562,7 +571,8 @@ G.ui.cabin = (function () {
         if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y);
         if (props[id].screen) {
           var s = props[id].screen;
-          if (tvOn) K.console90sScreen(ctx, ox + s[0], oy + s[1], s[2], s[3], t - tvT);    // Phase 64: the console's boot, then its game
+          if (tvMode === 2) pondCam(ctx, ox + s[0], oy + s[1], s[2], s[3]);               // Phase 85: Pond Cam
+          else if (tvOn) K.console90sScreen(ctx, ox + s[0], oy + s[1], s[2], s[3], t - tvT);    // Phase 64: the console's boot, then its game
           else { ctx.fillStyle = P.crt_dark; ctx.fillRect(ox + s[0], oy + s[1], s[2], s[3]); }
           K.glare(ctx, ox + s[0], oy + s[1], s[2], s[3]);
         }
@@ -601,6 +611,35 @@ G.ui.cabin = (function () {
     kx += U.hint(ctx, 'SPACE', !faced ? 'use' : ((level < 3 && (faced === 'tv' || faced === 'keys' || faced === 'records' || faced === 'lava')) || (level < 2 && (faced === 'chair' || faced === 'fan')) ? 'look' : HINT[faced] || 'use'), kx, ky);
     U.hint(ctx, 'ESC', 'leave', kx, ky);
   }
+  // Phase 85: Pond Cam: the pond seen from under the dock (a teal gradient, weed swaying up from
+  // the bottom, a few motes), its stocked fish crossing slowly at their own depths, each drawn
+  // from its swimmer at the screen's scale; a red dot blinks in the corner. Read-only: positions
+  // come from hashes and the scene's time.
+  function pondCam(ctx, x, y, w, h) {
+    var p = G.state.save.pond, st = p ? p.stock : [], i, H2 = G.gfx.sprites.hash;
+    ctx.fillStyle = P.water_deep; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = P.water_dark; ctx.fillRect(x, y, w, Math.round(h * 0.55));
+    ctx.fillStyle = P.water_mid; ctx.fillRect(x, y, w, 2);
+    for (i = 0; i < 7; i++) {                                                          // the weed
+      var wx = x + 2 + ((i * 37) % (w - 4)), wh = 4 + (H2(i, 5) % Math.max(1, h - 8)), sway = Math.round(Math.sin(t * 0.8 + i) * 1.2);
+      ctx.fillStyle = P[i & 1 ? 'moss_dark' : 'moss']; ctx.fillRect(wx, y + h - wh, 1, wh); ctx.fillRect(wx + sway, y + h - wh - 2, 1, 2);
+    }
+    for (i = 0; i < st.length; i++) {
+      var sp = -1;
+      for (var q = 0; q < G.data.fish.length; q++) if (G.data.fish[q].id === st[i].id) { sp = q; break; }
+      if (sp < 0) continue;
+      var dir = (H2(i, 7) & 1) ? 1 : -1, sp_ = 2 + (H2(i, 8) % 4), span = w + 16, u = ((t * sp_ + H2(i, 9) % span) % span), fx = dir > 0 ? x - 8 + u : x + w + 8 - u;
+      var fy = y + 3 + (H2(i, 10) % Math.max(1, h - 9)) + Math.round(Math.sin(t * 0.6 + i) * 1);
+      var cv = G.gfx.fishgen.swimmer(sp, Math.floor(t * 3 + i) & 1, false, dir < 0), fh = Math.max(2, Math.min(5, Math.round(st[i].len / 12))), fw = Math.round(cv.width * fh / cv.height);
+      ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(cv, Math.round(fx - fw / 2), fy, fw, fh); ctx.restore();
+    }
+    ctx.globalAlpha = 0.25; ctx.fillStyle = P.fog_light;
+    for (i = 0; i < 5; i++) ctx.fillRect(x + ((H2(i, 11) % w + t * 1.5) % w), y + ((H2(i, 12) % h + t * 0.7) % h), 1, 1);
+    ctx.globalAlpha = 1;
+    if (Math.floor(t * 1.5) & 1) { ctx.fillStyle = P.neon_red; ctx.fillRect(x + 2, y + 2, 2, 2); }
+  }
+
   // Phase 64: the varnished boards give back what is lit (the bench's lantern, the floor lamp,
   // the lava lamp, the TV on the rug), and the window's glass gives back the lamps at night.
   function reflections(ctx, ox, oy) {
@@ -643,7 +682,7 @@ G.ui.cabin = (function () {
       return WORD[faced] || 'USE';
     },
     // dbg: what is on the wall now; where he is and what he faces.
-    state: function () { return { from: from, level: level, mounted: mounted.length, turned: turned.filter(Boolean).length, facing: turned.slice(), stored: stored, at: walk ? [walk.c, walk.r, walk.face] : null, faced: faced, open: open, tv: tvOn, record: recordT >= 0, blocked: WK.blocked().length }; },
+    state: function () { return { tvMode: ['off', 'game', 'pond cam'][tvMode], from: from, level: level, mounted: mounted.length, turned: turned.filter(Boolean).length, facing: turned.slice(), stored: stored, at: walk ? [walk.c, walk.r, walk.face] : null, faced: faced, open: open, tv: tvOn, record: recordT >= 0, blocked: WK.blocked().length }; },
     // Phase 64 (dbg.roomLife): the live things and their state.
     life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'cabin', level: level, live: n, tv: tvOn ? (t - tvT < 5 ? 'booting' : 'game') : 'off', fan: level >= 2 ? (fanOn ? 'on' : 'off') : 'none', lava: level >= 3 ? (lavaOn ? 'on' : 'off') : 'none' }; },
     walkPath: function (path) { if (!walk) return 'not in the cabin'; var nb = WK.walkPath(walk, path || ''); faced = WK.facing(walk); return { c: walk.c, r: walk.r, face: walk.face, faced: faced, blocked: nb, exit: walk.exit }; }

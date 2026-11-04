@@ -126,7 +126,7 @@ G.core.save = (function () {
     // v11 -> v12 (Phase 84, PLAN_WINTER.md 2.6): the Back Pond, as it was: every piece of trash on
     // the bed, the stream jammed, the water murky, nothing stocked.
     11: function (s) {
-      s.pond = { got: 0, stream: false, clear: 0, stock: [] };
+      s.pond = { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 };
       return s;
     }
   };
@@ -162,7 +162,7 @@ G.core.save = (function () {
       tapes: [],
       settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone)
       look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)
-      pond: { got: 0, stream: false, clear: 0, stock: [] }, // Phase 84: the Back Pond (js/sim/pond.js)
+      pond: { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 }, // Phase 84 (caught, watch: Phase 85): the Back Pond (js/sim/pond.js)
       rng: null              // G.rng state, restored on load unless ?seed is given
     };
   }

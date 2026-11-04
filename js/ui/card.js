@@ -25,7 +25,9 @@ G.ui.card = (function () {
       spIdx: spIdx, id: sp.id, name: sp.name, len: h.len, w: h.w, q: h.q,
       price: G.sim.economy.price(sp, h.q, G.data), isNew: !j || !j.caught, isRecord: !!j && j.caught > 0 && h.w > j.bestW,
       windowCatch: win,
-      bait: G.state.run && G.state.run.cast ? G.state.run.cast.bait : '' // Phase 43: what it was caught on (the journal's "Caught on")
+      bait: G.state.run && G.state.run.cast ? G.state.run.cast.bait : '', // Phase 43: what it was caught on (the journal's "Caught on")
+      pondK: h.pondK >= 0 ? h.pondK : -1, // Phase 85: one of the Back Pond's own fish (no SELL: stocking is free)
+      trophy: h.w >= G.sim.pond.trophyKg(sp)
     };
   }
 
@@ -46,6 +48,7 @@ G.ui.card = (function () {
     SELL[0] = RECT[0] + U.PAD; SELL[1] = RECT[1] + KEY_Y; SELL[2] = U.keyW(txt.sell);
     KEEP[0] = SELL[0] + SELL[2] + 6; KEEP[1] = SELL[1]; KEEP[2] = U.keyW('KEEP');
     FREE[0] = KEEP[0] + KEEP[2] + 6; FREE[1] = SELL[1]; FREE[2] = U.keyW('RELEASE');
+    if (info.pondK >= 0) { SELL[2] = 0; KEEP[0] = SELL[0]; FREE[0] = KEEP[0] + KEEP[2] + 6; sel = 2; txt.price = 'Yours, from the pond'; } // Phase 85: KEEP or RELEASE only
   }
 
   function isOpen() { return cur !== null; }
@@ -62,7 +65,7 @@ G.ui.card = (function () {
     t += dt;
     if (t < 0.4) return null;
     var inp = G.core.input;
-    if (inp.pressed('left')) sel = Math.max(0, sel - 1);
+    if (inp.pressed('left')) sel = Math.max(cur.pondK >= 0 ? 1 : 0, sel - 1);
     if (inp.pressed('right')) sel = Math.min(2, sel + 1);
     if (cur.trash !== undefined) return inp.pressed('action') ? 'bin' : null;       // Phase 84: only the bin
     if (inp.pressed('action')) return CHOICES[sel];
@@ -71,8 +74,10 @@ G.ui.card = (function () {
 
   // Writes the catch into the save, closes the card and autosaves (§0.12).
   function commit(choice, save) {
+    if (cur.pondK >= 0 && choice === 'sell') choice = 'release';                     // Phase 85: never sold
     if (cur.trash !== undefined) { G.sim.pond.bin(save.pond, cur.trash, G.data); cur = null; G.core.save.autosave('catch'); return; } // Phase 84: binned
     G.sim.economy.recordCatch(save, cur, choice);
+    if (cur.pondK >= 0) G.sim.pond.caughtBack(save.pond, cur.pondK, choice === 'keep', G.data); // Phase 85: back in the pond (shy a while), or out of it
     cur = null;
     G.core.save.autosave('catch');
   }
@@ -86,16 +91,16 @@ G.ui.card = (function () {
     G.core.view.begin(ctx, true);
     if (cur.trash !== undefined) { drawTrash(ctx); G.core.view.begin(ctx, false); return; } // Phase 84
     var e = shownBy(), img = G.gfx.fishgen.portrait(cur.spIdx, PW, PH, false), x = RECT[0], y = RECT[1] - Math.round((1 - e) * (H + 12));
-    U.frame(ctx, x, y, W, H, cur.name, cur.isNew ? 'NEW!' : (cur.isRecord ? 'RECORD' : ''), cur.isNew ? 'neon_red' : 'teal_lit');
+    U.frame(ctx, x, y, W, H, cur.name, cur.isNew ? 'NEW!' : (cur.isRecord ? 'RECORD' : (cur.trophy ? 'TROPHY' : '')), cur.isNew ? 'neon_red' : (cur.isRecord ? 'teal_lit' : 'brass_hi')); // Phase 85: a trophy
     var ty = U.top(y);
     ctx.drawImage(img, x + U.PAD + ((PW - img.width) >> 1), ty + ((PH - img.height) >> 1));
     var rx = x + U.PAD + PW + 8;
     F.bold(ctx, txt.size, rx, ty + 1, 'bone');
     F.drawText(ctx, txt.cls, rx, ty + 1 + U.ROW + 1, 'fog_light');
-    ctx.drawImage(G.ui.hud.coin(), rx, ty + 2 + 2 * (U.ROW + 1));
-    F.bold(ctx, txt.price, rx + 11, ty + 1 + 2 * (U.ROW + 1), 'signal_amber');
+    if (cur.pondK >= 0) F.drawText(ctx, txt.price, rx, ty + 1 + 2 * (U.ROW + 1), 'teal_lit');   // Phase 85: no price at the pond
+    else { ctx.drawImage(G.ui.hud.coin(), rx, ty + 2 + 2 * (U.ROW + 1)); F.bold(ctx, txt.price, rx + 11, ty + 1 + 2 * (U.ROW + 1), 'signal_amber'); }
     var ky = y + KEY_Y;
-    U.key(ctx, txt.sell, SELL[0], ky, sel === 0);
+    if (!(cur.pondK >= 0)) U.key(ctx, txt.sell, SELL[0], ky, sel === 0);
     U.key(ctx, 'KEEP', KEEP[0], ky, sel === 1);
     U.key(ctx, 'RELEASE', FREE[0], ky, sel === 2);
     F.drawText(ctx, HINT, x + W - U.PAD - F.measure(HINT), ky + 2, 'fog_mid');
@@ -121,7 +126,7 @@ G.ui.card = (function () {
   function tap(gx, gy) {
     if (!cur) return false;
     if (cur.trash !== undefined) return U.inside(SELL, gx, gy);                     // Phase 84: BIN
-    if (U.inside(SELL, gx, gy)) { sel = 0; return true; }
+    if (SELL[2] && U.inside(SELL, gx, gy)) { sel = 0; return true; }
     if (U.inside(KEEP, gx, gy)) { sel = 1; return true; }
     if (U.inside(FREE, gx, gy)) { sel = 2; return true; }
     return false;

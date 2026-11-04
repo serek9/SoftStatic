@@ -67,8 +67,11 @@ G.sim.fish_ai = (function () {
   // Phase 68: every species that lives here starts at 1; what is on the hook (2 its favourite,
   // 1 taken, 0 ignored), the depth and the hour weigh it from there. Phase 75: "here" is its
   // home in this water and reach (G.data.homeOf), whose depth and hours it weighs by.
+  // Phase 85: at the Back Pond (ctx.pondN: {species id: stocked fish free to bite}) only its own
+  // stocked fish come, each species as often as there are of it, at any depth and hour.
+  var POND_HOME = { habitat: { depthMin: 0, depthMax: 1e9 }, timeLikes: [], bed: false };
   function weightOf(f, ctx) {
-    var hm = G.data.homeOf(f, ctx.loc, ctx.reach);
+    var hm = ctx.pondN ? (ctx.pondN[f.id] > 0 ? POND_HOME : null) : G.data.homeOf(f, ctx.loc, ctx.reach);
     if (!hm) return 0;
     var v = TAKE_W[interest(f, ctx.bait, ctx.lure)];
     if (!v) return 0;
@@ -78,7 +81,8 @@ G.sim.fish_ai = (function () {
       if (out > 0) v *= Math.max(W.depthFloor, 1 - out / W.depthFalloff);
     }
     if (hm.timeLikes.length) v *= hm.timeLikes.indexOf(Math.floor(ctx.hour)) >= 0 ? W.hourLiked : W.hourOther;
-    if (f.turnUp) v *= f.turnUp;                                                       // Phase 80: the (Ice) species' rarity
+    if (f.turnUp) v *= f.turnUp;
+    if (ctx.pondN) v *= ctx.pondN[f.id];                                               // Phase 85: how many of it are in the pond                                                       // Phase 80: the (Ice) species' rarity
     full = v;
     if (COVER[0] < 1) v *= Math.pow(COVER[0], W.coverK);                                // Phase 69: only the fish of its sizes come
     return v;
@@ -121,6 +125,7 @@ G.sim.fish_ai = (function () {
         attract: 1, // gear and cast spot: attract shortens the wait between arrivals
         cover: 1,   // Phase 69: the share of the fish here the hook is sized for (speciesWeights)
         maxDepthPx: 0, floorAt: null, // floorAt(x) -> bottom depth in px; null uses maxDepthPx
+        pondN: null, // Phase 85: the Back Pond's stocked fish free to bite, by species id (null elsewhere)
         ceilPx: 0,  // Phase 81: the ice's thickness (px): fish keep under it
         flowAt: null // Phase 28: flowAt(x, depth px) -> px/s of current; null is still water
       }
