@@ -704,6 +704,8 @@ G.audio.engine = (function () {
     while (clickAcc >= 1) { clickAcc -= 1; playBuf(pick(KIT.click[tier]), TR.gain * (0.5 + 0.5 * load), boatPan, 0.95 + 0.1 * G.vrng.next()); }
     if (turns === 0) clickAcc = 0;
     var dragRate = dD > 0 ? Math.min(90, 500 * dD) : 0;
+    // Phase 89.2: a run across (the hooked fish's side runs) takes line too: the clicks follow its speed
+    if (fsm === 'fighting' && F.mode === 'pull' && run.hook && run.hook.vx) dragRate = Math.min(90, dragRate + Math.min(40, Math.abs(run.hook.vx) * 0.9));
     dragAcc += dt * dragRate;
     while (dragAcc >= 1) { dragAcc -= 1; playBuf(pick(KIT.click[tier]), TR.gain * 0.8, boatPan, 1.3 + Math.min(1, dD * 8)); }
     if (dragRate === 0) dragAcc = 0;

@@ -471,6 +471,7 @@ G.core.debug = (function () {
     // dbg.device() (Phase 57): touch mode, the viewport, the fit and how much of the screen it
     // fills, the safe insets, portrait, full screen (asked once, its result) and the audio's state.
     device: function () { return G.core.device.report(); },
+    fightRun: function (on) { return G.scene.underwater.fightRun(on); }, // Phase 89
     tips: function (reset) { return reset ? G.ui.tips.reset() : G.ui.tips.info(); }, // Phase 88
     controls: function () { return G.ui.controls.check(); }, // Phase 88.5: every action has a row
     // Phase 90 (PLAN_PLAYABILITY.md 90.1-90.2): the UI layer's sizes in CSS px against the
