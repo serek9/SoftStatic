@@ -472,6 +472,9 @@ G.core.debug = (function () {
     // fills, the safe insets, portrait, full screen (asked once, its result) and the audio's state.
     device: function () { return G.core.device.report(); },
     fightRun: function (on) { return G.scene.underwater.fightRun(on); }, // Phase 89
+    // Phase 94: the milestones (each done or its progress, this sitting's counts, the queue); the badge now.
+    milestones: function () { return G.ui.milestones.info(); },
+    badge: function () { return G.ui.badge.info(); },
     rest: function (part) { return part === undefined ? G.ui.cabin.restInfo() : G.ui.cabin.restUntil(part); }, // Phase 93.1: rest until 'dawn' | 'day' | 'dusk' | 'night'
     tips: function (reset) { return reset ? G.ui.tips.reset() : G.ui.tips.info(); }, // Phase 88
     controls: function () { return G.ui.controls.check(); }, // Phase 88.5: every action has a row
@@ -524,6 +527,7 @@ G.core.debug = (function () {
       pages.push('tackle', 'setup', 'life under', 'bed', 'life above', 'shore'); // Phase 50.1
       pages.push('touch', 'notice'); // Phase 60.2: the phone's controls; the portrait notice and the icon
       pages.push('ui'); // Phase 90.5: the shared button's states, the three text sizes, the icons, the rows
+      pages.push('badge'); // Phase 94.3: the size badge in every size, a record, the trophy rim; the medallions; the milestones' marks
       page = 0; t = 0;
     }
 
@@ -938,6 +942,22 @@ G.core.debug = (function () {
         ctx.fillStyle = P.night_deep; ctx.fillRect(326, 222, 140, 11); F.drawText(ctx, 'Hovered row', 332, 224, 'fog_light');
         Un.row(ctx, 480, 210, 140, 21); F.drawText(ctx, 'A thumb\'s row', 486, 210, 'signal_amber');
         F.drawText(ctx, 'UI layer ' + (Un.on() ? 'on' : 'off') + ', capitals ' + Un.textPx() + ' CSS px', 8, 344, 'fog_light');
+      } else if (name === 'badge') {
+        // Phase 94.3: a badge in each size class (the first five species with that class), a
+        // record and a trophy; the medallions at the badge's, the journal's and the card's sizes;
+        // the milestones' marks.
+        var Bd = G.ui.badge, CL = G.data.SIZE_CLASSES, bi, sp0 = 0;
+        for (bi = 0; bi < CL.length; bi++) {
+          var spI = 0; for (var fi = 0; fi < G.data.fish.length; fi++) { var wk = G.data.fish[fi].weightKg; if (G.data.sizeClass(wk[1]) >= bi && G.data.sizeClass(wk[0]) <= bi) { spI = fi; break; } }
+          Bd.preview(ctx, 8 + (bi % 3) * 210, 20 + Math.floor(bi / 3) * 84, 200, { sp: spI, cls: CL[bi].id, kind: 'NEW SIZE: ' + CL[bi].id, size: '31.2 cm   0.42 kg', was: bi ? 'was 24.0 cm' : 'the first', trophy: false });
+          if (bi === 0) sp0 = spI;
+        }
+        Bd.preview(ctx, 428, 104, 200, { sp: sp0, cls: 'L', kind: 'NEW RECORD', size: '38.5 cm   0.81 kg', was: 'was 31.2 cm', trophy: true });
+        for (bi = 0; bi < CL.length; bi++) { Bd.medal(ctx, CL[bi].id, 16 + bi * 52, 200, 44, false); Bd.medal(ctx, CL[bi].id, 16 + bi * 52, 250, 13, bi === 4); Bd.medal(ctx, CL[bi].id, 36 + bi * 52, 250, 15, false); }
+        Bd.medal(ctx, 'XL', 290, 200, 44, true); F.drawText(ctx, 'trophy rim', 290, 248, 'fog_mid');
+        var MK = Object.keys(G.ui.milestones.MARKS);
+        for (bi = 0; bi < MK.length; bi++) { G.ui.milestones.mark(ctx, MK[bi], 16 + bi * 48, 290); F.drawText(ctx, MK[bi], 16 + bi * 48, 304, 'fog_mid'); }
+        F.drawText(ctx, 'badge: every size, a record with the trophy rim; medallions at 44 px and 15 px (the journal tiles, the card corner); the milestones\' marks', 8, 344, 'fog_light');
       } else if (name === 'notice') {
         // Phase 60.2: the portrait notice as a phone held upright sees it, and the home-screen icon.
         ctx.fillStyle = P.dusk_violet; ctx.fillRect(0, 18, 640, 170);

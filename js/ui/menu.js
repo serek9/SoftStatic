@@ -36,7 +36,7 @@ G.ui.menu = (function () {
 
   // arg: passed to the overlay's open() (Phase 47: the pause list's row; the picker's caller).
   function open(name, arg) {
-    var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, look: G.ui.look, controls: G.ui.controls }[name] || null;
+    var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, look: G.ui.look, controls: G.ui.controls, milestones: G.ui.milestones }[name] || null; // milestones: Phase 94.1
     if (!o) return false;
     cur = o; curName = name;
     o.open(arg);
@@ -72,7 +72,7 @@ G.ui.menu = (function () {
   // to the chosen one, with marks for more above and below.
   // Phase 91.3: 'Vibration' in touch mode. The list is built from ALL, keeping the rows that apply.
   // Phase 92: Music, World and Effects under the master Volume; Reduce flashes, Reduce motion and Reel (hold or toggle).
-  var ALL = ['Resume', 'Volume', 'Music', 'World', 'Effects', 'Sound', 'Dog barks', 'Full screen', 'Vibration', 'Text size', 'Reduce flashes', 'Reduce motion', 'Reel', 'Tips', 'Controls', 'Fisher & dog', 'Export save', 'Import save'];
+  var ALL = ['Resume', 'Volume', 'Music', 'World', 'Effects', 'Sound', 'Dog barks', 'Full screen', 'Vibration', 'Text size', 'Reduce flashes', 'Reduce motion', 'Reel', 'Tips', 'Milestones', 'Controls', 'Fisher & dog', 'Export save', 'Import save'];
   var SLIDER = { Volume: 'volume', Music: 'music', World: 'world', Effects: 'effects' };
   var ITEMS = [];
   function buildItems() {
@@ -202,6 +202,7 @@ G.ui.menu = (function () {
         case 'Reduce motion': flip('reduceMotion'); break;
         case 'Reel': reelMode(); break;
         case 'Controls': pause.close(); open('controls'); return true; // Phase 88.5
+        case 'Milestones': pause.close(); open('milestones', 'pause'); return true; // Phase 94.1
         case 'Fisher & dog': pause.close(); open('look', 'pause'); return true; // Phase 47: the picker is the overlay now
         case 'Export save': exportSave(); break;
         case 'Import save': askImport(); break;
@@ -261,7 +262,7 @@ G.ui.menu = (function () {
         else if (ITEMS[i] === 'Reduce motion') F.drawText(ctx, st.reduceMotion ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Reel') F.drawText(ctx, st.reel === 'toggle' ? 'tap on/off' : 'hold', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Vibration') F.drawText(ctx, st.vibration === false ? 'off' : (G.core.device.canVibrate() ? 'on' : 'on (none here)'), X + VAL_X, y, key);
-        else if ((ITEMS[i] === 'Fisher & dog' || ITEMS[i] === 'Controls') && !(k === SHOW - 1 && TOP + SHOW < ITEMS.length)) F.drawText(ctx, '>', X + W - U.PAD - 6, y, key);
+        else if ((ITEMS[i] === 'Fisher & dog' || ITEMS[i] === 'Controls' || ITEMS[i] === 'Milestones') && !(k === SHOW - 1 && TOP + SHOW < ITEMS.length)) F.drawText(ctx, '>', X + W - U.PAD - 6, y, key);
       }
       for (i = 0; i < msgLines.length && i < 2; i++) F.drawText(ctx, msgLines[i], U.left(X), Y + MSG_Y + i * U.ROW, msgKey);
       x = U.left(X);

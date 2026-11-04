@@ -143,6 +143,7 @@ G.ui.hud = (function () {
       label(ctx, s, kx - F.measure(s), dy, 'fog_light');
     }
     if (G.ui.tips) G.ui.tips.draw(ctx, run, X, Y, pic);                              // Phase 88: a first-time tip, by the boat
+    if (G.ui.milestones) G.ui.milestones.drawLine(ctx, pic, Y);                      // Phase 94.4: a milestone reached
     V.begin(ctx0, false);
   }
 

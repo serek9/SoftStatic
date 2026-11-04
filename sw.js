@@ -35,6 +35,7 @@ var FILES = [
   'data/lurelooks.js',
   'data/gear.js',
   'data/pond.js',
+  'data/milestones.js',
   'data/dialogue.js',
   'data/anomalies.js',
   'data/looks.js',
@@ -45,6 +46,7 @@ var FILES = [
   'js/sim/fight.js',
   'js/sim/economy.js',
   'js/sim/pond.js',
+  'js/sim/milestones.js',
   'js/gfx/bake.js',
   'js/gfx/sprites.js',
   'js/gfx/paint.js',
@@ -85,6 +87,8 @@ var FILES = [
   'js/ui/cabin.js',
   'js/ui/tips.js',
   'js/ui/controls.js',
+  'js/ui/badge.js',
+  'js/ui/milestones.js',
   'js/audio/engine.js'
 ];
 

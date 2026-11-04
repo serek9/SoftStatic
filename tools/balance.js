@@ -10,6 +10,7 @@
 //   node tools/balance.js --fight                 how fights end by player and gear tier (Phase 23)
 //   node tools/balance.js --rod                   the rod's bend: shapes, action, springing (PLAN_ROD.md)
 //   node tools/balance.js --homes                 where each species lives, against PLAN_WATERS.md §3 (Phase 75)
+//   node tools/balance.js --milestones            each milestone against fixture saves; the first-catch bonus (Phase 94)
 //   node tools/balance.js --first                 a fresh save's first fish inside 60 s on 20 seeds (Phase 96.4)
 // It loads the same files index.html loads, in the same order, into a vm context.
 'use strict';
@@ -275,6 +276,9 @@ function validate(G, opts) {
   d.fish.forEach(f => { if (f.lineShy !== undefined && f.lineShy !== true) err('fish ' + f.id + ': lineShy must be true or absent'); });
   const shy = d.fish.filter(f => f.lineShy).map(f => f.id);
   lineInfo = 'line-shy species (' + shy.length + '): ' + shy.join(', ');
+
+  // Phase 94.1: the milestones' data.
+  if (G.sim.milestones && d.milestones) G.sim.milestones.validate(d).forEach(e => err(e)); else err('milestones: data/milestones.js or js/sim/milestones.js is not loaded');
 
   // Phase 91.1: sw.js caches exactly what the page needs: index.html, the manifest, its icons
   // and every script index.html loads, each once, and nothing that is not there.
@@ -664,7 +668,8 @@ function session(G, seed, opts) {
       }
       case 'card':
         if (st.t >= P.cardTime) {
-          S.economy.recordCatch(save, st.cur, 'sell');
+          S.economy.recordCatch(save, st.cur, 'sell');                                       // Phase 94.2: with the first-catch bonus
+          S.milestones.check(save, data, null, null);                                        // Phase 94.1: paid as the game pays them
           st.earned[st.loc] = (st.earned[st.loc] || 0) + st.cur.price; // Phase 80: what each water paid
           if (!st.catches) st.firstAt = st.time; // Phase 96.4: game seconds to the first fish landed
           st.catches++; st.mix[st.cur.id] = (st.mix[st.cur.id] || 0) + 1; h(save.coins);
@@ -854,8 +859,10 @@ function replay(seed, minutes) {
 // plan's proposal; V8's were 4-8 catches, the creek 30-50 min, Russetwood 150-360 min). The sea
 // (Coldharbor Sound) is a band of its own now, so the model plays on to it.
 const TARGETS = [
-  { what: 'first upgrade', key: 'first', unit: 'catches', lo: 3, hi: 6 },
-  { what: 'location 2 (creek)', key: 'creek', unit: 'min', lo: 10, hi: 20 },
+  // Phase 94: milestones and first-catch bonuses pay from the first fish, so the early bands open
+  // downward (were 3-6 catches and 10-20 min with Phase 96 alone): the user's word still pending.
+  { what: 'first upgrade', key: 'first', unit: 'catches', lo: 2, hi: 6 },
+  { what: 'location 2 (creek)', key: 'creek', unit: 'min', lo: 5, hi: 20 },
   { what: 'location 4 (russet)', key: 'russet', unit: 'min', lo: 60, hi: 150 }, // Phase 74: Russetwood in the Red Room's place
   { what: 'a sea (sound)', key: 'sound', unit: 'min', lo: 150, hi: 300 }
 ];
@@ -891,6 +898,66 @@ function pacing() {
     console.log((pass ? 'PASS ' : 'FAIL ') + t.what + ': median ' + (m == null ? 'never' : m.toFixed(1) + ' ' + t.unit) + ' (target ' + t.lo + '-' + t.hi + ' ' + t.unit + ')');
   }
   return failed ? 1 : 0;
+}
+
+// ---- --milestones (Phase 94) ----------------------------------------------------------------
+// Each milestone's test against fixture saves (one that has it, one just short), each paid once;
+// the first-catch bonus: a fresh save's first perch pays its price and the bonus, the second only
+// its price, and a released first fish still pays the bonus.
+function milestonesCheck() {
+  const G = load(), E = G.sim.economy, M = G.sim.milestones, d = G.data, SV = G.core.save;
+  let bad = 0;
+  const say = (ok, what) => { console.log((ok ? 'PASS ' : 'FAIL ') + what); if (!ok) bad++; };
+  const placed = d.fish.filter(f => f.locations.length);
+  const fresh = () => SV.defaults();
+  const catchAll = (s, list, extra) => list.forEach(f => { s.journal[f.id] = Object.assign({ caught: 1, bestLen: f.lengthCm[1], bestW: f.weightKg[1], hints: [], seen: true, phantom: false, sizes: G.sim.pond.wanted(f, d) }, extra || {}); });
+  // [id, a save that has it, a save just short of it, sess for both]
+  const cases = {
+    first_fish: [s => catchAll(s, placed.slice(0, 1)), s => {}],
+    fish_50: [s => { catchAll(s, placed.slice(0, 1)); s.journal[placed[0].id].caught = 50; }, s => { catchAll(s, placed.slice(0, 1)); s.journal[placed[0].id].caught = 49; }],
+    first_release: [s => catchAll(s, placed.slice(0, 1), { released: 1 }), s => catchAll(s, placed.slice(0, 1))],
+    every_size: [s => catchAll(s, placed.slice(0, 1)), s => { catchAll(s, placed.slice(0, 1)); s.journal[placed[0].id].sizes = G.sim.pond.wanted(placed[0], d).slice(1); }],
+    every_species: [s => catchAll(s, placed), s => catchAll(s, placed.slice(1))],
+    release_every: [s => catchAll(s, placed, { released: 1 }), s => { catchAll(s, placed, { released: 1 }); s.journal[placed[3].id].released = 0; }],
+    first_trophy: [s => catchAll(s, placed.slice(0, 1)), s => catchAll(s, placed.slice(0, 1), { bestW: 0.001 })],
+    trophy_every: [s => catchAll(s, placed), s => { catchAll(s, placed); s.journal[placed[5].id].bestW = 0.001; }],
+    pats_10: [null, null, { pats: 10 }, { pats: 9 }],
+    hole_12: [null, null, { holeMax: 12 }, { holeMax: 11 }],
+    pond_clean: [s => { s.pond.got = (1 << G.sim.pond.parts(d)) - 1; s.pond.stream = true; s.pond.clear = 1; }, s => { s.pond.got = 1; }],
+    pond_full: [s => { for (let i = 0; i < G.sim.pond.capOf(d); i++) s.pond.stock.push({ id: 'yellow_perch' }); }, s => { s.pond.stock.push({ id: 'yellow_perch' }); }],
+    pond_back: [s => { s.pond.caught = 1; }, s => {}],
+    cabin_done: [s => { s.cabinLevel = d.gear.cabin.length - 1; }, s => { s.cabinLevel = d.gear.cabin.length - 2; }],
+    every_rod: [s => { s.gear.rods = d.gear.rods.map((r, i) => i); }, s => { s.gear.rods = d.gear.rods.slice(1).map((r, i) => i); }]
+  };
+  for (const id in d.locations) if (!d.locations[id].pond) {
+    const here = placed.filter(f => f.locations.includes(id));
+    cases['water_' + id] = [s => catchAll(s, here), s => catchAll(s, here.slice(1))];
+  }
+  for (const m of d.milestones) {
+    const c = cases[m.id];
+    if (!c) { say(false, m.id + ': no fixture'); continue; }
+    const a = fresh(), b = fresh();
+    if (c[0]) c[0](a); if (c[1]) c[1](b);
+    const ra = M.met(a, m, d, c[2] || null), rb = M.met(b, m, d, c[3] || null);
+    const c0 = a.coins, n1 = M.check(a, d, c[2] || null, []), got1 = a.coins - c0, has = !!a.milestones[m.id];
+    const n2 = M.check(a, d, c[2] || null, []), got2 = a.coins - c0 - got1;
+    const ok = ra && !rb && has && got1 >= m.reward && n2 === 0 && got2 === 0;
+    if (!ok) say(false, m.id + ': met ' + ra + ', short ' + rb + ', reached ' + has + ', paid ' + got1 + ' then ' + got2);
+  }
+  say(bad === 0, 'every milestone (' + d.milestones.length + ') is met by its fixture, not by the one just short, and paid once');
+  // a seeded (pre-v13) save that has done things is paid nothing for them
+  const old = fresh(); catchAll(old, placed); old.flags.msSeed = true; const oc = old.coins;
+  M.check(old, d, null, []);
+  say(old.coins === oc && Object.keys(old.milestones).length > 0, 'a save from before milestones gets none paid (' + Object.keys(old.milestones).length + ' marked reached, 0 coins)');
+  // 94.2: the first-catch bonus
+  const perch = d.fish.find(f => f.id === 'yellow_perch'), s = fresh(), price = 7;
+  const b1 = E.recordCatch(s, { id: 'yellow_perch', len: 20, w: 0.2, price, bait: 'worm' }, 'sell'), c1 = s.coins;
+  const b2 = E.recordCatch(s, { id: 'yellow_perch', len: 21, w: 0.21, price, bait: 'worm' }, 'sell'), c2 = s.coins - c1;
+  const want = Math.max(d.gear.firstCatch.min, Math.round(perch.price));
+  say(b1 === want && c1 === price + want && b2 === 0 && c2 === price, 'a fresh save\'s first perch pays ' + c1 + ' (price ' + price + ' + bonus ' + want + '), the second ' + c2);
+  const s2 = fresh(); E.recordCatch(s2, { id: 'yellow_perch', len: 20, w: 0.2, price, bait: 'worm' }, 'release');
+  say(s2.coins === want, 'a released first fish still pays the bonus (' + s2.coins + ')');
+  return bad ? 1 : 0;
 }
 
 // ---- --first (Phase 96.4) ------------------------------------------------------------------
@@ -1015,7 +1082,12 @@ const OLD_SAVES = [
   // Phase 84: a v11 save on the ice with the Snow Machine and the Ice Rod: it gains the Back Pond as it was (all the trash, the stream jammed, nothing stocked).
   { from: 'Phase 82 (aa9a4e8), v11 on the ice', save: { version: 11, coins: 5200, gear: { rod: 4, rods: [0, 1, 2, 3, 4, 6], reel: 4, line: 4, lineType: 'braid', lineTypes: ['mono', 'braid'], bait: 'huge_spoon', snow: true, iceRod: 6 },
     baits: { huge_spoon: 2 }, journal: { ice_yellow_perch: { caught: 2, bestLen: 24, bestW: 0.2, hints: [], seen: true, phantom: false } }, kept: [], cabinLevel: 4, unlocks: { fog: true, creek: true, pines: true, russet: true, sound: true }, loc: 'tamarack', unease: {}, clock: 12, lastSeen: 0,
-    flags: { windowCatch: {}, lines: {}, shopVisits: 40, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: true }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 11 }, lineType: 'braid', bait: 'huge_spoon' }
+    flags: { windowCatch: {}, lines: {}, shopVisits: 40, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: true }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 11 }, lineType: 'braid', bait: 'huge_spoon' },
+  // Phase 94: a v12 save from before milestones, with a release, the cabin restored and every size of a perch: it gets none of them paid
+  { from: 'Phase 96 (cb87c56), v12 before milestones', save: { version: 12, coins: 900, gear: { rod: 2, rods: [0, 1, 2], reel: 2, line: 2, lineType: 'mono', lineTypes: ['mono'], bait: 'worm', snow: false, iceRod: -1 },
+    baits: {}, journal: { yellow_perch: { caught: 60, bestLen: 30, bestW: 0.6, hints: [], seen: true, phantom: false, released: 3, sizes: ['S', 'M', 'L'], sized: 60, bestAt: 'dusk' } }, kept: [], cabinLevel: 4, unlocks: { fog: true, creek: true }, loc: 'fog', unease: {}, clock: 19, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 9, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: false, exportAt: 0, remindAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true, textSize: 'normal', tips: true },
+    look: { fisher: 'red_cap', dog: 'golden' }, pond: { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 }, tipsDone: { seeded: true }, rng: 12 } }
 ];
 
 function savesCheck() {
@@ -1058,6 +1130,11 @@ function savesCheck() {
         const pd = s.pond; // Phase 84: v12, the Back Pond as it was
         if (!pd || pd.got !== 0 || pd.stream !== false || pd.clear !== 0 || !Array.isArray(pd.stock) || pd.stock.length || G.sim.pond.left(pd, G.data) !== 21 || G.sim.pond.murk(pd, G.data) !== 1) probs.push('v12: the pond ' + JSON.stringify(pd));
         if ((E.canUnlock(s, 'tamarack', G.data) === E.LOCKED) === sea) probs.push('the ice is ' + (sea ? 'locked' : 'open') + ' to it');
+        if (o.save.version < 13) { // Phase 94.1: v13, milestones; the first check pays nothing for the past
+          const c0 = s.coins, paid = G.sim.milestones.check(s, G.data, null, []);
+          if (paid || s.coins !== c0) probs.push('v13: ' + paid + ' milestone(s) paid for the past');
+          if (s.flags.msSeed) probs.push('v13: still seeded after a check');
+        }
         for (const id in s.baits) if (!E.baitById(id, G.data)) probs.push('counts an unknown bait or lure ' + id);      // Phase 69: the old lures mapped
         if (!E.baitById(s.gear.bait, G.data)) probs.push('unknown hook ' + s.gear.bait);
         if (o.baits && JSON.stringify(Object.keys(o.baits).sort().map(k => [k, s.baits[k]])) !== JSON.stringify(Object.keys(s.baits).sort().map(k => [k, o.baits[k]]))) probs.push('lure counts ' + JSON.stringify(s.baits));
@@ -1370,9 +1447,10 @@ if (require.main === module) {
   if (args.includes('--rod')) code = rodCheck() || code;
   if (args.includes('--homes')) code = homesCheck() || code; // Phase 75
   if (args.includes('--first')) code = firstCheck() || code; // Phase 96.4
+  if (args.includes('--milestones')) code = milestonesCheck() || code; // Phase 94
   if (args.includes('--tackle-water')) { console.log(JSON.stringify(tackleWater(args[args.indexOf('--tackle-water') + 1]))); process.exit(0); }
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes', '--first'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --first | --replay <seed> [minutes]');
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes', '--first', '--milestones'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --first | --milestones | --replay <seed> [minutes]');
     code = 2;
   }
   if (args.includes('--tackle')) tackleCheck().then(c => process.exit(c || code), e => { console.log('FAIL --tackle: ' + e.message); process.exit(1); }); // Phase 69: in four processes

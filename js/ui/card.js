@@ -15,7 +15,7 @@ G.ui.card = (function () {
   var lv = -1, KH = U.KEY_H; // Phase 90: the layout's UI version; the keys' height (taller for a thumb)
   var CHOICES = ['sell', 'keep', 'release'];
   var cur = null, sel = 0, t = 0, at = 0; // at: how long it has been showing (the slide-in, P1-4)
-  var txt = { size: '', sell: '', price: '', cls: '' }; // built once per card, not per frame
+  var txt = { size: '', sell: '', price: '', cls: '', bonus: '' }; // built once per card, not per frame
 
   // Builds the card for species spIdx from a hooked fish {len, w, q}, reading the journal for
   // NEW/RECORD. latched: the cast's clock windows; the first one marks this as a window catch.
@@ -28,7 +28,8 @@ G.ui.card = (function () {
       windowCatch: win,
       bait: G.state.run && G.state.run.cast ? G.state.run.cast.bait : '', // Phase 43: what it was caught on (the journal's "Caught on")
       pondK: h.pondK >= 0 ? h.pondK : -1, // Phase 85: one of the Back Pond's own fish (no SELL: stocking is free)
-      trophy: h.w >= G.sim.pond.trophyKg(sp)
+      trophy: h.w >= G.sim.pond.trophyKg(sp),
+      bonus: (!j || !j.caught) && !(h.pondK >= 0) ? G.sim.economy.firstBonus(sp, G.data) : 0 // Phase 94.2: paid with any choice
     };
   }
 
@@ -46,9 +47,11 @@ G.ui.card = (function () {
       txt.sell = 'SELL ' + info.price + 'c';
       txt.price = info.price + 'c';
       txt.cls = 'Size ' + G.data.SIZE_CLASSES[G.data.sizeClass(info.w)].id; // Phase 68: S M L XL XXL, as the lures are sold
+      txt.bonus = info.bonus > 0 ? 'First catch +' + info.bonus + 'c' : '';        // Phase 94.2
       if (info.pondK >= 0) { sel = 2; txt.price = 'Yours, from the pond'; } // Phase 85: KEEP or RELEASE only
     }
     lv = -1; lay();
+    if (info.trash === undefined) G.ui.badge.show(info, G.state.save.journal[info.id]); else G.ui.badge.hide(); // Phase 94.3: before the catch is written
   }
 
   // Phase 90: the card and its keys, laid out for the UI layer now (again whenever it changes).
@@ -73,7 +76,7 @@ G.ui.card = (function () {
 
   function isOpen() { return cur !== null; }
   // Called every step while the card shows.
-  function tick(dt) { at += dt; }
+  function tick(dt) { at += dt; G.ui.badge.step(dt); }
   // 0 when it opens, 1 once it has slid into place (0.25 s, easing out).
   function shownBy() { var u = Math.min(1, at / 0.25); return 1 - (1 - u) * (1 - u) * (1 - u); }
   function info() { return cur; }
@@ -96,10 +99,12 @@ G.ui.card = (function () {
   function commit(choice, save) {
     if (cur.pondK >= 0 && choice === 'sell') choice = 'release';                     // Phase 85: never sold
     if (cur.trash !== undefined) { G.sim.pond.bin(save.pond, cur.trash, G.data); cur = null; G.core.save.autosave('catch'); return; } // Phase 84: binned
-    G.sim.economy.recordCatch(save, cur, choice);
+    G.sim.economy.recordCatch(save, cur, choice);                                  // Phase 94.2: with the first-catch bonus
+    G.ui.badge.hide();
     if (cur.pondK >= 0) G.sim.pond.caughtBack(save.pond, cur.pondK, choice === 'keep', G.data); // Phase 85: back in the pond (shy a while), or out of it
     cur = null;
     G.core.save.autosave('catch');
+    G.ui.milestones.checkNow();                                                     // Phase 94.1: judged after each catch
   }
 
   // Phase 46: the compact card, a small panel (G.ui.panel) at the top centre over the world
@@ -121,6 +126,7 @@ G.ui.card = (function () {
     var rx = x + U.PAD + PW + 8;
     F.bold(ctx, txt.size, rx, ty + 1, 'bone');
     F.drawText(ctx, txt.cls, rx, ty + 1 + U.ROW + 1, 'fog_light');
+    if (txt.bonus) F.drawText(ctx, txt.bonus, rx + F.measure(txt.cls) + 8, ty + 1 + U.ROW + 1, 'moss_lit'); // Phase 94.2
     if (cur.pondK >= 0) F.drawText(ctx, txt.price, rx, ty + 1 + 2 * (U.ROW + 1), 'teal_lit');   // Phase 85: no price at the pond
     else { ctx.drawImage(G.ui.hud.coin(), rx, ty + 2 + 2 * (U.ROW + 1)); F.bold(ctx, txt.price, rx + 11, ty + 1 + 2 * (U.ROW + 1), 'signal_amber'); }
     var ky = y + KEY_Y;
@@ -128,6 +134,7 @@ G.ui.card = (function () {
     U.button(ctx, 'KEEP', KEEP[0], ky, KEEP[2], KH, keyState(1, KEEP));
     U.button(ctx, 'RELEASE', FREE[0], ky, FREE[2], KH, keyState(2, FREE));
     if (!U.touch() && !G.core.device.touch()) F.drawText(ctx, HINT, x + W - U.PAD - F.measure(HINT), ty + 1 + 2 * (U.ROW + 1), 'fog_mid'); // 90.4: no keys named on a phone; 90.5: over the keys, at the right
+    G.ui.badge.draw(ctx, x, y, W);                                                   // Phase 94.3: the size badge, over the card
     G.core.view.begin(ctx0, false);
   }
 

@@ -140,6 +140,9 @@ G.data.gear = {
 
   // Cabin restoration (V9), one stage after another; cabinLevel is the index reached.
   // plaques: how many kept fish can be mounted at that stage.
+  // Phase 94.2: the first fish of a species pays its base price on top of its sale, at least min
+  // coins, whether it is sold, kept or released (so letting it go never costs the bonus).
+  firstCatch: { min: 10 },
   cabin: [
     { name: 'Derelict', cost: 0, plaques: 2 },
     { name: 'Patched Roof', cost: 150, plaques: 4 },

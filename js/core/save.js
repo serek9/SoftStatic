@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 12;
+  var VERSION = 13;
   var PREFIX = 'SS1';
   // `?tour`: every water open on the chart for a look round, and nothing written to the save
   // while it is on (persist() below), so a tour never spends, unlocks or moves the real one.
@@ -128,6 +128,14 @@ G.core.save = (function () {
     11: function (s) {
       s.pond = { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 };
       return s;
+    },
+    // v12 -> v13 (Phase 94.1, PLAN_PLAYABILITY.md): milestones. None is paid for the past: the
+    // first check (js/sim/milestones.js) marks what the save has already done as reached, unpaid.
+    12: function (s) {
+      s.milestones = {};
+      s.flags = s.flags || {};
+      s.flags.msSeed = true;
+      return s;
     }
   };
   var RED_REFUND = 4800, LANTERN_REFUND = 250, FINDER_REFUND = 180;
@@ -165,6 +173,7 @@ G.core.save = (function () {
         music: 1, world: 1, effects: 1, reduceFlashes: false, reduceMotion: false, reel: 'hold' }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone); textSize: Phase 90; tips: Phase 88; vibration: Phase 91.3; music..reel: Phase 92
       look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)
       pond: { got: 0, stream: false, clear: 0, stock: [], caught: 0, watch: 0 }, // Phase 84 (caught, watch: Phase 85): the Back Pond (js/sim/pond.js)
+      milestones: {},        // Phase 94.1: milestone id -> true once reached (and paid)
       tipsDone: {},          // Phase 88: first-time tip id -> true once done ('landed': fish landed while the fight was said, up to 3)
       rng: null              // G.rng state, restored on load unless ?seed is given
     };

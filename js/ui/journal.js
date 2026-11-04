@@ -290,6 +290,7 @@ G.ui.journal = (function () {
     if (narrow && reading && (inp.pressed('back') || inp.pressed('left') || inp.pressed('right') || inp.pressed('up') || inp.pressed('down'))) { if (inp.pressed('back')) { reading = false; return true; } }
     if (narrow && reading && inp.pressed('action') && !stockRow.show) { reading = false; return true; }
     if (inp.pressed('journal') || inp.pressed('back')) { close(); return false; }
+    if (inp.pressed('map')) { G.ui.menu.open('milestones', 'journal'); return true; } // Phase 94.1: M, the milestones page (back returns here)
     if (narrow && !reading && focus === 2 && inp.pressed('action') && list.length) { reading = true; return true; } // Phase 90: one panel: turn to the page
     var lr = M.axis('left', 'right'), ud = M.axis('up', 'down');
     if (focus < 2) {
@@ -333,6 +334,10 @@ G.ui.journal = (function () {
     ctx.globalAlpha = 1;
     if (got && !j.read) { ctx.fillStyle = P.neon_red; ctx.fillRect(x + CW - 7, y + CH - 7, 4, 4); }
     if (j && j.lateNew) F.bold(ctx, '*', x + 3, y + 3, 'teal_lit'); // a page that gained a line
+    if (got && j.sizes && j.sizes.length) {                                          // Phase 94.3: the highest size caught, as a medallion
+      var hi = -1; for (var q = 0; q < j.sizes.length; q++) for (var c = 0; c < G.data.SIZE_CLASSES.length; c++) if (G.data.SIZE_CLASSES[c].id === j.sizes[q] && c > hi) hi = c;
+      if (hi >= 0) G.ui.badge.medal(ctx, G.data.SIZE_CLASSES[hi].id, x + 2, y + CH - 17, 15, j.bestW >= G.sim.pond.trophyKg(sp));
+    }
   }
 
   // A filter as a key cap with its arrows; the focused one is lit.
@@ -412,7 +417,8 @@ G.ui.journal = (function () {
     var hx = rx, hy = y + RP[3] - U.PAD - U.KEY_H;
     hx += U.hint(ctx, 'W/S A/D', 'browse', hx, hy);
     if (narrow) hx += U.hint(ctx, 'SPACE', 'read', hx, hy);
-    U.hint(ctx, 'J', 'close', hx, hy);
+    hx += U.hint(ctx, 'J', 'close', hx, hy);
+    if (!U.touch() && !G.core.device.touch()) U.hint(ctx, 'M', 'milestones', hx, hy); // Phase 94.1 (on a phone: the pause list's row)
   }
 
   // Phase 59.2: a touch on the journal. A filter key turns it (as D does with it focused); a
