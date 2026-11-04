@@ -67,7 +67,7 @@ G.ui.journal = (function () {
   var sel = 0, top = 0;   // selected entry in list; first visible grid row
   var entry = [];         // every line of the entry page, built on selection: {s, key, hand}
   var notes = [];         // the handwritten part of it, wrapped for the page: {s, key}
-  var page = { name: '', family: '', where: '', count: '', best: '', got: false, ghost: false };
+  var page = { name: '', family: '', where: '', count: '', best: '', got: false, ghost: false, bestAt: '', parts: [] }; // Phase 93.2: bestAt, parts
   var title = { loc: '', rar: '', count: '', shown: '' }, selIsNew = false, heavyNote = false;
 
   function jitter() {
@@ -146,6 +146,17 @@ G.ui.journal = (function () {
     });
   }
 
+  // Phase 93.2: its best parts of the day: the hours of its home at the water the boat is on,
+  // or else its first home's (none for a fish that bites at any hour).
+  function bestParts(sp, out) {
+    var r = G.state.run, here = r && r.loc, h = null, i;
+    for (i = 0; i < sp.homes.length && !h; i++) if (sp.homes[i].loc === here) h = sp.homes[i];
+    h = h || sp.homes[0];
+    out.length = 0;
+    if (h) for (i = 0; i < h.hours.length; i++) out.push(h.hours[i]);
+    return out;
+  }
+
   function lureText(sp) {
     var fav = [], also = [];
     for (var k in sp.lureTypes) (sp.lureTypes[k] === 2 ? fav : also).push(TYPE_NAMES[k] || k);
@@ -171,7 +182,7 @@ G.ui.journal = (function () {
     if (sel >= (top + ROWS) * COLS) top = Math.floor(sel / COLS) - ROWS + 1;
     entry.length = 0; notes.length = 0;
     selIsNew = false;
-    page.name = ''; page.family = ''; page.where = ''; page.count = ''; page.best = ''; page.got = false; page.ghost = false;
+    page.name = ''; page.family = ''; page.where = ''; page.count = ''; page.best = ''; page.got = false; page.ghost = false; page.bestAt = ''; page.parts.length = 0;
     function add(s, key, hand) { entry.push({ s: s, key: key, hand: hand }); }
     function para(s, key, gap) {
       if (gap && notes.length) notes.push({ s: '', key: key });
@@ -210,6 +221,9 @@ G.ui.journal = (function () {
     page.count = 'Caught ' + j.caught + (j.caught === 1 ? ' time' : ' times') + (j.released ? ', ' + j.released + ' let go' : ''); // Phase 51
     var bw = j.bestW < 0.1 ? Math.round(j.bestW * 1000) + ' g' : j.bestW.toFixed(2) + ' kg'; // Phase 44: small fish in grams
     page.best = j.bestLen.toFixed(1) + ' cm  |  ' + bw;
+    page.bestAt = j.bestAt || '';                                                    // Phase 93.2: when the best was caught (from Phase 93 on)
+    if (page.bestAt) page.best += '  ' + WHEN[page.bestAt];
+    bestParts(sp, page.parts);
     add(sp.name, 'ink', true); add(sp.family, 'wood', false); add(page.count, 'ink', true); add('Best ' + j.bestLen.toFixed(1) + ' cm, ' + bw, 'ink', true);
     para(sp.latin + '.', 'rust'); first = false;                   // Phase 68: the Latin name where the riddle was
     for (h = 0; h < j.hints.length; h++) note(j.hints[h]);
@@ -357,6 +371,7 @@ G.ui.journal = (function () {
       F.drawText(ctx, page.where, lx + 10, ry, 'fog_light');
     }
     if (page.count) F.drawText(ctx, page.count, lx + 10, ry + U.ROW, 'bone');
+    if (page.got) for (i = 0; i < page.parts.length; i++) G.ui.cabin.partIcon(ctx, page.parts[i], lx + iw - 9 - (page.parts.length - 1 - i) * 9, ry + U.ROW); // Phase 93.2: its best parts of the day
     if (page.best) {
       ctx.fillStyle = P.signal_amber; ctx.fillRect(lx + 1, ry + 2 * U.ROW + 3, 6, 2);
       F.drawText(ctx, 'Best ' + page.best, lx + 10, ry + 2 * U.ROW, 'signal_amber');
@@ -454,7 +469,7 @@ G.ui.journal = (function () {
     lastLate: function () { return lastLate; },
     stock: function () { stockState(); return { show: stockRow.show, ok: stockRow.ok, cls: stockRow.cls, text: stockRow.text }; }, // Phase 85
     stockOne: stockOne,
-    state: function () { return { narrow: narrow, reading: reading, cols: COLS, rows: ROWS, loc: locs[locIdx], family: FAMILIES[famIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }) }; }
+    state: function () { return { narrow: narrow, reading: reading, cols: COLS, rows: ROWS, loc: locs[locIdx], family: FAMILIES[famIdx], list: list.slice(), sel: sel, focus: focus, heavyNote: heavyNote, count: title.count, entry: entry.map(function (e) { return e.s; }), best: page.best, bestAt: page.bestAt, parts: page.parts.slice() }; }
   };
 })();
 

@@ -14,13 +14,16 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.ui = G.ui || {};
 G.ui.dock = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine;
-  var WITH = { rows: ['Bait Shop', 'The Cabin', 'Stay on the water'], dest: ['shop', 'cabin', ''], says: ['Rusty has the coffee on.', '', 'The boat knocks against the posts.'] };
-  var PLAIN = { rows: ['Bait Shop', 'Stay on the water'], dest: ['shop', ''], says: ['Rusty has the coffee on.', 'The boat knocks against the posts.'] };
+  // Phase 93.1: every pier has 'Wait on the pier', which opens WAIT: until dawn, day, dusk or night.
+  var WAIT_SAYS = 'Tie up and wait for another light.';
+  var WITH = { rows: ['Bait Shop', 'The Cabin', 'Wait on the pier', 'Stay on the water'], dest: ['shop', 'cabin', 'wait', ''], says: ['Rusty has the coffee on.', '', WAIT_SAYS, 'The boat knocks against the posts.'] };
+  var PLAIN = { rows: ['Bait Shop', 'Wait on the pier', 'Stay on the water'], dest: ['shop', 'wait', ''], says: ['Rusty has the coffee on.', WAIT_SAYS, 'The boat knocks against the posts.'] };
   // Phase 83: the Back Pond's dock: up the steps to the cabin's back door, or stay.
-  var POND = { rows: ['The Cabin', 'Stay on the water'], dest: ['cabin', ''], says: ['', 'The boat bumps the dock.'] };
+  var POND = { rows: ['The Cabin', 'Wait on the pier', 'Stay on the water'], dest: ['cabin', 'wait', ''], says: ['', WAIT_SAYS, 'The boat bumps the dock.'] };
+  var WAIT = { title: 'WAIT', rows: ['Until dawn', 'Until day', 'Until dusk', 'Until night', 'Back'], dest: ['rest:dawn', 'rest:day', 'rest:dusk', 'rest:night', 'back'], says: ['', '', '', '', ''] };
   // Phase 84: at the Back Pond's stream (its lip, while the jam is in it): pay to clear the jam.
   var STREAM = { title: 'THE STREAM', rows: ['Clear the jam', 'Leave it'], dest: ['clear', ''], says: ['', 'Brown water lies still behind it.'] }, STREAM_R = 50;
-  var where = 'pier', msg = '';
+  var where = 'pier', msg = '', waitSay = '';
   var M = WITH, ROWS = M.rows, DEST = M.dest, SAYS = M.says; // the open panel's rows (Phase 76)
   function menuOf(loc) { return loc && loc.pond ? POND : (loc && loc.dock && loc.dock.cabin ? WITH : PLAIN); }
   var on = false, sel = 0, armed = false, phase = '', t = 0, dest = '', FADE = 0.35, near = false;
@@ -49,6 +52,7 @@ G.ui.dock = (function () {
   // the keys (the panel open, or the fade out to a place).
   function step(run, loc, dt) {
     var inp = G.core.input;
+    if (G.ui.cabin.restStep(dt)) return true;                                       // Phase 93.1: the wait's fade has the keys
     if (phase === 'out') {
       t += dt;
       if (t >= FADE) { phase = ''; on = false; G.core.state.change(dest); }
@@ -75,8 +79,12 @@ G.ui.dock = (function () {
     var p = G.state.save.pond;
     return !!(loc && loc.pond && p && !p.stream && run && run.boat && Math.abs(run.boat.x - loc.pond.stream) <= STREAM_R);
   }
+  function setMenu(m) { M = m; msg = ''; ROWS = M.rows; DEST = M.dest; SAYS = M.says; layout(); sel = 0; }
   function choose(i) {
     if (!DEST[i]) { close(); return; }
+    if (DEST[i] === 'wait') { setMenu(WAIT); var pn = G.ui.cabin.PARTS.indexOf(G.ui.cabin.partNow(G.state.save.clock)); sel = (pn + 1) % 4; return; } // Phase 93.1
+    if (DEST[i] === 'back') { var r0 = G.state.run; setMenu(menuOf(r0 && r0.loc ? G.data.locations[r0.loc] : null)); sel = DEST.indexOf('wait'); return; }
+    if (DEST[i].indexOf('rest:') === 0) { if (G.ui.cabin.restUntil(DEST[i].slice(5))) close(); return; }
     if (DEST[i] === 'clear') {                                                     // Phase 84: pay to clear the jam
       var r = G.sim.pond.clearStream(G.state.save, G.data);
       if (r === G.sim.pond.OK) { close(); G.core.save.autosave('purchase'); G.ui.hud.say('The jam drags free. The stream runs into the pond.'); G.audio.engine.cue('plop', G.state.run.boat.x); }
@@ -96,9 +104,11 @@ G.ui.dock = (function () {
 
   function draw(ctx0) {
     var U = G.ui.panel, run = G.state.run, i;
-    if (!on && phase !== 'out' && !near) return;
+    if (!on && phase !== 'out' && !near && !G.ui.cabin.restAlpha()) return;
     var ctx = U.begin(ctx0);                                                        // the panel draws on the UI layer (Phase 90)
     if (phase === 'out') { G.core.view.begin(ctx0, true); G.ui.menu.dim(ctx0, t / FADE); }
+    var ra = G.ui.cabin.restAlpha();
+    if (ra > 0) { G.core.view.begin(ctx0, true); G.ui.menu.dim(ctx0, ra); return; }  // Phase 93.1: the wait's fade
     if (!on) {
       // At the pier with the panel shut: a quiet hint where to step off.
       if (near && run && run.fsm === 'sailing' && run.boat.stopped && !G.ui.setup.isOpen() && !G.ui.menu.current()) { var lab = hintRect(); U.hint(ctx, lab, where === 'stream' ? 'the stream' : 'the pier', HINT_R[0], HINT_R[1]); }
@@ -112,8 +122,11 @@ G.ui.dock = (function () {
       var ry = U.top(y) + i * RH + off, here = i === sel;
       if (here) U.row(ctx, x + 3, ry + 1, R[2] - 6, RH);
       F.drawText(ctx, ROWS[i], U.left(x) + 6, ry + 1, here ? 'signal_amber' : 'bone');
+      if (M === WAIT && i < 4) G.ui.cabin.partIcon(ctx, G.ui.cabin.PARTS[i], x + R[2] - U.PAD - 10, ry + 1); // Phase 93: its mark
     }
-    var say = msg || (DEST[sel] === 'clear' ? G.data.pond.streamCost + 'c. You have ' + G.state.save.coins + '.' : '') || (DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.') : SAYS[sel]);
+    var rs = DEST[sel].indexOf('rest:') === 0 ? DEST[sel].slice(5) : '';
+    if (rs) { var hh = G.ui.cabin.partStart(rs); waitSay = (rs === G.ui.cabin.partNow(G.state.save.clock) ? 'It is ' + rs + ' now. ' : '') + 'The clock to ' + (hh < 10 ? '0' : '') + hh + ':00.'; }
+    var say = msg || (rs ? waitSay : '') || (DEST[sel] === 'clear' ? G.data.pond.streamCost + 'c. You have ' + G.state.save.coins + '.' : '') || (DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.') : SAYS[sel]);
     F.drawText(ctx, say, U.left(x), U.top(y) + ROWS.length * RH + 4, 'fog_mid');
     if (!U.touch()) {
       var hx = U.left(x), hy = y + R[3] - U.PAD - U.KEY_H;
@@ -143,7 +156,7 @@ G.ui.dock = (function () {
   return {
     step: step, draw: draw, tap: tap, at: at,
     isOpen: function () { return on; },
-    busy: function () { return on || phase === 'out'; },
+    busy: function () { return on || phase === 'out' || !!G.ui.cabin.restAlpha(); },
     rects: function () { return on ? RECTS : null; },
     // The map's trips to the shop and the cabin start from the pier too (Phase 67): no panel
     // until the boat leaves the pier and comes back.

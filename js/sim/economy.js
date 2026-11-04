@@ -237,13 +237,20 @@ G.sim.economy = (function () {
     return true;
   }
 
+  // Phase 93.2: the part of the day ('dawn', 'day', 'dusk', 'night') of a game hour, from G.data.HOURS.
+  function partOf(hour) {
+    var H = G.data && G.data.HOURS, hh = Math.floor((((hour || 0) % 24) + 24) % 24);
+    if (H) for (var k in H) if (H[k].indexOf(hh) >= 0) return k;
+    return '';
+  }
+
   // A landed fish into the save. c: {id, len, w, price, windowCatch, bait}; choice 'sell',
   // 'keep' or (Phase 51) 'release': let go, it still counts in the journal, and earns nothing.
   function recordCatch(save, c, choice) {
     var j = save.journal[c.id];
     if (!j) j = save.journal[c.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: true, phantom: false };
     j.caught++; j.seen = true; j.phantom = false;
-    if (c.len > j.bestLen) j.bestLen = c.len;
+    if (c.len > j.bestLen) { j.bestLen = c.len; j.bestAt = partOf(save.clock); }   // Phase 93.2: the part of the day of the best catch
     if (c.w > j.bestW) j.bestW = c.w;
     if (c.windowCatch) save.flags.windowCatch[c.windowCatch] = true;
     if (c.w > 0 && G.data.SIZE_CLASSES) {                                          // Phase 85: the size classes caught (for stocking the pond)
@@ -298,7 +305,7 @@ G.sim.economy = (function () {
 
   return {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
-    sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
+    partOf: partOf, sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
     ownsRod: ownsRod, nextLadderRod: nextLadderRod, buyRod: buyRod, useRod: useRod, loseLure: loseLure,
     iceAll: iceAll, buySnow: buySnow, onIce: onIce, iceHook: iceHook, rodInHand: rodInHand,
     lineTypeById: lineTypeById, ownsLineType: ownsLineType, buyLineType: buyLineType, useLineType: useLineType,
