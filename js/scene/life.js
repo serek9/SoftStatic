@@ -497,7 +497,8 @@ G.scene.life = (function () {
     flyV: 40, frogR: 50, deerR: 70, deerWalk: 3, beaverV: 4, beaverR: 50, foxV: 6, gullR: 45, gullBack: 80,
     ospV: 26, ospY: 46, ospDrop: 80, ospCatch: 0.5, osp0: 18, osp1: 45,     // Phase 77: px/s, its hover's height, px/s down, its luck, s on the nest
     otterV: 6, otterUV: 11, otterR: 45,                                         // Phase 78: px/s swimming and under, px from the boat that sends one under
-    hareHop: 14, hareR: 55, hareFlee: 30, ravenV: 9                             // Phase 82: px/s a hop and a flight off, px (on screen) that sends one off; px/s a raven flies
+    hareHop: 14, hareR: 55, hareFlee: 30, ravenV: 9,                           // Phase 82: px/s a hop and a flight off, px (on screen) that sends one off; px/s a raven flies
+    mooseR: 40, mooseWalk: 2.5, mooseWade: 3                             // Phase 82: px/s a hop and a flight off, px (on screen) that sends one off; px/s a raven flies
   };
   var ab = { loc: null, T: {}, lim: 0, ghost: 0, mirror: false, night: false, h: 0, lilies: [], layer: {}, lodge: -1, moored: [] };
   function hrs(list, h) {
@@ -588,6 +589,17 @@ G.scene.life = (function () {
     return sprite('raven', m, [
       ['k.........k...', '.kk......kk....', '..kkkbkkkk.....', '....kkkkkkkg...', '...kk..........'],
       ['..............', '...............', '..kkkbkkkkkkg..', '.kk.kkkkk......', 'k........k.....']
+    ]);
+  }
+  // Phase 83: a bull moose: a long dark body high on its legs, the hump over the shoulders, a
+  // long heavy head with the bell under it and broad flat antlers; head up, head down in the
+  // weed, walking.
+  function mooseArt() {
+    var m = { b: 'umber_dark', h: 'umber_deep', a: 'umber_hi', l: 'umber', d: 'ink', k: 'ink' };
+    return sprite('moose', m, [
+      ['..............a..a.a....', '.............aaa.aaa....', '..............aabaa.....', '...............bbbb.....', '..............bbbbbbb...', '..............bbbbbbbbk.', '.......hhhh..bbb...bb...', '..hhhhhbbbbbbbbd........', '.bbbbbbbbbbbbbbd........', 'bbbbbbbbbbbbbbb.........', 'bbbbbbbbbbbbbb..........', '.bbbbbbbbbbbbb..........', '..bbb......bbb..........', '..l.l......l.l..........', '..l.l......l.l..........', '..l.l......l.l..........', '..d.d......d.d..........'],
+      ['........................', '........................', '........................', '........................', '........................', '........................', '.......hhhh.............', '..hhhhhbbbbbb...........', '.bbbbbbbbbbbbbb.........', 'bbbbbbbbbbbbbbbb........', 'bbbbbbbbbbbbbbbbb.a.a...', '.bbbbbbbbbbbbb.bbaaa....', '..bbb......bbb..bbbbb...', '..l.l......l.l...bbbbk..', '..l.l......l.l..........', '..l.l......l.l..........', '..d.d......d.d..........'],
+      ['..............a..a.a....', '.............aaa.aaa....', '..............aabaa.....', '...............bbbb.....', '..............bbbbbbb...', '..............bbbbbbbbk.', '.......hhhh..bbb...bb...', '..hhhhhbbbbbbbbd........', '.bbbbbbbbbbbbbbd........', 'bbbbbbbbbbbbbbb.........', 'bbbbbbbbbbbbbb..........', '.bbbbbbbbbbbbb..........', '..bbb......bbb..........', '...l.l....l.l...........', '..l...l..l...l..........', '..l...l..l...l..........', '.d.....dd.....d.........']
     ]);
   }
   // Phase 82: the snow fox in its winter white (A.fox.white).
@@ -693,6 +705,7 @@ G.scene.life = (function () {
   var fr = { on: false, a: 0, i: 0, x: 0, mode: 0, t: 0, x0: 0, dir: 1, h: 0, ux: 0, uy: 0, wait: 0, ph: 0 }; // 0 sit 1 jump 2 under
   var RMAX_ = 8, rx_ = new Float32Array(RMAX_), rvx = new Float32Array(RMAX_), rt = new Float32Array(RMAX_), rzone = new Uint8Array(RMAX_), rn = 0, ra = 0;
   var dr = { on: false, a: 0, x: 0, dir: 1, mode: 0, t: 0, wait: 0, ph: 0, leaving: false }; // 0 walk in 1 drink 2 look 3 leave
+  var mo = { on: false, a: 0, x: 0, dir: 1, mode: 0, t: 0, wait: 0, ph: 0, leaving: false, wade: 0 }; // Phase 83: the moose: 0 walk in 1 eat weed 2 look 3 leave; wade 0..1 how far in
   var bv = { on: false, x: 0, dir: 1, mode: 0, t: 0, wait: 0, ph: 0 }; // 0 swim 1 dive
   var fo = { on: false, a: 0, x: 0, dir: 1, mode: 0, t: 0, wait: 0, ph: 0, sits: 0 }; // 0 trot 1 sit 2 leave
   var GMAX = 4, gx = new Float32Array(GMAX), gy = new Float32Array(GMAX), gmode = new Uint8Array(GMAX), gt = new Float32Array(GMAX), gph = new Float32Array(GMAX), gcx = new Float32Array(GMAX), gang = new Float32Array(GMAX), gper = new Uint8Array(GMAX), gn = 0, ga = 0; // 0 sit 1 fly 2 back
@@ -713,7 +726,7 @@ G.scene.life = (function () {
   // off into the woods) and up to RVMAX ravens (x world px, y px above the ice, wandering flight).
   var HAMAX = 3, hax = new Float32Array(HAMAX), hat = new Float32Array(HAMAX), haph = new Float32Array(HAMAX), hadir = new Int8Array(HAMAX), ham = new Uint8Array(HAMAX), haa = new Float32Array(HAMAX), han = 0, haA = 0;
   var RVMAX = 3, rvx_ = new Float32Array(RVMAX), rvy = new Float32Array(RVMAX), rvtx = new Float32Array(RVMAX), rvty = new Float32Array(RVMAX), rvph = new Float32Array(RVMAX), rvdir = new Int8Array(RVMAX), rvcall = new Float32Array(RVMAX), rvn = 0, rva = 0;
-  var acts = { hareFlee: 0, ravenCalls: 0, strikes: 0, takes: 0, dives: 0, plops: 0, calls: 0, slaps: 0, plunges: 0, fish: 0, otterDives: 0, sealDives: 0, hauls: 0, cormDives: 0 }; // dbg: how often each has happened
+  var acts = { mooseOff: 0, hareFlee: 0, ravenCalls: 0, strikes: 0, takes: 0, dives: 0, plops: 0, calls: 0, slaps: 0, plunges: 0, fish: 0, otterDives: 0, sealDives: 0, hauls: 0, cormDives: 0 }; // dbg: how often each has happened
 
   function aboveSetup(loc, set) {
     var A = (loc.life && loc.life.above) || {}, r = G.vrng, i;
@@ -728,7 +741,7 @@ G.scene.life = (function () {
         if (f.kind === 'moored') ab.moored.push({ x: f.x, p: Ly.parallax });
       }
     }
-    dk.on = hr.on = kf.on = ln.on = fr.on = dr.on = bv.on = fo.on = false;
+    dk.on = hr.on = kf.on = ln.on = fr.on = dr.on = bv.on = fo.on = mo.on = false; mo.wait = r.range(2, 10); mo.wade = 0;
     dk.wait = r.range(1, 6); hr.wait = r.range(1, 6); kf.wait = r.range(1, 6); ln.wait = r.range(1, 6); fr.wait = r.range(1, 4);
     dr.wait = r.range(2, 10); bv.wait = r.range(5, 25); fo.wait = r.range(3, 15);
     yn = A.ducks ? Math.min(YMAX, A.ducks.young || 0) : 0;
@@ -820,6 +833,7 @@ G.scene.life = (function () {
     }
     if (A.deer) deerStep(A.deer, dt, cam, bs, h, r);
     ab.ghost = toward(ab.ghost, ab.lim > 0.5 && dr.on ? 1 : 0, dt / 3); // the deer's reflection goes, slowly
+    if (A.moose) mooseStep(A.moose, dt, cam, bs, h, r);                          // Phase 83
     if (A.beaver && ab.lodge >= 0) beaverStep(A.beaver, dt, cam, bs, h, r, loc);
     if (A.fox) foxStep(A.fox, dt, h, r);
     if (gn) gullStep(A.gulls, dt, b, h, r);
@@ -1337,6 +1351,32 @@ G.scene.life = (function () {
     }
   }
 
+  // Phase 83: the moose comes down to the far shore at dawn and dusk, wades in to its knees and
+  // eats weed, head down, lifting it now and then to look about; it is unbothered by the boat
+  // unless it comes within mooseR px (on screen), when it looks up and walks off.
+  function mooseStep(T, dt, cam, bs, h, r) {
+    var want = hrs(T.hours, h), Ly = ab.layer[T.layer], p = Ly.parallax;
+    if (!mo.on) {
+      if (!want || (mo.wait -= dt) > 0) return;
+      var x = r.range(T.x[0], T.x[1]);
+      if (Math.abs(x - cam * p - bs) < LA.mooseR * 1.5) { mo.wait = 4; return; }
+      mo.on = true; mo.a = 0; mo.x = x; mo.dir = r.next() < 0.5 ? -1 : 1; mo.mode = 0; mo.t = 5; mo.leaving = false; mo.wade = 0;
+      return;
+    }
+    mo.ph += dt;
+    var d = mo.x - cam * p - bs;
+    if (mo.mode === 3) {
+      mo.x += mo.dir * LA.mooseWalk * dt; mo.wade = toward(mo.wade, 0, dt / 2); mo.a = toward(mo.a, 0, dt / 3);
+      if (mo.a <= 0) { mo.on = false; mo.wait = r.range(90, 160); }
+      return;
+    }
+    mo.a = toward(mo.a, 1, dt / LA.fade);
+    if (!mo.leaving && (!want || Math.abs(d) < LA.mooseR)) { mo.leaving = true; mo.mode = 2; mo.t = 1.5; mo.dir = d > 0 ? 1 : -1; acts.mooseOff++; }
+    if (mo.mode === 0) { mo.x += mo.dir * 1.2 * dt; mo.wade = toward(mo.wade, 1, dt / 4); if ((mo.t -= dt) <= 0) { mo.mode = 1; mo.t = r.range(6, 14); } }
+    else if (mo.mode === 1) { if ((mo.t -= dt) <= 0) { mo.mode = 2; mo.t = r.range(2, 4); } }
+    else if (mo.mode === 2) { if ((mo.t -= dt) <= 0) { if (mo.leaving) mo.mode = 3; else { mo.mode = mo.wade < 1 ? 0 : 1; mo.t = r.range(6, 14); } } }
+  }
+
   // The beaver swims to its lodge with a V behind it, and slaps its tail and dives at the boat.
   function beaverStep(T, dt, cam, bs, h, r, loc) {
     var want = hrs(T.hours, h), p = ab.layer[T.layer].parallax, L0 = ab.lodge;
@@ -1441,6 +1481,10 @@ G.scene.life = (function () {
     if (A.deer && A.deer.layer === id && dr.on && dr.a > 0) {
       var ga_ = ab.mirror ? 1 - ab.ghost : 1, frame = dr.mode === 1 ? 1 : (dr.mode === 0 || dr.mode === 3 ? (Math.floor(dr.ph * 3) & 1 ? 2 : 0) : 0);
       if (ga_ > 0.01) { c.globalAlpha = dr.a * ga_; img(c, deerArt(), frame, dr.dir < 0, dr.x - ox, wyS - (Ly.height || 4) + 1.5); c.globalAlpha = 1; }
+    }
+    if (A.moose && A.moose.layer === id && mo.on && mo.a > 0) {                      // Phase 83: the moose, its legs in the water as it wades
+      var mf = mo.mode === 1 ? 1 : (mo.mode === 0 || mo.mode === 3 ? (Math.floor(mo.ph * 2) & 1 ? 2 : 0) : 0);
+      c.globalAlpha = mo.a; img(c, mooseArt(), mf, mo.dir < 0, mo.x - ox, wyS - (Ly.height || 4) + 1.5 + mo.wade * LA.mooseWade); c.globalAlpha = 1;
     }
     if (A.beaver && A.beaver.layer === id && bv.on) drawBeaver(c, bv.x - ox, wyS, bv);
     if (A.hare && A.hare.layer === id && haA > 0) {                               // Phase 82: the hares
@@ -1726,6 +1770,7 @@ G.scene.life = (function () {
     if (A.dragonflies) o.dragonflies = { n: dfn, a: +dfa.toFixed(2) };
     if (A.frog) o.frog = fr.on ? { a: +fr.a.toFixed(2), x: +fr.x.toFixed(1), fromBoat: scr(fr.x, 1), mode: ['sit', 'jump', 'under'][fr.mode], pads: ab.lilies.length } : { pads: ab.lilies.length };
     if (A.striders) o.striders = { n: rn, a: +ra.toFixed(2) };
+    if (A.moose) o.moose = mo.on ? { a: +mo.a.toFixed(2), x: +mo.x.toFixed(1), fromBoat: scr(mo.x, ab.layer[A.moose.layer].parallax), mode: ['walk', 'eat', 'look', 'leave'][mo.mode], wade: +mo.wade.toFixed(2) } : null; // Phase 83
     if (A.deer) o.deer = dr.on ? { a: +dr.a.toFixed(2), x: +dr.x.toFixed(1), fromBoat: scr(dr.x, ab.layer[A.deer.layer].parallax), mode: ['walk', 'drink', 'look', 'leave'][dr.mode] } : null;
     if (A.beaver) o.beaver = bv.on ? { x: +bv.x.toFixed(1), lodge: ab.lodge, fromBoat: scr(bv.x, ab.layer[A.beaver.layer].parallax), mode: bv.mode ? (bv.slap ? 'slap' : 'dive') : 'swim' } : { lodge: ab.lodge };
     if (A.fox) o.fox = fo.on ? { a: +fo.a.toFixed(2), x: +fo.x.toFixed(1), mode: ['trot', 'sit', 'leave'][fo.mode] } : null;
@@ -1749,6 +1794,7 @@ G.scene.life = (function () {
     if (os.on && os.a > 0) o.push('osprey'); if (en && ea > 0) o.push('eagle'); // Phase 77
     if (otn && ota > 0) o.push('otter');                                         // Phase 78
     if (sen && sea_ > 0) o.push('seal'); if (cmn && cma > 0) o.push('cormorant'); // Phase 79
+    if (mo.on && mo.a > 0) o.push('moose');                                       // Phase 83
     if (han && haA > 0) o.push('hare'); if (rvn && rva > 0) o.push('raven');     // Phase 82
     return o;
   }
@@ -1771,7 +1817,7 @@ G.scene.life = (function () {
     if (kind === 'hare') { if (!han) return false; haA = 1; for (var hi = 0; hi < han; hi++) haa[hi] = 1; return true; }   // Phase 82
     if (kind === 'raven') { if (!rvn) return false; rva = 1; return true; }
     if (kind === 'cormdive') { for (var ci = 0; ci < cmn; ci++) if (cmm[ci] === 2) { cmt[ci] = 0; return true; } for (ci = 0; ci < cmn; ci++) if (cmm[ci] === 0) { cmt[ci] = 0; cma = 1; return true; } return false; }
-    var map = { ducks: dk, heron: hr, kingfisher: kf, loon: ln, frog: fr, deer: dr, beaver: bv, fox: fo };
+    var map = { ducks: dk, heron: hr, kingfisher: kf, loon: ln, frog: fr, deer: dr, beaver: bv, fox: fo, moose: mo };
     if (map[kind] && A[kind] && !map[kind].on) { map[kind].wait = 0; return hrs(A[kind].hours, ab.h) || (kind === 'heron' && ab.lim > 0.5 && ab.night); }
     return false;
   }
@@ -1802,7 +1848,7 @@ G.scene.life = (function () {
   // ---- Phase 50.1: for the gallery ---------------------------------------------------------
   // Every sprite baked (by name: {w, h, cv, fl}), and the drawn-in-code creatures posed from
   // the gallery's own scratch records, never the live ones. World px, the ctx at the view's scale.
-  var ARTS = [hareArt, ravenArt, foxWhiteArt, crayArt, snailArt, turtleArt, tadArt, crabArt, starArt, sealArt, sealHeadArt, sealSwimArt, cormArt, cormFlyArt, cormSwimArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt, ospreyArt, eagleArt, otterArt, otterSitArt];
+  var ARTS = [mooseArt, hareArt, ravenArt, foxWhiteArt, crayArt, snailArt, turtleArt, tadArt, crabArt, starArt, sealArt, sealHeadArt, sealSwimArt, cormArt, cormFlyArt, cormSwimArt, duckArt, youngArt, duckUnderArt, heronBodyArt, kingArt, loonArt, frogArt, deerArt, foxArt, gullArt, ospreyArt, eagleArt, otterArt, otterSitArt];
   function sprites() { for (var i = 0; i < ARTS.length; i++) ARTS[i](); return spr; }
   var gH = { x: 0, dir: 1, mode: 0, reach: 0, ph: 0, lift: 0, a: 1, fish: 0 }, gB = { dir: 1, mode: 0, t: 0 };
   var gEx = new Float32Array(EELN), gEy = new Float32Array(EELN);

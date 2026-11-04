@@ -16,8 +16,10 @@ G.ui.dock = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine;
   var WITH = { rows: ['Bait Shop', 'The Cabin', 'Stay on the water'], dest: ['shop', 'cabin', ''], says: ['Rusty has the coffee on.', '', 'The boat knocks against the posts.'] };
   var PLAIN = { rows: ['Bait Shop', 'Stay on the water'], dest: ['shop', ''], says: ['Rusty has the coffee on.', 'The boat knocks against the posts.'] };
+  // Phase 83: the Back Pond's dock: up the steps to the cabin's back door, or stay.
+  var POND = { rows: ['The Cabin', 'Stay on the water'], dest: ['cabin', ''], says: ['', 'The boat bumps the dock.'] };
   var M = WITH, ROWS = M.rows, DEST = M.dest, SAYS = M.says; // the open panel's rows (Phase 76)
-  function menuOf(loc) { return loc && loc.dock && loc.dock.cabin ? WITH : PLAIN; }
+  function menuOf(loc) { return loc && loc.pond ? POND : (loc && loc.dock && loc.dock.cabin ? WITH : PLAIN); }
   var on = false, sel = 0, armed = false, phase = '', t = 0, dest = '', FADE = 0.35, near = false;
   var R = [0, 0, 0, 0], RECTS = [R];
 
@@ -83,7 +85,7 @@ G.ui.dock = (function () {
       if (here) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, R[2] - 6, U.ROW); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 1, U.ROW); }
       F.drawText(ctx, ROWS[i], U.left(x) + 6, ry + 1, here ? 'signal_amber' : 'bone');
     }
-    var say = DEST[sel] === 'cabin' ? 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.' : SAYS[sel];
+    var say = DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.') : SAYS[sel];
     F.drawText(ctx, say, U.left(x), U.top(y) + ROWS.length * U.ROW + 4, 'fog_mid');
     var hx = U.left(x), hy = y + R[3] - U.PAD - U.KEY_H;
     hx += U.hint(ctx, 'SPACE', 'go', hx, hy);

@@ -16,6 +16,10 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // bench), the stove lit (fire, firewood, the armchair, the amp, a plant), a rug and lamp (the
 // rug, the floor lamp, the CRT, the synth, the record player, string lights), restored
 // (curtains, a quilt, a painting, more plants). Esc or M, or the door, goes back out.
+// Phase 83 (PLAN_WINTER.md 2.4): a back door in the east wall (row 3) opens onto the Back Pond
+// (data/loc_pond.js): walking out of it, or Space at it, goes down to the pond's dock and the
+// boat moored there; coming in from the pond he stands inside it. The front door always goes
+// out to Fogbound's pier, and Esc or M goes back the way he came in.
 G.ui = G.ui || {};
 G.ui.cabin = (function () {
   var S = G.gfx.sprites, P = S.PALETTE, F = S.fine, A = G.gfx.paint, X = G.gfx.pix, K = G.ui.roomKit, R = G.ui.room, tone = X.tone;
@@ -24,7 +28,7 @@ G.ui.cabin = (function () {
     'wwwWWwwwwwww',
     's..........s',
     's..........s',
-    's..........s',
+    's..........b',
     's..........s',
     's..........s',
     's...m......s',
@@ -52,10 +56,13 @@ G.ui.cabin = (function () {
     { id: 'fan', c: 5, r: 1, w: 1, h: 1, block: true, talk: 'fan' },
     { id: 'fridge', c: 9, r: 1, w: 1, h: 1, block: true, talk: 'fridge' },
     { id: 'side', c: 6, r: 4, w: 1, h: 1, block: true, talk: 'lava' },
-    { id: 'console', c: 7, r: 3, w: 1, h: 1, block: true, talk: 'tv' }
+    { id: 'console', c: 7, r: 3, w: 1, h: 1, block: true, talk: 'tv' },
+    // Phase 83: the back door, to the pond.
+    { id: 'backdoor', c: 11, r: 3, w: 1, h: 1, block: true, talk: 'backdoor' }
   ];
   var DOOR = [4, 7], MAT = [4, 6], PLQ0 = 5, PCOLS = 5;
-  var WK = R.walker(MAP, OBJECTS, MAT);
+  var BACK = [10, 3]; // Phase 83: the tile inside the back door
+  var WK = R.walker(MAP, OBJECTS, MAT, [{ c: BACK[0], r: BACK[1], dir: 'right', id: 'back' }]);
   function tx(c) { return c * T; }
   function ty(r) { return TOP + r * T; }
   var GL = [tx(3) + 5, 11, 2 * T - 10, TOP - 4];            // the window's glass
@@ -117,11 +124,25 @@ G.ui.cabin = (function () {
     if (lv < 2) for (var w = 0; w < 2; w++) { var cx = w ? W - T - 1 : T, dir = w ? -1 : 1; for (k = 0; k < 5; k++) A.line(c, 'fog_mid', cx, 5, cx + dir * (30 - k * 6), 5 + k * 6); for (k = 1; k < 4; k++) A.line(c, 'fog_dark', cx + dir * k * 8, 5, cx, 5 + k * 8); }
     // String lights from stage 3.
     cable = lv >= 3 ? K.lightCable(c, T + 4, W - T - 4, 6, 44, 5) : [];
+    paintBackDoor(c, lv);
     paintWall(c, lv, nPlaques);
     paintFurniture(c, lv);
     A.reset();
   }
   var cable = [];
+
+  // Phase 83: the back door in the east wall (row 3): the doorway through the wall's top with the
+  // night beyond, its frame, the threshold, and the door itself standing open against the wall.
+  function paintBackDoor(c, lv) {
+    var x = W - T, y = ty(BACK[1]) + 3, h = T - 6;
+    box(c, 'outline', x, y - 1, T, h + 2);
+    A.area(c, x + 3, y, T - 3, h, function (xx, yy) { var e = xx - x - 3; return e < 4 ? (e < 2 ? 'wood_mid' : 'wood_dark') : (e < 10 ? 'night_blue' : 'night_deep'); });
+    box(c, 'wood_lit', x, y - 1, T, 1); box(c, 'wood_mid', x, y + h, T, 1);
+    A.slab(c, x - 2, y, 4, h, ['wood_dark', 'wood_mid', 'wood_hi']);                       // the threshold
+    box(c, 'fog_dark', x + 14, y + 3, 1, h - 6);                                           // a glimpse of the pond's light
+    A.slab(c, x + 4, y - 9, T - 8, 8, ['wood_deep', lv < 1 ? 'wood_dark' : 'umber', lv < 1 ? 'wood' : 'umber_hi']); // the door, open against the wall
+    px(c, 'brass_hi', x + T - 7, y - 5);
+  }
 
   function paintWall(c, lv, n) {
     var i;
@@ -344,7 +365,7 @@ G.ui.cabin = (function () {
   var mounted = [];   // {spIdx, img, flipImg, name, len}, decided in enter()
   var turned = [];    // per mounted trophy: faces the door; decided in enter() only
   var order = [];
-  var stored = 0, walk = null, faced = '', held = [], txt = { title: '', next: '', stored: '', coins: '' }, lastCoins = -1, coin = null;
+  var from = 'front', stored = 0, walk = null, faced = '', held = [], txt = { title: '', next: '', stored: '', coins: '' }, lastCoins = -1, coin = null;
   var open = '', lines = [], tvOn = false, recordT = -1, chordN = 0, tvT = 0, fanOn = true, lavaOn = true;
   var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, strange: '', st: 0, flash: 0 };
   var BOX = { x: 24, y: 296, w: 592, h: 56 }, HEAD = { x: 120, y: 316, w: 400, h: 40 };
@@ -384,7 +405,8 @@ G.ui.cabin = (function () {
     var save = G.state.save, kept = save.kept, cap = G.data.gear.cabin[save.cabinLevel].plaques, i, j;
     bakeRoom();
     t = 0; open = ''; faced = ''; held.length = 0; tvOn = false; recordT = -1; fanOn = true; lavaOn = true;
-    walk = WK.create();
+    from = G.state.run.loc === 'pond' ? 'back' : 'front';                         // Phase 83: which door he came in by
+    walk = from === 'back' ? WK.create({ c: BACK[0], r: BACK[1], face: 'left', dc: BACK[0] - 1, dr: BACK[1] }) : WK.create();
     R.prebake('fisher'); R.prebake('dog');                                          // so no step bakes a frame
     order.length = 0;
     var ord = [];
@@ -407,6 +429,21 @@ G.ui.cabin = (function () {
   }
 
   function exit() {}
+
+  // Phase 83: out by a door. The back door goes down to the pond's dock (the boat moored there);
+  // the front door to Fogbound's pier. The water is loaded here, behind the scene change, and
+  // the pier's panel waits until the boat leaves and comes back (as after the map's trips).
+  function leave(door) {
+    var run = G.state.run, sc = G.scene.sailing, L = G.data.locations;
+    if (door === 'back') {
+      if (run.loc !== 'pond') { sc.load('pond'); sc.tp(L.pond.dock.x - 30); }
+      G.ui.dock.disarm(); G.core.save.autosave('travel');
+    } else if (run.loc !== 'fog') {
+      sc.load('fog'); sc.tp(L.fog.dock.x + 30);
+      G.ui.dock.disarm(); G.core.save.autosave('travel');
+    }
+    G.core.state.change('sailing');
+  }
 
   function restore() {
     var r = G.sim.economy.restoreCabin(G.state.save, G.data), msg;
@@ -431,6 +468,7 @@ G.ui.cabin = (function () {
       open = 'restore'; return;
     }
     if (what === 'mirror') { G.ui.menu.open('look', 'cabin'); return; }
+    if (what === 'backdoor') { leave('back'); return; }                             // Phase 83: out to the pond
     if (what === 'plaques') {
       var c = walk.c - PLQ0, a = mounted[c], b = mounted[c + PCOLS], cap = G.data.gear.cabin[lv].plaques, s;
       if (c < 0 || c >= PCOLS) return;
@@ -470,10 +508,10 @@ G.ui.cabin = (function () {
       if (inp.pressed('action')) { if (open === 'restore') restore(); else open = ''; }
       return;
     }
-    if (inp.pressed('back') || inp.pressed('map')) { G.core.state.change('sailing'); return; }
+    if (inp.pressed('back') || inp.pressed('map')) { leave(from); return; }
     var steps0 = walk.steps;
     WK.step(walk, dt, R.heldDir(inp, held));
-    if (walk.exit) { G.core.state.change('sailing'); return; }
+    if (walk.exit) { leave(walk.exit); return; }
     if (walk.steps !== steps0) G.audio.engine.cue('step');
     faced = WK.facing(walk);
     if (inp.pressed('action') && faced) use(faced);
@@ -577,8 +615,8 @@ G.ui.cabin = (function () {
     if (lv >= 3 && n > 0.4) { ctx.fillStyle = P.paper; for (var i = 0; i < 2; i++) { var a = t * (2.3 + i * 0.8) + i * 3; ctx.fillRect(Math.round(ox + LAMPP[0] + Math.cos(a) * (7 + i * 3)), Math.round(oy + LAMPP[1] - 24 + Math.sin(a * 1.6) * 4), 1 + (Math.floor(t * 12 + i) & 1), 1); } }
   }
   var bp = [];
-  var WORD = { bench: 'FIX', mirror: 'LOOK', plaques: 'READ', guitar: 'PLAY', keys: 'PLAY', records: 'PLAY', tv: 'TV', stove: 'WARM', chair: 'SIT', bed: 'REST', fan: 'FAN', fridge: 'OPEN', lava: 'LAMP' }; // Phase 58
-  var HINT = { bench: 'restore', mirror: 'fisher & dog', plaques: 'look', guitar: 'play', keys: 'play', records: 'play', tv: 'switch', stove: 'warm up', chair: 'sit', bed: 'rest', fan: 'switch', fridge: 'open', lava: 'switch' };
+  var WORD = { backdoor: 'OUT', bench: 'FIX', mirror: 'LOOK', plaques: 'READ', guitar: 'PLAY', keys: 'PLAY', records: 'PLAY', tv: 'TV', stove: 'WARM', chair: 'SIT', bed: 'REST', fan: 'FAN', fridge: 'OPEN', lava: 'LAMP' }; // Phase 58
+  var HINT = { backdoor: 'the pond', bench: 'restore', mirror: 'fisher & dog', plaques: 'look', guitar: 'play', keys: 'play', records: 'play', tv: 'switch', stove: 'warm up', chair: 'sit', bed: 'rest', fan: 'switch', fridge: 'open', lava: 'switch' };
 
   return {
     native: true,
@@ -605,10 +643,10 @@ G.ui.cabin = (function () {
       return WORD[faced] || 'USE';
     },
     // dbg: what is on the wall now; where he is and what he faces.
-    state: function () { return { level: level, mounted: mounted.length, turned: turned.filter(Boolean).length, facing: turned.slice(), stored: stored, at: walk ? [walk.c, walk.r, walk.face] : null, faced: faced, open: open, tv: tvOn, record: recordT >= 0, blocked: WK.blocked().length }; },
+    state: function () { return { from: from, level: level, mounted: mounted.length, turned: turned.filter(Boolean).length, facing: turned.slice(), stored: stored, at: walk ? [walk.c, walk.r, walk.face] : null, faced: faced, open: open, tv: tvOn, record: recordT >= 0, blocked: WK.blocked().length }; },
     // Phase 64 (dbg.roomLife): the live things and their state.
     life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'cabin', level: level, live: n, tv: tvOn ? (t - tvT < 5 ? 'booting' : 'game') : 'off', fan: level >= 2 ? (fanOn ? 'on' : 'off') : 'none', lava: level >= 3 ? (lavaOn ? 'on' : 'off') : 'none' }; },
-    walkPath: function (path) { if (!walk) return 'not in the cabin'; var nb = WK.walkPath(walk, path || ''); faced = WK.facing(walk); return { c: walk.c, r: walk.r, face: walk.face, faced: faced, blocked: nb }; }
+    walkPath: function (path) { if (!walk) return 'not in the cabin'; var nb = WK.walkPath(walk, path || ''); faced = WK.facing(walk); return { c: walk.c, r: walk.r, face: walk.face, faced: faced, blocked: nb, exit: walk.exit }; }
   };
 })();
 

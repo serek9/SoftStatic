@@ -17,8 +17,11 @@ G.ui.room = (function () {
   // ---- The walk -----------------------------------------------------------------------------
   // map: rows of tile characters ('.', 'r' and 'm' are floor; anything else blocks); objects:
   // [{c, r, w, h, block, talk}]; mat: [c, r], the tile inside the door (walking down off it
-  // leaves). Returns the room's walk: create, step, facing, isBlocked, blocked.
-  function walker(map, objects, mat) {
+  // leaves). Phase 83: doors, more ways out: [{c, r, dir, id}] (walking dir off tile c, r
+  // leaves by door id; st.exit is 'front' for the mat's door, else the id). Returns the room's
+  // walk: create, step, facing, isBlocked, blocked.
+  function walker(map, objects, mat, doors) {
+    doors = doors || [];
     var COLS = map[0].length, ROWS = map.length, blocked = [], talkAt = [], r, c, i;
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
       var ch = map[r][c];
@@ -36,9 +39,11 @@ G.ui.room = (function () {
 
     // st: {c, r (the tile he stands on or leaves), tc, tr (the tile he steps to), t (0..1 of
     // the step), face, turnT (s held since a turn), moving, dog: {c, r, tc, tr, face, sit}}.
-    function create() {
-      return { c: mat[0], r: mat[1], tc: mat[0], tr: mat[1], t: 1, face: 'up', turnT: 0, turned: false, moving: false, steps: 0,
-        dog: { c: mat[0] - 1, r: mat[1], tc: mat[0] - 1, tr: mat[1], face: 'up', sit: true }, exit: false };
+    // at (Phase 83, optional): {c, r, face, dc, dr}: where he and the dog start (a back door).
+    function create(at) {
+      var c0 = at ? at.c : mat[0], r0 = at ? at.r : mat[1], dc = at ? at.dc : mat[0] - 1, dr = at ? at.dr : mat[1], f = at ? at.face : 'up';
+      return { c: c0, r: r0, tc: c0, tr: r0, t: 1, face: f, turnT: 0, turned: false, moving: false, steps: 0,
+        dog: { c: dc, r: dr, tc: dc, tr: dr, face: f, sit: true }, exit: false };
     }
     // dir: the direction held this step ('' none). A press of a new direction turns him on the
     // spot, and he walks once it has been held for TURN s. Sets st.exit when he walks down off
@@ -56,7 +61,8 @@ G.ui.room = (function () {
       if (st.turned && st.turnT < TURN) return;
       st.turned = false;
       var nc = st.c + DIRS[dir][0], nr = st.r + DIRS[dir][1];
-      if (st.c === mat[0] && st.r === mat[1] && dir === 'down') { st.exit = true; return; }
+      if (st.c === mat[0] && st.r === mat[1] && dir === 'down') { st.exit = 'front'; return; }
+      for (var di = 0; di < doors.length; di++) if (st.c === doors[di].c && st.r === doors[di].r && dir === doors[di].dir) { st.exit = doors[di].id; return; }
       if (isBlocked(nc, nr)) return;
       // The dog takes the tile he leaves.
       var dc = st.c, dr = st.r;

@@ -423,6 +423,8 @@ G.core.debug = (function () {
     mapNav: function () { return G.ui.map.nav(); },
     // dbg.roomLife(): Phase 64, the live things in the room you are in (the shop or the cabin).
     roomLife: function () { var n = G.core.state.sceneName(); return n === 'shop' ? G.ui.shopRoom.life() : (n === 'cabin' ? G.ui.cabin.life() : 'not in a room'); },
+    // dbg.cabinWalk('UDLR'): Phase 83, walks him round the cabin a tile a step (R off the tile inside the back door goes out to the pond).
+    cabinWalk: function (path) { return G.core.state.sceneName() === 'cabin' ? G.ui.cabin.walkPath(path || '') : 'not in the cabin'; },
     shopWalk: function (path) { return G.core.state.sceneName() === 'shop' ? G.ui.shop.walkPath(path || '') : 'not in the shop'; },
     // dbg.dangle() returns the lure hanging from the tip between casts (Phase 34): on, th (rad from
     // straight down), om (rad/s), len (px of line), off (the lure from the tip, world px).
@@ -793,7 +795,7 @@ G.core.debug = (function () {
         // Phase 50.1: Phases 48-49's sprites (every frame at 1x, then 4x, then flipped) and the
         // creatures drawn in code, posed from the gallery's own records (the live ones untouched).
         var LF = G.scene.life, SP = LF.sprites(), under = name === 'life under';
-        var NAMES = under ? ['cray', 'snail', 'turtle', 'tad', 'crab', 'star'] : ['duck', 'duckling', 'duckUnder', 'kingfisher', 'loon', 'frog', 'deer', 'fox', 'gull', 'heron', 'osprey', 'eagle', 'otter', 'otterSit', 'seal', 'sealHead', 'sealSwim', 'cormorant', 'cormFly', 'cormSwim']; // Phase 79: and the sea's
+        var NAMES = under ? ['cray', 'snail', 'turtle', 'tad', 'crab', 'star'] : ['duck', 'duckling', 'duckUnder', 'kingfisher', 'loon', 'frog', 'deer', 'fox', 'gull', 'heron', 'osprey', 'eagle', 'otter', 'otterSit', 'seal', 'sealHead', 'sealSwim', 'cormorant', 'cormFly', 'cormSwim', 'moose']; // Phase 79: and the sea's; Phase 83: the moose
         var Z = under ? 4 : 3, cy0 = 20, cx0 = 8, rowH = 0;
         ctx.imageSmoothingEnabled = false;
         for (var ni = 0; ni < NAMES.length; ni++) {
