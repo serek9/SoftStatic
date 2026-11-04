@@ -10,6 +10,7 @@
 //   node tools/balance.js --fight                 how fights end by player and gear tier (Phase 23)
 //   node tools/balance.js --rod                   the rod's bend: shapes, action, springing (PLAN_ROD.md)
 //   node tools/balance.js --homes                 where each species lives, against PLAN_WATERS.md §3 (Phase 75)
+//   node tools/balance.js --first                 a fresh save's first fish inside 60 s on 20 seeds (Phase 96.4)
 // It loads the same files index.html loads, in the same order, into a vm context.
 'use strict';
 const vm = require('vm'), fs = require('fs'), path = require('path');
@@ -547,7 +548,9 @@ const P = {
 // Phase 80 (PLAN_WINTER.md 5): after Russetwood (where --pacing's 20 seeds stop) the plan goes
 // on to a sea, then the Snow Machine and the ice, which opens free after the sea; --pacing runs
 // one seed on through them (pacingIce).
-const PLAN = ['line', 'reel', 'rod', 'creek', 'fluoro', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'russet', 'line', 'rod', 'reel', 'sound', 'snow', 'tamarack'];
+// Phase 96: with waters near Cast n Chill's prices the model goes for the next water before the
+// next tier of gear (the creek after the first line, Russetwood after the Pines).
+const PLAN = ['line', 'creek', 'reel', 'rod', 'fluoro', 'line', 'rod', 'reel', 'pines', 'russet', 'line', 'rod', 'reel', 'line', 'rod', 'reel', 'sound', 'snow', 'tamarack'];
 
 function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
@@ -615,7 +618,7 @@ function session(G, seed, opts) {
     S.unease.step(save, uIn, DT, rng, data);
     const c = school.ctx;
     c.hour = save.clock; c.unease = S.unease.get(save, st.loc); c.bait = lure.bait; c.rodMaxMass = fx.maxMass;
-    c.attract = fx.attract; c.depthM = lure.y * 0.25;
+    c.attract = fx.attract; c.depthM = lure.y * 0.25; c.first = !S.economy.anyCaught(save); // Phase 96.4
     c.lure = lure.lure = fx.lure; c.smallBoost = fx.smallBoost; c.smallMass = fx.smallMass; // Phase 43
     c.lineSeen = fx.lineSeen && !(opts && opts.unseen); // Phase 53
     st.t += DT;
@@ -663,6 +666,7 @@ function session(G, seed, opts) {
         if (st.t >= P.cardTime) {
           S.economy.recordCatch(save, st.cur, 'sell');
           st.earned[st.loc] = (st.earned[st.loc] || 0) + st.cur.price; // Phase 80: what each water paid
+          if (!st.catches) st.firstAt = st.time; // Phase 96.4: game seconds to the first fish landed
           st.catches++; st.mix[st.cur.id] = (st.mix[st.cur.id] || 0) + 1; h(save.coins);
           if (!opts || opts.shop !== false) shop();
           st.phase = 'cast'; st.t = 0;
@@ -679,7 +683,7 @@ function session(G, seed, opts) {
     }
   }
 
-  return { st, save, step, run(seconds, until) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) { step(); if (until && until(st, save)) break; } return st; } };
+  return { st, save, school, bite, step, run(seconds, until) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) { step(); if (until && until(st, save)) break; } return st; } };
 }
 
 // ---- --tackle (Phase 43) ---------------------------------------------------------------------
@@ -846,10 +850,14 @@ function replay(seed, minutes) {
 // V8 targets: first upgrade after about 6 catches, location 2 after about 40 minutes,
 // location 4 after several hours. Run over several seeds; the median must sit in each band.
 
+// Phase 96 (PLAN_PLAYABILITY.md §6): prices nearer Cast n Chill's, and the bands with them (the
+// plan's proposal; V8's were 4-8 catches, the creek 30-50 min, Russetwood 150-360 min). The sea
+// (Coldharbor Sound) is a band of its own now, so the model plays on to it.
 const TARGETS = [
-  { what: 'first upgrade', key: 'first', unit: 'catches', lo: 4, hi: 8 },
-  { what: 'location 2 (creek)', key: 'creek', unit: 'min', lo: 30, hi: 50 },
-  { what: 'location 4 (russet)', key: 'russet', unit: 'min', lo: 150, hi: 360 } // Phase 74: Russetwood in the Red Room's place
+  { what: 'first upgrade', key: 'first', unit: 'catches', lo: 3, hi: 6 },
+  { what: 'location 2 (creek)', key: 'creek', unit: 'min', lo: 10, hi: 20 },
+  { what: 'location 4 (russet)', key: 'russet', unit: 'min', lo: 60, hi: 150 }, // Phase 74: Russetwood in the Red Room's place
+  { what: 'a sea (sound)', key: 'sound', unit: 'min', lo: 150, hi: 300 }
 ];
 
 function pacing() {
@@ -859,10 +867,10 @@ function pacing() {
   for (let i = 1; i <= 20; i++) seeds.push(i * 11);
   for (const seed of seeds) {
     const s = session(load(), seed);
-    s.run(8 * 3600, st => st.events.some(e => e.what === 'russet'));
+    s.run(8 * 3600, st => st.events.some(e => e.what === 'sound'));
     const ev = s.st.events, at = k => ev.find(e => e.what === k);
     rows.push({ seed, first: ev[0] ? ev[0].catches : null, firstWhat: ev[0] && ev[0].what, creek: at('creek') && at('creek').t / 60, pines: at('pines') && at('pines').t / 60,
-      russet: at('russet') && at('russet').t / 60, catches: s.st.catches, mix: s.st.mix, events: ev, coinsAt: s.st.coinsAt, windowCatch: Object.keys(s.save.flags.windowCatch) });
+      firstAt: s.st.firstAt, russet: at('russet') && at('russet').t / 60, sound: at('sound') && at('sound').t / 60, catches: s.st.catches, mix: s.st.mix, events: ev, coinsAt: s.st.coinsAt, windowCatch: Object.keys(s.save.flags.windowCatch) });
   }
   const median = k => { const v = rows.map(r => r[k]).filter(x => x != null).sort((a, b) => a - b); return v.length === rows.length ? v[Math.floor(v.length / 2)] : null; };
   console.log('Active-player model (moves to each water it opens; fishes minnows in the Pines; ' + JSON.stringify(P) + ')\n');
@@ -871,11 +879,12 @@ function pacing() {
   r0.events.forEach(e => console.log('  ' + (e.t / 60).toFixed(1).padStart(6) + ' min  ' + String(e.catches).padStart(4) + ' catches  ' + e.what));
   console.log('  coins held every 30 min: ' + r0.coinsAt.map(c => c[0] + 'm:' + c[1]).join(' '));
   console.log('  catch mix: ' + JSON.stringify(r0.mix) + '  window catches: ' + r0.windowCatch.join(',') + '\n');
-  console.log('seed   first upgrade        creek     pines    russet');
-  rows.forEach(r => console.log(String(r.seed).padEnd(6) + ' ' + (r.first + ' catches (' + r.firstWhat + ')').padEnd(20) + ' ' + (r.creek ? r.creek.toFixed(1) : '-').padStart(6) + 'm  ' + (r.pines ? r.pines.toFixed(1) : '-').padStart(6) + 'm  ' + (r.russet ? r.russet.toFixed(1) : '-').padStart(6) + 'm'));
+  console.log('seed   first upgrade        creek     pines    russet     sound');
+  rows.forEach(r => console.log(String(r.seed).padEnd(6) + ' ' + (r.first + ' catches (' + r.firstWhat + ')').padEnd(20) + ' ' + (r.creek ? r.creek.toFixed(1) : '-').padStart(6) + 'm  ' + (r.pines ? r.pines.toFixed(1) : '-').padStart(6) + 'm  ' + (r.russet ? r.russet.toFixed(1) : '-').padStart(6) + 'm  ' + (r.sound ? r.sound.toFixed(1) : '-').padStart(6) + 'm'));
   console.log('');
   let failed = 0;
   failed += pacingIce(seeds[0]);
+
   for (const t of TARGETS) {
     const m = median(t.key), pass = m != null && m >= t.lo && m <= t.hi;
     if (!pass) failed++;
@@ -884,10 +893,50 @@ function pacing() {
   return failed ? 1 : 0;
 }
 
+// ---- --first (Phase 96.4) ------------------------------------------------------------------
+// A gentler first session: on each of the pacing's 20 seeds a fresh save lands its first fish
+// (the card done) inside 60 s of game time; and once one is landed the bias is off (the next
+// cast's school has no eager fish).
+function firstCheck() {
+  const seeds = [], got = [];
+  for (let i = 1; i <= 20; i++) seeds.push(i * 11);
+  let after = 0;
+  for (const seed of seeds) {
+    const G = load(), s = session(G, seed);
+    s.run(600, st => st.catches > 0);
+    got.push(s.st.firstAt == null ? Infinity : s.st.firstAt);
+    if (G.sim.economy.anyCaught(s.save) === false) after++;
+  }
+  const max = Math.max(...got), sorted = got.slice().sort((a, b) => a - b), ok = max < 60;
+  console.log('first fish landed (s of game time): ' + got.map(v => v.toFixed(1)).join(' '));
+  console.log((ok ? 'PASS ' : 'FAIL ') + 'every fresh save lands a fish inside 60 s: median ' + sorted[sorted.length >> 1].toFixed(1) + ' s, slowest ' + max.toFixed(1) + ' s');
+  const off = after === 0;
+  console.log((off ? 'PASS ' : 'FAIL ') + 'the first-taker bias is off once a fish is landed (fish_ai ctx.first false on all ' + seeds.length + ')');
+  return ok && off ? 0 : 1;
+}
+
 // Phase 80 (PLAN_WINTER.md 2.2 and 5): one seed played on past Russetwood: a sea, the Snow
 // Machine, then the ice (free once a sea has been seen). Checks: the ice cannot be opened before
 // a sea visit; the model reaches it only after the sea and the snowmobile; and it is not a
 // shortcut: the ice pays no more an hour than the sea before it did.
+// Phase 96: the sea against the ice, an hour fished at each with the model's bait there (the sea
+// on the Long Rod, the ice on the Ice Rod), net of bait, on three seeds. With the Snow Machine at
+// 1250 the model is at sea only some 17 minutes before it buys it, too short to rate the sea.
+function iceVsSea(seed) {
+  const rows = [];
+  for (const sd of [seed, seed * 2, seed * 3]) {
+    const r = {};
+    for (const loc of ['sound', 'tamarack']) {
+      const s = session(load(), sd, { loc, rod: loc === 'tamarack' ? 6 : 4, bait: P.baitAt[loc] || 'worm', stay: true, shop: false });
+      s.run(3600); r[loc] = Math.round((s.st.earned[loc] || 0) - (s.st.spent || 0));
+    }
+    rows.push(r);
+  }
+  const sea = rows.reduce((a, r) => a + r.sound, 0) / rows.length, ice = rows.reduce((a, r) => a + r.tamarack, 0) / rows.length;
+  console.log('An hour each (seeds ' + seed + ', ' + seed * 2 + ', ' + seed * 3 + '): the sea ' + rows.map(r => r.sound).join('/') + ', the ice ' + rows.map(r => r.tamarack).join('/') + ' coins net; mean ' + Math.round(sea) + ' vs ' + Math.round(ice));
+  return ice > 0 && ice <= sea;
+}
+
 function pacingIce(seed) {
   const G = load(), E = G.sim.economy, fresh = G.core.save.defaults();
   let bad = 0;
@@ -902,7 +951,7 @@ function pacingIce(seed) {
   const checks = [
     ['the ice is locked before a sea visit', early],
     ['the snowmobile and the ice come after the sea', !!order],
-    ['the ice pays at most what the sea did an hour (no shortcut)', rate('tamarack') > 0 && rate('tamarack') <= rate('sound')]
+    ['the ice pays at most what the sea does an hour (no shortcut)', iceVsSea(seed)]
   ];
   for (const [what, ok] of checks) { console.log((ok ? 'PASS ' : 'FAIL ') + what); if (!ok) bad++; }
   console.log('');
@@ -1320,9 +1369,10 @@ if (require.main === module) {
   if (args.includes('--fight')) code = fightCheck() || code;
   if (args.includes('--rod')) code = rodCheck() || code;
   if (args.includes('--homes')) code = homesCheck() || code; // Phase 75
+  if (args.includes('--first')) code = firstCheck() || code; // Phase 96.4
   if (args.includes('--tackle-water')) { console.log(JSON.stringify(tackleWater(args[args.indexOf('--tackle-water') + 1]))); process.exit(0); }
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --replay <seed> [minutes]');
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes', '--first'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --first | --replay <seed> [minutes]');
     code = 2;
   }
   if (args.includes('--tackle')) tackleCheck().then(c => process.exit(c || code), e => { console.log('FAIL --tackle: ' + e.message); process.exit(1); }); // Phase 69: in four processes

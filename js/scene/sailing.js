@@ -592,6 +592,7 @@ G.scene.sailing = (function () {
     // wait for the next spawn). speciesWeights is pure and draws nothing from the RNG.
     if (ctx.rodMaxMass !== lastRodMax) { lastRodMax = ctx.rodMaxMass; G.sim.fish_ai.speciesWeights(ctx); }
     ctx.attract = gx.attract * c.boost.attract;
+    ctx.first = !G.sim.economy.anyCaught(save);                    // Phase 96.4: a first taker each cast until one is landed
     ctx.maxDepthPx = loc.maxDepth;
     pondFish(run, save, ctx); // Phase 85
     G.sim.fish_ai.stepSchool(run.school, li, dt, G.rng, G.data);

@@ -12,7 +12,7 @@ G.data.locations = G.data.locations || {};
 G.data.locations.wreck = {
   id: 'wreck',
   name: 'Wreckhollow Bay',
-  cost: 9500,
+  cost: 2250, // Phase 96.1 (was 9500)
   width: 1400,
   waterY: 112,
   maxDepth: 160,

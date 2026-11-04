@@ -237,6 +237,9 @@ G.sim.economy = (function () {
     return true;
   }
 
+  // Phase 96.4: true once the save has landed a fish (any species caught).
+  function anyCaught(save) { for (var k in save.journal) if (save.journal[k].caught > 0) return true; return false; }
+
   // Phase 93.2: the part of the day ('dawn', 'day', 'dusk', 'night') of a game hour, from G.data.HOURS.
   function partOf(hour) {
     var H = G.data && G.data.HOURS, hh = Math.floor((((hour || 0) % 24) + 24) % 24);
@@ -305,7 +308,7 @@ G.sim.economy = (function () {
 
   return {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
-    partOf: partOf, sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
+    partOf: partOf, anyCaught: anyCaught, sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
     ownsRod: ownsRod, nextLadderRod: nextLadderRod, buyRod: buyRod, useRod: useRod, loseLure: loseLure,
     iceAll: iceAll, buySnow: buySnow, onIce: onIce, iceHook: iceHook, rodInHand: rodInHand,
     lineTypeById: lineTypeById, ownsLineType: ownsLineType, buyLineType: buyLineType, useLineType: useLineType,
