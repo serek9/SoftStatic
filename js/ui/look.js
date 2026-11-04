@@ -41,9 +41,11 @@ G.ui.look = (function () {
     set(kind, L[(i + d + L.length) % L.length].id);
   }
 
+  var lv = -1;
+  function lay() { if (lv === G.ui.panel.ver()) return; lv = G.ui.panel.ver(); G.ui.panel.place(W, H, from === 'cabin' ? 'bl' : 'right', R); }
   function open(src) {
     from = src || ''; row = 0; changed = false; t = 0;
-    G.ui.panel.place(W, H, from === 'cabin' ? 'bl' : 'right', R);
+    lv = -1; lay();
   }
 
   // Saves a change, then hands back: to the pause list (the overlay stays up) or to the scene.
@@ -88,8 +90,9 @@ G.ui.look = (function () {
     F.drawText(ctx, L.name, x + ((cw - F.measure(L.name)) >> 1), ny, key);
   }
 
-  function draw(ctx) {
-    var U = G.ui.panel, x = R[0], y = R[1], cw = (W - 2 * U.PAD - GAP) >> 1;
+  function draw(ctx0) {
+    lay();
+    var U = G.ui.panel, ctx = U.begin(ctx0), x = R[0], y = R[1], cw = (W - 2 * U.PAD - GAP) >> 1;
     U.frame(ctx, x, y, W, H, 'FISHER & DOG');
     cell(ctx, 0, U.left(x), U.top(y), cw);
     cell(ctx, 1, U.left(x) + cw + GAP, U.top(y), cw);
@@ -101,8 +104,9 @@ G.ui.look = (function () {
 
   // Phase 59.2: a touch on the picker. A cell's left or right third turns its look (and makes
   // it the row), its middle only picks the row; the ESC hint is done. Anywhere else, nothing.
-  function tap(gx, gy) {
-    var U = G.ui.panel, x0 = U.left(R[0]), y0 = U.top(R[1]), cw = (W - 2 * U.PAD - GAP) >> 1, y1 = y0 + U.ROW + PREV + 4 + F.LINE_H + 2;
+  function tap(gx0, gy0) {
+    lay();
+    var U = G.ui.panel, gx = U.ux(gx0), gy = U.uy(gy0), x0 = U.left(R[0]), y0 = U.top(R[1]), cw = (W - 2 * U.PAD - GAP) >> 1, y1 = y0 + U.ROW + PREV + 4 + F.LINE_H + 2;
     for (var i = 0; i < 2; i++) {
       var cx = x0 + i * (cw + GAP);
       if (gx >= cx && gx < cx + cw && gy >= y0 - 2 && gy < y1) {
@@ -122,5 +126,5 @@ G.ui.look = (function () {
     return { row: row, from: from, fisher: now('fisher').id, dog: now('dog').id, bakeMs: +bakeMs.toFixed(2), bakes: bakes, rect: R.slice() };
   }
 
-  return { native: true, open: open, update: update, draw: draw, set: set, info: info, tap: tap, rect: function () { return R; } };
+  return { native: true, open: open, update: update, draw: draw, set: set, info: info, tap: tap, rect: function () { lay(); return R; } };
 })();

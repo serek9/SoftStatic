@@ -69,6 +69,11 @@ G.core.device = (function () {
     canvas.style.width = cw + 'px';
     canvas.style.height = ch + 'px';
     info.left = ins[3] + (aw - cw) / 2; info.top = ins[0] + (ah - ch) / 2;
+    // Phase 90.3: on a phone wider than the picture, the margins hold the controls: the left
+    // one the steering pad (it needs more), the right one the column of keys and the action
+    // button, so the picture sits a little right of centre (60% of the spare width on the left).
+    if (t && aw - cw > 24) info.left = ins[3] + Math.round((aw - cw) * MARGIN_L);
+    info.left = Math.round(info.left * dpr) / dpr; info.top = Math.round(info.top * dpr) / dpr; // on whole device pixels
     canvas.style.left = info.left + 'px';
     canvas.style.top = info.top + 'px';
     var c2 = canvas.getContext('2d');
@@ -80,7 +85,12 @@ G.core.device = (function () {
     info.portrait = t && vh > vw;
     info.fullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
     info.fits++;
+    // Phase 90.1: the UI layer, sized from the same measures.
+    var st = G.state && G.state.save && G.state.save.settings;
+    if (G.ui && G.ui.panel) G.ui.panel.configure({ touch: t, large: !!(st && st.textSize === 'large'), compact: !!G.core.compact || !!(G.core.state && G.core.state.sceneName && G.core.state.sceneName() === 'gallery'),
+      dpr: dpr, vw: vw, vh: vh, insL: ins[3], insR: ins[1], left: info.left, top: info.top, cssW: cw, cssH: ch, gameCss: scale / dpr });
   }
+  var MARGIN_L = 0.6;
 
   // 57.2: on the first tap in touch mode, full screen and a landscape lock, where the browser
   // allows them. Asked once per load: leaving full screen afterwards is the player's choice.
@@ -170,6 +180,16 @@ G.core.device = (function () {
   function drawNotice(ctx, force) {
     if ((!info.portrait && !force) || !G.ui || !G.ui.panel) return;
     var F = G.gfx.sprites.fine, Pn = G.ui.panel, s = NOTICE_S;
+    if (Pn.on() && !force) { // Phase 90: over the UI layer, at 2 UI px a pixel in the middle of the screen
+      var c = Pn.begin(ctx), m0 = Pn.PAD + 2, w0 = Math.max(F.measureBold(NOTICE_A), F.measure(NOTICE_B)) + 2 * m0 + 2, h0 = Pn.TAB + 2 * m0 + 2 * F.LINE_H + 3;
+      var k = Pn.VW() >= 2 * w0 + 16 ? 2 : 1;
+      c.setTransform(k, 0, 0, k, Math.round((Pn.VW() - w0 * k) / 2), Math.round((Pn.VH() - h0 * k) / 2));
+      Pn.frame(c, 0, 0, w0, h0, '');
+      F.bold(c, NOTICE_A, m0, Pn.TAB + m0, 'bone');
+      F.drawText(c, NOTICE_B, m0, Pn.TAB + m0 + F.LINE_H + 3, 'fog_light');
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      return;
+    }
     // No title tab: the body starts TAB rows down, and the two lines sit evenly inside it.
     var m = Pn.PAD + 2, w = Math.max(F.measureBold(NOTICE_A), F.measure(NOTICE_B)) + 2 * m + 2, h = Pn.TAB + 2 * m + 2 * F.LINE_H + 3;
     var ox = Math.round((640 - w * s) / 2), oy = Math.round((360 - h * s) / 2);
@@ -191,7 +211,9 @@ G.core.device = (function () {
       scale: +info.scale.toFixed(3), whole: info.whole, css: [+info.cssW.toFixed(1), +info.cssH.toFixed(1)], at: [+info.left.toFixed(1), +info.top.toFixed(1)],
       fill: +info.fill.toFixed(3), fsAsked: info.fsAsked, fsResult: info.fsResult, lock: info.lock, fits: info.fits, audio: info.audio, budget: held >= 0 ? held : level,
       // Phase 58: the touch layout's mode and the action button's word
-      layout: G.core.input.layout().mode, word: G.ui && G.ui.hud ? G.ui.hud.word() : ''
+      layout: G.core.input.layout().mode, word: G.ui && G.ui.hud ? G.ui.hud.word() : '',
+      // Phase 90: the UI layer: on, its pixel in CSS px, the capitals' height in CSS px, its size
+      ui: G.ui && G.ui.panel ? { on: G.ui.panel.on(), css: +G.ui.panel.css().toFixed(3), textPx: G.ui.panel.textPx(), size: [G.ui.panel.VW(), G.ui.panel.VH()], pic: G.ui.panel.pic() } : null
     };
   }
 

@@ -22,6 +22,7 @@ G.ui.setup = (function () {
   var L = { rodW: 0, hookW: 0, hookX: 0, nameW: 0, hookNameW: 0, lineW: 0, lineX: 0 };
   var W_MAX = 320; // Phase 53: three columns need more than the small panel's MAX_W
   var msg = '', posTop = -1, posLen = -1, posStr = '';
+  var RH = 12, OFF = 0, lv = -1, openT = 0; // Phase 90: a row's height (taller for a thumb), the text's offset in it, the layout's UI version, when it opened
 
   function E() { return G.sim.economy; }
   function name(b) { return b.label === false ? '(no label)' : b.name; }
@@ -60,9 +61,11 @@ G.ui.setup = (function () {
     w = Math.min(W_MAX, 2 * U.PAD + 6 + L.rodW + GAP + L.hookW + GAP + L.lineW);
     L.hookX = U.PAD + 3 + L.rodW + GAP;
     L.lineX = L.hookX + L.hookW + GAP;
-    var h = U.TAB + U.PAD + U.ROW + ROWS * U.ROW + U.ROW + U.KEY_H + U.PAD;
+    RH = U.rowH(); OFF = (RH - U.ROW) >> 1;
+    var h = U.TAB + U.PAD + U.ROW + ROWS * RH + U.ROW + (U.touch() ? U.PAD + 4 : U.KEY_H + U.PAD);
     U.place(w, h, 'top', R);
     R[2] = w; R[3] = h;
+    lv = U.ver();
   }
 
   function cursorTo(save) {
@@ -76,7 +79,7 @@ G.ui.setup = (function () {
   function open() {
     var save = G.state.save;
     build(save); layout(); cursorTo(save);
-    col = 0; msg = ''; on = true;
+    col = 0; msg = ''; on = true; openT = G.ui.panel.now();
     took.rod = false; took.hook = false; took.rod0 = E().rodInHand(save, G.data); took.hook0 = save.gear.bait; took.line0 = save.gear.lineType;
   }
 
@@ -137,11 +140,14 @@ G.ui.setup = (function () {
     if (!usable(save, b)) return 'None left.';
     if (!downHole(save, b)) return 'Needs open water.';
     if (!E().isLure(b.id, G.data)) return b.unlimited ? 'Live bait. Never runs out.' : 'Live bait. One a cast.';
-    return (SWIM_SAYS[b.vary || b.swim] || 'A lure.') + ' ' + b.sizes[0] + (b.sizes.length > 1 ? '-' + b.sizes[b.sizes.length - 1] : ''); // Phase 69: its action and sizes
+    var how = G.ui.tips ? G.ui.tips.RETRIEVE[E().onIce(save, G.data) ? 'jig' : RETRIEVE_OF[b.swim]] : '';    // Phase 88.4: how to work it
+    return (SWIM_SAYS[b.vary || b.swim] || 'A lure.') + ' ' + (how ? how + ' ' : '') + b.sizes[0] + (b.sizes.length > 1 ? '-' + b.sizes[b.sizes.length - 1] : ''); // Phase 69: its action and sizes
   }
   var SWIM_SAYS = { mid: 'Swims mid water.', dive: 'Dives as you reel.', top: 'Stays on the top.', lift: 'Sinks fast, lifts and falls.',
     float: 'A worm under a float.', flutter: 'Falls fluttering.', dropshot: 'Worm held over a weight.', wacky: 'Sinks slow and level.',
     glide: 'Glides side to side.', rattle: 'Lift it sharp; it shivers.', kick: 'Its paddle tail kicks.' };
+
+  var RETRIEVE_OF = { dive: 'steady', mid: 'steady', glide: 'steady', lift: 'stopgo', flutter: 'stopgo', top: 'top', dropshot: 'slow', wacky: 'slow' };
 
   var LINE_SAYS = { mono: 'Stretches and forgives. Fish see it.', fluoro: 'Shy fish cannot see it. Sinks.', braid: 'No stretch: every touch shows. Seen.' };
 
@@ -152,10 +158,12 @@ G.ui.setup = (function () {
     for (i = 0; i < 5; i++) { ctx.fillStyle = P[i <= a ? 'signal_amber' : 'fog_dark']; ctx.fillRect(x + i * BAR, y + 5, BAR - 1, 2); }
   }
 
-  function draw(ctx) {
+  function draw(ctx0) {
     if (!on) return;
-    var U = G.ui.panel, save = G.state.save, g = G.data.gear, x = R[0], y = R[1], i, ry, key;
-    G.core.view.begin(ctx, true);
+    var U = G.ui.panel;
+    if (lv !== U.ver()) layout();
+    var ctx = U.begin(ctx0), a = U.fadeIn(openT), save = G.state.save, g = G.data.gear, x = R[0], y = R[1] + Math.round((1 - a) * 4), i, ry, key;
+    ctx.globalAlpha = a;
     U.frame(ctx, x, y, R[2], R[3], 'TACKLE');
     var cx0 = x + U.PAD + 3, cx1 = x + L.hookX, ty = U.top(y);
     F.bold(ctx, 'ROD', cx0, ty, col === 0 ? 'bone' : 'fog_mid');
@@ -165,8 +173,8 @@ G.ui.setup = (function () {
     ty += U.ROW;
     for (i = 0; i < rods.length && i < ROWS; i++) {
       var r = g.rods[rods[i]], inUse = E().rodInHand(save, G.data) === rods[i];
-      ry = ty + i * U.ROW;
-      if (col === 0 && i === sel[0]) U.row(ctx, cx0 - 3, ry, L.rodW + 6);
+      ry = ty + i * RH + OFF;
+      if (col === 0 && i === sel[0]) U.row(ctx, cx0 - 3, ry, L.rodW + 6, RH);
       key = inUse ? 'signal_amber' : 'fog_light';
       F.drawText(ctx, r.name, cx0, ry, key);
       bars(ctx, cx0 + L.nameW + 4, ry, POWER.indexOf(r.power), r.action);
@@ -175,16 +183,16 @@ G.ui.setup = (function () {
     }
     for (i = 0; i < ROWS && top + i < hooks.length; i++) {
       var b = E().baitById(hooks[top + i], G.data), n = left(save, b), ok = usable(save, b);
-      ry = ty + i * U.ROW;
-      if (col === 1 && top + i === sel[1]) U.row(ctx, cx1 - 3, ry, L.hookW + 6);
+      ry = ty + i * RH + OFF;
+      if (col === 1 && top + i === sel[1]) U.row(ctx, cx1 - 3, ry, L.hookW + 6, RH);
       key = !ok || !downHole(save, b) ? 'fog_dark' : (save.gear.bait === b.id ? 'signal_amber' : 'fog_light');
       F.drawText(ctx, name(b), cx1, ry, key);
       if (n >= 0) { var cnt = 'x' + n; F.drawText(ctx, cnt, cx1 + L.hookW - F.measure(cnt), ry, ok ? 'fog_mid' : 'fog_dark'); }
     }
     for (i = 0; i < lines.length; i++) {
       var lt = E().lineTypeById(lines[i], G.data);
-      ry = ty + i * U.ROW;
-      if (col === 2 && i === sel[2]) U.row(ctx, cx2 - 3, ry, L.lineW + 6);
+      ry = ty + i * RH + OFF;
+      if (col === 2 && i === sel[2]) U.row(ctx, cx2 - 3, ry, L.lineW + 6, RH);
       F.drawText(ctx, lt.name, cx2, ry, save.gear.lineType === lt.id ? 'signal_amber' : 'fog_light');
     }
     if (top > 0) F.drawText(ctx, '^', cx1 + L.hookW - 10, ty - U.ROW, 'fog_mid'); // more above or below, in the header
@@ -196,26 +204,31 @@ G.ui.setup = (function () {
     // Phase 73: the lure under the cursor in its own art, under the lines (fitted to the room left)
     var hb = hooks[sel[1]];
     if (hb && G.gfx.luregen.has(hb)) {
-      var room = (ROWS - lines.length) * U.ROW - 2, ic = G.gfx.luregen.iconImg(hb, L.lineW, room);
-      ctx.drawImage(ic, cx2 + ((L.lineW - ic.width) >> 1), ty + lines.length * U.ROW + 1 + ((room - ic.height) >> 1));
+      var room = (ROWS - lines.length) * RH - 2, ic = G.gfx.luregen.iconImg(hb, L.lineW, Math.min(room, 40));
+      ctx.drawImage(ic, cx2 + ((L.lineW - ic.width) >> 1), ty + lines.length * RH + 1 + ((room - ic.height) >> 1));
     }
-    ry = ty + ROWS * U.ROW;
+    ry = ty + ROWS * RH;
     F.drawText(ctx, detail(save), cx0, ry, msg ? 'signal_amber' : 'fog_light');
     var hx = x + U.PAD, hy = y + R[3] - U.PAD - U.KEY_H;
-    hx += U.hint(ctx, 'SPACE', 'pick', hx, hy);
-    hx += U.hint(ctx, 'A/D', 'column', hx, hy);
-    U.hint(ctx, 'S', 'close', hx, hy);
-    G.core.view.begin(ctx, false);
+    if (!U.touch()) {                                                                  // Phase 90: on a phone rows are tapped and ESC closes
+      hx += U.hint(ctx, 'SPACE', 'pick', hx, hy);
+      hx += U.hint(ctx, 'A/D', 'column', hx, hy);
+      U.hint(ctx, 'S', 'close', hx, hy);
+    }
+    ctx.globalAlpha = 1;
+    G.core.view.begin(ctx0, false);
   }
 
   // Touch and the mouse: a tap on a row moves the cursor there and returns 'action' (the
   // caller presses it, which picks); elsewhere on the panel 'action' too; off it 'setup', which
   // closes it. '' while the panel is shut.
-  function tap(gx, gy) {
+  function tap(gx0, gy0) {
     if (!on) return '';
     var U = G.ui.panel;
+    if (lv !== U.ver()) layout();
+    var gx = U.ux(gx0), gy = U.uy(gy0); // Phase 90: the panel is laid out in UI px
     if (!U.inside(R, gx, gy)) return 'setup';
-    var y0 = U.top(R[1]) + U.ROW - 2, i = Math.floor((gy - y0) / U.ROW), cx0 = R[0] + U.PAD, cx1 = R[0] + L.hookX - 3, cx2 = R[0] + L.lineX - 3;
+    var y0 = U.top(R[1]) + U.ROW - 2, i = Math.floor((gy - y0) / RH), cx0 = R[0] + U.PAD, cx1 = R[0] + L.hookX - 3, cx2 = R[0] + L.lineX - 3;
     if (i < 0 && hooks.length > ROWS && gx >= cx1 + L.hookW - 14 && gx < cx1 + L.hookW + 6) { // Phase 69: the ^ v marks page the hooks
       col = 1; msg = '';
       var pg = gx < cx1 + L.hookW - 2 ? -ROWS : ROWS;
@@ -239,6 +252,6 @@ G.ui.setup = (function () {
     isOpen: function () { return on; },
     // What the last close changed (the scene plays the fisher's act for it), and forgets it.
     changes: function () { var c = { rod: took.rod, hook: took.hook }; took.rod = false; took.hook = false; return c; },
-    rect: function () { return R; }
+    rect: function () { if (on && lv !== G.ui.panel.ver()) layout(); return R; }
   };
 })();

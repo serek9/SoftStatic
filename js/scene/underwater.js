@@ -1010,6 +1010,14 @@ G.scene.underwater = (function () {
     sweep: 0.25, sweepX: 1.5, sweepY: 4, // a run's slow sweeps (rad per thrash unit, px across, px down): it bores up and down more than across
     dive: 10                      // px deeper while pulling, at full stamina
   };
+  // Phase 89 (PLAN_PLAYABILITY.md 89.1): a hooked fish runs one way, turns and runs the other, as
+  // in Cast n Chill and in life. Each `pull` run takes a side (the other side from the last one
+  // `flip` of the time, from G.vrng: presentation only) and the fish heads that way, w0 + wMass ×
+  // its weight's share px from where the fight holds it, swinging across at most vcap px/s, at speedK × the old approach rate
+  // (scaled by the species' speed); tired, it comes back to the line and is led in. The fight's
+  // numbers (T, D, S, H) are not touched: only where the fish is drawn, the line to it and the
+  // camera that follows it. RUN.on false is the old path (dbg.fightRun(false), to compare).
+  var RUN = { on: true, flip: 0.7, w0: 26, wMass: 34, massRef: 4, speedK: 1.3, inK: 2.6, outK: 1.4, vcap: 16, reach: 150, silt: 14, bubbles: 7 };
   var lenOf = [];
   function bodyLen(sp) { return lenOf[sp] || (lenOf[sp] = G.gfx.fishgen.swimmer(sp, 0, false, false).width / HI * 0.85); }
 
@@ -1359,6 +1367,7 @@ G.scene.underwater = (function () {
   function hook(run) {
     var b = run.bite, f = run.school.fish[b.slot], sp = G.data.fish[f.sp], h = run.hook, boatB = run.boat;
     h.trash = -1; h.sp = f.sp; h.uid = f.uid; h.x = f.x; h.y = f.y; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false; // wet: 1 until it leaves the water
+    runReset(h, f.x >= run.cast.x1 ? 1 : -1);                                      // Phase 89
     fx.splash(run.cast.x1, G.scene.sailing.loc().waterY, 0.25); // audit P1-4: the hook-set shows at the surface
     h.dist = Math.max(8, Math.abs(f.x - (boatB.x + boatB.facing * UW.reach)));
     h.hx = run.cast.x1; h.side = f.x >= h.hx ? 1 : -1;                            // Phase 81: the hole it was hooked through, and the way it runs
@@ -1379,8 +1388,11 @@ G.scene.underwater = (function () {
 
   // Where the hooked fish is: D sets how far out (0 at the boat), it rises toward the surface
   // as it comes in, and thrashes while pulling. The line and camera follow cast.x1/ly.
+  // Phase 89: a new fight's run state. side: where the first run goes (the way it took the lure).
+  function runReset(h, side) { h.runSide = side; h.runOff = 0; h.runW = 0; h.lastMode = ''; h.runs = 0; h.flips = 0; h.vx = 0; h.vmax = 0; h.px = h.x; h.bub = 0; }
+
   function hookPos(run, dt, loc) {
-    var F = run.fight, h = run.hook, b = run.boat, tx, ty;
+    var F = run.fight, h = run.hook, b = run.boat, tx, ty, rate = 5;
     if (run.fsm === 'landing') {
       h.lift = Math.min(1, h.lift + dt / LAND_TIME);
       var u = h.lift * h.lift * (3 - 2 * h.lift);
@@ -1401,17 +1413,41 @@ G.scene.underwater = (function () {
       // the ice (the way it took the lure) and is always led back to the hole, rising to it.
       var ice = loc.ice, T = ice ? ice.thick + 3 : 0;
       if (ice) { tx = h.hx + h.side * Math.min(frac * h.dist, 120); ty = T + (h.depth - T) * Math.min(1, frac) + (1 - Math.min(1, frac * 4)) * -T * 0.5; }
+      // Phase 89: the side runs (not under the ice: there the hole holds it, Phase 81).
+      if (RUN.on && !ice && !F.steady) {
+        var pulling = F.mode === 'pull';
+        if (pulling && h.lastMode !== 'pull') {                                      // a new run: which way, how wide
+          if (h.runs > 0 && G.vrng.next() < RUN.flip) { h.runSide = -h.runSide; h.flips++; }
+          h.runs++;
+          h.runW = RUN.w0 + RUN.wMass * Math.min(1, Math.sqrt(Math.max(0, F.mass) / RUN.massRef));
+          var bedY = bottomAt(loc, h.x);
+          if (bedY - h.y < RUN.silt && G.scene.life.silt) G.scene.life.silt(h.x, bedY, 5);   // the turn stirs the bed
+          fx.emit('bubbles', h.x, loc.waterY + h.y - 2, 3);
+        }
+        h.lastMode = F.mode;
+        var want = pulling ? h.runSide * h.runW * (0.55 + 0.45 * F.S) : 0;
+        var dOff = (want - h.runOff) * Math.min(1, (pulling ? RUN.inK : RUN.outK) * dt), cap = RUN.vcap * clamp(0.8 + 0.2 * F.speed, 0.875, 1.125) * dt;
+        h.runOff += clamp(dOff, -cap, cap);                                          // a run swings across at most vcap px/s
+        tx += h.runOff;
+        tx = clamp(tx, Math.max(4, b.x - RUN.reach), Math.min(loc.width - 4, b.x + RUN.reach));
+        if (pulling) rate = 5 * RUN.speedK * clamp(0.8 + 0.2 * F.speed, 0.875, 1.125); // 1.4-1.8x the old approach
+      }
       if (F.mode === 'pull') {
         // Phase 29: a run bores up and down in slow arcs and dives while the fish is fresh (it
         // used to shake ±3 px at 2 Hz; the head shakes are drawn on the body now).
         h.thrash += dt * 14; tx += Math.sin(h.thrash * HOOK.sweep) * HOOK.sweepX; ty += Math.cos(h.thrash * HOOK.sweep * 0.8) * HOOK.sweepY + HOOK.dive * F.S;
+        // Phase 89.2: thrash bubbles off the fish while it pulls, more in a head shake.
+        h.bub += dt * (RUN.bubbles * (F.shake > 0 ? 2 : 1) * (0.4 + 0.6 * F.S));
+        if (h.bub >= 1 && !ice) { h.bub -= 1; fx.emit('bubbles', h.x + G.vrng.range(-3, 3), loc.waterY + h.y - 1, 1); }
         // Phase 20: a fish pulling near the surface (above 4 m) churns it, harder the shallower.
         if (h.y < SHALLOW) { h.churn += dt * 5; if (h.churn >= 1) { h.churn -= 1; G.gfx.surface.poke(h.x, 0.4 * (1 - h.y / SHALLOW), 2); if (G.vrng.next() < 0.2 * F.speed) G.audio.engine.cue('thrash', h.x, 1 - h.y / SHALLOW); } } // splashes: more often for a fast fish
       }
       // Phase 23: a jump lifts it clear of the water in an arc and drops it back.
       var jl = G.data.gear.fight.jumpLen;
       if (F.jump > 0 && !ice) ty = -14 * Math.sin(Math.PI * (1 - F.jump / jl)); // Phase 81: no leaping under the ice
-      h.x += (tx - h.x) * Math.min(1, 5 * dt);
+      h.x += (tx - h.x) * Math.min(1, rate * dt);
+      h.vx = dt > 0 ? (h.x - h.px) / dt : 0; h.px = h.x;                               // Phase 89: its speed across (the drag's clicks read it)
+      if (F.mode === 'pull' && Math.abs(h.vx) > h.vmax) h.vmax = Math.abs(h.vx);
       // Phase 29: a jump cut short (the fight turned tired mid-leap) falls back, not snaps.
       var yb = h.y;
       h.y += (ty - h.y) * Math.min(1, (F.jump > 0 || yb < 0 ? 14 : 4) * dt);
@@ -1426,6 +1462,7 @@ G.scene.underwater = (function () {
       }
       var away = h.x >= b.x ? 1 : -1;
       h.face = F.mode === 'pull' ? away : -away;
+      if (RUN.on && !ice && F.mode === 'pull' && Math.abs(h.vx) > 8) h.face = h.vx > 0 ? 1 : -1; // Phase 89: it faces the way it runs
     }
     var c = run.cast;
     c.x1 = c.lx = h.x;
@@ -1456,6 +1493,7 @@ G.scene.underwater = (function () {
     }
     var h = run.hook, b = run.boat, gx = run.gearFx;
     h.trash = i; h.pondK = -1; h.sp = -1; h.uid = -1; h.x = x; h.y = depth; h.t = 0; h.lift = 0; h.thrash = 0; h.drip = -1; h.wet = 1; h.churn = 0; h.air = false;
+    runReset(h, 1);                                                                 // Phase 89 (trash never pulls, so never runs)
     h.dist = Math.max(8, Math.abs(x - (b.x + b.facing * UW.reach))); h.hx = x; h.side = 1; h.depth = depth;
     h.q = 0; h.len = 0; h.w = k.kg;
     TRASH.strength = k.pull; TRASH.mass = k.kg;
@@ -1475,7 +1513,7 @@ G.scene.underwater = (function () {
     var inp = G.core.input, fsm = run.fsm, F = G.sim.fight;
     if (fsm === 'waiting' || fsm === 'interest') {
       if (loc.pond && run.bite.slot < 0 && trashTouch(run, loc)) return;            // Phase 84: the lure on a piece of trash
-      biteIn.reel = inp.held('action');
+      biteIn.reel = inp.held('action') || inp.pressed('action'); // Phase 88: a tap shorter than a step still sets the hook
       var biting = run.bite.slot >= 0;
       if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
       else if (!biting && run.bite.slot >= 0) { // audit P1-4: a ring where the line goes in, and a dent (Phase 20)
@@ -1495,12 +1533,15 @@ G.scene.underwater = (function () {
         G.core.state.go(run, 'landing');
       } else if (res === F.SNAP || res === F.ESCAPE) {
         release(run);
+        // Phase 88.2: why it got away, said once on the HUD (the lure's loss with it).
+        var why = res === F.SNAP ? 'The line snapped. Let go when it runs hard.' : (run.fight.thrown ? 'It threw the hook on a slack line. Keep a little tension.' : 'It ran off. Reel while it is tired.');
         // Phase 43: a snapped line takes the lure with it (a thrown hook does not).
         if (res === F.SNAP && G.sim.economy.loseLure(G.state.save, run.cast.bait, G.data)) {
           var lb = G.sim.economy.baitById(run.cast.bait, G.data), left = G.state.save.baits[lb.id] || 0;
-          G.ui.hud.say('Lost the ' + lb.name + '. ' + (left ? left + ' left.' : 'None left: worms next.'));
+          why = 'The line snapped: lost the ' + lb.name + '. ' + (left ? left + ' left.' : 'None left: worms next.');
           G.core.save.autosave('lure');
         }
+        G.ui.hud.say(why);
         fx.splash(run.hook.x, loc.waterY, 0.3);
         if (G.core.debug) G.core.debug.log(res === F.SNAP ? 'the line snapped' : 'it slipped away');
         G.core.state.go(run, 'sailing');
@@ -1788,6 +1829,9 @@ G.scene.underwater = (function () {
       for (var i = 0; i < BN; i++) if (bon[i]) out.push({ i: i, shoal: (i / SHMAX) | 0, x: +bx[i].toFixed(2), y: +by[i].toFixed(2), vx: +bvx[i].toFixed(2), vy: +bvy[i].toFixed(2), scared: +Math.max(0, bsc[i]).toFixed(2), face: bface[i], L: +shL[(i / SHMAX) | 0].toFixed(2), H: +shH[(i / SHMAX) | 0].toFixed(2) });
       return out;
     },
+    // dbg.fightRun(on): the hooked fish's runs (Phase 89): how many, how many changed side, its
+    // fastest speed across in a run (px/s); on false/true switches the side runs off/on.
+    fightRun: function (on) { if (on !== undefined) RUN.on = !!on; var h = G.state.run.hook; return { on: RUN.on, runs: h.runs | 0, flips: h.flips | 0, vmax: +(h.vmax || 0).toFixed(1), side: h.runSide, off: +(h.runOff || 0).toFixed(1) }; },
     fishBody: function (i) { // dbg.fishBody: slot 0..7, or 'hook'
       var bd = bodies[i === 'hook' ? HOOKB : i];
       if (!bd || bd.uid < 0) return null;

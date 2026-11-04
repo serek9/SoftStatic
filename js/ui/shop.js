@@ -180,6 +180,7 @@ G.ui.shop = (function () {
   // ---- Scene ----------------------------------------------------------------------------
   var row = 0, col = 0, t = 0, line_ = null;
   var R = G.ui.shopRoom, walk = null, faced = '';
+  var RETRIEVE_OF = { dive: 'steady', mid: 'steady', glide: 'steady', lift: 'stopgo', flutter: 'stopgo', top: 'top', dropshot: 'slow', wacky: 'slow' }; // Phase 88.4: how each is worked
   var txt = { name: [], icon: '', price: '', desc: [], status: [], msg: [], msgKey: 'fog_light', coins: '', pos: '', posSel: -1, posLen: -1 }, lastCoins = -1;
   var uneaseIn = { loc: 'fog', still: true, atShop: true };
   // Phase 37: what is open over the room: '' (walking), 'box' (Rusty talking), 'choice'
@@ -194,6 +195,29 @@ G.ui.shop = (function () {
   var BOX_R = [BOX.x, BOX.y - 13, BOX.w, BOX.h + 13], CH_R = [CH.x, CH.y - 13, CH.w, CH.h - 1];
   var LIST_R = [LIST.x, LIST.y, LIST.w, LIST.h], ITEM_R = [ITEM.x, ITEM.y, ITEM.w, ITEM.h];
   var R_NONE = [], R_BOX = [BOX_R], R_CHOICE = [BOX_R, CH_R], R_ITEMS = [LIST_R, ITEM_R];
+  // Phase 90: on the UI layer the box, the choice and the item window are laid out on the
+  // picture there (a PC at the normal text size keeps the numbers above); rows grow for a thumb.
+  var lv = -1, CH_ROW = 22;
+  function lay() {
+    var U = G.ui.panel;
+    if (lv === U.ver()) return;
+    lv = U.ver();
+    if (U.on()) {
+      var p = U.pic(), rh = Math.max(16, U.rowH());
+      BOX.w = p[2] - 32; BOX.x = p[0] + 16; BOX.h = 62; BOX.y = p[1] + p[3] - 8 - BOX.h;
+      CH_ROW = Math.max(22, U.rowH() + 2); CH.w = 128; CH.h = 26 + 3 * CH_ROW - 20; CH.x = BOX.x + BOX.w - CH.w; CH.y = BOX.y - U.TAB - 8 - CH.h + 14;
+      LIST.w = 240; LIST.x = p[0] + p[2] - 8 - LIST.w; LIST.y = p[1] + 8; LIST.rowH = rh;
+      LIST.rows = Math.max(3, Math.min(6, Math.floor((p[3] - 16 - 98 - 6 - (U.TAB + U.PAD + 16)) / rh)));
+      LIST.h = U.TAB + U.PAD + LIST.rows * rh + 16; ITEM.x = LIST.x; ITEM.w = 240; ITEM.y = LIST.y + LIST.h + 6; ITEM.h = 98;
+    } else {
+      BOX.x = 24; BOX.y = 290; BOX.w = 592; BOX.h = 62; CH.x = 488; CH.y = 196; CH.w = 128; CH.h = 88; CH_ROW = 22;
+      LIST.x = 392; LIST.y = 8; LIST.w = 240; LIST.h = 140; LIST.rowH = 16; LIST.rows = 6; ITEM.x = 392; ITEM.y = 154; ITEM.w = 240; ITEM.h = 98;
+    }
+    BOX_R[0] = BOX.x; BOX_R[1] = BOX.y - 13; BOX_R[2] = BOX.w; BOX_R[3] = BOX.h + 13;
+    CH_R[0] = CH.x; CH_R[1] = CH.y - 13; CH_R[2] = CH.w; CH_R[3] = CH.h - 1;
+    LIST_R[0] = LIST.x; LIST_R[1] = LIST.y; LIST_R[2] = LIST.w; LIST_R[3] = LIST.h;
+    ITEM_R[0] = ITEM.x; ITEM_R[1] = ITEM.y; ITEM_R[2] = ITEM.w; ITEM_R[3] = ITEM.h;
+  }
   var TITLES = { rusty: 'BUY', rack: 'THE RACK', gear: 'GEAR', worms: 'WORMS', crickets: 'CRICKETS', tank: 'THE TANK', jar: 'THE JAR', lures: 'LURES' };
   var rusty = { face: 'down', fr: 3 };
   // Phase 38: the shelves he can face, and their items ([shelf, item] in SHELVES); what they
@@ -284,7 +308,7 @@ G.ui.shop = (function () {
       if (b.unlimited) desc = 'Free, and they never run out. Most fish take them.';
       else if (b.swim) { // Phase 43: a lure
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
-        desc = SWIM_SAYS[b.vary || b.swim] + ' ' + (b.sizes.length > 1 ? 'Sizes ' + b.sizes[0] + '-' + b.sizes[b.sizes.length - 1] : 'Size ' + b.sizes[0]) + '. Lost if the line snaps.'; // Phase 69: its action and the fish sizes it is made for
+        desc = SWIM_SAYS[b.vary || b.swim] + ' ' + (G.ui.tips && RETRIEVE_OF[b.swim] ? G.ui.tips.RETRIEVE[RETRIEVE_OF[b.swim]] + ' ' : '') + (b.sizes.length > 1 ? 'Sizes ' + b.sizes[0] + '-' + b.sizes[b.sizes.length - 1] : 'Size ' + b.sizes[0]) + '. Lost if the line snaps.'; // Phase 69: its action and the fish sizes it is made for
       } else {
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
         if (b.label === false) desc = 'No label. The jar is warm.';
@@ -356,6 +380,7 @@ G.ui.shop = (function () {
   // The visit's line as pages of the text box: up to two lines each; a repeated line is said
   // twice, on its own pages; a reversed one runs backwards in crimson.
   function talk() {
+    lay();
     pages.length = 0;
     var said = spoken(line_);
     for (var i = 0; i < said.length; i++) {
@@ -370,6 +395,7 @@ G.ui.shop = (function () {
     cat: ['The cat is asleep on the freezer. It has been asleep on the freezer since you can remember.', 'One ear turns toward you. The rest of the cat does not.'],
     gear: ['Boxes of hooks, a coil of rope, a box of fuses. Nothing for sale on this shelf now.', 'A lava lamp, and dust where something used to stand.'] }; // Phase 79b: the lantern and the finder are gone
   function remark(id) {
+    lay();
     var r = REMARKS[id], ls = F.wrap(r[remarkN++ % r.length], BOX.w - 32);
     pages.length = 0;
     for (var k = 0; k < ls.length; k += 2) pages.push(ls.slice(k, k + 2));
@@ -500,13 +526,14 @@ G.ui.shop = (function () {
   // rest of the page, the next page, then the choice). Buy, Talk, Leave and the item window's
   // rows by the row rule (a tap selects, a tap on the selected row chooses or buys); the item
   // panel's SPACE hint chooses and its ESC hint goes back. Anywhere else, nothing.
-  function tap(gx, gy) {
-    var U = G.ui.panel, i;
+  function tap(gx0, gy0) {
+    var U = G.ui.panel, i, gx = U.ux(gx0), gy = U.uy(gy0);                         // Phase 90: UI px
+    lay();
     if (open === 'box') return gx >= BOX.x && gx < BOX.x + BOX.w && gy >= BOX.y - U.TAB && gy < BOX.y + BOX.h ? 'action' : 'none';
     if (open === 'choice') {
       for (i = 0; i < CHOICES.length; i++) {
-        var cy = CH.y + 8 + i * 22;
-        if (gx >= CH.x && gx < CH.x + CH.w && gy >= cy - 4 && gy < cy + 14) {
+        var cy = CH.y + 8 + i * CH_ROW;
+        if (gx >= CH.x && gx < CH.x + CH.w && gy >= cy - 4 - ((CH_ROW - 22) >> 1) && gy < cy - 4 - ((CH_ROW - 22) >> 1) + CH_ROW) {
           if (i !== choice) { choice = i; return 'none'; }
           return 'action';
         }
@@ -545,11 +572,13 @@ G.ui.shop = (function () {
     for (var i = 0; i < 4; i++) { if (right) ctx.fillRect(x + i, y + i, 1, 7 - i * 2); else ctx.fillRect(x + i, y + i, 7 - i * 2, 1); }
   }
 
-  function draw(ctx) {
+  function draw(ctx0) {
     var save = G.state.save, i;
-    R.draw(ctx, walk, t, save.clock, rusty, stock, env);
-    if (env.flash > 0) { ctx.globalAlpha = 0.1 * env.flash; ctx.fillStyle = P.fog_light; ctx.fillRect(0, 0, 640, 360); ctx.globalAlpha = 1; } // Phase 55: lightning through the windows
+    R.draw(ctx0, walk, t, save.clock, rusty, stock, env);
+    if (env.flash > 0) { ctx0.globalAlpha = 0.1 * env.flash; ctx0.fillStyle = P.fog_light; ctx0.fillRect(0, 0, 640, 360); ctx0.globalAlpha = 1; } // Phase 55: lightning through the windows
     if (!open) return;
+    lay();
+    var ctx = G.ui.panel.begin(ctx0);                                              // Phase 90: the boxes on the UI layer
     if (open === 'box' || open === 'choice') {
       // Phase 54: the text box in the shared panel style, Rusty's name on its tab.
       G.ui.panel.frame(ctx, BOX.x, BOX.y - G.ui.panel.TAB, BOX.w, BOX.h + G.ui.panel.TAB, 'RUSTY');
@@ -562,8 +591,8 @@ G.ui.shop = (function () {
       var U = G.ui.panel;
       U.frame(ctx, CH.x, CH.y - U.TAB, CH.w, CH.h + U.TAB - 14, '');
       for (i = 0; i < CHOICES.length; i++) {
-        var cy = CH.y + 8 + i * 22;
-        if (i === choice) { ctx.fillStyle = P.rust_dark; ctx.fillRect(CH.x + 3, cy - 4, CH.w - 6, 16); ctx.fillStyle = P.signal_amber; ctx.fillRect(CH.x + 3, cy - 4, 1, 16); }
+        var cy = CH.y + 8 + i * CH_ROW;
+        if (i === choice) { ctx.fillStyle = P.rust_dark; ctx.fillRect(CH.x + 3, cy - 4, CH.w - 6, 16); ctx.fillStyle = P.signal_amber; ctx.fillRect(CH.x + 3, cy - 4, 2, 16); }
         F.bold(ctx, CHOICES[i], CH.x + 16, cy, i === choice ? 'signal_amber' : 'bone');
       }
     }
@@ -580,14 +609,14 @@ G.ui.shop = (function () {
       ctx.imageSmoothingEnabled = false;
       for (i = top; i < list.length && i < top + rows; i++) {
         var it = SHELVES[list[i][0]][list[i][1]], ry = U.top(y) + (i - top) * LIST.rowH, l = label(it), on = i === sel;
-        if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, LIST.w - 6, LIST.rowH); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 1, LIST.rowH); }
+        if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, LIST.w - 6, LIST.rowH); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 2, LIST.rowH); }
         var ic = icon(it, 1);
-        if (it.icon === 'lure') ctx.drawImage(ic, x + U.PAD + 2 + ((LURE_ROW[0] - ic.width) >> 1), ry + ((LURE_ROW[1] - ic.height) >> 1)); // Phase 73: at its own size
-        else ctx.drawImage(ic, x + U.PAD + 2, ry, 14, 14);
-        F.drawText(ctx, l.name, x + U.PAD + 20, ry + 3, on ? 'signal_amber' : 'bone');
+        if (it.icon === 'lure') ctx.drawImage(ic, x + U.PAD + 2 + ((LURE_ROW[0] - ic.width) >> 1), ry + ((LIST.rowH - 16) >> 1) + ((LURE_ROW[1] - ic.height) >> 1)); // Phase 73: at its own size
+        else ctx.drawImage(ic, x + U.PAD + 2, ry + ((LIST.rowH - 16) >> 1), 14, 14);
+        F.drawText(ctx, l.name, x + U.PAD + 20, ry + 3 + ((LIST.rowH - 16) >> 1), on ? 'signal_amber' : 'bone');
         var pw = F.measure(l.price);
-        F.drawText(ctx, l.price, x + LIST.w - U.PAD - pw, ry + 3, l.price === 'OWNED' || l.price === 'BEST' ? 'fog_mid' : 'rust_hi');
-        if (l.mark) F.drawText(ctx, l.mark, x + LIST.w - U.PAD - 8 - pw - F.measure(l.mark), ry + 3, l.mark === 'ON' ? 'moss_lit' : 'fog_light');
+        F.drawText(ctx, l.price, x + LIST.w - U.PAD - pw, ry + 3 + ((LIST.rowH - 16) >> 1), l.price === 'OWNED' || l.price === 'BEST' ? 'fog_mid' : 'rust_hi');
+        if (l.mark) F.drawText(ctx, l.mark, x + LIST.w - U.PAD - 8 - pw - F.measure(l.mark), ry + 3 + ((LIST.rowH - 16) >> 1), l.mark === 'ON' ? 'moss_lit' : 'fog_light');
       }
       if (top > 0) F.drawText(ctx, '^', x + (LIST.w >> 1) - 8, y + LIST.h - 12, 'fog_mid');           // more above, more below
       if (top + rows < list.length) F.drawText(ctx, 'v', x + (LIST.w >> 1) + 4, y + LIST.h - 14, 'fog_mid');
@@ -616,7 +645,7 @@ G.ui.shop = (function () {
     // Phase 58: a text box or window is open over the room (the touch pad hides), and the word
     // on the touch action button for what he faces.
     busy: function () { return open !== ''; }, tap: tap,
-    rects: function () { return open === 'box' ? R_BOX : open === 'choice' ? R_CHOICE : open === 'items' ? R_ITEMS : R_NONE; },
+    rects: function () { lay(); return open === 'box' ? R_BOX : open === 'choice' ? R_CHOICE : open === 'items' ? R_ITEMS : R_NONE; },
     word: function () { return open !== '' || !walk ? '' : faced === 'rusty' ? 'TALK' : SHELF_ITEMS[faced] ? 'LOOK' : faced === 'guitar' ? 'PLAY' : REMARKS[faced] ? 'LOOK' : ''; },
     // Tests: choose an item (shelf r, item c) in the window, as if the cursor were on it, and buy.
     select: function (r, c) { row = r; col = c; describe(); return txt.name.join(' '); },

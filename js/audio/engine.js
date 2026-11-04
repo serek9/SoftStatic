@@ -522,6 +522,9 @@ G.audio.engine = (function () {
     coin: function () { tone('sine', 1318.5, 1318.5, 0.12, 0.025, 0.1); tone('sine', 1760, 1760, 0.22, 0.02, 0.1, 0.07); },
     buy: function () { click(0.6, 0.06, 0); tone('sine', 140, 90, 0.12, 0.05, 0, 0.02); SOUNDS.coin(); },
     page: function () { hiss('lowpass', 1500, 600, 0.7, 0.08, 0.02, 0); },
+    // Phase 90.5: the UI's two soft sounds: a move between rows, and a choice.
+    uiMove: function () { click(2.2, 0.012, 0); },
+    uiOk: function () { click(1.4, 0.02, 0); tone('sine', 880, 880, 0.06, 0.008, 0, 0.01); },
     hum: function (pan) { tone('sine', 98, 97, 1.4, 0.05, pan, 0, null, 0.2); tone('sine', 147, 146.2, 1.4, 0.03, pan, 0, null, 0.2); },
     owl: function (pan) {
       for (var i = 0; i < 2; i++) {
@@ -701,6 +704,8 @@ G.audio.engine = (function () {
     while (clickAcc >= 1) { clickAcc -= 1; playBuf(pick(KIT.click[tier]), TR.gain * (0.5 + 0.5 * load), boatPan, 0.95 + 0.1 * G.vrng.next()); }
     if (turns === 0) clickAcc = 0;
     var dragRate = dD > 0 ? Math.min(90, 500 * dD) : 0;
+    // Phase 89.2: a run across (the hooked fish's side runs) takes line too: the clicks follow its speed
+    if (fsm === 'fighting' && F.mode === 'pull' && run.hook && run.hook.vx) dragRate = Math.min(90, dragRate + Math.min(40, Math.abs(run.hook.vx) * 0.9));
     dragAcc += dt * dragRate;
     while (dragAcc >= 1) { dragAcc -= 1; playBuf(pick(KIT.click[tier]), TR.gain * 0.8, boatPan, 1.3 + Math.min(1, dD * 8)); }
     if (dragRate === 0) dragAcc = 0;

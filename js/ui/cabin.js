@@ -373,6 +373,17 @@ G.ui.cabin = (function () {
   var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, strange: '', st: 0, flash: 0 };
   var BOX = { x: 24, y: 296, w: 592, h: 56 }, HEAD = { x: 120, y: 316, w: 400, h: 40 };
   var R_BOX = [[BOX.x, BOX.y - 13, BOX.w, BOX.h + 13]], R_HEAD = [[HEAD.x, HEAD.y - 13, HEAD.w, HEAD.h]]; // 8.4 #38
+  // Phase 90: on the UI layer the box and the heading sit at the picture's foot there.
+  var uiv = -1;
+  function uiLay() {
+    var U = G.ui.panel;
+    if (uiv === U.ver()) return;
+    uiv = U.ver();
+    if (U.on()) { var p = U.pic(); BOX.x = p[0] + 16; BOX.w = p[2] - 32; BOX.h = 56; BOX.y = p[1] + p[3] - 8 - BOX.h; HEAD.w = Math.min(400, p[2] - 16); HEAD.x = p[0] + ((p[2] - HEAD.w) >> 1); HEAD.h = 40; HEAD.y = p[1] + p[3] - 4 - HEAD.h + 13 - 13; }
+    else { BOX.x = 24; BOX.y = 296; BOX.w = 592; BOX.h = 56; HEAD.x = 120; HEAD.y = 316; HEAD.w = 400; HEAD.h = 40; }
+    var b = R_BOX[0], h = R_HEAD[0];
+    b[0] = BOX.x; b[1] = BOX.y - 13; b[2] = BOX.w; b[3] = BOX.h + 13; h[0] = HEAD.x; h[1] = HEAD.y - 13; h[2] = HEAD.w; h[3] = HEAD.h;
+  }
 
   function bakeRoom() {
     var lv = G.state.save.cabinLevel, st = G.data.gear.cabin[lv];
@@ -460,14 +471,14 @@ G.ui.cabin = (function () {
     return r;
   }
 
-  function say(s) { lines = F.wrap(s, BOX.w - 32); open = 'box'; }
+  function say(s) { uiLay(); lines = F.wrap(s, BOX.w - 32); open = 'box'; }
 
   // What Space does facing each thing.
   function use(what) {
     var lv = level, next = G.data.gear.cabin[lv + 1], i;
     if (what === 'bench') {
       if (!next) { say('The ledger is all ticked off. Nothing left to fix.'); return; }
-      lines = F.wrap('The ledger: ' + next.name + ', ' + next.cost + ' coins. You have ' + G.state.save.coins + '.', BOX.w - 32);
+      uiLay(); lines = F.wrap('The ledger: ' + next.name + ', ' + next.cost + ' coins. You have ' + G.state.save.coins + '.', BOX.w - 32);
       open = 'restore'; return;
     }
     if (what === 'mirror') { G.ui.menu.open('look', 'cabin'); return; }
@@ -592,7 +603,8 @@ G.ui.cabin = (function () {
     if (cable.length) { for (i = 0; i < cable.length; i++) { bp[i] = bp[i] || [0, 0]; bp[i][0] = ox + cable[i][0]; bp[i][1] = oy + cable[i][1]; } bp.length = cable.length; K.bulbs(ctx, bp, t, env.night); }
     if (env.flash > 0) { ctx.globalAlpha = 0.1 * env.flash; ctx.fillStyle = P.fog_light; ctx.fillRect(0, 0, 640, 360); ctx.globalAlpha = 1; }
     // The words: the cabin's stage, coins and next repair along the bottom; or a message.
-    var U = G.ui.panel;
+    var U = G.ui.panel, ctx0 = ctx;
+    uiLay(); ctx = U.begin(ctx0);                                                   // Phase 90: on the UI layer
     if (open) {
       U.frame(ctx, BOX.x, BOX.y - U.TAB, BOX.w, BOX.h + U.TAB, open === 'restore' ? 'THE LEDGER' : 'CABIN');
       for (i = 0; i < lines.length && i < 2; i++) F.drawText(ctx, lines[i], BOX.x + 14, BOX.y + 10 + i * (F.LINE_H + 6), 'bone');
@@ -663,11 +675,12 @@ G.ui.cabin = (function () {
     // Phase 58: a panel is open over the room (the touch pad hides), and the touch action
     // button's word for what he faces (the hint's 'look' where it would say look).
     busy: function () { return open !== ''; },
-    rects: function () { return open ? R_BOX : R_HEAD; }, // 8.4 #38: what the ESC key keeps off
+    rects: function () { uiLay(); return open ? R_BOX : R_HEAD; }, // 8.4 #38: what the ESC key keeps off
     // Phase 59.2: a touch with the box open. A message: a tap on the box is Space (ok). The
     // ledger: only its SPACE hint pays and its ESC hint is not now, so a stray tap spends nothing.
-    tap: function (gx, gy) {
-      var U = G.ui.panel, onBox = gx >= BOX.x && gx < BOX.x + BOX.w && gy >= BOX.y - U.TAB && gy < BOX.y + BOX.h;
+    tap: function (gx0, gy0) {
+      uiLay();
+      var U = G.ui.panel, gx = U.ux(gx0), gy = U.uy(gy0), onBox = gx >= BOX.x && gx < BOX.x + BOX.w && gy >= BOX.y - U.TAB && gy < BOX.y + BOX.h;
       if (!open) return '';
       if (open !== 'restore') return onBox ? 'action' : 'none';
       var hx = BOX.x + 14, hy = BOX.y + BOX.h - U.PAD - U.KEY_H, w = U.hintW('SPACE', 'pay');

@@ -1868,7 +1868,7 @@ G.scene.life = (function () {
     strider: strider
   };
 
-  return { table: table, L: L, LA: LA, step: step, drawBed: drawBed, drawWater: drawWater, spawn: function (k) { return spawn(k) || spawnAbove(k); }, state: state, fry: fry, stats: stats, onSplash: onSplash,
+  return { silt: siltPuff, table: table, L: L, LA: LA, step: step, drawBed: drawBed, drawWater: drawWater, spawn: function (k) { return spawn(k) || spawnAbove(k); }, state: state, fry: fry, stats: stats, onSplash: onSplash,
     // Phase 49: the life above the water.
     drawFar: drawFar, afterLayer: afterLayer, drawSurface: drawSurface, above: aboveState, showing: showing, hrs: hrs,
     mirror: function (on) { ab.mirror = on; },
