@@ -621,6 +621,46 @@ G.data.fish = [
   }
 ];
 
+// Phase 80 (PLAN_WINTER.md 2.2): the ten (Ice) species of Tamarack Lake, each its own species
+// with its own journal page, made from its summer self: the same body, fight, sizes and live
+// baits, its lure types kept to the ones that fish straight down a hole (G.data.ICE_TYPES), a
+// price × ICE_PRICE for the cold (Phase 68's rule, the reference valuing its ice fish a little
+// above the others), and how often it turns up (turnUp, the reference's rarity: common 1, rare
+// 0.45, epic 0.2 of the reach's spawn weight; fish_ai, the one place a rarity appears). Their
+// homes are PLAN_WINTER.md §3. `more` overrides a field (the muskies' typical weight is under
+// the Ice Rod's 5 kg, so they can be found before the Hardwater Rod is sold). trophyKg: the
+// weight from which a catch is the trophy (the Tiger Muskie (Ice): the journal's "The ice monster").
+G.data.ICE_TYPES = ['float', 'spoon', 'dropshot', 'wacky', 'jighead', 'blade'];
+G.data.TURN_UP = { common: 1, rare: 0.45, epic: 0.2 };
+G.data.ICE_PRICE = 1.25;
+(function () {
+  var ICE = [
+    ['yellow_perch', 'epic', [{ loc: 'tamarack', reaches: ['the_flats'], depth: [1.5, 5], hours: ['day'] }]],
+    ['northern_pike', 'rare', [{ loc: 'tamarack', reaches: ['the_flats'], depth: [1.5, 5], hours: ['day'] }]],
+    ['largemouth_bass', 'rare', [{ loc: 'tamarack', reaches: ['the_flats'], depth: [2, 5], bed: true, hours: ['day'] }]],
+    ['walleye', 'rare', [{ loc: 'tamarack', reaches: ['pressure_ridge'], depth: [4, 12], hours: ['dawn', 'dusk'] }]],
+    ['smallmouth_bass', 'common', [{ loc: 'tamarack', reaches: ['pressure_ridge'], depth: [6, 12], bed: true, hours: ['day'] }]],
+    ['muskie', 'epic', [{ loc: 'tamarack', reaches: ['pressure_ridge'], depth: [4, 12], hours: [] }], { mass: 5 }],
+    ['tiger_muskie', 'epic', [{ loc: 'tamarack', reaches: ['pressure_ridge'], depth: [4, 10], hours: ['day'] }], { trophyKg: 10 }],
+    ['lake_trout', 'rare', [{ loc: 'tamarack', reaches: ['the_deep_hole'], depth: [12, 28], hours: ['dawn', 'day'] }]],
+    ['arctic_char', 'rare', [{ loc: 'tamarack', reaches: ['the_deep_hole'], depth: [14, 28], hours: ['day'] }]],
+    ['channel_catfish', 'common', [{ loc: 'tamarack', reaches: ['the_deep_hole'], depth: [18, 28], bed: true, hours: ['night'] }]]
+  ];
+  var KEEP = ['latin', 'family', 'speed', 'strength', 'fatigue', 'mass', 'jumps', 'lengthCm', 'weightKg', 'awareness', 'caution', 'baitLikes', 'bite', 'lineShy'];
+  ICE.forEach(function (e) {
+    var f = null, i, k;
+    for (i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === e[0]) f = G.data.fish[i];
+    var o = { id: 'ice_' + f.id, name: f.name + ' (Ice)', of: f.id, ice: true, turnUp: G.data.TURN_UP[e[1]], turnUpName: e[1] };
+    KEEP.forEach(function (key) { if (f[key] !== undefined) o[key] = f[key]; });
+    o.price = Math.round(f.price * G.data.ICE_PRICE);
+    o.lureTypes = {};
+    for (k in f.lureTypes) if (G.data.ICE_TYPES.indexOf(k) >= 0) o.lureTypes[k] = f.lureTypes[k];
+    o.homes = e[2];
+    for (k in e[3] || {}) o[k] = e[3][k];
+    G.data.fish.push(o);
+  });
+})();
+
 // Phase 75: each home's habitat and timeLikes, each species' locations (built once, at load).
 G.data.fish.forEach(function (f) {
   f.locations = [];
@@ -729,6 +769,17 @@ G.data.validateFish = function (fish, ref) {
     if (!f.lureTypes || typeof f.lureTypes !== 'object') errs.push(p + 'lureTypes');
     else for (var k in f.lureTypes) if (types.indexOf(k) < 0 || [1, 2].indexOf(f.lureTypes[k]) < 0) errs.push(p + 'lureTypes.' + k + ' must be a lure type and 1 or 2');
     if (!ref.looks || !ref.looks[f.id]) errs.push(p + 'no anatomy spec in data/fishlooks.js (Phase 72: every species is painted)');
+    // Phase 80: an (Ice) species lives only on the ice and takes only what fishes down a hole;
+    // no other species lives there; turnUp is one of the reference's rarities.
+    var onIce = (f.homes || []).some(function (h) { return ref.locations[h.loc] && ref.locations[h.loc].ice; });
+    if (f.ice) {
+      if ((f.homes || []).some(function (h) { return !(ref.locations[h.loc] && ref.locations[h.loc].ice); })) errs.push(p + 'an (Ice) species lives only on the ice');
+      for (var lt in f.lureTypes) if (G.data.ICE_TYPES.indexOf(lt) < 0) errs.push(p + 'lureTypes.' + lt + ' needs open water (only ' + G.data.ICE_TYPES.join(', ') + ' through the ice)');
+      var tu = G.data.TURN_UP; if (!(f.turnUp === tu.common || f.turnUp === tu.rare || f.turnUp === tu.epic)) errs.push(p + 'turnUp (common, rare or epic)');
+      if (!/ \(Ice\)$/.test(f.name)) errs.push(p + 'an ice species is named "... (Ice)"');
+    } else if (onIce) errs.push(p + 'only the (Ice) species live on the ice');
+    else if (f.turnUp !== undefined) errs.push(p + 'turnUp is for the (Ice) species only');
+    if (f.trophyKg !== undefined && !(num(f.trophyKg) && f.trophyKg > f.weightKg[0] && f.trophyKg < f.weightKg[1])) errs.push(p + 'trophyKg inside weightKg');
   }
   return errs;
 };

@@ -37,12 +37,14 @@ G.gfx.surface = (function () {
   var stats = { ms: 0, energy: 0, min: 0, max: 0, wake: 0 };
 
   // Sizes the arrays for a water and resets it. Called on location load (not a hot path).
+  var frozen = false;
   function setup(loc) {
     var need = loc.width * HI + 2;
     if (!h || h.length < need) { h = new Float32Array(need); v = new Float32Array(need); hw = new Float32Array(need); vw = new Float32Array(need); }
     else { h.fill(0); v.fill(0); hw.fill(0); vw.fill(0); }
     n = need;
     sw = loc.swell || CALM;
+    frozen = !!loc.ice; // Phase 81: the ice does not move
     clampH = sw.clamp || K.clampH;
     ks.length = ws.length = as.length = ph.length = 0;
     for (var i = 0; i < sw.waves.length; i++) {
@@ -84,7 +86,7 @@ G.gfx.surface = (function () {
   // A disturbance at world x: strength 0..1.5 (a lure's splash is about 0.3–1), width in world
   // px. The shape holds no net water (a dip with a raised rim), so it spreads as a ripple train.
   function poke(x, s, width) {
-    if (!h) return;
+    if (!h || frozen) return;
     s = Math.min(1.5, s); width = (width || 2.5) * HI;
     var c = Math.round(x * HI), r = Math.ceil(width * 6), A = s * K.pokeA, i0 = Math.max(1, c - r), i1 = Math.min(n - 2, c + r);
     for (var i = i0; i <= i1; i++) {
@@ -97,7 +99,7 @@ G.gfx.surface = (function () {
   // and down (s 0..1, with speed) swinging once per wlen px travelled, over a few px.
   var wph = 0;
   function wake(x, s, speed, dt) {
-    if (!vw || s <= 0) return;
+    if (!vw || s <= 0 || frozen) return;
     wph += 6.2832 * Math.abs(speed) / K.wlen * dt;
     var c = Math.round(x * HI), w = 4 * HI, push = K.wakeA * Math.min(1, s) * Math.sin(wph) * dt, i0 = Math.max(1, c - 3 * w), i1 = Math.min(n - 2, c + 3 * w);
     for (var i = i0; i <= i1; i++) { var d = (i - c) / w; vw[i] += push * Math.exp(-d * d); }

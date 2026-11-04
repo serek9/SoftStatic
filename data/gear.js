@@ -21,8 +21,18 @@ G.data.gear = {
     { id: 'rod_3', name: 'Lacquered Rod', cost: 1400, castMax: 146, maxMass: 11, attract: 1.15, power: 'medium heavy', action: 3, smallHook: 0.82, smallBoost: 1, look: ['moss_hi', 'moss'] },
     { id: 'rod_4', name: 'The Long Rod', cost: 4200, castMax: 160, maxMass: 18, attract: 1.2, power: 'heavy', action: 4, smallHook: 0.75, smallBoost: 1, look: ['bone', 'stone_hi'] },
     // Phase 43: the small-fish rod, off the ladder (index 5 keeps older saves' indices).
-    { id: 'rod_5', name: 'Ultralight Wand', cost: 60, castMax: 104, maxMass: 1.2, attract: 1.0, power: 'ultralight', action: 3, smallHook: 1, smallBoost: 1.6, look: ['teal_hi', 'teal'], ladder: false }
+    { id: 'rod_5', name: 'Ultralight Wand', cost: 60, castMax: 104, maxMass: 1.2, attract: 1.0, power: 'ultralight', action: 3, smallHook: 1, smallBoost: 1.6, look: ['teal_hi', 'teal'], ladder: false },
+    // Phase 80 (PLAN_WINTER.md 2.2): the ice rods, short, for jigging down a hole. They work only
+    // on the ice, and no other rod works there (ice: true; save.gear.iceRod is the one in hand
+    // on the ice). The Ice Rod comes free with the Snow Machine (grant: 'snow'); the Hardwater
+    // Rod is sold once every (Ice) species is in the journal (need: 'iceAll'). sizes: the size
+    // classes it is made for (the shop says so).
+    { id: 'rod_6', name: 'Ice Rod', cost: 0, castMax: 40, maxMass: 5, attract: 1.0, power: 'light', action: 3, smallHook: 1, smallBoost: 1, look: ['ice_hi', 'ice'], ladder: false, ice: true, grant: 'snow', sizes: ['S', 'M', 'L'] },
+    { id: 'rod_7', name: 'Hardwater Rod', cost: 1000, castMax: 44, maxMass: 16, attract: 1.15, power: 'heavy', action: 2, smallHook: 0.75, smallBoost: 1, look: ['stone_lit', 'stone'], ladder: false, ice: true, need: 'iceAll', sizes: ['XL', 'XXL'] }
   ],
+  // Phase 80: the Snow Machine, sold at Rusty's: the way onto the ice (it replaces the boat
+  // there, Phase 81), and with it the Ice Rod (rod: its index). Priced by --pacing.
+  snow: { id: 'snow', name: 'Snow Machine', cost: 2000, rod: 6 },
   rodSmall: { frac: 0.15, mass: 0.4 },
   topDepthM: 1, // Phase 43: m a surface lure counts as for which fish come (they rise to it) // smallHook below frac × maxMass; smallBoost for species of mass kg or less
   reels: [

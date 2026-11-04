@@ -936,3 +936,21 @@ G.data = G.data || {};
     }
   };
 })();
+
+// Phase 80 (PLAN_WINTER.md 2.2): the (Ice) species' winter looks. Each is its summer self's spec
+// with a winter palette: every fish_ key in it swapped for its cold copy (js/gfx/sprites.js):
+// fish_w_ (paler, colder) for the shallow and middle fish, fish_d_ (darker, colder) for the
+// three of the Deep Hole.
+(function () {
+  var DEEP = { ice_lake_trout: 1, ice_arctic_char: 1, ice_channel_catfish: 1 };
+  function cold(v, pre) {
+    if (typeof v === 'string') return v.indexOf('fish_') === 0 ? pre + v.slice(5) : v;
+    if (Array.isArray(v)) return v.map(function (x) { return cold(x, pre); });
+    if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = cold(v[k], pre); return o; }
+    return v;
+  }
+  var L = G.data.fishLooks;
+  (G.data.fish || []).forEach(function (f) {
+    if (f.ice && L[f.of] && !L[f.id]) L[f.id] = cold(L[f.of], DEEP[f.id] ? 'fish_d_' : 'fish_w_');
+  });
+})();

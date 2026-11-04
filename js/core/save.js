@@ -6,7 +6,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.core = G.core || {};
 G.core.save = (function () {
   var KEY = 'softstatic_save_v1';
-  var VERSION = 10;
+  var VERSION = 11;
   var PREFIX = 'SS1';
   // `?tour`: every water open on the chart for a look round, and nothing written to the save
   // while it is on (persist() below), so a tour never spends, unlocks or moves the real one.
@@ -111,6 +111,17 @@ G.core.save = (function () {
       if (g.depthFinder) s.coins = (s.coins || 0) + FINDER_REFUND;
       delete g.lantern; delete g.depthFinder;
       return s;
+    },
+    // v10 -> v11 (Phase 80, PLAN_WINTER.md 2.6): the ice. No Snow Machine yet, no ice rod in hand,
+    // and a save that has opened a sea counts as having been out to sea (flags.seaSeen), which
+    // opens Tamarack Lake on the chart. The holes are not saved.
+    10: function (s) {
+      s.gear = s.gear || {};
+      s.gear.snow = false;
+      s.gear.iceRod = -1;
+      s.flags = s.flags || {};
+      s.flags.seaSeen = !!(s.unlocks && (s.unlocks.sound || s.unlocks.wreck));
+      return s;
     }
   };
   var RED_REFUND = 4800, LANTERN_REFUND = 250, FINDER_REFUND = 180;
@@ -122,7 +133,8 @@ G.core.save = (function () {
       // Tier index per kind (data/gear.js), equipment owned, and the bait to put on.
       // Phase 43: rods, the rod indices owned (rod is the one in hand); bait may be a lure id.
       // Phase 53: lineType, the line spooled on (data/gear.js lineTypes), and lineTypes, the ones owned.
-      gear: { rod: 0, rods: [0], reel: 0, line: 0, lineType: 'mono', lineTypes: ['mono'], bait: 'worm' },
+      // Phase 80: snow, the Snow Machine owned; iceRod, the ice rod in hand on the ice (-1: none).
+      gear: { rod: 0, rods: [0], reel: 0, line: 0, lineType: 'mono', lineTypes: ['mono'], bait: 'worm', snow: false, iceRod: -1 },
       baits: {},             // bait or lure id -> count left
       journal: {},           // species id -> {caught, bestLen, bestW, hints, seen, phantom}
       kept: [],              // {id, len, w}
@@ -139,7 +151,8 @@ G.core.save = (function () {
       // anomalies: anomaly id -> times seen. dogStare: location id -> true once the dog has
       // stared at its hidden spot (10.3). lateAt: total catches when a journal page last
       // gained a late hint (10.5).
-      flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 },
+      // seaSeen (Phase 80): true once he has been out on a sea (it opens the ice).
+      flags: { windowCatch: {}, lines: {}, shopVisits: 0, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0, seaSeen: false },
       tapes: [],
       settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, // dogBark: Phase 42; fullscreen: Phase 59.3 (on a phone)
       look: { fisher: 'red_cap', dog: 'golden' }, // Phase 47: the fisher and the dog (data/looks.js ids)

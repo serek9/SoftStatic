@@ -87,28 +87,57 @@ G.sim.economy = (function () {
     var n = r[top + 1];
     return n && n.ladder !== false ? top + 1 : -1;
   }
-  // Buys rod i and puts it in hand: OK, MAXED (owned), POOR or UNKNOWN.
+  // Buys rod i and puts it in hand: OK, MAXED (owned), POOR, LOCKED or UNKNOWN. Phase 80: an
+  // ice rod goes in hand for the ice (save.gear.iceRod); the Ice Rod comes only with the Snow
+  // Machine (LOCKED), the Hardwater Rod once every (Ice) species is in the journal.
   function buyRod(save, i, data) {
     var rod = data.gear.rods[i];
     if (!rod) return UNKNOWN;
     if (ownsRod(save, i)) return MAXED;
+    if (rod.grant || (rod.need === 'iceAll' && !iceAll(save, data))) return LOCKED;
     if (save.coins < rod.cost) return POOR;
     save.coins -= rod.cost;
     save.gear.rods.push(i);
-    save.gear.rod = i;
+    if (rod.ice) save.gear.iceRod = i; else save.gear.rod = i;
     return OK;
   }
-  // Takes an owned rod in hand: OK or LOCKED (not owned).
-  function useRod(save, i) {
+  // Takes an owned rod in hand: OK or LOCKED (not owned). Phase 80: an ice rod for the ice.
+  function useRod(save, i, data) {
     if (!ownsRod(save, i)) return LOCKED;
-    save.gear.rod = i;
+    var rod = data && data.gear.rods[i];
+    if (rod && rod.ice) save.gear.iceRod = i; else save.gear.rod = i;
     return OK;
+  }
+  // Phase 80: every (Ice) species has been caught (the Hardwater Rod's condition).
+  function iceAll(save, data) {
+    for (var i = 0; i < data.fish.length; i++) { var f = data.fish[i]; if (f.ice && !(save.journal[f.id] && save.journal[f.id].caught > 0)) return false; }
+    return true;
+  }
+  // Phase 80: the Snow Machine: OK, MAXED (owned) or POOR. It brings the Ice Rod, in hand on the ice.
+  function buySnow(save, data) {
+    var sn = data.gear.snow;
+    if (save.gear.snow) return MAXED;
+    if (save.coins < sn.cost) return POOR;
+    save.coins -= sn.cost;
+    save.gear.snow = true;
+    if (!ownsRod(save, sn.rod)) save.gear.rods.push(sn.rod);
+    save.gear.iceRod = sn.rod;
+    return OK;
+  }
+  // Phase 80: is the save on the ice now (its water has ice)?
+  function onIce(save, data) { var L = data.locations[save.loc]; return !!(L && L.ice); }
+  // Phase 80: can hook id go down a hole (a live bait, or a lure of G.data.ICE_TYPES)?
+  function iceHook(id, data) {
+    var b = baitById(id, data);
+    return !!b && (!b.type || data.ICE_TYPES.indexOf(b.type) >= 0);
   }
 
   // The bait that will actually go on the hook: the equipped one if any is left, else worms.
+  // Phase 80: on the ice a lure that needs open water is not fished either (worms go on).
   function baitInUse(save, data) {
     var b = baitById(save.gear.bait, data);
     if (!b || (!b.unlimited && !(save.baits[b.id] > 0))) b = data.gear.baits[0];
+    if (b.type && onIce(save, data) && data.ICE_TYPES.indexOf(b.type) < 0) b = data.gear.baits[0];
     return b;
   }
 
@@ -137,9 +166,17 @@ G.sim.economy = (function () {
     return OK;
   }
 
+  // Phase 80: the rod in hand here: on the ice the ice rod (the Ice Rod if none is chosen, so a
+  // tour of the ice still fishes), elsewhere the open-water rod.
+  function rodInHand(save, data) {
+    if (!onIce(save, data)) return save.gear.rod;
+    var i = save.gear.iceRod;
+    return data.gear.rods[i] && data.gear.rods[i].ice ? i : data.gear.snow.rod;
+  }
+
   // Fills out (reused object) with everything the equipped gear does.
   function effects(save, data, out) {
-    var g = data.gear, s = save.gear, rod = g.rods[s.rod], bait = baitInUse(save, data);
+    var g = data.gear, s = save.gear, rod = g.rods[rodInHand(save, data)], bait = baitInUse(save, data);
     out.castMax = rod.castMax;
     out.maxMass = rod.maxMass;
     out.rodAction = rod.action;                                         // Phase 43
@@ -228,6 +265,7 @@ G.sim.economy = (function () {
       for (var k in save.flags.windowCatch) if (w === 'any' || k === w) met = true;
       if (!met) return LOCKED;
     }
+    if (L.need && L.need.seaSeen && !(save.flags && save.flags.seaSeen)) return LOCKED; // Phase 80: the ice opens after a sea visit
     var nf = L.need && L.need.fish; // a specific species caught (V6, Phase 14)
     if (nf && !(save.journal[nf] && save.journal[nf].caught > 0)) return LOCKED;
     if (save.coins < L.cost) return POOR;
@@ -256,6 +294,7 @@ G.sim.economy = (function () {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
     sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
     ownsRod: ownsRod, nextLadderRod: nextLadderRod, buyRod: buyRod, useRod: useRod, loseLure: loseLure,
+    iceAll: iceAll, buySnow: buySnow, onIce: onIce, iceHook: iceHook, rodInHand: rodInHand,
     lineTypeById: lineTypeById, ownsLineType: ownsLineType, buyLineType: buyLineType, useLineType: useLineType,
     nextItem: nextItem, buy: buy, buyBait: buyBait, useBait: useBait, recordCatch: recordCatch,
     canUnlock: canUnlock, unlock: unlock, restoreCabin: restoreCabin

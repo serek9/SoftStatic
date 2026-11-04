@@ -159,7 +159,8 @@ function validate(G, opts) {
   for (const id in d.locations) {
     const here = d.fish.filter(f => f.locations.includes(id));
     if (here.length < 6) err('roster ' + id + ': ' + here.length + ' species (want 6 or more)');
-    if (d.locations[id].need) err('location ' + id + ': need was removed in Phase 68 (the waters open by cost)');
+    const nd = d.locations[id].need; // Phase 80: only the ice's sea visit (need.seaSeen) is a condition again
+    if (nd && (!d.locations[id].ice || Object.keys(nd).some(k => k !== 'seaSeen' && k !== 'text') || nd.seaSeen !== true)) err('location ' + id + ': need was removed in Phase 68 (the waters open by cost); only the ice has need.seaSeen');
   }
   rosterInfo = 'species by water: ' + Object.keys(d.locations).map(id => id + ' ' + d.fish.filter(f => f.locations.includes(id)).length).join(', ') +
     ', waiting for the sea ' + d.fish.filter(f => !f.locations.length).length + '; small: ' + d.fish.filter(d.isSmall).map(f => f.id).join(', ');
@@ -298,7 +299,15 @@ function validateLocations(G, err) {
     const spots = L.spots || [];
     spots.forEach(s => { if (!(s.x >= 0 && s.x < L.width && s.r > 0)) err(p + 'spot ' + s.id + ' x or r'); });
     if (spots.filter(s => s.kind === 'hidden').length > 1) err(p + 'more than one hidden spot (the dog stares once)');
-    if (L.need && L.need.windowCatch !== 'any' && !d.windows.some(w => w.id === L.need.windowCatch)) err(p + 'need.windowCatch: unknown window');
+    if (L.need && L.need.windowCatch && L.need.windowCatch !== 'any' && !d.windows.some(w => w.id === L.need.windowCatch)) err(p + 'need.windowCatch: unknown window');
+    // Phase 80 (PLAN_WINTER.md 2.2): an ice water: free, opened by a sea visit, its ice 1-3 m
+    // thick, 1-8 holes, skinning over in 1-10 game minutes; no current, and not a river or sea.
+    if (L.ice) {
+      const I = L.ice;
+      if (L.cost !== 0 || !(L.need && L.need.seaSeen === true)) err(p + 'the ice costs nothing and opens after a sea visit (need.seaSeen)');
+      if (!(num(I.thick) && I.thick >= 4 && I.thick <= 12 && num(I.holes) && I.holes >= 1 && I.holes <= 8 && num(I.freeze) && I.freeze >= 1 / 60 && I.freeze <= 10 / 60)) err(p + 'ice {thick 4-12 px, holes 1-8, freeze 1-10 game minutes}');
+      if (L.water !== 'lake' || L.drift || (L.current && L.current.speed)) err(p + 'the ice is a lake with no drift');
+    }
     // Phase 74 (PLAN_WATERS.md): a kind of water, reaches that cover the width in order with
     // no gap or overlap, and a pier (dock) inside the world with a pier landmark at it.
     if (!['lake', 'river', 'sea'].includes(L.water)) err(p + 'water must be lake, river or sea');
@@ -392,7 +401,7 @@ function validateLocations(G, err) {
 // read; `above` with known creatures, hours as [from, to] pairs in 0..24, places inside the
 // world or the named layer, perches above the water. Shore layers' features are known kinds.
 const UNDER_KEYS = ['cray', 'snail', 'fry', 'tad', 'turtle', 'eel', 'mussel', 'caddis', 'litter', 'roots', 'tree', 'ribbon', 'fern', 'lily', 'algae'];
-const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls', 'osprey', 'eagle', 'otter', 'seal', 'cormorant']; // Phase 77: the osprey and the eagle; Phase 78: the otter; Phase 79: the seal and the cormorant
+const ABOVE_KINDS = ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'deer', 'beaver', 'fox', 'gulls', 'osprey', 'eagle', 'otter', 'seal', 'cormorant', 'hare', 'raven']; // Phase 77: the osprey and the eagle; Phase 78: the otter; Phase 79: the seal and the cormorant; Phase 82: the hare and the raven
 const SHORE_KINDS = { bank: ['posts', 'moored', 'lodge', 'duckbox'], zigzag: ['pot', 'chair', 'table', 'door'] };
 function validateLife(L, p, err) {
   const life = L.life, num = v => typeof v === 'number' && isFinite(v);
@@ -413,6 +422,8 @@ function validateLife(L, p, err) {
     if (u.flat > 4) err(p + 'life.under.flat: at most 4');
     if (u.flat > 0 && L.underwater.rockBed && !(L.underwater.rockBed.reduce((a, r) => a - (r[1] - r[0]), L.width) > 60)) err(p + 'life.under.flat: no sand for the flatfish');
   }
+  // Phase 82: under the ice, winter: no crayfish, tadpoles, turtles, eels or lilies (the ten (Ice) fish, a few snails and fry).
+  if (u && L.ice && ['cray', 'tad', 'lily'].some(k => u[k] > 0) || (u && L.ice && (u.turtle || u.eel))) err(p + 'life.under: nothing of summer under the ice');
   const a = life.above;
   if (!a) { err(p + 'life.above'); return; }
   const hoursOk = hs => Array.isArray(hs) && hs.length && hs.every(h => Array.isArray(h) && h.length === 2 && h.every(v => num(v) && v >= 0 && v <= 24) && h[0] !== h[1]);
@@ -435,6 +446,13 @@ function validateLife(L, p, err) {
     if ((k === 'ducks' || k === 'loon') && !(c.p > 0 && c.p <= 1)) err(q + 'p (parallax)');
     // Phase 77: the osprey nests on a landmark with a nest above the water, and fishes inside the world
     if (k === 'osprey') { const lm = (L.landmarks || []).find(m => m.id === c.landmark); if (!(lm && lm.nest && inW(lm.nest.x) && num(lm.nest.y) && lm.nest.y > 0)) err(q + 'landmark with a nest {x, y}'); if (!c.x) err(q + 'x (the water it fishes)'); }
+    // Phase 82: the winter animals: hares (1-3) on a layer, ravens (1-3) with a height range, both on the ice only; a white fox there too.
+    if ((k === 'hare' || k === 'raven') && !L.ice) err(q + 'a winter animal, on the ice only');
+    if (k === 'hare' && !(c.n >= 1 && c.n <= 3 && lay && c.x)) err(q + 'n (1-3), layer and x');
+    if (k === 'raven' && !(c.n >= 1 && c.n <= 3 && c.x && Array.isArray(c.y) && c.y[0] > 0 && c.y[0] < c.y[1])) err(q + 'n (1-3), x, y [lo, hi] above the ice');
+    if (k === 'fox' && c.white && !L.ice) err(q + 'a white fox lives on the ice');
+    if (k === 'fox' && lay && !num(lay.base)) err(q + 'its layer needs a base (the ground it stands on)');
+    if (L.ice && ['ducks', 'heron', 'kingfisher', 'loon', 'dragonflies', 'frog', 'striders', 'beaver', 'otter', 'seal', 'cormorant'].includes(k)) err(q + 'nothing of open water lives on the ice');
     if (k === 'otter' && !(c.n >= 1 && c.n <= 3 && c.x && (!c.log || (L.landmarks || []).some(m => m.id === c.log && m.len > 0)))) err(q + 'n (1-3), x, and log: a landmark with len');
     // Phase 79: seals haul out on spots above the water (at least one) and swim inside x; the
     // cormorant perches above the water and fishes inside x. Both at sea only.
@@ -462,17 +480,20 @@ const P = {
   hookDelay: 0.5,  // s to react to a bite
   skill: 0.85,     // fight skill of an attentive player
   depthM: 8,       // the player's usual depth (per water: depthAt)
-  depthAt: { fog: 8, creek: 6, copper: 5, pines: 8, harts: 8, stone: 4, russet: 8, sound: 12, wreck: 12 },
+  depthAt: { fog: 8, creek: 6, copper: 5, pines: 8, harts: 8, stone: 4, russet: 8, sound: 12, wreck: 12, tamarack: 8 },
   // Phase 68: the live bait it fishes at each water. The Pines' (and Russetwood's and the seas') best fish
   // (pike, muskie, the striped bass hybrid) take minnows, not worms, so there it buys minnows
   // a pack at a time with its own coins (worms when it cannot afford a pack).
-  baitAt: { fog: 'worm', creek: 'worm', copper: 'worm', pines: 'minnow', harts: 'worm', stone: 'worm', russet: 'minnow', sound: 'minnow', wreck: 'minnow' },
+  baitAt: { fog: 'worm', creek: 'worm', copper: 'worm', pines: 'minnow', harts: 'worm', stone: 'worm', russet: 'minnow', sound: 'minnow', wreck: 'minnow', tamarack: 'minnow' },
   lureX: 600
 };
 // Phase 53: 'fluoro' buys the fluorocarbon spool and puts it on (line-shy fish then bite).
 // Phase 74: the Red Room is retired; the model opens Russetwood in its place (the same cost,
 // the same step in V8's pacing: location 4 of the model's route) and stops there.
-const PLAN = ['line', 'reel', 'rod', 'creek', 'fluoro', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'russet', 'line', 'rod', 'reel'];
+// Phase 80 (PLAN_WINTER.md 5): after Russetwood (where --pacing's 20 seeds stop) the plan goes
+// on to a sea, then the Snow Machine and the ice, which opens free after the sea; --pacing runs
+// one seed on through them (pacingIce).
+const PLAN = ['line', 'reel', 'rod', 'creek', 'fluoro', 'line', 'rod', 'reel', 'pines', 'line', 'rod', 'reel', 'russet', 'line', 'rod', 'reel', 'sound', 'snow', 'tamarack'];
 
 function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
@@ -488,18 +509,23 @@ function session(G, seed, opts) {
   function moveTo(id) {
     if (opts && opts.stay) return;
     st.loc = id; uIn.loc = id; school.ctx.loc = id; school.ctx.maxDepthPx = data.locations[id].maxDepth;
+    save.loc = id; if (data.locations[id].water === 'sea') save.flags.seaSeen = true; // Phase 80: as sailing.load does
     for (const f of school.fish) f.active = false;
     lure.active = false; st.phase = 'cast'; st.t = 0;
   }
 
   // Phase 43 (--tackle): fish one water with one rod and one hook, the hook topped up and its
   // cost counted (baits per cast, lures when the line snaps).
-  st.spent = 0;
+  st.spent = 0; st.earned = {}; st.timeAt = {};
   if (opts && opts.loc) {
+    if (opts.loc === 'tamarack') { save.gear.snow = true; save.gear.rods.push(6); save.gear.iceRod = opts.iceRod !== undefined ? opts.iceRod : 6; } // Phase 80: on the ice with an ice rod
     st.loc = opts.loc; uIn.loc = opts.loc; school.ctx.loc = opts.loc; school.ctx.maxDepthPx = data.locations[opts.loc].maxDepth; st.depthM = P.depthAt[opts.loc];
     save.unlocks[opts.loc] = true; save.loc = opts.loc;
   }
-  if (opts && opts.rod !== undefined) { save.gear.rods = [0, opts.rod]; save.gear.rod = opts.rod; save.gear.reel = save.gear.line = Math.min(4, opts.rod); }
+  if (opts && opts.rod !== undefined) {
+    save.gear.rods = [0, opts.rod].concat(save.gear.snow ? [6] : []); save.gear.reel = save.gear.line = Math.min(4, opts.rod);
+    if (data.gear.rods[opts.rod].ice) save.gear.iceRod = opts.rod; else save.gear.rod = opts.rod; // Phase 80: an ice rod for the ice
+  }
   function topUp() {
     if (!opts || !opts.bait) return;
     save.gear.bait = opts.bait;
@@ -521,13 +547,14 @@ function session(G, seed, opts) {
   function shop() {
     while (st.plan < PLAN.length) {
       const k = PLAN[st.plan], E = S.economy;
-      const r = data.locations[k] ? E.unlock(save, k, data) : (k === 'fluoro' ? E.buyLineType(save, k, data) : E.buy(save, k, data));
+      const r = data.locations[k] ? E.unlock(save, k, data) : (k === 'fluoro' ? E.buyLineType(save, k, data) : (k === 'snow' ? E.buySnow(save, data) : E.buy(save, k, data)));
       if (r === E.OK || r === E.MAXED) { if (r === E.OK) { event(k); if (data.locations[k] && k !== 'russet') moveTo(k); } st.plan++; } else break;
     }
   }
 
   function step() {
     st.time += DT;
+    st.timeAt[st.loc] = (st.timeAt[st.loc] || 0) + DT;
     S.economy.effects(save, data, fx);
     S.clock.step(save, null, DT, rng, data);
     uIn.still = st.phase !== 'cast';
@@ -581,6 +608,7 @@ function session(G, seed, opts) {
       case 'card':
         if (st.t >= P.cardTime) {
           S.economy.recordCatch(save, st.cur, 'sell');
+          st.earned[st.loc] = (st.earned[st.loc] || 0) + st.cur.price; // Phase 80: what each water paid
           st.catches++; st.mix[st.cur.id] = (st.mix[st.cur.id] || 0) + 1; h(save.coins);
           if (!opts || opts.shop !== false) shop();
           st.phase = 'cast'; st.t = 0;
@@ -619,8 +647,9 @@ function session(G, seed, opts) {
 // Phase 74: nine waters, each with the rod of its stage (by cost: the fibreglass at Fogbound,
 // the graphite at the creek and Copperbend, the lacquered at the Pines, Hartsmere and
 // Stonehorn, the long rod at Russetwood and the seas).
-const TACKLE_WATERS = { fog: 1, creek: 2, copper: 2, pines: 3, harts: 3, stone: 3, russet: 4, sound: 4, wreck: 4 };
-function tackleHooks(d) { return ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)); }
+// Phase 81: and Tamarack Lake on the Ice Rod (index 6), with only the hooks that go down a hole.
+const TACKLE_WATERS = { fog: 1, creek: 2, copper: 2, pines: 3, harts: 3, stone: 3, russet: 4, sound: 4, wreck: 4, tamarack: 6 };
+function tackleHooks(d, w) { return ['worm', 'cricket', 'minnow'].concat(d.gear.lures.map(l => l.id)).filter(id => !w || !d.locations[w].ice || d.ICE_TYPES.indexOf((d.gear.lures.find(l => l.id === id) || {}).type || 'float') >= 0); }
 // Phase 75: a water is fished reach by reach (each at its middle), and a hook is judged at a
 // water by its best reach, as a player fishes it where it works. In each reach it is fished at
 // the depth its takers live at (the median of the middles of their homes' depths there; the
@@ -633,7 +662,7 @@ function tackleTakers(G, hk, w, reach) {
 }
 function tackleWater(w) {
   const G = load(), d = G.data, L = d.locations[w], out = {};
-  for (const hk of tackleHooks(d)) {
+  for (const hk of tackleHooks(d, w)) {
     for (const R of L.reaches) {
       const tk = tackleTakers(G, hk, w, R.id);
       if (!tk.length) continue;
@@ -686,9 +715,12 @@ function tackleCheck() {
 // same species in the same reaches, at the same depths, on the bottom or not, at the same hours.
 function homesCheck() {
   const G = load(), d = G.data;
-  const md = fs.readFileSync(path.join(ROOT, 'PLAN_WATERS.md'), 'utf8');
-  const sec = md.slice(md.indexOf('## 3. Where each species lives'), md.indexOf('## 4. Design'));
+  const md = fs.readFileSync(path.join(ROOT, 'PLAN_WATERS.md'), 'utf8'), mw = fs.readFileSync(path.join(ROOT, 'PLAN_WINTER.md'), 'utf8');
+  // Phase 80: and PLAN_WINTER.md §3, the ice fish of Tamarack Lake.
+  const sec = md.slice(md.indexOf('## 3. Where each species lives'), md.indexOf('## 4. Design')) + '\n' + mw.slice(mw.indexOf('## 3. Where each ice fish lives'), mw.indexOf('## 4. Phases'));
   const byName = n => {
+    const exact = d.fish.find(f => f.name === n.trim()); // Phase 80: "Yellow Perch (Ice)" is its own species
+    if (exact) return exact;
     n = n.replace(/\(.*?\)/g, '').trim();
     return d.fish.find(f => f.name === n) || d.fish.find(f => f.name.startsWith(n + ' ')) || null;
   };
@@ -742,7 +774,7 @@ function homesCheck() {
   const unplaced = d.fish.filter(f => !f.homes.length).map(f => f.id);
   console.log('\n' + Object.keys(want).length + ' plan rows, ' + Object.keys(have).length + ' data rows, ' + d.fish.length + ' species' + (unplaced.length ? ', unplaced: ' + unplaced.join(', ') : ', every one placed'));
   probs.forEach(p => console.log('FAIL ' + p));
-  console.log((probs.length || unplaced.length ? 'FAIL' : 'PASS') + ' the data matches PLAN_WATERS.md §3 (' + probs.length + ' difference(s))');
+  console.log((probs.length || unplaced.length ? 'FAIL' : 'PASS') + ' the data matches PLAN_WATERS.md §3 and PLAN_WINTER.md §3 (' + probs.length + ' difference(s))');
   return probs.length || unplaced.length ? 1 : 0;
 }
 
@@ -789,12 +821,38 @@ function pacing() {
   rows.forEach(r => console.log(String(r.seed).padEnd(6) + ' ' + (r.first + ' catches (' + r.firstWhat + ')').padEnd(20) + ' ' + (r.creek ? r.creek.toFixed(1) : '-').padStart(6) + 'm  ' + (r.pines ? r.pines.toFixed(1) : '-').padStart(6) + 'm  ' + (r.russet ? r.russet.toFixed(1) : '-').padStart(6) + 'm'));
   console.log('');
   let failed = 0;
+  failed += pacingIce(seeds[0]);
   for (const t of TARGETS) {
     const m = median(t.key), pass = m != null && m >= t.lo && m <= t.hi;
     if (!pass) failed++;
     console.log((pass ? 'PASS ' : 'FAIL ') + t.what + ': median ' + (m == null ? 'never' : m.toFixed(1) + ' ' + t.unit) + ' (target ' + t.lo + '-' + t.hi + ' ' + t.unit + ')');
   }
   return failed ? 1 : 0;
+}
+
+// Phase 80 (PLAN_WINTER.md 2.2 and 5): one seed played on past Russetwood: a sea, the Snow
+// Machine, then the ice (free once a sea has been seen). Checks: the ice cannot be opened before
+// a sea visit; the model reaches it only after the sea and the snowmobile; and it is not a
+// shortcut: the ice pays no more an hour than the sea before it did.
+function pacingIce(seed) {
+  const G = load(), E = G.sim.economy, fresh = G.core.save.defaults();
+  let bad = 0;
+  const early = E.canUnlock(fresh, 'tamarack', G.data) === E.LOCKED;
+  const s = session(G, seed);
+  s.run(16 * 3600, st => st.events.some(e => e.what === 'tamarack') && st.timeAt.tamarack > 3600);
+  const ev = s.st.events, at = k => ev.find(e => e.what === k), t = k => at(k) ? (at(k).t / 60).toFixed(1) + ' min' : 'never';
+  const rate = w => s.st.timeAt[w] ? s.st.earned[w] / (s.st.timeAt[w] / 3600) : 0;
+  console.log('Seed ' + seed + ' played on to the ice: russet ' + t('russet') + ', sound ' + t('sound') + ', snow ' + t('snow') + ', tamarack ' + t('tamarack') +
+    '; coins an hour at russet ' + Math.round(rate('russet')) + ', sound ' + Math.round(rate('sound')) + ', tamarack ' + Math.round(rate('tamarack')) + ' (' + ((s.st.timeAt.tamarack || 0) / 60).toFixed(0) + ' min on the ice)');
+  const order = at('sound') && at('snow') && at('tamarack') && at('sound').t <= at('snow').t && at('snow').t <= at('tamarack').t;
+  const checks = [
+    ['the ice is locked before a sea visit', early],
+    ['the snowmobile and the ice come after the sea', !!order],
+    ['the ice pays at most what the sea did an hour (no shortcut)', rate('tamarack') > 0 && rate('tamarack') <= rate('sound')]
+  ];
+  for (const [what, ok] of checks) { console.log((ok ? 'PASS ' : 'FAIL ') + what); if (!ok) bad++; }
+  console.log('');
+  return bad;
 }
 
 // ---- --saves ------------------------------------------------------------------------------
@@ -846,7 +904,11 @@ const OLD_SAVES = [
   // Phase 79b: a v9 save with the lantern and the finder bought: 250 + 180 come back, both go.
   { from: 'Phase 79 (d24232d), v9 with the lantern and the finder', save: { version: 9, coins: 1000, gear: { rod: 1, rods: [0, 1], reel: 1, line: 1, lineType: 'mono', lineTypes: ['mono'], lantern: true, depthFinder: true, bait: 'worm' },
     baits: {}, journal: {}, kept: [], cabinLevel: 1, unlocks: { fog: true, creek: true }, loc: 'creek', unease: {}, clock: 12, lastSeen: 0,
-    flags: { windowCatch: {}, lines: {}, shopVisits: 2, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 9 } }
+    flags: { windowCatch: {}, lines: {}, shopVisits: 2, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 9 } },
+  // Phase 80: a v10 save that has opened Coldharbor Sound: it has been out to sea (flags.seaSeen), so the ice is open to it; no Snow Machine yet.
+  { from: 'Phase 79b (c183807), v10 out at sea', save: { version: 10, coins: 3100, gear: { rod: 4, rods: [0, 1, 2, 3, 4], reel: 4, line: 4, lineType: 'braid', lineTypes: ['mono', 'braid'], bait: 'minnow' },
+    baits: { minnow: 4 }, journal: { striped_bass: { caught: 3, bestLen: 80, bestW: 6.1, hints: [], seen: true, phantom: false } }, kept: [], cabinLevel: 4, unlocks: { fog: true, creek: true, pines: true, russet: true, sound: true }, loc: 'sound', unease: {}, clock: 6, lastSeen: 0,
+    flags: { windowCatch: {}, lines: {}, shopVisits: 30, heavy: {}, anomalies: {}, dogStare: {}, lateAt: 0 }, tapes: [], settings: { volume: 0.8, mute: false, dogBark: true, fullscreen: true }, look: { fisher: 'red_cap', dog: 'golden' }, rng: 10 }, lineType: 'braid' }
 ];
 
 function savesCheck() {
@@ -883,6 +945,9 @@ function savesCheck() {
         if (s.unlocks.red || (s.unease && 'red' in s.unease) || s.flags.heavy.red || s.flags.dogStare.red) probs.push('the Red Room is still in the save');
         if (o.save.loc === 'red' && s.loc !== 'fog') probs.push('a save in the Red Room resumes at ' + s.loc + ', not Fogbound');
         if (!G.data.locations[s.loc]) probs.push('resumes at unknown water ' + s.loc);
+        const sea = !!(o.save.unlocks && (o.save.unlocks.sound || o.save.unlocks.wreck)); // Phase 80: v11
+        if (s.flags.seaSeen !== sea || s.gear.snow !== false || s.gear.iceRod !== -1) probs.push('v11: seaSeen ' + s.flags.seaSeen + ' (want ' + sea + '), snow ' + s.gear.snow + ', iceRod ' + s.gear.iceRod);
+        if ((E.canUnlock(s, 'tamarack', G.data) === E.LOCKED) === sea) probs.push('the ice is ' + (sea ? 'locked' : 'open') + ' to it');
         for (const id in s.baits) if (!E.baitById(id, G.data)) probs.push('counts an unknown bait or lure ' + id);      // Phase 69: the old lures mapped
         if (!E.baitById(s.gear.bait, G.data)) probs.push('unknown hook ' + s.gear.bait);
         if (o.baits && JSON.stringify(Object.keys(o.baits).sort().map(k => [k, s.baits[k]])) !== JSON.stringify(Object.keys(s.baits).sort().map(k => [k, o.baits[k]]))) probs.push('lure counts ' + JSON.stringify(s.baits));
@@ -942,9 +1007,13 @@ function fightCheck() {
   const all = {};
   console.log('hook hold at a 0.5 s hook-set: ' + hold.toFixed(3) + '  (instant 1, late ' + g.fight.holdLate + ')');
   console.log('tier  player       landed  snapped  thrown  run out  (s to a loss)');
-  for (let tier = 0; tier < g.lines.length; tier++) { // the five ladder tiers (Phase 43: with the rod's small-fish hold)
-    const gear = { lineStrength: g.lines[tier].strength, reelSpeed: g.reels[tier].speed, maxMass: g.rods[tier].maxMass, smallHook: g.rods[tier].smallHook };
-    const fish = d.fish.filter(f => f.mass <= g.rods[tier].maxMass && f.locations.length); // Phase 68: the fish of today's waters (not the sea's)
+  // Phase 80: and the ice: the (Ice) species on the two ice rods, with the best reel and line
+  // (the ice opens after the seas), as 'ice6' and 'ice7'; they are not fought on the ladder.
+  const tiers = [0, 1, 2, 3, 4, 6, 7];
+  for (const tier of tiers) { // the five ladder tiers (Phase 43: with the rod's small-fish hold)
+    const ice = !!g.rods[tier].ice, lt = ice ? 4 : tier;
+    const gear = { lineStrength: g.lines[lt].strength, reelSpeed: g.reels[lt].speed, maxMass: g.rods[tier].maxMass, smallHook: g.rods[tier].smallHook };
+    const fish = d.fish.filter(f => f.mass <= g.rods[tier].maxMass && f.locations.length && !!f.ice === ice); // Phase 68: the fish of today's waters (not the sea's)
     for (const [name, play] of players) {
       const rng = new G.core.rng.Rng(4242 + tier), n = { win: 0, snap: 0, thrown: 0, run: 0, lossT: 0 };
       for (const f of fish) for (let i = 0; i < N; i++) {
@@ -957,7 +1026,7 @@ function fightCheck() {
       const tot = fish.length * N, a = all[name] || (all[name] = { win: 0, snap: 0, thrown: 0, run: 0, lossT: 0, tot: 0 });
       ['win', 'snap', 'thrown', 'run', 'lossT'].forEach(k => { a[k] += n[k]; }); a.tot += tot;
       const pc = k => (100 * n[k] / tot).toFixed(1).padStart(6) + '%';
-      console.log(String(tier).padEnd(6) + name.padEnd(12) + pc('win') + ' ' + pc('snap') + ' ' + pc('thrown') + ' ' + pc('run') + '   ' + (tot - n.win ? (n.lossT / (tot - n.win)).toFixed(1) : '-'));
+      console.log((ice ? 'ice' + tier : String(tier)).padEnd(6) + name.padEnd(12) + pc('win') + ' ' + pc('snap') + ' ' + pc('thrown') + ' ' + pc('run') + '   ' + (tot - n.win ? (n.lossT / (tot - n.win)).toFixed(1) : '-'));
     }
   }
   const rate = (k, w) => all[k][w] / all[k].tot, loss = k => all[k].tot - all[k].win;
@@ -976,7 +1045,7 @@ function fightCheck() {
   console.log('\nline     player      landed  snapped  thrown  run out   (tier 2)');
   for (const t of g.lineTypes) {
     const gear = { lineStrength: g.lines[2].strength * t.strength, reelSpeed: g.reels[2].speed, maxMass: g.rods[2].maxMass, smallHook: g.rods[2].smallHook, lineRise: t.rise, lineShake: t.shake, lineHold: t.hold };
-    const fish = d.fish.filter(f => f.mass <= g.rods[2].maxMass && f.locations.length); // Phase 68: today's waters
+    const fish = d.fish.filter(f => f.mass <= g.rods[2].maxMass && f.locations.length && !f.ice); // Phase 68: today's waters (Phase 80: off the ice)
     lt[t.id] = {};
     for (const sk of [0.5, 0.85]) {
       const rng = new G.core.rng.Rng(777), n = { win: 0, snap: 0, thrown: 0, run: 0 };
@@ -1198,4 +1267,4 @@ if (require.main === module) {
   else process.exit(code);
 }
 
-module.exports = { load, validate, session, replay, pacing, passiveCheck, savesCheck, fightCheck, PLAN, P };
+module.exports = { load, validate, session, replay, pacing, pacingIce, passiveCheck, savesCheck, fightCheck, PLAN, P };

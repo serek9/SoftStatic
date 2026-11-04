@@ -50,6 +50,7 @@ G.scene.sailing = (function () {
   // under a sky without clouds (loc.sky.clouds false). Presentation only: it reads unease and the clock.
   var rainAcc = 0;
   function rainK() {
+    if (scen.winter) return 0;                                                  // Phase 82: on the ice it snows (snowK)
     if (sky.opt && sky.opt.clouds === false) return 0;
     var save = G.state.save, c = save.clock || 0, hr = Math.floor(c), f = c - hr, st = stormK();
     var k = clamp((G.sim.unease.get(save, loc.id) - 0.45) / 0.35, 0, 1);
@@ -86,6 +87,7 @@ G.scene.sailing = (function () {
   // One step: the flash fades, the thunder comes, and the next flash counts down with the storm.
   function stormStep(dt) {
     var k = stormK();
+    if (scen.winter) { storm.t = -1; storm.thunder = 0; return; }              // Phase 82: a blizzard: no lightning, no thunder
     if (storm.t >= 0) { storm.t += dt; if (storm.t >= STORM.flashLen) storm.t = -1; }
     if (storm.thunder > 0) { storm.thunder -= dt; if (storm.thunder <= 0) { storm.heard++; G.audio.engine.cue('thunder', 0, storm.dist); } }
     if (k <= 0.05) { if (storm.next < 3) storm.next = 3; return; }
@@ -105,6 +107,7 @@ G.scene.sailing = (function () {
   function drawStormSky(c) {
     var k = stormK(), wy = loc.waterY - camPy, f = flashF();
     if (k <= 0 && f <= 0) return;
+    if (scen.winter) { c.fillStyle = P.snow_dark; c.globalAlpha = 0.45 * k; c.fillRect(0, -camPy, VIEW_W, wy + camPy); c.globalAlpha = 1; return; } // Phase 82: the sky lost in blowing snow
     c.fillStyle = P.night_ink; c.globalAlpha = STORM.dark * k;
     c.fillRect(0, -camPy, VIEW_W, wy + camPy);
     if (f > 0) {
@@ -133,8 +136,43 @@ G.scene.sailing = (function () {
     c.fillRect(0, wy, VIEW_W, VIEW_H - wy);
     c.globalAlpha = 1;
   }
+  // ---- Snow (Phase 82, PLAN_WINTER.md 2.3) ----------------------------------------------
+  // On the ice it snows instead of raining: in about one game hour in three (a hash of the hour
+  // and the place) a light fall comes in and goes over the hour's edges (snowK), flakes drifting
+  // down on the wind, swaying. A storm there is a blizzard (stormK): the snow driven nearly
+  // level in streaks, many more flakes, the far shore and then the near one lost in white
+  // (whiteout, over the layers), wind and no thunder. Presentation only: the clock and hashes.
+  var SNOW_N = 90, BLIZ_N = 200, snowDrawn = 0;
+  function snowK() {
+    if (!scen.winter) return 0;
+    var c = G.state.save.clock || 0, hr = Math.floor(c), f = c - hr, fall = (S.hash(loc.seed, hr * 13 + 5) % 3) === 0 ? 0.7 * Math.min(1, f * 4, (1 - f) * 4) : 0;
+    return Math.max(fall, stormK());
+  }
+  function whiteout(c, k, a) {
+    if (k <= 0) return;
+    c.fillStyle = P.snow; c.globalAlpha = a * k;
+    c.fillRect(0, -camPy, VIEW_W, loc.waterY);
+    c.globalAlpha = 1;
+  }
+  function drawSnow(c) {
+    var k = snowK(), bz = stormK(), t = G.state.run.boat.t;
+    snowDrawn = 0;
+    if (k <= 0) return;
+    var n = Math.round(SNOW_N * k + BLIZ_N * bz), wind = 5 + 85 * bz, H = VIEW_H + 12;
+    c.fillStyle = P.snow_lit;
+    for (var i = 0; i < n; i++) {
+      var hs = S.hash(i, 41), fall = 7 + (hs % 11) + 20 * bz, near = (hs >> 4) % 3;            // three depths of flake
+      var y = ((S.hash(i, 42) % 400) + t * fall * (0.6 + 0.3 * near)) % H - 6;
+      var x = ((S.hash(i, 43) % 400) + t * wind * (0.5 + 0.35 * near) + Math.sin(t * 1.3 + i) * 2 * (1 - bz)) % 360 - 20;
+      c.globalAlpha = (0.45 + 0.2 * near) * Math.min(1, k * 1.5);
+      c.fillRect(Math.round(x * HI) / HI, Math.round(y * HI) / HI, bz > 0.4 ? 1 + near * 0.5 : 0.5, 0.5);
+      snowDrawn++;
+    }
+    c.globalAlpha = 1;
+  }
   var RAIN_N = 60;
   function drawRain(c) {
+    if (scen.winter) { drawSnow(c); return; } // Phase 82
     var k = rainK();
     if (k <= 0) return;
     var st = stormK(), t = G.state.run.boat.t, wy = loc.waterY - camPy, n = Math.round(RAIN_N * k * (1 + 1.4 * st)), slant = 0.15 + 0.25 * st; // Phase 55: a storm's rain is heavier and slants
@@ -434,6 +472,7 @@ G.scene.sailing = (function () {
     loc = G.data.locations[id];
     if (!loc) throw new Error('unknown location: ' + id);
     G.state.save.loc = id;
+    if (loc.water === 'sea' && !G.core.save.tour()) G.state.save.flags.seaSeen = true; // Phase 80: out to sea once opens the ice
     scen = (loc.scenery && G.scene.scenery && G.scene.scenery[loc.scenery]) || NO_SCENERY;
     layers.length = 0;
     for (var i = 0; i < loc.layers.length; i++) layers.push(bakeLayer(loc.layers[i], i));
@@ -451,7 +490,10 @@ G.scene.sailing = (function () {
 
     var run = G.state.run;
     run.loc = id;
-    run.boat = boat.create(loc.start);
+    run.boat = boat.create(loc.start, !!loc.ice); // Phase 81: on the ice, the Snow Machine
+    run.ice = G.scene.ice.create(loc);            // Phase 81: the holes (never saved)
+    fx.setFrozen(!!loc.ice);
+    if (loc.ice) G.scene.ice.sheet(loc);          // bakes the ice's snow now, behind the map's fade
     run.dog = dog.create();
     run.fisher = G.scene.fisher.create(); // Phase 33: his hands, the holder, the idle director
     run.cam = { x: 0, y: 0 };
@@ -465,6 +507,7 @@ G.scene.sailing = (function () {
       boost: { attract: 1 } };
     run.school = G.sim.fish_ai.createSchool(G.data);
     run.school.ctx.floorAt = function (x) { return G.scene.underwater.bottomAt(loc, x); };
+    run.school.ctx.ceilPx = loc.ice ? loc.ice.thick : 0; // Phase 81: the fish keep under the ice
     // Phase 28: the current carries the fish as it carries the lure (the same pure function).
     run.school.ctx.flowAt = loc.drift ? function (x, depth) { return G.scene.underwater.flow(loc, depth); } : null;
     G.scene.underwater.bottomAt(loc, 0); // bakes the cross-section now
@@ -527,6 +570,7 @@ G.scene.sailing = (function () {
 
   // World x where a cast at this charge lands. The marker and the release both use this.
   function landingX(b, charge) {
+    if (loc.ice) return G.scene.ice.dropX(G.state.run); // Phase 81: straight down the hole under the rod tip
     var maxD = G.state.run.gearFx.castMax; // the rod sets how far a full cast reaches
     var dist = CAST.minD + (maxD - CAST.minD) * Math.sqrt(charge);
     return clamp(Math.round(b.x + b.facing * (CAST.reach + dist)), 8, loc.width - 8);
@@ -542,6 +586,7 @@ G.scene.sailing = (function () {
     c.t = 0;
     c.flying = false;
     G.core.state.go(run, 'casting');
+    if (loc.ice) G.scene.ice.dropped(run); // Phase 81: the hole he fishes
     if (G.core.debug) G.core.debug.log('cast #' + c.n + ' charge ' + c.charge.toFixed(2) + ' -> x ' + c.x1 + ' seed ' + c.seed);
   }
 
@@ -560,7 +605,7 @@ G.scene.sailing = (function () {
       c.x0 = tip[0]; c.y0 = tip[1];
       if (dg.on) { c.x0 = tip[0] + dg.ox; c.y0 = tip[1] + dg.oy; } // Phase 34: from where the lure hangs
       c.T = 0.5 + Math.abs(c.x1 - c.x0) / 240;
-      c.h = 12 + c.dist * 0.22;
+      c.h = loc.ice ? 0 : 12 + c.dist * 0.22; // Phase 81: on the ice it drops, no arc
       c.flying = true;
     }
     var u = Math.min(1, (c.t - CAST.flick) / c.T), dr = CAST.drag * Math.min(1, c.dist / 60);
@@ -620,7 +665,10 @@ G.scene.sailing = (function () {
     var c = run.cast, inp = G.core.input;
     switch (run.fsm) {
       case 'sailing':
-        if (inp.pressed('action') && run.boat.stopped && !dg.up) startCharge(run); // the user's fixes: not before the lure is reeled up
+        if (inp.pressed('action') && run.boat.stopped && !dg.up) {
+          startCharge(run); // the user's fixes: not before the lure is reeled up
+          if (loc.ice) { c.charge = 0; release(run); } // Phase 81: no cast on the ice: the lure drops down the hole
+        }
         break;
       case 'charging':
         if (inp.move() !== 0) { G.core.state.go(run, 'sailing'); break; } // steering cancels the charge
@@ -1001,6 +1049,7 @@ G.scene.sailing = (function () {
     if (end) { lx = end[0]; ly = end[1]; }
     else if (ropeLure) { lx = rope.x[rope.N - 1] - camPx; ly = rope.y[rope.N - 1] - camPy; }
     else return;
+    if (end && isFloat(run) && loc.ice) G.scene.ice.drawTipUp(ctx, run, camPx, wy, run.bite.slot >= 0); // Phase 81: the tip-up's flag
     if (end && isFloat(run)) {                                                          // Phase 65: the float, its leader and the worm
       var hx = c.x1 - camPx + (fsm !== 'sinking' ? Math.round(Math.sin(b.t * 1.1) * 1) : 0), hy = c.ly - camPy;
       G.scene.underwater.drawFloat(ctx, lx, ly, hx, hy, run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85, run.bite.slot >= 0 ? floatDip(run) : 0, b.t, run.gearFx.bait); // Phase 69: the Bobber or the Deep Bobber
@@ -1617,7 +1666,7 @@ G.scene.sailing = (function () {
     if (G.ui.setup.isOpen()) return 'PICK';
     if (G.ui.dock.isOpen()) return 'GO';
     switch (run.fsm) {
-      case 'sailing': return dg.up ? 'REEL' : (run.boat.stopped ? 'CAST' : '');
+      case 'sailing': return dg.up ? 'REEL' : (run.boat.stopped ? (loc.ice ? (run.ice.drill >= 0 ? 'DRILL' : (G.scene.ice.holeAt(run, G.scene.ice.drillX(run.boat)) >= 0 ? 'DROP' : 'DRILL')) : 'CAST') : ''); // Phase 81
       case 'charging': return 'CAST';
       case 'sinking': case 'waiting': case 'interest': return run.bite.slot >= 0 ? 'HOOK' : 'REEL';
       case 'hooked': case 'fighting': return 'REEL';
@@ -1657,7 +1706,9 @@ G.scene.sailing = (function () {
     anomalyStep(run, save, dt);
     owlStep(run, save, hour0, dt);
     var dockOn = !setupOn && G.ui.dock.step(run, loc, dt);                 // Phase 67: at the pier
-    if (!setupOn && !dockOn) castStep(run, dt);
+    var drilling = G.scene.ice.step(run, dt, run.fsm === 'sailing' && !setupOn ? inp.move() || sail.dir * (sail.t > 0 ? 1 : 0) : 0, !setupOn && !dockOn && !dg.up); // Phase 81: drilling takes the key
+    if (!setupOn && !dockOn && !drilling) castStep(run, dt);
+    run.boat.parked = G.scene.ice.parked(run);
     // Audit P1-6: the down arrow pets the dog while the boat sits still between casts. Phase 45:
     // ↓ alone or a tap on him; S (down and setup together) opens the setup panel instead.
     if (run.fsm === 'sailing' && b.stopped && !setupOn && !dockOn && inp.pressed('down') && !inp.pressed('setup')) dog.pet(run.dog);
@@ -1739,7 +1790,7 @@ G.scene.sailing = (function () {
     churnT -= dt;
     if (churnT <= 0 && b.throttle > 0.15) {
       churnT = 0.12 / b.throttle;
-      fx.emit('bubbles', boat.stern(b) + b.facing * 2, wy + 3 + G.vrng.next() * 3, 1);
+      if (!loc.ice) fx.emit('bubbles', boat.stern(b) + b.facing * 2, wy + 3 + G.vrng.next() * 3, 1); // Phase 81: the track throws snow, no bubbles
       fx.emit('splash', boat.stern(b), wy, sp > 0.5 ? 1 : 0);
       if (sp > 0.4) fx.emit('wake', boat.bow(b), wy, 1);
     }
@@ -1766,6 +1817,7 @@ G.scene.sailing = (function () {
     for (var i = 0; i < layers.length; i++) {
       var L = layers[i], oxN = Math.round(camPx * L.p * HI), vw = VIEW_W * HI, wh = wy * HI;
       if (L.p === 1) G.scene.life.drawFar(c, camPx, wy - camPy); // Phase 49: the birds further out than the boat, before the landmarks
+      if (scen.winter && L.p >= 0.5 && (i === 0 || layers[i - 1].p < 0.5)) whiteout(c, stormK(), 0.6); // Phase 82: the far shore lost in the blizzard
       if (L.fog) {
         c.globalAlpha = fa;
         drawWrapped(c, L.cv, L.w, camPx * L.p + run.boat.t * L.drift, -camPy, wy);
@@ -1779,6 +1831,7 @@ G.scene.sailing = (function () {
       if (scen.afterLayer) scen.afterLayer(c, L.id, oxN / HI, camPy, run, loc);
       G.scene.life.afterLayer(c, L.id, oxN / HI, wy - camPy); // Phase 49: what lives on this layer
     }
+    if (scen.winter) whiteout(c, stormK(), 0.25);                               // Phase 82: and the near one half lost
     var nf = nightF(hourNow());
     bats(c, nf);
     fireflies(c, nf);
@@ -1790,7 +1843,7 @@ G.scene.sailing = (function () {
   var gearLook = { rod: 0, night: 0, fisher: null, lineKey: 'fog_light', lineA: 0.6 };
   function drawBoat(c, fisher) {
     var run = G.state.run, g = G.state.save.gear, fsm = run.fsm;
-    gearLook.rod = g.rod || 0;
+    gearLook.rod = G.sim.economy.rodInHand(G.state.save, G.data) || 0; // Phase 80: the ice rod on the ice
     gearLook.night = 1 - greyF(hourNow());
     gearLook.fisher = run.fisher; // Phase 33: P2-2's thermos is one of his idle acts now
     // Phase 31: the line along the rod in the same colour as the line out (drawCast).
@@ -1926,16 +1979,22 @@ G.scene.sailing = (function () {
     // mirror water covers its top, and shrinks to nothing as the view goes under (uw.alpha).
     // The mirror is only ever drawn with the camera at the surface (see underwater.js).
     G.scene.underwater.draw(ctx, loc, camPx, camPy, 1, run.boat.t);
+    if (loc.ice) { // Phase 81: the ice, its underside over the cross-section and its snow from above
+      G.scene.ice.drawUnder(ctx, run, camPx, wy - camPy, 1 - nightF(hourNow()));
+      if (band > 0) G.scene.ice.drawSheet(ctx, run, camPx, wy - camPy, band, nightF(hourNow()));
+    } else {
     if (band > 0) G.gfx.water.draw(ctx, wy, VIEW_H, run.boat.t, drawAbove, wl, band, camPx);
     drawWaterline(ctx, wy - camPy + band, cols, wl, band === 0 ? a : 0);
     drawStormWater(ctx); // Phase 55
     ctx.drawImage(glint, camPx * HI, 0, VIEW_W * HI, 1, 0, wy - camPy, VIEW_W, 1 / HI);
     drawPosts(ctx, wy - camPy);
+    }
     if (scen.surface) scen.surface(ctx, run, loc); // Phase 77: a river's live water (js/scene/rivers.js)
     G.scene.life.drawSurface(ctx, camPx, camPy); // Phase 49: lily pads, the frog, the striders
     fx.draw(ctx, camPx, camPy);
     drawBoat(ctx);
-    if (band === 0) { // Phase 20: the hull sits in the water; the surface washes over its bottom
+    if (loc.ice) G.scene.ice.drawAuger(ctx, run, camPx, wy - camPy); // Phase 81
+    if (band === 0 && !loc.ice) { // Phase 20: the hull sits in the water; the surface washes over its bottom
       var hx = Math.round((run.boat.x - run.cam.x) * HI);
       drawWaterline(ctx, wy - camPy, cols, wl, 0, Math.max(0, hx - 36), Math.min(640, hx + 36), 0.55);
     }
@@ -1978,6 +2037,9 @@ G.scene.sailing = (function () {
     loc: function () { return loc; },
     night: function () { return fisherIn.night; }, // Phase 35: what the idle director takes as dusk or night
     sail: function (dir, secs) { sail.dir = dir < 0 ? -1 : 1; sail.t = secs === undefined ? 1 : +secs; return sail; },
+    ice: function () { return G.scene.ice.info(G.state.run); }, // dbg.ice() (Phase 81)
+    // dbg.winter() (Phase 82): the snow's fall now (0..1), the blizzard (the storm, 0..1), flakes drawn last frame.
+    winter: function () { return scen.winter ? { snow: +snowK().toFixed(3), blizzard: +stormK().toFixed(3), flakes: snowDrawn, flashes: storm.n, thunder: storm.heard } : null; },
     dangle: function () { return { on: dg.on, up: dg.up, th: +dg.th.toFixed(3), om: +dg.om.toFixed(3), len: +dg.len.toFixed(2), off: [+dg.ox.toFixed(2), +dg.oy.toFixed(2)] }; }, // dbg.dangle (Phase 34); up: being reeled out of the water
     reelingUp: function () { return dg.up && G.core.input.held('action'); },
     // The user's fixes: how the fish on the lure takes it now (dbg.bite(); the audio's knock).

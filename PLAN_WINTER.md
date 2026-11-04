@@ -1,6 +1,6 @@
 # SoftStatic: The Ice and the Pond, Phases 80–85
 
-**Date:** 2026-11-03. **Repo state:** Phases 1–79 and 79b done (PLAN.md §8.1).
+**Date:** 2026-11-03. **Repo state:** Phases 1–79 and 79b done when planned; Phases 80–82 done since (PLAN.md §8.1).
 **Status:** Asked for by the user on 2026-11-03. Each phase starts only when the user says so.
 
 > An ice-fishing water for the ten "(Ice)" species, and the cabin valley's pond … PLAN IT. In the cabin pond you can have the species in the pond you kept, just like in cast n chill. make a research in the whole wiki https://castnchill.unpack.wiki/ and take decisions based in how the dynamics of cast n chill work.
@@ -99,7 +99,23 @@ Save **v11** at Phase 80 (the snowmobile, the ice rods, `flags.seaSeen` worked o
 
 ## 3. Where each ice fish lives
 
-Filled in at Phase 80 (depths in metres, the hours dawn, day, dusk and night as in PLAN_WATERS.md §3), for `--homes` to check.
+Filled in at Phase 80 (depths in metres, the hours dawn, day, dusk and night as in PLAN_WATERS.md §3), for `--homes` to check. Every depth starts under the ice's 1.5 m. How often each turns up (2.2): common ×1, rare ×0.45, epic ×0.2.
+
+### Tamarack Lake (28 m, frozen)
+| Reach | Species | Depth | When |
+|---|---|---|---|
+| The Flats | Yellow Perch (Ice) | 1.5–5 m | day |
+| | Northern Pike (Ice) | 1.5–5 m | day |
+| | Largemouth Bass (Ice) | 2–5 m, bed | day |
+| Pressure Ridge | Walleye (Ice) | 4–12 m | dawn, dusk |
+| | Smallmouth Bass (Ice) | 6–12 m, bed | day |
+| | Muskie (Ice) | 4–12 m | any |
+| | Tiger Muskie (Ice) | 4–10 m | day |
+| The Deep Hole | Lake Trout (Ice) | 12–28 m | dawn, day |
+| | Arctic Char (Ice) | 14–28 m | day |
+| | Channel Catfish (Ice) | 18–28 m, bed | night |
+
+Rarity: Smallmouth Bass and Channel Catfish (Ice) common; Walleye, Northern Pike, Largemouth Bass, Lake Trout and Arctic Char (Ice) rare; Muskie, Tiger Muskie and Yellow Perch (Ice) epic (the reference's).
 
 ---
 

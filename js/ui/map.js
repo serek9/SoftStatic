@@ -32,14 +32,17 @@ G.ui.map = (function () {
     { id: 'russet', kind: 'loc', x: 468, y: 196, rx: 44, ry: 22 },
     { id: 'sound', kind: 'loc', x: 580, y: 110, rx: 30, ry: 26, sea: true },
     { id: 'wreck', kind: 'loc', x: 580, y: 252, rx: 30, ry: 26, sea: true },
+    // Phase 80: Tamarack Lake, frozen, up past the coast's north end (ice: drawn white).
+    { id: 'tamarack', kind: 'loc', x: 572, y: 46, rx: 36, ry: 13, ice: true },
     // Phase 66: the shop and the cabin stand on Fogbound's west shore by the pier (Phase 67).
     { id: 'shop', kind: 'shop', x: 70, y: 226 },
     { id: 'cabin', kind: 'cabin', x: 56, y: 150 }
   ];
   // Phase 74: the coast, in view px: x of the shoreline at view row y (the sea lies east of it).
-  function coastX(y) { return 532 + Math.round(8 * Math.sin(y * 0.05) + 5 * Math.sin(y * 0.13 + 1)); }
+  // Phase 80: at its north end (above view row 78) the coast bends away east, leaving land for the ice.
+  function coastX(y) { return 532 + Math.round(8 * Math.sin(y * 0.05) + 5 * Math.sin(y * 0.13 + 1)) + (y < 78 ? Math.round((78 - y) * (78 - y) * 0.6) : 0); }
   // Phase 74: the dotted routes between the waters (pairs of stop ids).
-  var ROUTE = [['fog', 'creek'], ['fog', 'copper'], ['fog', 'pines'], ['creek', 'harts'], ['harts', 'pines'], ['harts', 'stone'], ['pines', 'russet'], ['stone', 'sound'], ['russet', 'wreck'], ['sound', 'wreck']];
+  var ROUTE = [['fog', 'creek'], ['fog', 'copper'], ['fog', 'pines'], ['creek', 'harts'], ['harts', 'pines'], ['harts', 'stone'], ['pines', 'russet'], ['stone', 'sound'], ['russet', 'wreck'], ['sound', 'wreck'], ['stone', 'tamarack'], ['sound', 'tamarack']];
   var PIER = [98, 190];                                             // where the pier runs out into Fogbound
   var KM = 0.022;                                                    // km a chart pixel
   // Phase 66: more on the chart: rivers between the waters, the shore road and its bridge,
@@ -67,7 +70,7 @@ G.ui.map = (function () {
     // Peaks along the top and pines scattered over the land.
     for (i = 0; i < 9; i++) {
       var mx = 30 + i * 66 + rng.int(-10, 10), my = 46 + rng.int(-6, 8), mh = rng.int(14, 22);
-      if (mx + CX > coastX(my + CY) - 30 || mx < 130) continue;              // Phase 74: no peaks at sea or over the legend
+      if (mx + CX > coastX(my + CY) - 30 || mx < 130 || Math.abs(mx + CX - 572) < 70) continue; // Phase 74: no peaks at sea or over the legend; Phase 80: or the ice
       for (y = 0; y < mh; y++) { A.box(ctx, 'fog_dark', mx - y, my - mh + y, y + 1, 1); A.box(ctx, 'night_blue', mx + 1, my - mh + y, y, 1); }
       A.box(ctx, 'fog_mid', mx - 2, my - mh + 2, 3, 2);
     }
@@ -107,6 +110,7 @@ G.ui.map = (function () {
         if (sea && e > 1) continue;                                       // a bay of the sea has no shore of its own
         var key = e > 1 ? 'fog_light' : (e > 0.82 ? 'water_mid' : (sea ? 'water_deep' : 'water_mid'));
         if (e <= 0.82 && e > 0.55 && (x + y * 3) % 23 === 0) key = 'water_hi';
+        if (s.ice) key = e > 1 ? 'snow_dark' : ((x * 5 + y * 11) % 29 === 0 ? 'ice_hi' : (e > 0.8 ? 'snow' : 'snow_hi')); // Phase 80: the ice, snow lying on it
         A.px(ctx, key, s.x - CX + x, s.y - CY + y);
       }
     }
@@ -114,7 +118,7 @@ G.ui.map = (function () {
     var rr = new G.core.rng.Rng(7718);
     for (i = 0; i < 9; i++) {
       var hx0 = 30 + i * 66 + rr.int(-10, 10);
-      if (hx0 + CX > coastX(70) - 30 || hx0 < 130) continue;                 // Phase 74: none at sea or over the legend
+      if (hx0 + CX > coastX(70) - 30 || hx0 < 130 || Math.abs(hx0 + CX - 572) < 70) continue; // Phase 74: none at sea or over the legend; Phase 80: or the ice
       for (var hk = 0; hk < 6; hk++) A.line(ctx, 'fog_dark', hx0 - 4 - hk * 3, 48 + hk, hx0 - 6 - hk * 3, 52 + hk);
     }
     for (i = 0; i < STOPS.length; i++) {
@@ -217,7 +221,9 @@ G.ui.map = (function () {
   function verdict(s) {
     if (s.kind !== 'loc') return 'travel';
     if (s.id === G.state.run.loc) return 'here';
-    if (G.state.save.unlocks[s.id] || G.core.save.tour()) return 'travel'; // ?tour: every water open
+    if (G.core.save.tour()) return 'travel'; // ?tour: every water open
+    if (G.data.locations[s.id].ice && !G.state.save.gear.snow) return ''; // Phase 80: nothing to cross the ice on yet
+    if (G.state.save.unlocks[s.id]) return 'travel';
     if (!stocked(s.id)) return '';
     return E.canUnlock(G.state.save, s.id, G.data) === E.OK ? 'buy' : '';
   }
@@ -236,6 +242,8 @@ G.ui.map = (function () {
     if (v === 'travel') { info.status = (G.core.save.tour() && !save.unlocks[s.id] ? 'Open for the tour (nothing is saved), ' : 'Open water, ') + Math.round(L.maxDepth * 0.25) + ' m at its deepest.' + far; info.hint = 'travel'; return; }
     if (!stocked(s.id)) { info.status = 'The water is still settling. Nothing lives here yet.'; info.key = 'rust'; return; }
     var r = E.canUnlock(save, s.id, G.data);
+    if (L.ice && !save.gear.snow && r !== E.LOCKED) { info.status = 'Frozen hard, ' + Math.round(L.maxDepth * 0.25) + ' m under the ice. You\'ll need something to cross the ice.' + far; info.key = 'rust'; return; } // Phase 80
+    if (L.ice && r === E.OK) { info.status = 'Frozen hard, free to fish. ' + Math.round(L.maxDepth * 0.25) + ' m under the ice.' + far; info.hint = 'travel'; return; }
     if (r === E.LOCKED) { info.status = (L.need && L.need.text) || 'It opens to someone who has fished while the owl calls.'; info.key = 'rust'; return; }
     info.status = 'Opens for ' + L.cost + 'c.';
     if (r === E.OK) info.hint = 'pay and travel'; else info.key = 'rust';

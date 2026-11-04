@@ -310,7 +310,7 @@ G.ui.shopRoom = (function () {
   function drawStock(ctx, stock, t, ox, oy) {
     var x0 = ox + tx(1), y0 = oy + ty(1), i, n = 0, rods = G.data.gear.rods;
     for (i = 1; i < rods.length; i++) {
-      if (stock.rods && stock.rods.indexOf(i) >= 0) continue;
+      if ((stock.rods && stock.rods.indexOf(i) >= 0) || rods[i].ice) continue; // Phase 80: the ice rods are kept behind the counter
       var x = x0 + 9 + (i - 1) * 10;
       ctx.fillStyle = P.outline; ctx.fillRect(x, y0 - 30, 3, 41);
       ctx.fillStyle = P[rods[i].look[0]]; ctx.fillRect(x + 1, y0 - 30, 1, 41);

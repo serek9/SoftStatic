@@ -19,7 +19,8 @@ G.ui.shop = (function () {
   var SHELVES = [
     [{ kind: 'rod', id: 0, icon: 'rod' }, { kind: 'rod', id: 5, icon: 'rod' }, { kind: 'rod', id: 1, icon: 'rod' }, { kind: 'rod', id: 2, icon: 'rod' },
      { kind: 'rod', id: 3, icon: 'rod' }, { kind: 'rod', id: 4, icon: 'rod' }, { kind: 'reel', icon: 'reel' }, { kind: 'line', icon: 'line' },
-     { kind: 'lineType', id: 'mono', icon: 'line' }, { kind: 'lineType', id: 'fluoro', icon: 'line' }, { kind: 'lineType', id: 'braid', icon: 'line' }], // Phase 53: the spools
+     { kind: 'lineType', id: 'mono', icon: 'line' }, { kind: 'lineType', id: 'fluoro', icon: 'line' }, { kind: 'lineType', id: 'braid', icon: 'line' }, // Phase 53: the spools
+     { kind: 'snow', icon: 'sled' }, { kind: 'rod', id: 6, icon: 'rod' }, { kind: 'rod', id: 7, icon: 'rod' }], // Phase 80: the Snow Machine and the ice rods
     [{ kind: 'bait', id: 'worm', icon: 'worm' }, { kind: 'bait', id: 'cricket', icon: 'cricket' },
      { kind: 'bait', id: 'minnow', icon: 'minnow' }, { kind: 'bait', id: 'unlabelled', icon: 'jar' }],
     [] // Phase 69: the case holds data/gear.js's 23 lures, filled below
@@ -116,6 +117,16 @@ G.ui.shop = (function () {
       blob(c, 13 * s, 10 * s, 3.5 * s, 1.2 * s, ['stone_hi', 'fog_light', 'cream'], { bias: 0.2 }); px(c, 'ink', (11 * s) | 0, (10 * s) | 0);
       line(c, 'fog_light', 16 * s, 10 * s, 18 * s, 9 * s); line(c, 'fog_light', 16 * s, 10 * s, 18 * s, 11 * s);
     },
+    // Phase 80: the Snow Machine: a red cowl and windscreen over a ski, the track behind.
+    sled: function (c, s) {
+      slab(c, 4 * s, 22 * s, 22 * s, 4 * s, STONE);                                   // the track
+      for (var k = 0; k < 5; k++) box(c, 'ink', (6 + k * 4) * s, 25 * s, s, s);
+      blob(c, 17 * s, 18 * s, 10 * s, 4.5 * s, RUST, { bias: 0.15 });                 // the cowl
+      box(c, 'wood_dark', 8 * s, 15 * s, 9 * s, 2 * s); box(c, 'wood', 8 * s, 15 * s, 9 * s, 1);    // the seat
+      line(c, 'fog_light', 23 * s, 11 * s, 26 * s, 15 * s); line(c, 'ice_hi', 22 * s, 12 * s, 25 * s, 16 * s); // the windscreen
+      line(c, 'stone_lit', 22 * s, 27 * s, 30 * s, 27 * s); line(c, 'stone_lit', 30 * s, 27 * s, 31 * s, 25 * s); // the ski
+      limb(c, 25 * s, 21 * s, 25 * s, 27 * s, 0.8 * s, STONE);
+    },
     jar: function (c, s) {
       for (var y = 9 * s; y < 29 * s; y++) for (var x = 6 * s; x < 26 * s; x++) {
         var nx = (x - 16 * s) / (10 * s), edge = Math.abs(nx) > 0.86 || y > 28 * s - 2;
@@ -188,7 +199,7 @@ G.ui.shop = (function () {
   // Phase 38: the shelves he can face, and their items ([shelf, item] in SHELVES); what they
   // show: the gear he has, and the minnows and crickets left after what he bought this visit
   // (the shop's stock is endless in the sim; the tank and the crate are full again next visit).
-  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10]], worms: [[1, 0]], crickets: [[1, 1]], tank: [[1, 2]], jar: [[1, 3]],
+  var SHELF_ITEMS = { rack: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10], [0, 11], [0, 12], [0, 13]], worms: [[1, 0]], crickets: [[1, 1]], tank: [[1, 2]], jar: [[1, 3]],
     lures: [] };
   (function () { for (var i = 0; i < SHELVES[2].length; i++) SHELF_ITEMS.lures.push([2, i]); })(); // Phase 69: all 23
   var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
@@ -234,13 +245,22 @@ G.ui.shop = (function () {
   function describe() {
     var it = item(), save = G.state.save, g = G.data.gear, desc = '', next, cur, name = '', status = '';
     txt.price = '';
-    if (it.kind === 'rod') { // Phase 43: one rod of the rack
-      var rd = g.rods[it.id], inHand = g.rods[save.gear.rod], own = E.ownsRod(save, it.id);
+    if (it.kind === 'snow') { // Phase 80: the Snow Machine
+      var sn = g.snow;
+      name = sn.name;
+      desc = 'Fast over the ice, with a box sled for the dog. Comes with an Ice Rod. Takes you out on Tamarack Lake.';
+      if (!save.gear.snow) txt.price = sn.cost + 'c';
+      status = save.gear.snow ? 'Yours. It waits by the ice.' : (save.flags.seaSeen ? 'The ice is open to you.' : 'The ice opens once you have been out to sea.');
+    } else if (it.kind === 'rod') { // Phase 43: one rod of the rack
+      var rd = g.rods[it.id], hand = rd.ice ? save.gear.iceRod : save.gear.rod, inHand = g.rods[hand], own = E.ownsRod(save, it.id);
       name = rd.name;
       desc = cap(rd.power) + ', ' + ACTION[rd.action] + ' action. Holds fish up to ' + rd.maxMass + ' kg' +
-        (rd.smallBoost > 1 ? '; small fish come to it.' : (rd.smallHook < 0.9 ? '; small mouths tear free of it.' : '.'));
-      if (!own) txt.price = rd.cost + 'c';
-      status = save.gear.rod === it.id ? 'In your hands.' : (own ? 'Yours. Space to take it.' : 'In hand: ' + inHand.name + '.');
+        (rd.ice ? ', sizes ' + rd.sizes[0] + '-' + rd.sizes[rd.sizes.length - 1] + '. Jigs through the ice; works only there.' :
+        (rd.smallBoost > 1 ? '; small fish come to it.' : (rd.smallHook < 0.9 ? '; small mouths tear free of it.' : '.')));
+      if (!own && !rd.grant) txt.price = rd.cost + 'c';
+      if (rd.grant && !own) status = 'Comes with the Snow Machine.';
+      else if (rd.need === 'iceAll' && !own && !E.iceAll(save, G.data)) status = 'For someone who has caught every fish under the ice.';
+      else status = hand === it.id ? (rd.ice ? 'Yours, for the ice.' : 'In your hands.') : (own ? 'Yours. Space to take it.' : (inHand ? 'In hand: ' + inHand.name + '.' : ''));
     } else if (it.kind === 'lineType') { // Phase 53: a spool of a line type
       var lt = E.lineTypeById(it.id, G.data), ownL = E.ownsLineType(save, it.id);
       name = lt.name;
@@ -283,10 +303,12 @@ G.ui.shop = (function () {
   function label(it) {
     var save = G.state.save, g = G.data.gear;
     lab.mark = '';
-    if (it.kind === 'rod') {
+    if (it.kind === 'snow') { // Phase 80
+      lab.name = g.snow.name; lab.price = save.gear.snow ? 'OWNED' : g.snow.cost + 'c';
+    } else if (it.kind === 'rod') {
       var rd = g.rods[it.id], own = E.ownsRod(save, it.id);
-      lab.name = rd.name; lab.price = own ? 'OWNED' : rd.cost + 'c';
-      if (save.gear.rod === it.id) lab.mark = 'ON';
+      lab.name = rd.name; lab.price = own ? 'OWNED' : (rd.grant ? 'WITH SLED' : (rd.need === 'iceAll' && !E.iceAll(save, G.data) ? 'LATER' : rd.cost + 'c'));
+      if ((rd.ice ? save.gear.iceRod : save.gear.rod) === it.id) lab.mark = 'ON';
     } else if (it.kind === 'lineType') {
       var lt = E.lineTypeById(it.id, G.data), ownL = E.ownsLineType(save, it.id);
       lab.name = lt.name; lab.price = ownL ? 'OWNED' : lt.cost + 'c';
@@ -315,8 +337,11 @@ G.ui.shop = (function () {
       r = E.buyBait(save, b.id, b.pack, G.data);
       if (r === E.OK) { save.gear.bait = b.id; if (packs[b.id] !== undefined) packs[b.id]++; }
     } else if (it.kind === 'rod') { // Phase 43: buy it, or take it in hand if it is yours
-      if (E.ownsRod(save, it.id)) { E.useRod(save, it.id); describe(); G.core.save.autosave('rod'); say('In your hands now.'); return; }
+      if (E.ownsRod(save, it.id)) { E.useRod(save, it.id, G.data); describe(); G.core.save.autosave('rod'); say('In your hands now.'); return; }
       r = E.buyRod(save, it.id, G.data);
+    } else if (it.kind === 'snow') { // Phase 80
+      r = E.buySnow(save, G.data);
+      if (r === E.MAXED) { describe(); say('It is yours already, out by the ice.'); return; }
     } else if (it.kind === 'lineType') { // Phase 53: buy the spool, or spool on one you own
       if (E.ownsLineType(save, it.id)) { E.useLineType(save, it.id); describe(); G.core.save.autosave('line'); say('Spooled on.'); return; }
       r = E.buyLineType(save, it.id, G.data);
@@ -325,6 +350,7 @@ G.ui.shop = (function () {
     if (r === E.OK) { G.core.save.autosave('purchase'); say('Thank you kindly.', 'moss_lit'); }
     else if (r === E.POOR) say('Not enough coins.', 'rust_hi');
     else if (r === E.MAXED) say('Nothing finer on the shelf.');
+    else if (r === E.LOCKED) say(G.data.gear.rods[it.id] && G.data.gear.rods[it.id].grant ? 'That one comes with the Snow Machine.' : 'Not yet. Catch every fish under the ice first.', 'rust_hi');
   }
 
   // The visit's line as pages of the text box: up to two lines each; a repeated line is said

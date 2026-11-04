@@ -80,7 +80,7 @@ G.ui.journal = (function () {
     title.count = n + ' of ' + list.length + ' caught';
     title.shown = n + ' / ' + list.length;
     heavyNote = false;
-    var rod = G.data.gear.rods[G.state.save.gear.rod].maxMass;
+    var rod = G.data.gear.rods[G.sim.economy.rodInHand(G.state.save, G.data)].maxMass;
     for (var k = 0; k < G.data.fish.length; k++) {
       var sp = G.data.fish[k];
       for (var l = 0; l < sp.locations.length; l++) {
@@ -184,7 +184,11 @@ G.ui.journal = (function () {
     if (j.hints.indexOf('lure') < 0) note('lure');
     if (j.caught >= 2 && j.hints.indexOf('bait') < 0) note('bait');
     if (j.hints.indexOf('depth') < 0) note('depth');                // Phase 75: where, how deep and when, from the first catch
+    if (sp.ice) para(ICE_SAYS[sp.turnUpName] || '', 'wood', true);   // Phase 80: how often it turns up under the ice
+    if (sp.trophyKg && j.bestW >= sp.trophyKg) para('The ice monster. ' + j.bestW.toFixed(2) + ' kg, out of a hole in the ice.', 'rust', true); // Phase 80: the one named trophy
   }
+  // Phase 80: the reference's rarity, said as how often it comes to a hole.
+  var ICE_SAYS = { common: 'Comes to a hole often enough.', rare: 'Comes to a hole now and then.', epic: 'Seldom comes to a hole. Worth the wait.' };
 
   function open() {
     buildLocs();
