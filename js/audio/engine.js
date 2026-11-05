@@ -518,6 +518,10 @@ G.audio.engine = (function () {
       var notes = [261.6, 329.6, 392];
       for (var i = 0; i < notes.length; i++) tone('sine', notes[i], notes[i] * 0.995, 2.4, 0.03, (i - 1) * 0.2, i * 0.12, bus.music, 0.25);
     },
+    badge: function () { // Phase 94.3: the size badge: a soft rising chime on the effects bus
+      var notes = [784, 988, 1175];
+      for (var i = 0; i < notes.length; i++) tone('sine', notes[i], notes[i], 0.5, 0.014, 0, i * 0.09);
+    },
     bell: function () { tone('sine', 1568, 1562, 0.9, 0.025, 0); tone('sine', 2093, 2088, 0.7, 0.015, 0, 0.11); }, // Phase 39: the shop door's bell
     coin: function () { tone('sine', 1318.5, 1318.5, 0.12, 0.025, 0.1); tone('sine', 1760, 1760, 0.22, 0.02, 0.1, 0.07); },
     buy: function () { click(0.6, 0.06, 0); tone('sine', 140, 90, 0.12, 0.05, 0, 0.02); SOUNDS.coin(); },
@@ -598,6 +602,7 @@ G.audio.engine = (function () {
     return L;
   }
 
+  function vol(v) { return typeof v === 'number' ? Math.max(0, Math.min(1, v)) : 1; }
   // Called after every fixed step (index.html), whether or not the world moved.
   function step(dt) {
     if (!ac) return;
@@ -608,7 +613,11 @@ G.audio.engine = (function () {
     var lost = G.core.save.lost();
     set(master.gain, st.mute || lost ? 0 : st.volume * BASE, 0.08);
     // Under the pause menu the effects duck; indoors the ambience is heard through the walls.
-    set(bus.sfx.gain, BUS.sfx * (menu === 'pause' ? 0.3 : 1), 0.1);
+    // Phase 92.1: Music, World (the ambience: weather, wildlife, the lake) and Effects (the reel,
+    // splashes, the dog, the UI), each 0..1 under the master (settings.music, world, effects).
+    set(bus.sfx.gain, BUS.sfx * vol(st.effects) * (menu === 'pause' ? 0.3 : 1), 0.1);
+    set(bus.music.gain, BUS.music * vol(st.music), 0.1);
+    set(bus.amb.gain, BUS.amb * vol(st.world), 0.1);
     set(ambLP.frequency, scene === 'sailing' ? 18000 : 520, 0.3);
 
     if (menu !== prev.menu) { if (menu) play('page'); prev.menu = menu; }

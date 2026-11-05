@@ -36,7 +36,9 @@ node tools/balance.js --fight                    # how fights end by player and 
 node tools/balance.js --rod                      # the rod's bend: shapes, action, springing (Phase 31b)
 node tools/balance.js --tackle                   # each bait and lure's income at each water (Phase 43)
 node tools/balance.js --homes                    # where each species lives, against PLAN_WATERS.md §3 (Phase 75)
+node tools/balance.js --first                    # a fresh save's first fish inside 60 s, on 20 seeds (Phase 96)
+node tools/balance.js --milestones               # each milestone against fixture saves; the first-catch bonus (Phase 94)
 node tools/icon.js --check                       # the home-screen icon files match the grid they are painted from (Phase 61)
 ```
 
-On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`, `?tour` (every water open on the map, nothing saved).
+On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`, `?tour` (every water open on the map, nothing saved), `?sw` (use the offline service worker on localhost too).

@@ -1524,6 +1524,7 @@ G.scene.underwater = (function () {
       run.hook.t += dt;
       if (run.hook.t >= HOOKED_BEAT) G.core.state.go(run, 'fighting');
     } else if (fsm === 'fighting') {
+      inp.reelToggle(run.fsm === 'fighting' && G.state.save.settings.reel === 'toggle'); // Phase 92.2
       fightIn.reel = inp.held('action');
       var res = F.step(run.fight, fightIn, dt, G.rng, G.data);
       if (run.fight.slipped) { fx.ripple(run.hook.x, loc.waterY + 2, 2, 10, 0.8); G.gfx.surface.poke(run.hook.x, 0.5); } // the soft slip sound: audio/engine.js

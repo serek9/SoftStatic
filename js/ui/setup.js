@@ -43,7 +43,7 @@ G.ui.setup = (function () {
     var all = g.baits.concat(g.lures || []);
     for (i = 0; i < all.length; i++) {
       b = all[i];
-      if (usable(save, b) || b.id === save.gear.bait) hooks.push(b.id);
+      if (usable(save, b) || b.id === save.gear.bait || (E().isLure(b.id, G.data) && b.id in save.baits)) hooks.push(b.id); // Phase 96.3: a lure once owned stays, greyed, when none are left
     }
   }
 
@@ -137,7 +137,7 @@ G.ui.setup = (function () {
     }
     if (col === 2) return LINE_SAYS[lines[sel[2]]] || '';
     var b = E().baitById(hooks[sel[1]], G.data);
-    if (!usable(save, b)) return 'None left.';
+    if (!usable(save, b)) return E().isLure(b.id, G.data) ? 'None left. Rusty sells packs at the pier.' : 'None left.'; // Phase 96.3
     if (!downHole(save, b)) return 'Needs open water.';
     if (!E().isLure(b.id, G.data)) return b.unlimited ? 'Live bait. Never runs out.' : 'Live bait. One a cast.';
     var how = G.ui.tips ? G.ui.tips.RETRIEVE[E().onIce(save, G.data) ? 'jig' : RETRIEVE_OF[b.swim]] : '';    // Phase 88.4: how to work it

@@ -227,6 +227,15 @@ G.ui.shop = (function () {
     lures: [] };
   (function () { for (var i = 0; i < SHELVES[2].length; i++) SHELF_ITEMS.lures.push([2, i]); })(); // Phase 69: all 23
   var ALL = []; (function () { for (var r = 0; r < SHELVES.length; r++) for (var c = 0; c < SHELVES[r].length; c++) ALL.push([r, c]); })();
+  // Phase 96.3: a 'Buy 5' row under each lure in a list (a shelf of its own, never in a room's
+  // shelves): five packs at once.
+  var FIVE = 5, FIVE_ROW = SHELVES.length;
+  SHELVES.push(SHELVES[2].map(function (l) { return { kind: 'five', id: l.id, icon: 'lure' }; }));
+  function withFives(entries) {
+    var out = [];
+    for (var i = 0; i < entries.length; i++) { out.push(entries[i]); if (entries[i][0] === 2) out.push([FIVE_ROW, entries[i][1]]); }
+    return out;
+  }
   var stock = { rod: 0, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
   // Phase 39: the hour and the light for the room (the lake's: Fogbound's drizzle and fog),
   // and the strange: at Fogbound's unease 0.4 or more, now and then and one at a time, the
@@ -269,7 +278,12 @@ G.ui.shop = (function () {
   function describe() {
     var it = item(), save = G.state.save, g = G.data.gear, desc = '', next, cur, name = '', status = '';
     txt.price = '';
-    if (it.kind === 'snow') { // Phase 80: the Snow Machine
+    if (it.kind === 'five') { // Phase 96.3: five packs of the lure above
+      var fb = E.baitById(it.id, G.data);
+      name = fb.name + ', five packs'; txt.price = FIVE * fb.pack * fb.cost + 'c';
+      desc = FIVE * fb.pack + ' ' + fb.name + (FIVE * fb.pack === 1 ? '' : 's') + ' in one go, for when the line snaps.';
+      status = 'You have ' + (save.baits[fb.id] || 0) + '.';
+    } else if (it.kind === 'snow') { // Phase 80: the Snow Machine
       var sn = g.snow;
       name = sn.name;
       desc = 'Fast over the ice, with a box sled for the dog. Comes with an Ice Rod. Takes you out on Tamarack Lake.';
@@ -327,6 +341,7 @@ G.ui.shop = (function () {
   function label(it) {
     var save = G.state.save, g = G.data.gear;
     lab.mark = '';
+    if (it.kind === 'five') { var b5 = E.baitById(it.id, G.data); lab.name = '  Buy 5 packs'; lab.price = FIVE * b5.pack * b5.cost + 'c'; return lab; } // Phase 96.3
     if (it.kind === 'snow') { // Phase 80
       lab.name = g.snow.name; lab.price = save.gear.snow ? 'OWNED' : g.snow.cost + 'c';
     } else if (it.kind === 'rod') {
@@ -355,7 +370,11 @@ G.ui.shop = (function () {
 
   function act() {
     var it = item(), save = G.state.save, r;
-    if (it.kind === 'bait') {
+    if (it.kind === 'five') { // Phase 96.3: five packs in one action; it goes on the hook
+      var b5 = E.baitById(it.id, G.data);
+      r = E.buyBait(save, b5.id, FIVE * b5.pack, G.data);
+      if (r === E.OK) save.gear.bait = b5.id;
+    } else if (it.kind === 'bait') {
       var b = E.baitById(it.id, G.data);
       if (b.unlimited || (save.gear.bait !== b.id && save.baits[b.id] > 0)) { save.gear.bait = b.id; describe(); say('On the hook next cast.'); return; }
       r = E.buyBait(save, b.id, b.pack, G.data);
@@ -407,6 +426,7 @@ G.ui.shop = (function () {
   // The item window over the room, for every shelf (Rusty's Buy) or one shelf (Phase 38).
   function showItems(entries, src) {
     list.length = 0;
+    entries = withFives(entries);                                                    // Phase 96.3
     for (var i = 0; i < entries.length; i++) list.push(entries[i]);
     sel = 0; from = src; open = 'items';
     row = list[0][0]; col = list[0][1]; describe(); say('');
@@ -611,7 +631,8 @@ G.ui.shop = (function () {
         var it = SHELVES[list[i][0]][list[i][1]], ry = U.top(y) + (i - top) * LIST.rowH, l = label(it), on = i === sel;
         if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(x + 3, ry - 1, LIST.w - 6, LIST.rowH); ctx.fillStyle = P.signal_amber; ctx.fillRect(x + 3, ry - 1, 2, LIST.rowH); }
         var ic = icon(it, 1);
-        if (it.icon === 'lure') ctx.drawImage(ic, x + U.PAD + 2 + ((LURE_ROW[0] - ic.width) >> 1), ry + ((LIST.rowH - 16) >> 1) + ((LURE_ROW[1] - ic.height) >> 1)); // Phase 73: at its own size
+        if (it.kind === 'five') { /* Phase 96.3: no icon of its own; the lure is the row above */ }
+        else if (it.icon === 'lure') ctx.drawImage(ic, x + U.PAD + 2 + ((LURE_ROW[0] - ic.width) >> 1), ry + ((LIST.rowH - 16) >> 1) + ((LURE_ROW[1] - ic.height) >> 1)); // Phase 73: at its own size
         else ctx.drawImage(ic, x + U.PAD + 2, ry + ((LIST.rowH - 16) >> 1), 14, 14);
         F.drawText(ctx, l.name, x + U.PAD + 20, ry + 3 + ((LIST.rowH - 16) >> 1), on ? 'signal_amber' : 'bone');
         var pw = F.measure(l.price);

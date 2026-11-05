@@ -10,7 +10,7 @@ G.data.locations = G.data.locations || {};
 G.data.locations.pines = {
   id: 'pines',
   name: 'The Pines',
-  cost: 1500,
+  cost: 600, // Phase 96.1 (was 1500)
   width: 1300,
   waterY: 112,
   maxDepth: 112,

@@ -500,7 +500,7 @@ G.ui.cabin = (function () {
     if (what === 'fridge') { say(lv < 1 ? 'The fridge is dead. Something in it was food once.' : ['Cold beer, eggs, a jar of something pickled. The motor shudders and holds.', 'A note on the door in your handwriting: CHECK THE PIER. You do not remember writing it.'][chordN++ % 2]); return; }
     if (what === 'stove') { say(lv < 2 ? 'Cold, and rusted through at the pipe.' : 'The fire ticks and settles. Warm.'); return; }
     if (what === 'chair') { say(lv < 2 ? 'An upturned bucket. It holds.' : 'The chair still keeps the shape of whoever sat in it.'); return; }
-    if (what === 'bed') { say(['A sleeping bag on a pallet. The floor breathes cold.', 'A cot. You lie down a minute.', 'You lie down a minute. The stove ticks.', 'You lie down a minute. The lamp hums.', 'You lie down a minute under the quilt. Outside, the lake.'][lv]); return; }
+    if (what === 'bed') { uiLay(); lines = F.wrap(['A sleeping bag on a pallet. Rest until:', 'A cot. Rest until:', 'The stove ticks. Rest until:', 'The lamp hums. Rest until:', 'Under the quilt. Rest until:'][lv], BOX.w - 32); var pn = PARTS.indexOf(partNow(G.state.save.clock)); restSel = (pn + 1) % PARTS.length; open = 'rest'; return; } // Phase 93.1
   }
 
   function envStep(dt) {
@@ -510,16 +510,61 @@ G.ui.cabin = (function () {
     env.rain = sc.rain(); env.fog = sc.fogAlpha(); env.flash = sc.flash();
   }
 
+  // ---- Phase 93.1 (PLAN_PLAYABILITY.md): rest until a part of the day -------------------------
+  // The bed here, and the pier's Wait row (G.ui.dock), offer dawn, day, dusk or night. A short
+  // fade out, the clock set to that part's first hour (G.data.HOURS), the fish in view sent off
+  // quietly (fish_ai.scatter), an autosave, and a fade back in. Never with a line out or a fish
+  // on (only from the sailing fsm, as the pier's panel; the cabin has no line). A UI action:
+  // the sim's clock just carries on from the new hour.
+  var PARTS = ['dawn', 'day', 'dusk', 'night'], PART_ROWS = ['Dawn', 'Day', 'Dusk', 'Night'], REST_FADE = 0.45;
+  var rest = { phase: '', t: 0, to: '', n: 0, last: '' };
+  function partStart(p) { var h = G.data.HOURS[p]; return h ? h[0] : -1; }
+  function partNow(hour) { var hh = Math.floor(G.sim.clock.wrap(hour)); for (var k in G.data.HOURS) if (G.data.HOURS[k].indexOf(hh) >= 0) return k; return ''; }
+  function canRest() { var r = G.state.run; return !rest.phase && !(r && r.fsm && r.fsm !== 'sailing'); }
+  function restUntil(p) {
+    if (partStart(p) < 0 || !canRest()) return false;
+    rest.phase = 'out'; rest.t = 0; rest.to = p;
+    G.audio.engine.play('uiOk');
+    return true;
+  }
+  // One step; true while the fade has the keys.
+  function restStep(dt) {
+    if (!rest.phase) return false;
+    rest.t += dt;
+    if (rest.phase === 'out' && rest.t >= REST_FADE) {
+      G.state.save.clock = partStart(rest.to);
+      var r = G.state.run;
+      if (r && r.school) G.sim.fish_ai.scatter(r.school);
+      G.core.save.autosave('rest');
+      rest.phase = 'in'; rest.t = 0; rest.n++; rest.last = rest.to;
+    } else if (rest.phase === 'in' && rest.t >= REST_FADE) rest.phase = '';
+    return true;
+  }
+  function restAlpha() { return rest.phase === 'out' ? Math.min(1, rest.t / REST_FADE) : (rest.phase === 'in' ? Math.max(0, 1 - rest.t / REST_FADE) : 0); }
+  var restSel = 0;
+  function restRects() {
+    var U = G.ui.panel, bh = U.btnH(), gap = 6, x = BOX.x + 14, y = BOX.y + BOX.h - U.PAD - bh, out = [];
+    for (var i = 0; i < PART_ROWS.length; i++) { var w = Math.max(56, U.buttonW(PART_ROWS[i])); out.push([x, y, w, bh]); x += w + gap; }
+    return out;
+  }
+
   function update(dt) {
     var inp = G.core.input;
     t += dt;
     G.sim.clock.step(G.state.save, null, dt, G.rng, G.data);
     envStep(dt);
+    if (restStep(dt)) return;                                                         // Phase 93.1: the fade has the keys
     if (recordT >= 0 && t - recordT > 9) recordT = -1;                               // the side ends
     if (tvMode === 2 && G.state.save.pond) G.state.save.pond.watch = (G.state.save.pond.watch || 0) + dt; // Phase 85: Fishwatch
     if (open) {
       if (inp.pressed('map')) { open = ''; return; }
       if (inp.pressed('back')) { open = ''; return; }
+      if (open === 'rest') {                                                         // Phase 93.1: the bed's four buttons
+        var lr = (inp.pressed('right') ? 1 : 0) - (inp.pressed('left') ? 1 : 0);
+        if (lr) { restSel = (restSel + lr + PARTS.length) % PARTS.length; G.audio.engine.play('uiMove'); }
+        if (inp.pressed('action')) { open = ''; restUntil(PARTS[restSel]); }
+        return;
+      }
       if (inp.pressed('action')) { if (open === 'restore') restore(); else open = ''; }
       return;
     }
@@ -549,6 +594,11 @@ G.ui.cabin = (function () {
   }
 
   function draw(ctx) {
+    drawRoom(ctx);
+    var a = restAlpha();
+    if (a > 0) { G.core.view.begin(ctx, true); G.ui.menu.dim(ctx, a); }            // Phase 93.1: the rest's fade
+  }
+  function drawRoom(ctx) {
     var save = G.state.save, ox = OX, oy = OY - TOP, i;
     ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
     ctx.drawImage(base, ox, oy);
@@ -606,7 +656,20 @@ G.ui.cabin = (function () {
     var U = G.ui.panel, ctx0 = ctx;
     uiLay(); ctx = U.begin(ctx0);                                                   // Phase 90: on the UI layer
     if (open) {
-      U.frame(ctx, BOX.x, BOX.y - U.TAB, BOX.w, BOX.h + U.TAB, open === 'restore' ? 'THE LEDGER' : 'CABIN');
+      U.frame(ctx, BOX.x, BOX.y - U.TAB, BOX.w, BOX.h + U.TAB, open === 'restore' ? 'THE LEDGER' : (open === 'rest' ? 'REST' : 'CABIN'));
+      if (open === 'rest') {                                                         // Phase 93.1: a line and the four buttons
+        F.drawText(ctx, lines[0] || '', BOX.x + 14, BOX.y + 6, 'bone');
+        var rr = restRects(), pn = partNow(save.clock);
+        for (i = 0; i < rr.length; i++) {
+          var b = rr[i], st = i === restSel ? (G.core.input.held('action') ? 2 : 1) : 0;
+          U.button(ctx, PART_ROWS[i], b[0], b[1], b[2], b[3], st);
+          if (PARTS[i] === pn) partIcon(ctx, PARTS[i], b[0] + b[2] - 9, b[1] + 2);
+        }
+        var lx = rr[rr.length - 1][0] + rr[rr.length - 1][2] + 12, ly = rr[0][1] + ((rr[0][3] - U.KEY_H) >> 1);
+        if (!U.touch()) { lx += U.hint(ctx, 'A/D', 'choose', lx, ly); U.hint(ctx, 'ESC', 'not now', lx, ly); }
+        else U.hint(ctx, 'ESC', 'not now', lx, ly);
+        return;
+      }
       for (i = 0; i < lines.length && i < 2; i++) F.drawText(ctx, lines[i], BOX.x + 14, BOX.y + 10 + i * (F.LINE_H + 6), 'bone');
       var hx = BOX.x + 14, hy = BOX.y + BOX.h - U.PAD - U.KEY_H;
       if (open === 'restore') { hx += U.hint(ctx, 'SPACE', 'pay', hx, hy); U.hint(ctx, 'ESC', 'not now', hx, hy); }
@@ -666,12 +729,24 @@ G.ui.cabin = (function () {
     if (lv >= 3 && n > 0.4) { ctx.fillStyle = P.paper; for (var i = 0; i < 2; i++) { var a = t * (2.3 + i * 0.8) + i * 3; ctx.fillRect(Math.round(ox + LAMPP[0] + Math.cos(a) * (7 + i * 3)), Math.round(oy + LAMPP[1] - 24 + Math.sin(a * 1.6) * 4), 1 + (Math.floor(t * 12 + i) & 1), 1); } }
   }
   var bp = [];
+  // Phase 93: the parts of the day as 7×7 marks: dawn a half sun on a line, day a sun, dusk a
+  // low sun, night a crescent moon (palette keys; the journal's pages use them too).
+  var PART_ICON = {
+    dawn: [['ink', 0, 6, 7, 1], ['signal_amber', 2, 3, 3, 3], ['signal_amber', 1, 4, 5, 2], ['lamp_glow', 3, 1, 1, 1], ['lamp_glow', 0, 2, 1, 1], ['lamp_glow', 6, 2, 1, 1]],
+    day: [['lamp_glow', 2, 1, 3, 5], ['lamp_glow', 1, 2, 5, 3], ['bone', 3, 0, 1, 1], ['bone', 3, 6, 1, 1], ['bone', 0, 3, 1, 1], ['bone', 6, 3, 1, 1]],
+    dusk: [['rust_hi', 2, 2, 3, 4], ['rust_hi', 1, 3, 5, 3], ['ink', 0, 5, 7, 2], ['rust', 1, 6, 5, 1]],
+    night: [['bone', 2, 0, 3, 1], ['bone', 1, 1, 2, 5], ['bone', 2, 6, 3, 1], ['bone', 3, 1, 1, 1], ['bone', 3, 5, 1, 1]]
+  };
+  function partIcon(ctx, p, x, y) { var r = PART_ICON[p]; if (!r) return; for (var i = 0; i < r.length; i++) { ctx.fillStyle = P[r[i][0]]; ctx.fillRect(x + r[i][1], y + r[i][2], r[i][3], r[i][4]); } }
   var WORD = { backdoor: 'OUT', bench: 'FIX', mirror: 'LOOK', plaques: 'READ', guitar: 'PLAY', keys: 'PLAY', records: 'PLAY', tv: 'TV', stove: 'WARM', chair: 'SIT', bed: 'REST', fan: 'FAN', fridge: 'OPEN', lava: 'LAMP' }; // Phase 58
   var HINT = { backdoor: 'the pond', bench: 'restore', mirror: 'fisher & dog', plaques: 'look', guitar: 'play', keys: 'play', records: 'play', tv: 'switch', stove: 'warm up', chair: 'sit', bed: 'rest', fan: 'switch', fridge: 'open', lava: 'switch' };
 
   return {
     native: true,
     enter: enter, exit: exit, update: update, draw: draw, restore: restore, use: use,
+    // Phase 93.1: resting, shared with the pier's panel (dock.js)
+    PARTS: PARTS, PART_ROWS: PART_ROWS, partStart: partStart, partNow: partNow, canRest: canRest, restUntil: restUntil, restStep: restStep, restAlpha: restAlpha, partIcon: function (c, p, x, y) { partIcon(c, p, x, y); },
+    restInfo: function () { return { phase: rest.phase, to: rest.to, last: rest.last, n: rest.n, open: open === 'rest', sel: PARTS[restSel] }; },
     // Phase 58: a panel is open over the room (the touch pad hides), and the touch action
     // button's word for what he faces (the hint's 'look' where it would say look).
     busy: function () { return open !== ''; },
@@ -682,6 +757,13 @@ G.ui.cabin = (function () {
       uiLay();
       var U = G.ui.panel, gx = U.ux(gx0), gy = U.uy(gy0), onBox = gx >= BOX.x && gx < BOX.x + BOX.w && gy >= BOX.y - U.TAB && gy < BOX.y + BOX.h;
       if (!open) return '';
+      if (open === 'rest') {                                                         // Phase 93.1: a button rests until its part; ESC's hint closes
+        var rr = restRects();
+        for (var k = 0; k < rr.length; k++) if (U.inside(rr[k], gx, gy)) { restSel = k; return 'action'; }
+        var ex = rr[3][0] + rr[3][2] + 12;
+        if (gx >= ex && gx < ex + U.hintW('ESC', 'not now') && gy >= rr[0][1] && gy < rr[0][1] + rr[0][3]) return 'back';
+        return 'none';
+      }
       if (open !== 'restore') return onBox ? 'action' : 'none';
       var hx = BOX.x + 14, hy = BOX.y + BOX.h - U.PAD - U.KEY_H, w = U.hintW('SPACE', 'pay');
       if (gy < hy - 2 || gy >= hy + U.KEY_H + 2) return 'none';

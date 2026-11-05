@@ -125,6 +125,7 @@ G.sim.fish_ai = (function () {
         attract: 1, // gear and cast spot: attract shortens the wait between arrivals
         cover: 1,   // Phase 69: the share of the fish here the hook is sized for (speciesWeights)
         maxDepthPx: 0, floorAt: null, // floorAt(x) -> bottom depth in px; null uses maxDepthPx
+        first: false, // Phase 96.4: the save has landed no fish yet (one eager taker a cast)
         pondN: null, // Phase 85: the Back Pond's stocked fish free to bite, by species id (null elsewhere)
         ceilPx: 0,  // Phase 81: the ice's thickness (px): fish keep under it
         flowAt: null // Phase 28: flowAt(x, depth px) -> px/s of current; null is still water
@@ -172,7 +173,7 @@ G.sim.fish_ai = (function () {
       f.yaw = dir >= 0 ? 0 : Math.PI; f.pitch = 0; f.spd = 0; f.back = 0; f.face = dir >= 0 ? 1 : -1; f.gl = 0; f.glT = 0; f.bursts = 0; f.flow = 0;
       f.home = hb.bed ? bedDepth(school, f, rng) : clampDepth(school, f, rng.range(h.depthMin, h.depthMax) * 4);
       f.turnT = rng.range(2, 6); f.circles = 0; f.ang = 0; f.swept = 0; f.nibbles = 0; f.nibbleN = 0; f.nibbleT = 0; f.missed = 0; f.shied = 0;
-      f.pass = rng.next() < W.passBy; f.dead = 0;                                   // the user's fixes: just passing by
+      f.pass = rng.next() < W.passBy; f.dead = 0; f.eager = false;                                   // the user's fixes: just passing by
       setState(f, 'wander');
       return f;
     }
@@ -321,6 +322,7 @@ G.sim.fish_ai = (function () {
         break;
 
       case 'inspect': // circle the lure circles times (a flattened circle), steering after a point on it
+        if (f.eager) { setState(f, 'nibble'); f.nibbleN = 2; f.nibbles = 0; f.nibbleT = f.nibbleLen = rng.range(0.25, 0.6); f.dir = f.x < lure.x ? 1 : -1; break; } // Phase 96.4: no circling
         var w = speed * 0.4 / A.inspectR;
         f.ang += f.dir * w * dt;
         f.swept += w * dt;
@@ -331,7 +333,7 @@ G.sim.fish_ai = (function () {
           f.swept = 0;
           if (--f.circles <= 0 && sp.lineShy && school.ctx.lineSeen) {
             setState(f, 'leave'); f.shied = 1;           // Phase 53: close enough to see the line: it turns away
-          } else if (f.circles <= 0 && lure.lure && work < 1 && rng.next() < W.refuseK * (1 - work)) {
+          } else if (f.circles <= 0 && !f.eager && lure.lure && work < 1 && rng.next() < W.refuseK * (1 - work)) {
             setState(f, 'leave');                        // the user's fixes: it has seen enough of a badly worked lure
           } else if (f.circles <= 0) {
             setState(f, 'nibble');
@@ -347,7 +349,7 @@ G.sim.fish_ai = (function () {
         if (f.nibbleT <= 0) {
           f.nibbles++;
           f.nibbleT = f.nibbleLen = rng.range(0.25, 0.6);
-          if (f.nibbles >= f.nibbleN) setState(f, rng.next() >= sp.caution ? 'bite' : 'leave');
+          if (f.nibbles >= f.nibbleN) setState(f, rng.next() >= sp.caution || f.eager ? 'bite' : 'leave'); // Phase 96.4: the first taker takes it
         }
         break;
 
@@ -369,8 +371,37 @@ G.sim.fish_ai = (function () {
   }
 
   // The whole school for one fixed step: spawning near the lure, then every fish.
+  // Phase 96.4 (PLAN_PLAYABILITY.md): a gentler first session. While ctx.first (the save has
+  // landed no fish yet), each cast sends an eager fish FIRST.delay s after the lure goes in (another when it is gone): of
+  // a species picked as any other, near the lure at its depth (inside the fish's home), already
+  // circling it; it does not just pass by, refuse a lure or shy at the caution roll. Once a
+  // fish is landed the caller clears ctx.first and the school is as before.
+  var FIRST = { delay: 1, near: 10 }; // s after the lure is in; px from it (the inspect circle's radius)
+  function firstTaker(school, lure, dt, rng, data) {
+    if (school.firstSent) {                                                          // gone (missed, or swum off): another comes
+      var alive = false;
+      for (var i = 0; i < MAX; i++) { var e = school.fish[i]; if (e.active && e.eager && e.state !== 'leave') alive = true; }
+      if (alive) return;
+      school.firstSent = false; school.firstT = 0;
+    }
+    if (count(school) >= MAX) return;
+    school.firstT = (school.firstT || 0) + dt;
+    if (school.firstT < FIRST.delay) return;
+    school.firstSent = true;
+    var sp = pickSpecies(school.ctx, rng);
+    if (sp < 0) return;
+    var side = rng.next() < 0.5 ? -1 : 1, f = spawn(school, sp, lure.x + side * FIRST.near, lure.y, -side, rng, data);
+    if (!f) return;
+    var h = f.hab.habitat;
+    f.y = clampDepth(school, f, Math.max(h.depthMin * 4, Math.min(h.depthMax * 4, lure.y)));
+    f.eager = true; f.pass = false;
+    setState(f, 'inspect');                                                          // already at the lure: straight to the nibbles (stepFish)
+  }
+
   function stepSchool(school, lure, dt, rng, data) {
     school.ctx.reach = data.reachAt(data.locations[school.ctx.loc], lure.x); // Phase 75: the reach the lure is in
+    if (lure.active && school.ctx.first) firstTaker(school, lure, dt, rng, data);
+    else if (!lure.active) { school.firstSent = false; school.firstT = 0; }
     if (lure.active) {
       school.spawnT -= dt;
       if (school.spawnT <= 0) {
@@ -421,7 +452,7 @@ G.sim.fish_ai = (function () {
   function clear(school) { for (var i = 0; i < MAX; i++) school.fish[i].active = false; school.spawnT = 0; }
 
   return {
-    MAX: MAX, W: W, A: A, M: M,
+    MAX: MAX, W: W, A: A, M: M, FIRST: FIRST,
     weightOf: weightOf, speciesWeights: speciesWeights, pickSpecies: pickSpecies,
     createSchool: createSchool, spawn: spawn, stepFish: stepFish, stepSchool: stepSchool,
     interest: interest, count: count, interested: interested, interestLevel: interestLevel, scatter: scatter, clear: clear

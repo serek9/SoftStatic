@@ -237,13 +237,28 @@ G.sim.economy = (function () {
     return true;
   }
 
+  // Phase 96.4: true once the save has landed a fish (any species caught).
+  function anyCaught(save) { for (var k in save.journal) if (save.journal[k].caught > 0) return true; return false; }
+
+  // Phase 93.2: the part of the day ('dawn', 'day', 'dusk', 'night') of a game hour, from G.data.HOURS.
+  function partOf(hour) {
+    var H = G.data && G.data.HOURS, hh = Math.floor((((hour || 0) % 24) + 24) % 24);
+    if (H) for (var k in H) if (H[k].indexOf(hh) >= 0) return k;
+    return '';
+  }
+
   // A landed fish into the save. c: {id, len, w, price, windowCatch, bait}; choice 'sell',
   // 'keep' or (Phase 51) 'release': let go, it still counts in the journal, and earns nothing.
+  // Phase 94.2: the first-catch bonus for species sp: its base price, at least gear.firstCatch.min.
+  function firstBonus(sp, data) { var r = data.gear.firstCatch; return r ? Math.max(r.min, Math.round(sp.price)) : 0; }
+  function speciesById(id, data) { for (var i = 0; i < data.fish.length; i++) if (data.fish[i].id === id) return data.fish[i]; return null; }
+
+  // Returns the first-catch bonus paid (Phase 94.2), 0 for a species caught before.
   function recordCatch(save, c, choice) {
-    var j = save.journal[c.id];
+    var j = save.journal[c.id], first = !j || !j.caught, sp = first ? speciesById(c.id, G.data) : null, bonus = first && sp ? firstBonus(sp, G.data) : 0;
     if (!j) j = save.journal[c.id] = { caught: 0, bestLen: 0, bestW: 0, hints: [], seen: true, phantom: false };
     j.caught++; j.seen = true; j.phantom = false;
-    if (c.len > j.bestLen) j.bestLen = c.len;
+    if (c.len > j.bestLen) { j.bestLen = c.len; j.bestAt = partOf(save.clock); }   // Phase 93.2: the part of the day of the best catch
     if (c.w > j.bestW) j.bestW = c.w;
     if (c.windowCatch) save.flags.windowCatch[c.windowCatch] = true;
     if (c.w > 0 && G.data.SIZE_CLASSES) {                                          // Phase 85: the size classes caught (for stocking the pond)
@@ -256,6 +271,8 @@ G.sim.economy = (function () {
     if (choice === 'sell') save.coins += c.price;
     else if (choice === 'release') j.released = (j.released || 0) + 1;
     else save.kept.push({ id: c.id, len: c.len, w: c.w });
+    save.coins += bonus;
+    return bonus;
   }
 
   // OK when the location can be bought now; MAXED if already open; POOR; LOCKED if its
@@ -298,7 +315,7 @@ G.sim.economy = (function () {
 
   return {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
-    sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
+    partOf: partOf, anyCaught: anyCaught, firstBonus: firstBonus, sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
     ownsRod: ownsRod, nextLadderRod: nextLadderRod, buyRod: buyRod, useRod: useRod, loseLure: loseLure,
     iceAll: iceAll, buySnow: buySnow, onIce: onIce, iceHook: iceHook, rodInHand: rodInHand,
     lineTypeById: lineTypeById, ownsLineType: ownsLineType, buyLineType: buyLineType, useLineType: useLineType,

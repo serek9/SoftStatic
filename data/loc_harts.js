@@ -12,7 +12,7 @@ G.data.locations = G.data.locations || {};
 G.data.locations.harts = {
   id: 'harts',
   name: 'Hartsmere Lake',
-  cost: 2400,
+  cost: 900, // Phase 96.1 (was 2400)
   width: 1400,
   waterY: 112,
   maxDepth: 128,

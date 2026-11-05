@@ -16,7 +16,8 @@ G.core.device = (function () {
     touch: false, coarse: false, portrait: false, fullscreen: false, standalone: false,
     vw: 0, vh: 0, dpr: 1, insets: [0, 0, 0, 0], // top, right, bottom, left (CSS px)
     scale: 1, whole: true, cssW: 0, cssH: 0, fill: 0, left: 0, top: 0,
-    fsAsked: 0, fsResult: '', lock: '', fits: 0, audio: '-'
+    fsAsked: 0, fsResult: '', lock: '', fits: 0, audio: '-',
+    persistAsked: false, persisted: null, sw: '-', updated: false, buzz: { bite: 0, hook: 0, slip: 0 } // Phase 91
   };
 
   function touch() { return coarse || touchSeen; }
@@ -155,6 +156,44 @@ G.core.device = (function () {
     return cv;
   }
 
+  // ---- Phase 91 (PLAN_PLAYABILITY.md): the phone as an app -----------------------------------
+
+  // 91.2: keep the save. On the first tap (or click or key) the browser is asked to keep this
+  // site's storage (navigator.storage.persist()); info.persisted is what it answered (null: no
+  // answer yet or no API). iOS Safari may clear a site's storage after 7 days without a visit
+  // unless it is on the Home Screen, so there a once-only note says so (G.ui.tips).
+  function ios() {
+    var n = window.navigator, ua = n.userAgent || '';
+    return /iPad|iPhone|iPod/.test(ua) || (n.platform === 'MacIntel' && n.maxTouchPoints > 1);
+  }
+  function askPersist() {
+    if (info.persistAsked) return;
+    info.persistAsked = true;
+    var st = window.navigator.storage;
+    if (!st || !st.persist) { info.persisted = null; return; }
+    try { st.persist().then(function (v) { info.persisted = !!v; }, function () { info.persisted = false; }); } catch (e) { info.persisted = false; }
+  }
+  function readPersisted() {
+    var st = window.navigator.storage;
+    if (st && st.persisted) try { st.persisted().then(function (v) { if (v || info.persisted === null) info.persisted = !!v; }, function () {}); } catch (e) {}
+  }
+  // The Home Screen note's moment: an iPhone or iPad's browser, not the installed app.
+  function wantsHomeScreen() { return ios() && !info.standalone; }
+
+  // 91.3: feel it. A short tick on a bite, a pulse on the hook-set, a buzz on a slip, through
+  // navigator.vibrate (Android; iOS Safari has none), in touch mode with Vibration on. Every call
+  // that would vibrate is counted by kind (dbg.device().buzz), whether the browser has the API or not.
+  var BUZZ = { bite: 18, hook: [30, 40, 30], slip: [12, 30, 12, 30, 12] };
+  function buzz(kind) {
+    var st = G.state && G.state.save && G.state.save.settings;
+    if (!touch() || !BUZZ[kind] || (st && st.vibration === false)) return false;
+    info.buzz[kind] = (info.buzz[kind] | 0) + 1;
+    var n = window.navigator;
+    if (n.vibrate) try { n.vibrate(BUZZ[kind]); } catch (e) {}
+    return true;
+  }
+  function canVibrate() { return touch() && !!window.navigator.vibrate; }
+
   function attach(cv, w, h) {
     canvas = cv; W = w; H = h;
     var mq = window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
@@ -165,6 +204,10 @@ G.core.device = (function () {
     window.addEventListener('touchstart', function () { if (!touchSeen) { touchSeen = true; fit(); } }, { capture: true, passive: true });
     // touchend is a user activation where touchstart is not (iOS), so full screen is asked here.
     window.addEventListener('touchend', askFullscreen, { capture: true, passive: true });
+    window.addEventListener('touchend', askPersist, { capture: true, passive: true });   // 91.2: on the first tap
+    window.addEventListener('mousedown', askPersist, { capture: true, passive: true });
+    window.addEventListener('keydown', askPersist, { capture: true });
+    readPersisted();
     var refit = function () { fit(); };
     window.addEventListener('resize', refit);
     window.addEventListener('orientationchange', refit);
@@ -211,6 +254,9 @@ G.core.device = (function () {
       scale: +info.scale.toFixed(3), whole: info.whole, css: [+info.cssW.toFixed(1), +info.cssH.toFixed(1)], at: [+info.left.toFixed(1), +info.top.toFixed(1)],
       fill: +info.fill.toFixed(3), fsAsked: info.fsAsked, fsResult: info.fsResult, lock: info.lock, fits: info.fits, audio: info.audio, budget: held >= 0 ? held : level,
       // Phase 58: the touch layout's mode and the action button's word
+      // Phase 91: the service worker, the save kept or not, the Home Screen note's moment, vibration calls
+      sw: info.sw, updated: info.updated, persisted: info.persisted, persistAsked: info.persistAsked, ios: ios(), homeScreenNote: wantsHomeScreen(),
+      buzz: { bite: info.buzz.bite, hook: info.buzz.hook, slip: info.buzz.slip }, vibrate: !!window.navigator.vibrate,
       layout: G.core.input.layout().mode, word: G.ui && G.ui.hud ? G.ui.hud.word() : '',
       // Phase 90: the UI layer: on, its pixel in CSS px, the capitals' height in CSS px, its size
       ui: G.ui && G.ui.panel ? { on: G.ui.panel.on(), css: +G.ui.panel.css().toFixed(3), textPx: G.ui.panel.textPx(), size: [G.ui.panel.VW(), G.ui.panel.VH()], pic: G.ui.panel.pic() } : null
@@ -219,6 +265,7 @@ G.core.device = (function () {
 
   return {
     attach: attach, fit: fit, touch: touch, drawNotice: drawNotice, report: report,
+    ios: ios, wantsHomeScreen: wantsHomeScreen, buzz: buzz, canVibrate: canVibrate, persisted: function () { return info.persisted; }, // Phase 91
     canFullscreen: canFullscreen, isFullscreen: isFullscreen, setFullscreen: setFullscreen, budget: budget, paintIcon: paintIcon, ICON: ICON,
     portrait: function () { return info.portrait; },
     scale: function () { return info.scale; },
@@ -230,5 +277,6 @@ if (G.core.debug) G.core.debug.addLine(function () {
   var d = G.core.device.info;
   return 'device ' + (d.touch ? 'touch' : 'pc') + (d.portrait ? ' portrait' : '') + '  ' + d.vw + 'x' + d.vh + ' @' + d.dpr +
     '  scale ' + d.scale.toFixed(2) + (d.whole ? '' : ' (fractional)') + '  fill ' + Math.round(d.fill * 100) + '%' +
-    (d.fsAsked ? '  fullscreen ' + d.fsResult : '') + (d.fullscreen ? ' (on)' : '') + '  budget ' + G.core.device.budget().level;
+    (d.fsAsked ? '  fullscreen ' + d.fsResult : '') + (d.fullscreen ? ' (on)' : '') + '  budget ' + G.core.device.budget().level +
+    '  sw ' + d.sw + '  kept ' + (d.persisted === null ? '?' : d.persisted ? 'yes' : 'no') + '  buzz ' + (d.buzz.bite + d.buzz.hook + d.buzz.slip); // Phase 91
 });

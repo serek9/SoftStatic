@@ -8,7 +8,7 @@ G.data.locations = G.data.locations || {};
 G.data.locations.creek = {
   id: 'creek',
   name: 'Blackwater Creek',
-  cost: 550,
+  cost: 250, // Phase 96.1 (was 550)
   width: 1300,
   waterY: 112,
   maxDepth: 64,

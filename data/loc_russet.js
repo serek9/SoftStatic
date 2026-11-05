@@ -12,7 +12,7 @@ G.data.locations = G.data.locations || {};
 G.data.locations.russet = {
   id: 'russet',
   name: 'Russetwood Lake',
-  cost: 4800,
+  cost: 1500, // Phase 96.1 (was 4800)
   width: 1300,
   waterY: 112,
   maxDepth: 96,

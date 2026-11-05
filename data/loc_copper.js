@@ -13,7 +13,7 @@ G.data.locations = G.data.locations || {};
 G.data.locations.copper = {
   id: 'copper',
   name: 'Copperbend River',
-  cost: 800,
+  cost: 400, // Phase 96.1 (was 800)
   width: 1400,
   waterY: 112,
   maxDepth: 40,

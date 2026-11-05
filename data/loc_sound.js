@@ -14,7 +14,7 @@ G.data.locations = G.data.locations || {};
 G.data.locations.sound = {
   id: 'sound',
   name: 'Coldharbor Sound',
-  cost: 7000,
+  cost: 1750, // Phase 96.1 (was 7000)
   width: 1500,
   waterY: 112,
   maxDepth: 160,

@@ -18,7 +18,7 @@ G.ui.hud = (function () {
   var IDLE = 6, FADE = 1, idle = 0, seenCoins = -1, seenBait = '';
   var still = false; // audit P3-2: H hides every corner until pressed again
   // Phase 43: a short note under the bait (a lure lost), shown for NOTE s.
-  var NOTE = 4, note = '', noteT = 0;
+  var NOTE = 4, note = '', noteT = 0, lastOne = '', lastOneN = 0; // lastOne: Phase 96.3
   function say(s) { note = s; noteT = NOTE; idle = 0; }
   // Phase 75 (PLAN_WATERS.md 4.2): the reach's name, quietly at the top centre for REACH s when
   // the boat crosses into one (or arrives at a water), fading in and out.
@@ -32,6 +32,10 @@ G.ui.hud = (function () {
     if (G.core.input.pressed('still')) still = !still;
     if (G.core.input.any() || run.fsm !== 'sailing' || save.coins !== seenCoins || run.gearFx.bait !== seenBait) idle = 0;
     seenCoins = save.coins; seenBait = run.gearFx.bait;
+    // Phase 96.3: a lure down to its last one is said once each time it gets there.
+    var lb = run.gearFx.bait, ln = save.baits[lb] | 0, lk = G.sim.economy.isLure(lb, G.data) && ln === 1 ? lb : '';
+    if (lk && lk !== lastOne && run.fsm === 'sailing') { lastOne = lk; lastOneN++; say('Last one on the line. Rusty has more.'); }
+    else if (!lk && run.fsm === 'sailing') lastOne = '';
     if (reachT > 0) reachT -= dt;
     var L = run.loc && G.data.locations[run.loc];
     if (L && run.boat) {
@@ -139,6 +143,7 @@ G.ui.hud = (function () {
       label(ctx, s, kx - F.measure(s), dy, 'fog_light');
     }
     if (G.ui.tips) G.ui.tips.draw(ctx, run, X, Y, pic);                              // Phase 88: a first-time tip, by the boat
+    if (G.ui.milestones) G.ui.milestones.drawLine(ctx, pic, Y);                      // Phase 94.4: a milestone reached
     V.begin(ctx0, false);
   }
 
@@ -293,7 +298,7 @@ G.ui.hud = (function () {
     return { clock: clockStr, coins: coinStr, bait: baitStr, depth: G.scene.underwater.UNDER[G.state.run.fsm] ? depthStr : '' };
   }
 
-  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, reach: function () { return { name: reachName, shown: reachT > 0 }; }, alpha: alpha, drawButtons: drawButtons, word: word,
+  return { coin: coinImg, metres: metres, depthText: depthText, clockText: clockText, tensionKey: tensionKey, update: update, say: say, note: function () { return noteT > 0 ? note : ''; }, lastOneSaid: function () { return lastOneN; }, reach: function () { return { name: reachName, shown: reachT > 0 }; }, alpha: alpha, drawButtons: drawButtons, word: word,
     // Phase 60.2: the touch layout's pieces for the gallery's touch page.
     touchParts: { keyBox: keyBox, arrow: arrow, round: roundImg, icon: iconImg, wordFor: wordFor }, isStill: function () { return still; }, draw: draw, shown: shown };
 })();

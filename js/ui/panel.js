@@ -94,7 +94,8 @@ G.ui.panel = (function () {
   function step(dt) { L.now += dt; }
   function now() { return L.now; }
   var FADE = 0.12;
-  function fadeIn(t0) { var u = (L.now - t0) / FADE; return u >= 1 ? 1 : (u <= 0 ? 0 : u * (2 - u)); }
+  // Phase 92.2: nothing fades or slides under Reduce motion.
+  function fadeIn(t0) { var st = G.state && G.state.save && G.state.save.settings; if (st && st.reduceMotion) return 1; var u = (L.now - t0) / FADE; return u >= 1 ? 1 : (u <= 0 ? 0 : u * (2 - u)); }
   // 90.5: where the mouse is, in UI px (hover); -1 when it has left.
   function pointer(x, y) { L.mx = x; L.my = y; }
   function hot(r) { return L.mx >= 0 && inside(r, L.mx, L.my); }

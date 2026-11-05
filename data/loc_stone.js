@@ -11,7 +11,7 @@ G.data.locations = G.data.locations || {};
 G.data.locations.stone = {
   id: 'stone',
   name: 'Stonehorn River',
-  cost: 3400,
+  cost: 1250, // Phase 96.1 (was 3400)
   width: 1300,
   waterY: 112,
   maxDepth: 32,

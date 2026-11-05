@@ -63,6 +63,7 @@ G.ui.tips = (function () {
     var save = G.state.save, i, sc = G.core.state.sceneName(), menu = G.ui.menu.current();
     if (!save.tipsDone) save.tipsDone = {};
     if (!save.tipsDone.seeded) { save.tipsDone.seeded = true; if (caught(save) > 0) { for (i = 0; i < BASICS.length; i++) save.tipsDone[BASICS[i]] = true; save.tipsDone.landed = FIGHTS; } }
+    homeStep(dt, run);
     for (var k in ev) ev[k] = false;
     var f = run.fsm;
     if (f === 'casting' && last.fsm !== 'casting') ev.cast = true;
@@ -92,6 +93,16 @@ G.ui.tips = (function () {
     if (enabled() && workT > WORK_S && saidCast !== run.cast.n) { saidCast = run.cast.n; G.ui.hud.say(WORK_SAYS[st]); }
   }
 
+  // Phase 91.2: on an iPhone or iPad's browser (not the Home Screen app), once a save: Add to Home
+  // Screen keeps the save (Safari may clear a site after 7 days away) and plays full screen. Shown
+  // for HOME_S s after the first tap, on the water between casts, whatever the Tips setting says.
+  var HOME_S = 8, HOME_SAYS = 'Add to Home Screen to keep your save and play full screen.', homeT = 0, homeShown = 0;
+  function homeStep(dt, run) {
+    if (homeT > 0) { homeT -= dt; return; }
+    if (done('homescreen') || !G.core.device.wantsHomeScreen() || !G.core.input.woke() || run.fsm !== 'sailing') return;
+    mark('homescreen'); homeT = HOME_S; homeShown++;
+  }
+
   // A line on a dark plate: the key cap (if any) and the words, centred at x, top y.
   function line(ctx, cap, words, cx, y, keyLit) {
     var U = G.ui.panel, w = (cap ? U.keyW(cap) + 4 : 0) + F.measure(words), x = Math.round(cx - w / 2);
@@ -105,6 +116,7 @@ G.ui.tips = (function () {
     if (!G.state.save || G.ui.setup.isOpen() || G.ui.dock.isOpen() || G.ui.menu.current() || G.ui.card.isOpen()) return;
     var touch = G.core.device.touch(), cx = pic[0] + (pic[2] >> 1), y = Y + 38;
     if (word) { line(ctx, word, wordKey, cx, y, true); return; }
+    if (homeT > 0) { ctx.globalAlpha = Math.min(1, homeT); line(ctx, '', HOME_SAYS, cx, y, false); ctx.globalAlpha = 1; return; } // 91.2
     if (!cur) return;
     var s = touch ? cur.touch : cur.pc, cap = s[0];
     if (cap.charAt(0) === '@') cap = G.ui.hud.touchParts.wordFor(cap.slice(1), G.core.input.layout().bs).toUpperCase(); // the word on that key
@@ -114,7 +126,7 @@ G.ui.tips = (function () {
   return {
     update: update, draw: draw, RETRIEVE: RETRIEVE, styleOf: styleOf,
     // dbg.tips(): each tip with done or not, the one showing, the fight word, how many landed
-    info: function () { var o = {}; for (var i = 0; i < TIPS.length; i++) o[TIPS[i].id] = done(TIPS[i].id); return { done: o, showing: cur ? cur.id : '', word: word, landed: landed(), on: enabled() }; },
+    info: function () { var o = {}; for (var i = 0; i < TIPS.length; i++) o[TIPS[i].id] = done(TIPS[i].id); return { done: o, showing: homeT > 0 ? 'homescreen' : (cur ? cur.id : ''), homeScreen: { done: done('homescreen'), shown: homeShown }, word: word, landed: landed(), on: enabled() }; },
     reset: function () { G.state.save.tipsDone = { seeded: true }; return 'tips reset'; }
   };
 })();

@@ -60,6 +60,7 @@
 <script src="data/lurelooks.js"></script>
 <script src="data/gear.js"></script>
 <script src="data/pond.js"></script>
+<script src="data/milestones.js"></script>
 <script src="data/dialogue.js"></script>
 <script src="data/anomalies.js"></script>
 <script src="data/looks.js"></script>
@@ -71,6 +72,7 @@
 <script src="js/sim/fight.js"></script>
 <script src="js/sim/economy.js"></script>
 <script src="js/sim/pond.js"></script>
+<script src="js/sim/milestones.js"></script>
 <!-- gfx -->
 <script src="js/gfx/bake.js"></script>
 <script src="js/gfx/sprites.js"></script>
@@ -114,6 +116,8 @@
 <script src="js/ui/cabin.js"></script>
 <script src="js/ui/tips.js"></script>
 <script src="js/ui/controls.js"></script>
+<script src="js/ui/badge.js"></script>
+<script src="js/ui/milestones.js"></script>
 <!-- audio -->
 <script src="js/audio/engine.js"></script>
 
@@ -153,6 +157,17 @@
   G.core.state.change(q.has('gallery') ? 'gallery' : 'sailing');
   G.core.device.fit(); // Phase 90: again, now the save's settings and the scene are known (the UI layer's size)
 
+  // Phase 91.1: offline play through sw.js. Not on localhost or 127.0.0.1 unless ?sw (a PC on
+  // http.server works as before). When the worker has written a new version, the next load says so.
+  var UPD = 'softstatic_updated';
+  try { if (localStorage.getItem(UPD)) { localStorage.removeItem(UPD); G.ui.hud.say('Updated.'); G.core.device.info.updated = true; } } catch (e) {}
+  var local = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(location.hostname);
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && (!local || q.has('sw')) && !q.has('nosw')) {
+    navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.type === 'updated') { try { localStorage.setItem(UPD, '1'); } catch (er) {} } });
+    navigator.serviceWorker.register('sw.js').then(function () { G.core.device.info.sw = 'registered'; }, function (e) { G.core.device.info.sw = 'failed: ' + e.message; });
+    G.core.device.info.sw = 'asked';
+  } else G.core.device.info.sw = 'off';
+
   // Another tab owns the save (12.5): this one waits, and a click or key brings it back here.
   function reclaim() { if (G.core.save.lost()) { G.core.save.claim(); location.reload(); } }
   canvas.addEventListener('mousedown', reclaim);
@@ -169,7 +184,7 @@
   // An open overlay (pause, journal, map, look picker) takes the step and the scene waits (9.2).
   var warmed = false;
   G.core.loop.start({
-    update: function (dt) { G.ui.panel.step(dt); if (!G.ui.menu.update(dt)) G.core.state.update(dt); G.audio.engine.step(dt); },
+    update: function (dt) { G.ui.panel.step(dt); if (!G.ui.menu.update(dt)) G.core.state.update(dt); G.ui.milestones.step(dt); G.audio.engine.step(dt); }, // Phase 94: the milestones judged and said
     // Each part draws in its own space (G.core.view): the scene, the overlay, the buttons.
     draw: function (ctx) {
       G.ui.panel.frameStart(); // Phase 90: the UI layer starts clear each frame
