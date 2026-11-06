@@ -18,22 +18,60 @@ G.data.locations.creek = {
   // Phase 20: the surface's swell (view px; see loc_fog.js): short and choppy, running with the current.
   swell: { amp: 2, mirror: 1.1, waves: [[52, 22, 0.45], [27, 15, 0.35], [13, 9, 0.2]] },
 
+  // 2026-11-06 (the user's third reference: a blush dusk over snow): snowy ranges lit rose,
+  // rounded slopes of conifers in mist, a dark line of spruce, old pines with flat ragged crowns
+  // (one with an eagle's nest), a bank of violet granite with rust brush and gold larches, and
+  // mist on the water. Painters: js/scene/creek.js (oldpines, granite; fbhills from fogbound.js)
+  // and js/gfx/paint.js (mountains, forest, bank). The cabins and snags are the landmarks.
+  scenery: 'creek',
   layers: [
-    { id: 'hills', kind: 'mountains', parallax: 0.1, base: 92, amp: 30, color: 'mount_mid', lit: 'mount_lit', dark: 'night_deep', haze: 'fog_dark' },
-    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 88, h: 14, color: 'fog_mid', alpha: 0.22, drift: 0.8 },
-    { id: 'forest', kind: 'forest', parallax: 0.35, base: 104, height: 26, gap: [2, 7], mix: { pine: 0.5, round: 0.22, birch: 0.15, spruce: 0.08, dead: 0.05 },
-      keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' }, round: { dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'wood_dark' }, birch: { bark: 'birch', dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'birch' } } },
-    { id: 'trunks', kind: 'trunks', parallax: 0.55, color: 'night_ink', crown: 'moss_dark', top: 18, gap: [26, 70] },
-    { id: 'fog_near', kind: 'fog', parallax: 0.6, y: 100, h: 10, color: 'fog_light', alpha: 0.12, drift: 1.6 },
+    { id: 'peaks', kind: 'mountains', parallax: 0.05, base: 90, amp: 58, cap: 2.2, capFrom: 0.5, color: 'mtnc', lit: 'mtnc_lit', dark: 'mtnc_dark', haze: 'mtnc_haze', snow: 'snowp_lit', snowDark: 'snowp' },
+    { id: 'range', kind: 'mountains', parallax: 0.08, base: 94, amp: 30, cap: 1.8, capFrom: 0.6, color: 'mtnc', lit: 'mtnc_lit', dark: 'mtnc_dark', haze: 'mtnc_haze', snow: 'snowp_lit', snowDark: 'snowp' },
+    { id: 'fog_high', kind: 'fog', parallax: 0.09, y: 76, h: 20, color: 'fog_mauve', alpha: 0.3, drift: 0.6 },
+    { id: 'hills', kind: 'fbhills', parallax: 0.12, base: 100, amp: 34, domes: 4, trees: 2.2,
+      keys: { mid: 'hillc_mid', lit: 'hillc_lit', dark: 'hillc_dark', haze: 'hillc_haze', tree: 'hillc_dark' } },
+    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 88, h: 16, color: 'fog_mauve', alpha: 0.45, drift: 0.8 },
+    { id: 'forest', kind: 'forest', parallax: 0.32, base: 102, height: 26, gap: [2, 6], mix: { spruce: 0.58, pine: 0.31, larch: 0.06, dead: 0.05 },
+      keys: { pine: { dark: 'pinec_dark', mid: 'pinec_mid', lit: 'pinec_lit', trunk: 'pinec_dark' }, larch: { dark: 'larch_dark', mid: 'larch_mid', lit: 'larch_lit', trunk: 'pinec_trunk' } } },
+    { id: 'fog_mid', kind: 'fog', parallax: 0.4, y: 96, h: 12, color: 'fog_mauve', alpha: 0.34, drift: 1.2 },
+    { id: 'old', kind: 'oldpines', parallax: 0.5, base: 106, height: 72, gap: [30, 90], mix: { old: 0.5, spruce: 0.35, pine: 0.15 }, place: 3391,
+      features: [{ kind: 'nest', x: 520 }] },
+    { id: 'fog_near', kind: 'fog', parallax: 0.56, y: 102, h: 8, color: 'fog_mauve', alpha: 0.2, drift: 1.6 },
+    { id: 'granite', kind: 'granite', parallax: 0.6, base: 111, size: [40, 84], gap: [50, 120], trees: 0.45, brush: 3, place: 8147 },
     // Phase 49: the bank's things (see loc_fog.js): fallen trunks reaching into the water, the beaver's lodge, an old dock's posts.
-    { id: 'bank', kind: 'bank', parallax: 0.7, height: 5, reeds: 1, rockEvery: 30, reedH: 14, place: 5521, trunks: 4, cattails: 3,
+    { id: 'bank', kind: 'bank', parallax: 0.7, height: 5, reeds: 0.5, rockEvery: 30, reedH: 12, place: 5521, trunks: 4, cattails: 3,
+      rock: { dark: 'grn_dark', mid: 'grn', lit: 'grn_mid' }, ground: 'grn_dark', reedKeys: ['shrub_dk', 'shrub', 'reed_gold'],
       features: [{ kind: 'lodge', x: 640 }, { kind: 'posts', x: 300, n: 3 }] },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
 
-  // Presentation only (see loc_fog.js).
-  sky: { moonX: 150, glowX: 60 },
-  mist: { h: 5, alpha: 0.09, drift: 2 },
+  // Presentation only (see loc_fog.js). 2026-11-06: the creek's own sky: dusk a blush of rose over
+  // mauve with an orchid band at the peaks and long banded clouds lit underneath, dawn rose over
+  // lilac, the grey hours a cool lavender haze, the night violet; the layers grade toward violet at
+  // night and lavender by day; mauve water under a clear mirror; a thick mist on the water.
+  sky: {
+    moonX: 90, glowX: 80, glowKey: 'dusk_blush_hi',
+    keys: [
+      [0, ['night_violet_ink', 'night_violet', 'night_plum', 'night_mauve']],
+      [3, ['night_violet_ink', 'night_violet_ink', 'night_violet', 'night_plum']],
+      [5, ['night_violet_ink', 'night_violet', 'night_plum', 'night_mauve']],
+      [6.25, ['dusk_lilac_dk', 'dusk_mauve', 'dusk_blush', 'dusk_peach']],
+      [7.5, ['dusk_lilac_dk', 'fog_lav_dk', 'fog_lav', 'dusk_peach']],
+      [9, ['fog_lav_dk', 'fog_lav', 'fog_mauve', 'fog_mauve_hi']],
+      [12.5, ['fog_lav_dk', 'fog_lav', 'fog_lav_hi', 'fog_mauve_hi']],
+      [16, ['fog_lav_dk', 'fog_lav', 'fog_mauve', 'fog_mauve_hi']],
+      [17.5, ['dusk_blush_dk', 'dusk_blush', 'dusk_blush_hi', 'dusk_orchid']],
+      [19, ['dusk_blush_dk', 'dusk_blush_hi', 'dusk_blush_lt', 'dusk_orchid']],
+      [20.5, ['night_plum', 'dusk_blush_dk', 'dusk_blush', 'dusk_blush_hi']],
+      [22, ['night_violet_ink', 'night_violet', 'night_plum', 'night_mauve']],
+      [24, ['night_violet_ink', 'night_violet', 'night_plum', 'night_mauve']]
+    ],
+    cloudKeys: [['night_violet', 'night_plum', 'night_mauve'], ['fog_lav_dk', 'fog_lav', 'fog_mauve_hi'], ['dusk_blush_dk', 'dusk_blush_hi', 'dusk_blush_lt'], [null, null, 'dusk_blush_lt']]
+  },
+  grade: { night: ['night_violet', 0.6], grey: ['fog_lav_dk', 0.3] },
+  waterBase: 'water_mauve',
+  reflect: 1.5,
+  mist: { h: 7, alpha: 0.18, drift: 2, color: 'fog_mauve' },
   // Life (see loc_fog.js). Fireflies along the bank at night (audit P2-1).
   life: {
     fireflies: 16,
@@ -44,7 +82,8 @@ G.data.locations.creek = {
       kingfisher: { perches: [{ x: 250, y: 31 }, { x: 720, y: 28 }], hours: [[6, 19]] },
       dragonflies: { n: 6, x: [[30, 300], [1000, 1270]], hours: [[9.5, 17]] },
       deer: { layer: 'bank', x: [180, 330], hours: [[5, 7.75], [17.25, 20]] },
-      beaver: { layer: 'bank', hours: [[18.5, 5.5]] }
+      beaver: { layer: 'bank', hours: [[18.5, 5.5]] },
+      eagle: { n: 1, x: [120, 1180], y: [64, 92], hours: [[8, 17.5]] } // 2026-11-06: the nest's eagle, soaring by day
     }
   },
 
@@ -62,6 +101,7 @@ G.data.locations.creek = {
   // snags: {x, top} branches standing up from the bottom to depth `top` px (0 breaks the surface).
   underwater: {
     bottomAmp: 20, rock: 'stone_dark', silt: 'wood_dark',
+    grad: ['water_slate_lit', 'water_slate_mid', 'water_slate_dark', 'water_slate_deep'], // 2026-11-06: the mauve creek's water, slate under it
     weed: 'moss', weedDark: 'moss_dark', weedDensity: 0.05, shaftEvery: 190,
     snags: [{ x: 470, top: 0 }, { x: 610, top: 30 }, { x: 960, top: 0 }, { x: 1080, top: 38 }, { x: 1190, top: 0 }]
   },

@@ -47,7 +47,7 @@ G.gfx.paint = (function () {
     peaks.sort(function (a, b) { return a.h - b.h; }).reverse();
     var shadow = L.dark || L.color, snowLit = L.snow || 'fog_light', snowDark = L.snowDark || L.lit;
     for (i = 0; i < peaks.length; i++) {
-      var p = peaks[i], jag = new G.core.rng.Rng(p.seed), capH = p.h > L.amp * 0.68 ? p.h * jag.range(0.16, 0.28) : 0;
+      var p = peaks[i], jag = new G.core.rng.Rng(p.seed), capH = p.h > L.amp * (L.capFrom || 0.68) ? p.h * jag.range(0.16, 0.28) * (L.cap || 1) : 0; // 2026-11-06: L.cap, L.capFrom: more snow (Blackwater's ranges)
       var jl = 0, jr = 0, jc = 0, wig = 0;
       for (y = Math.ceil(p.y); y < wy; y++) {
         var d = y - p.y;
