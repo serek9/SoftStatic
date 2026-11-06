@@ -457,14 +457,16 @@ G.scene.sailing = (function () {
         });
       });
     }
-    var grade = !fog && loc.grade !== false;
+    // 2026-11-06: a water may grade its own way (loc.grade {night: [key, alpha], grey: [key, alpha]}):
+    // Fogbound's night toward violet, its grey hours toward a lavender haze.
+    var grade = !fog && loc.grade !== false, gk = loc.grade || {}, gn = gk.night || ['night_deep', 0.55], gg = gk.grey || ['fog_dark', 0.35];
     return {
       id: L.id,
       p: L.parallax,
       fog: fog, w: w, drift: L.drift || 0,
       cv: cv,
-      night: grade ? graded('night', 'night_deep', 0.55) : null,
-      grey: grade ? graded('grey', 'fog_dark', 0.35) : null
+      night: grade ? graded('night', gn[0], gn[1]) : null,
+      grey: grade ? graded('grey', gg[0], gg[1]) : null
     };
   }
 
@@ -1211,10 +1213,12 @@ G.scene.sailing = (function () {
   function skyBrightness(hour) { return 1 - nightF(G.sim.clock.wrap(hour)); }
 
   // f is 0 at the top of the sky and 1 at the horizon. Writes [r, g, b] into out.
+  // 2026-11-06: a water may bring its own keyframes (loc.sky.keys, the same shape: Fogbound's
+  // violet and rose); the ceiling check in refreshSky holds for them too.
   function skyColor(hour, f, out) {
-    var h = G.sim.clock.wrap(hour), k = 0;
-    while (k < SKY_KEYS.length - 2 && h >= SKY_KEYS[k + 1][0]) k++;
-    var A = SKY_KEYS[k], Z = SKY_KEYS[k + 1], u = smooth(A[0], Z[0], h), i;
+    var KS = (loc && loc.sky && loc.sky.keys) || SKY_KEYS, h = G.sim.clock.wrap(hour), k = 0;
+    while (k < KS.length - 2 && h >= KS[k + 1][0]) k++;
+    var A = KS[k], Z = KS[k + 1], u = smooth(A[0], Z[0], h), i;
     for (i = 0; i < 4; i++) mix(S.RGB[A[1][i]], S.RGB[Z[1][i]], u, skyStops[i]);
     i = 0;
     while (i < 2 && f > SKY_F[i + 1]) i++;
@@ -1273,9 +1277,10 @@ G.scene.sailing = (function () {
     sky.stars = o.stars === false ? null : B.cached('loc:' + id + ':stars', function () { return starField(loc.seed * 7 + 1, 160, 6); });
     sky.twinkle = o.stars === false ? null : B.cached('loc:' + id + ':twinkle', function () { return starField(loc.seed * 7 + 2, 36, 3); });
     // The glow where the sun went down: stepped rings of dusk_amber (alpha, never brighter).
-    sky.glow = o.glow === false ? null : B.cached('sky:glow2', function () {
+    var glowKey = o.glowKey || 'dusk_amber';                                        // 2026-11-06: a water's own glow (Fogbound's coral)
+    sky.glow = o.glow === false ? null : B.cached('sky:glow2' + (o.glowKey ? ':' + glowKey : ''), function () {
       return B.layer(400, 92, function (ctx) {
-        ctx.fillStyle = P.dusk_amber;
+        ctx.fillStyle = P[glowKey];
         for (var y = 0; y < 92; y++) for (var x = 0; x < 400; x++) {
           var dx = (x - 200) / 200, dy = (91 - y) / 91, d = Math.sqrt(dx * dx + dy * dy);
           if (d >= 1) continue;
@@ -1303,12 +1308,27 @@ G.scene.sailing = (function () {
         A.reset();
       });
     });
+    // 2026-11-06: the low sun of dusk and dawn (loc.sky.sun {x, y, r} in sky px): a disc in
+    // dusk_sun (at the ceiling, never past it) in two soft stepped rings of the glow's key.
+    sky.sun = !o.sun ? null : B.cached('loc:' + id + ':sun', function () {
+      var R = o.sun.r * HI, D = R * 6;
+      return B.layer(D, D, function (ctx) {
+        for (var y = 0; y < D; y++) for (var x = 0; x < D; x++) {
+          var d = Math.sqrt((x + 0.5 - D / 2) * (x + 0.5 - D / 2) + (y + 0.5 - D / 2) * (y + 0.5 - D / 2));
+          if (d <= R) { ctx.globalAlpha = 1; ctx.fillStyle = P[d > R - HI ? 'dusk_coral' : 'dusk_sun']; ctx.fillRect(x, y, 1, 1); }
+          else if (d <= R * 3) { ctx.globalAlpha = d <= R * 1.8 ? 0.3 : 0.12; ctx.fillStyle = P[glowKey]; ctx.fillRect(x, y, 1, 1); }
+        }
+        ctx.globalAlpha = 1;
+      });
+    });
     if (o.clouds === false) { sky.clouds = null; return; }
     // Phase 15: one field of clouds (gfx/paint.js cloudMask) baked in four colourings
     // (shadow, body, lit): night, grey, dusk, and the dusk rim light alone.
     var mask = null, CW = CLOUD_W * HI;
-    function maskOnce() { return mask || (mask = A.cloudMask(CW, wy, new G.core.rng.Rng(loc.seed * 13 + 5), 9, HI)); }
-    var KEYS = [['night_deep', 'night_blue', 'dusk_violet'], ['fog_dark', 'fog_mid', 'fog_light'], ['dusk_violet', 'dusk_plum', 'dusk_rose'], [null, null, 'dusk_amber']];
+    // 2026-11-06: a scenery module may shape the clouds (scen.cloudMask, as A.cloudMask), and a
+    // water colour them (loc.sky.cloudKeys: the same four colourings).
+    function maskOnce() { return mask || (mask = (scen.cloudMask || A.cloudMask)(CW, wy, new G.core.rng.Rng(loc.seed * 13 + 5), 9, HI)); }
+    var KEYS = o.cloudKeys || [['night_deep', 'night_blue', 'dusk_violet'], ['fog_dark', 'fog_mid', 'fog_light'], ['dusk_violet', 'dusk_plum', 'dusk_rose'], [null, null, 'dusk_amber']];
     sky.clouds = KEYS.map(function (k, ki) {
       return B.cached('loc:' + id + ':cloud' + ki, function () {
         return B.layer(CW, wy, function (ctx) { A.reset(); A.paintMask(ctx, maskOnce(), CW, wy, k); A.reset(); });
@@ -1351,6 +1371,11 @@ G.scene.sailing = (function () {
       c.drawImage(sky.stars, sx, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
       c.globalAlpha = n * (0.35 + 0.35 * Math.sin(t * 1.3)) * (1 - st);
       c.drawImage(sky.twinkle, sx, 0, VIEW_W * HI, wy * HI, 0, -camPy, VIEW_W, wy);
+    }
+    if (sky.sun && d > 0.02 && st < 1) {                                              // 2026-11-06: the low sun, behind the clouds
+      var so = sky.opt.sun, sr = so.r * 3, sxp = Math.round((so.x - camPx * SKYP) * HI) / HI;
+      c.globalAlpha = Math.min(1, d * 1.6) * (1 - st);
+      c.drawImage(sky.sun, sxp - sr, so.y - sr - camPy, sr * 2, sr * 2);
     }
     moonAt(h, moonPt);
     moonPt[2] *= 1 - 0.95 * st;
@@ -2012,7 +2037,8 @@ G.scene.sailing = (function () {
   var waterLight = { x: 0, a: 0, key: 'fog_mid', w: 4, mirror: 1 };
   function lightOnWater(h) {
     var d = duskF(h) * (sky.glow ? 1 : 0), m = moonPt[2];
-    waterLight.mirror = 1 - 0.35 * rainK(); // drizzle softens the reflection
+    waterLight.mirror = (loc.reflect || 1) * (1 - 0.35 * rainK()); // drizzle softens the reflection; 2026-11-06: loc.reflect, a clearer mirror (Fogbound's still water)
+    waterLight.base = loc.waterBase || 'water_dark'; // 2026-11-06: under the mirror (Fogbound's violet)
     if (m * 0.55 >= d * 0.45) {
       waterLight.x = moonPt[0]; waterLight.a = m * 0.55; waterLight.key = 'fog_mid'; waterLight.w = 3;
     } else {

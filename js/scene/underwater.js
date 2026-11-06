@@ -521,7 +521,9 @@ G.scene.underwater = (function () {
         for (var y = 0; y < HH; y += 4) {
           var f = y / HH;
           // Phase 15: lit teal near the surface, through blue-green, to the deep.
-          ctx.fillStyle = f < 0.3 ? lerpRGB('water_lit', 'water_mid', f / 0.3) : (f < 0.65 ? lerpRGB('water_mid', 'water_dark', (f - 0.3) / 0.35) : lerpRGB('water_dark', 'water_deep', (f - 0.65) / 0.35));
+          // 2026-11-06: a water may bring its own four (u.grad: lit, mid, dark, deep; Fogbound's slate violet).
+          var gk = u.grad || ['water_lit', 'water_mid', 'water_dark', 'water_deep'];
+          ctx.fillStyle = f < 0.3 ? lerpRGB(gk[0], gk[1], f / 0.3) : (f < 0.65 ? lerpRGB(gk[1], gk[2], (f - 0.3) / 0.35) : lerpRGB(gk[2], gk[3], (f - 0.65) / 0.35));
           ctx.fillRect(0, y, 1, 4);
         }
       });

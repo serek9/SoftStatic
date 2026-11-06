@@ -42,30 +42,65 @@ G.data.locations.fog = {
   drift: function (seed, t, depth, onBottom, wind) { return G.data.lakeDrift(this, seed, t, depth, onBottom, wind); },
 
   // Back to front. Every layer is baked once and only drawn with drawImage.
-  // Phase 15: painted layers (js/gfx/paint.js): far peaks, a nearer ridge with the tower and
-  // the mast, a pine forest, tall pines and birches near the water, and a reedy, rocky shore.
+  // 2026-11-06 (the user's reference: "the hour between"): forested violet hills in haze, a
+  // nearer line of them with the radio mast and its red light, mist between every distance,
+  // violet pines with the larches gone gold, a dome of rock with a stepped waterfall, a cabin
+  // lit across the lake, and the reedy shore in violet stone. Painters: js/scene/fogbound.js
+  // (fbhills, falls, fbcabin) and js/gfx/paint.js (forest, bank, the larch).
+  scenery: 'fogbound',
   layers: [
-    { id: 'peaks', kind: 'mountains', parallax: 0.05, base: 92, amp: 50, color: 'mount_far', lit: 'mount_lit', dark: 'night_deep', haze: 'mount_haze' },
-    { id: 'fog_high', kind: 'fog', parallax: 0.08, y: 66, h: 22, color: 'fog_mid', alpha: 0.16, drift: 0.7 },
-    { id: 'ridge', kind: 'mountains', parallax: 0.14, base: 102, amp: 24, color: 'mount_mid', lit: 'mount_lit', dark: 'night_deep', haze: 'fog_dark', featureKey: 'night_deep',
-      features: [{ kind: 'tower', x: 120 }, { kind: 'mast', x: 330 }] },
-    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 84, h: 20, color: 'fog_mid', alpha: 0.32, drift: 1.2 },
-    { id: 'trees', kind: 'forest', parallax: 0.3, base: 106, height: 17, gap: [2, 6], mix: { pine: 0.75, spruce: 0.25 },
-      keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' } } },
-    { id: 'fog_near', kind: 'fog', parallax: 0.42, y: 97, h: 12, color: 'fog_light', alpha: 0.16, drift: 2.4 },
-    { id: 'woods', kind: 'forest', parallax: 0.5, base: 110, height: 36, gap: [8, 46], mix: { pine: 0.62, spruce: 0.22, birch: 0.08, dead: 0.08 }, place: 4417,
-      keys: { pine: { dark: 'pine_dark', mid: 'pine_mid', lit: 'pine_lit', trunk: 'pine_dark' }, birch: { bark: 'birch', dark: 'moss_dark', mid: 'moss', lit: 'moss_hi', trunk: 'birch' } } },
+    { id: 'peaks', kind: 'fbhills', parallax: 0.05, base: 96, amp: 62, domes: 3, big: [70, 120], trees: 1.6,
+      keys: { mid: 'hill_far', lit: 'hill_lit', dark: 'hill_mid', haze: 'hill_haze', tree: 'hill_mid' } },
+    { id: 'fog_high', kind: 'fog', parallax: 0.08, y: 70, h: 24, color: 'fog_lav', alpha: 0.22, drift: 0.7 },
+    { id: 'ridge', kind: 'fbhills', parallax: 0.14, base: 104, amp: 26, domes: 4, trees: 1.8, featureKey: 'night_violet',
+      keys: { mid: 'hill_mid', lit: 'hill_far', dark: 'hill_dark', haze: 'hill_haze', tree: 'hill_dark' },
+      features: [{ kind: 'mast', x: 232, h: 22 }] },
+    { id: 'fog_far', kind: 'fog', parallax: 0.2, y: 86, h: 22, color: 'fog_lav', alpha: 0.4, drift: 1.2 },
+    { id: 'trees', kind: 'forest', parallax: 0.3, base: 106, height: 20, gap: [2, 6], mix: { pine: 0.5, spruce: 0.35, larch: 0.15 },
+      keys: { pine: { dark: 'pinev_dark', mid: 'pinev_mid', lit: 'pinev_lit', trunk: 'pinev_dark' }, larch: { dark: 'larch_dark', mid: 'larch_mid', lit: 'larch_lit', trunk: 'pinev_dark' } } },
+    { id: 'fog_near', kind: 'fog', parallax: 0.42, y: 96, h: 14, color: 'fog_lav', alpha: 0.24, drift: 2.4 },
+    { id: 'woods', kind: 'forest', parallax: 0.5, base: 110, height: 38, gap: [7, 40], mix: { spruce: 0.45, pine: 0.25, larch: 0.24, dead: 0.06 }, place: 4417,
+      keys: { pine: { dark: 'pinev_dark', mid: 'pinev_mid', lit: 'pinev_lit', trunk: 'pinev_dark' }, larch: { dark: 'larch_dark', mid: 'larch_mid', lit: 'larch_lit', trunk: 'pinev_dark' } } },
+    { id: 'cabin', kind: 'fbcabin', parallax: 0.5, base: 110, place: 5521, features: [{ x: 292 }] },
+    { id: 'falls', kind: 'falls', parallax: 0.56, place: 6631, features: [{ x: 6, w: 84, h: 34, steps: 4 }] },
     // Phase 49: the shore's things, scattered from its own placement seed (place): pads on the
     // water, fallen trunks, cattail clumps; features stand where the data puts them (layer px).
-    { id: 'shore', kind: 'bank', parallax: 0.6, height: 4, reeds: 0.8, rockEvery: 38, place: 7741, pads: 7, trunks: 2, cattails: 4,
+    { id: 'shore', kind: 'bank', parallax: 0.6, height: 4, reeds: 0.9, rockEvery: 38, place: 7741, pads: 7, trunks: 2, cattails: 4,
+      rock: { dark: 'rockv_dark', mid: 'rockv', lit: 'rockv_mid' }, ground: 'rockv_dark',
       features: [{ kind: 'posts', x: 180, n: 5 }, { kind: 'moored', x: 236 }, { kind: 'lodge', x: 560 }, { kind: 'duckbox', x: 700 }] },
     { id: 'marks', kind: 'landmarks', parallax: 1 }
   ],
 
-  // Presentation only. sky: where the moon and the dusk glow sit (sky px); mist: a low band on
-  // the water that drifts over the boat (fog layers drift by their own `drift`, px/s).
-  sky: { moonX: 92, glowX: 236 },
-  mist: { h: 7, alpha: 0.13, drift: 3 },
+  // Presentation only. sky: where the moon, the dusk glow and the low sun sit (sky px), and
+  // 2026-11-06: Fogbound's own keyframes (each hour's four keys, top to horizon, as
+  // sailing.js SKY_KEYS): dusk as the reference (mauve over cerise over coral), dawn in lilac
+  // and peach, the grey hours a lavender haze, the night violet ink; the clouds in the same
+  // keys, as long bands (fogbound.js cloudMask). grade: the layers go violet at night and
+  // lavender in the grey hours. waterBase: the violet under the mirror; reflect: a clearer
+  // mirror for the still water. mist: a low band on the water that drifts over the boat.
+  sky: {
+    moonX: 92, glowX: 248, glowKey: 'dusk_coral', sun: { x: 250, y: 46, r: 7 },
+    keys: [
+      [0, ['night_violet_ink', 'night_violet', 'night_plum', 'night_mauve']],
+      [3, ['night_violet_ink', 'night_violet_ink', 'night_violet', 'night_plum']],
+      [5, ['night_violet_ink', 'night_violet', 'night_plum', 'night_mauve']],
+      [6.25, ['dusk_lilac_dk', 'dusk_lilac', 'dusk_peach', 'dusk_coral']],
+      [7.5, ['dusk_lilac_dk', 'fog_lav_dk', 'fog_lav', 'dusk_peach']],
+      [9, ['fog_lav_dk', 'fog_lav', 'fog_lav', 'fog_lav_hi']],
+      [12.5, ['fog_lav_dk', 'fog_lav', 'fog_lav_hi', 'fog_lav_hi']],
+      [16, ['fog_lav_dk', 'fog_lav', 'fog_lav', 'fog_lav_hi']],
+      [17.5, ['dusk_mauve_dk', 'dusk_mauve', 'dusk_peach', 'dusk_coral']],
+      [19, ['dusk_mauve_dk', 'dusk_mauve', 'dusk_cerise', 'dusk_coral']],
+      [20.5, ['night_plum', 'dusk_mauve_dk', 'dusk_mauve', 'dusk_cerise']],
+      [22, ['night_violet_ink', 'night_violet', 'night_plum', 'night_mauve']],
+      [24, ['night_violet_ink', 'night_violet', 'night_plum', 'night_mauve']]
+    ],
+    cloudKeys: [['night_violet', 'night_plum', 'night_mauve'], ['fog_lav_dk', 'fog_lav', 'fog_lav_hi'], ['dusk_mauve', 'dusk_cerise', 'dusk_coral'], [null, null, 'dusk_sun']]
+  },
+  grade: { night: ['night_violet', 0.64], grey: ['fog_lav_dk', 0.3] },
+  waterBase: 'water_violet',
+  reflect: 1.45,
+  mist: { h: 8, alpha: 0.16, drift: 3, color: 'fog_lav' },
 
   // Life (presentation only, js/scene/life.js). under (Phase 48): how many crayfish, snails,
   // fry clouds and tadpole clouds, whether a turtle and an eel live here, and what the bake
@@ -101,6 +136,7 @@ G.data.locations.fog = {
   // and touches maxDepth somewhere. shaftEvery is the spacing of light shafts in px.
   underwater: {
     bottomAmp: 24, rock: 'stone_dark', silt: 'wood_dark',
+    grad: ['water_slate_lit', 'water_slate_mid', 'water_slate_dark', 'water_slate_deep'], // 2026-11-06: the violet lake's water, a slate blue under it
     weed: 'moss', weedDark: 'moss_dark', weedDensity: 0.07, shaftEvery: 150
   },
 

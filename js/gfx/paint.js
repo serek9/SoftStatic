@@ -173,7 +173,27 @@ G.gfx.paint = (function () {
     }
   }
 
-  var TREES = { pine: pine, round: round, birch: birch, spruce: spruce, dead: dead, poplar: poplar };
+  // 2026-11-06 (Fogbound's look): a larch in autumn: a thin dark trunk through a soft, ragged
+  // cone of gold needles in loose tufts (the light on the left, gaps the sky shows through).
+  // keys: {dark, mid, lit, trunk}.
+  function larch(ctx, x, gy, h, k, rng) {
+    var hw = Math.max(3, Math.round(h * rng.range(0.25, 0.3))), top = gy - h, y;
+    pen(ctx, k.trunk || k.dark); ctx.fillRect(x, top + 2, 1, h - 2);
+    for (y = top; y < gy - 3; y++) {
+      var r = (y - top) / (gy - 3 - top), half = Math.max(1, Math.round(hw * Math.pow(r, 0.8) * (0.75 + 0.25 * Math.sin(y * 0.9 + x))));
+      for (var xx = -half; xx <= half; xx++) {
+        var edge = Math.abs(xx) >= half - 1;
+        if (edge && rng.next() < 0.28) continue;                                     // the ragged edge
+        if (!edge && rng.next() < 0.06) continue;                                   // the gaps
+        var lit = xx < -half * 0.3, key = lit ? k.lit : (xx > half * 0.35 ? k.dark : k.mid);
+        if (xx === 0 && rng.next() < 0.4) key = k.trunk || k.dark;
+        px(ctx, key, x + xx, y);
+      }
+    }
+    px(ctx, k.mid, x, top - 1);
+  }
+
+  var TREES = { pine: pine, round: round, birch: birch, spruce: spruce, dead: dead, poplar: poplar, larch: larch };
   var TREE_KEYS = { spruce: 'pine', dead: 'pine', poplar: 'round' }; // a kind without its own keys borrows these
 
   // L: {base (ground y), height, gap [lo, hi], mix {pine, round, birch}, keys {...} per kind,

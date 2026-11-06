@@ -27,6 +27,19 @@ G.gfx.sprites = (function () {
     leaf_dim: '#45261d', leaf_rust: '#83391f', leaf_gold: '#a8742a', birch: '#8c8a82',
     reed_dark: '#2f2a20', reed: '#4f4430', reed_hi: '#6f6040',
     rock_dark: '#1b1e25', rock: '#30343e', rock_lit: '#4c5262',
+    // Fogbound's look (the user's reference, 2026-11-06): the hour between, in violet and rose.
+    // The sky's keyframes (dusk, dawn, the lavender day, the violet night), the forested hills,
+    // the violet pines, the larches' gold, the rock and its waterfall, the violet water.
+    dusk_mauve_dk: '#56385e', dusk_mauve: '#7d5075', dusk_cerise: '#a15474', dusk_coral: '#b86a78', dusk_sun: '#d48278',
+    dusk_lilac_dk: '#3e3460', dusk_lilac: '#665684', dusk_peach: '#a8788a',
+    fog_lav_dk: '#4e4866', fog_lav: '#6e6688', fog_lav_hi: '#8e84a2',
+    night_violet_ink: '#100d1e', night_violet: '#1b1630', night_plum: '#2a1f40', night_mauve: '#3a2a4c',
+    hill_dark: '#2e2846', hill_mid: '#3e3658', hill_far: '#4e4468', hill_lit: '#5e5078', hill_haze: '#5a5074',
+    pinev_dark: '#1e1a2c', pinev_mid: '#2c2638', pinev_lit: '#3e3448',
+    larch_dark: '#5e4232', larch_mid: '#8e6a3e', larch_lit: '#b48a4e',
+    rockv_dark: '#2c2644', rockv: '#3c345a', rockv_mid: '#4a4068', rockv_lit: '#5c5078',
+    water_fall_mid: '#7a7498', water_fall_hi: '#948eac', water_violet: '#241e3a',
+    water_slate_lit: '#34446a', water_slate_mid: '#283658', water_slate_dark: '#1a2240', water_slate_deep: '#0b0f1e',
     dog_dark: '#6e4c2a', dog: '#a87b45', dog_hi: '#cfae78',
     coat_dark: '#2a3426', coat: '#3f4d36', coat_hi: '#5b6b48', cap: '#7a3326',
     // The bait shop's painted interior: the lit side of a face.

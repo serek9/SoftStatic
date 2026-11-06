@@ -151,7 +151,7 @@ G.gfx.water = (function () {
       stats.rebuilt++;
     }
 
-    ctx.fillStyle = G.gfx.sprites.PALETTE.water_dark;
+    ctx.fillStyle = G.gfx.sprites.PALETTE[(light && light.base) || 'water_dark']; // 2026-11-06: a water's own base under the mirror
     ctx.fillRect(0, waterY, VIEW_W, rows);
     ctx.globalAlpha = ALPHA * (light && light.mirror !== undefined ? light.mirror : 1);
     // Row by row in the view's pixels; each row of 1/HI world px shifts (see chunkShifts).
