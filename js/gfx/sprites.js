@@ -40,6 +40,21 @@ G.gfx.sprites = (function () {
     rockv_dark: '#2c2644', rockv: '#3c345a', rockv_mid: '#4a4068', rockv_lit: '#5c5078',
     water_fall_mid: '#7a7498', water_fall_hi: '#948eac', water_violet: '#241e3a',
     water_slate_lit: '#34446a', water_slate_mid: '#283658', water_slate_dark: '#1a2240', water_slate_deep: '#0b0f1e',
+    // The Pines' look (the user's second reference, 2026-11-06): a crimson dusk over plum ranges,
+    // a forested butte with a rose cliff, spruces and gold birches, a cabin on stilts, gold reeds.
+    // The sky's keyframes (the crimson dusk, a rose dawn, the mauve day, the wine night).
+    dusk_wine_dk: '#5a2c58', dusk_wine: '#7e3a64', dusk_crimson: '#9c3c62', dusk_crimson_hi: '#b04462',
+    dusk_rosepink: '#c4566c', dusk_orchid: '#8a4a74',
+    fog_mauve_dk: '#54405e', fog_mauve: '#76607e', fog_mauve_hi: '#927a94',
+    night_wine_ink: '#120c1a', night_wine: '#20142a', night_berry: '#321c3a', night_orchid: '#44284a',
+    mtnp_dark: '#3a2c4c', mtnp_mid: '#563c62', mtnp_lit: '#74486c', mtnp_rim: '#94506e', mtnp_haze: '#5e4468',
+    hillp_dark: '#2c2240', hillp_mid: '#3c2e50', hillp_far: '#4c385c', hillp_lit: '#664462', hillp_haze: '#5a4266',
+    butte_cliff_dk: '#3e2c48', butte_cliff: '#583a58', butte_cliff_lit: '#7a4c66',
+    butte_wood_dk: '#2e2834', butte_wood: '#46423a', butte_wood_lit: '#646040',
+    gold_dk: '#563832', gold: '#80583a', gold_lit: '#a87a44',
+    reed_gold_dk: '#4e3434', reed_gold: '#7a5236', reed_gold_hi: '#9c703c',
+    cabin_red_dk: '#2e1a22', cabin_red: '#4a2a2c', cabin_red_hi: '#643a36', roof_slate: '#3a3040', roof_slate_hi: '#54465a',
+    water_plum: '#2a1c34',
     dog_dark: '#6e4c2a', dog: '#a87b45', dog_hi: '#cfae78',
     coat_dark: '#2a3426', coat: '#3f4d36', coat_hi: '#5b6b48', cap: '#7a3326',
     // The bait shop's painted interior: the lit side of a face.

@@ -58,12 +58,13 @@ G.scene.scenery = (function () {
       farshore: function (ctx, L, w, wy, rng) {
         var x, i, f, t = 0;
         for (x = 0; x < w; x++) { t = clamp(t + rng.int(-1, 1), -2, 1); A.box(ctx, L.color, x, L.base + t, 1, wy - L.base - t); }
-        for (x = rng.int(0, 20); x < w; x += rng.int(10, 30)) A.pine(ctx, x, L.base + 1, rng.int(8, 16), { dark: L.color, mid: 'night_blue', lit: 'night_blue', trunk: L.color }, rng);
+        var tk = L.tree || 'night_blue';                                                  // 2026-11-06: the far trees' key (the Pines' violet)
+        for (x = rng.int(0, 20); x < w; x += rng.int(10, 30)) A.pine(ctx, x, L.base + 1, rng.int(8, 16), { dark: L.color, mid: tk, lit: tk, trunk: L.color }, rng);
         for (i = 0; i < L.features.length; i++) {
           f = L.features[i];
           if (f.kind === 'diner') {
             var dx = f.x, dy = L.base - DINER.h;
-            A.box(ctx, 'night_deep', dx - 6, dy - 4, DINER.w + 12, DINER.h + 4);            // clear the trees behind it
+            A.box(ctx, L.color, dx - 6, dy - 4, DINER.w + 12, DINER.h + 4);                 // clear the trees behind it
             A.slab(ctx, dx, dy, DINER.w, DINER.h, ['ink', 'stone_dark', 'stone', 'stone_hi']);
             A.box(ctx, 'stone_hi', dx - 2, dy - 2, DINER.w + 4, 2); A.box(ctx, 'stone_lit', dx - 2, dy - 2, DINER.w + 4, 1);
             for (x = dx + 4; x < dx + DINER.w - 8; x += 7) { A.box(ctx, 'dusk_amber', x, dy + 5, 6, 5); A.box(ctx, 'dusk_high', x, dy + 5, 6, 1); }   // the long window
