@@ -66,6 +66,7 @@ var FILES = [
   'js/scene/scenery.js',
   'js/scene/rivers.js',
   'js/scene/lakes.js',
+  'js/scene/fogbound.js',
   'js/scene/seas.js',
   'js/scene/winter.js',
   'js/scene/pond.js',
