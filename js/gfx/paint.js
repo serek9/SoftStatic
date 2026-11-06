@@ -228,6 +228,7 @@ G.gfx.paint = (function () {
   // night by life.js), 'lodge' (a beaver's), 'duckbox' (on a pole)) stand behind the rocks;
   // L.trunks fallen trunks reach into the water, L.cattails more clumps, L.pads lily pads lie
   // on the water. Returns the kinds of thing it painted.
+  var REED_KEYS = ['reed_dark', 'reed', 'reed_hi'];
   function shore(ctx, L, w, wy, rng) {
     var x, i, r = L.rock || { dark: 'rock_dark', mid: 'rock', lit: 'rock_lit' }, t = 0, kinds = ['rocks', 'reeds', 'grass'];
     pen(ctx, L.ground || 'rock_dark');
@@ -250,7 +251,8 @@ G.gfx.paint = (function () {
     for (i = 0; i < clumps; i++) {
       var bx = rng.int(0, w - 1), stalks = rng.int(4, 10), lean = rng.range(-0.25, 0.25);
       for (var s = 0; s < stalks; s++) {
-        var sx = bx + rng.int(-5, 5), h = rng.int(6, L.reedH || 24), key = s % 3 === 0 ? 'reed_hi' : (s % 3 === 1 ? 'reed' : 'reed_dark');
+        var RK = L.reedKeys || REED_KEYS; // 2026-11-06: a water's own reeds (the Pines' gold)
+        var sx = bx + rng.int(-5, 5), h = rng.int(6, L.reedH || 24), key = s % 3 === 0 ? RK[2] : (s % 3 === 1 ? RK[1] : RK[0]);
         for (var k = 0; k < h; k++) px(ctx, key, sx + Math.round(lean * k * (k / h)), wy - 2 - k);
         if (h > 14 && s % 4 === 0) { pen(ctx, 'wood_dark'); ctx.fillRect(sx + Math.round(lean * h) - 1, wy - 3 - h - 4, 2, 5); px(ctx, 'reed_dark', sx + Math.round(lean * h), wy - 3 - h - 6); }
       }
