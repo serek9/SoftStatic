@@ -55,6 +55,16 @@ G.gfx.sprites = (function () {
     reed_gold_dk: '#4e3434', reed_gold: '#7a5236', reed_gold_hi: '#9c703c',
     cabin_red_dk: '#2e1a22', cabin_red: '#4a2a2c', cabin_red_hi: '#643a36', roof_slate: '#3a3040', roof_slate_hi: '#54465a',
     water_plum: '#2a1c34',
+    // Blackwater Creek's look (the user's third reference, 2026-11-06): a blush dusk over snowy
+    // ranges, misty conifer slopes, old pines, violet granite, rust brush and gold larches.
+    dusk_blush_dk: '#6e4468', dusk_blush: '#8e4868', dusk_blush_hi: '#a84866', dusk_blush_lt: '#b85868',
+    mtnc_dark: '#382a4a', mtnc: '#4e3a5c', mtnc_lit: '#6e4a6c', mtnc_haze: '#5a4462',
+    snowp_lit: '#b48aa6', snowp: '#8a6a92', snowp_dk: '#5c4a70',
+    hillc_dark: '#261e32', hillc_mid: '#342840', hillc_far: '#44364e', hillc_lit: '#58405a', hillc_haze: '#584462',
+    pinec_dark: '#16121a', pinec_mid: '#242028', pinec_lit: '#3a3a34', pinec_trunk: '#2a1e22',
+    grn_dark: '#281e30', grn: '#3c2e46', grn_mid: '#52405a', grn_lit: '#6a5068', lichen: '#5a5640', lichen_hi: '#767050',
+    shrub_dk: '#3a1e26', shrub: '#62282c', shrub_lit: '#8a3c30',
+    water_mauve: '#30223a',
     dog_dark: '#6e4c2a', dog: '#a87b45', dog_hi: '#cfae78',
     coat_dark: '#2a3426', coat: '#3f4d36', coat_hi: '#5b6b48', cap: '#7a3326',
     // The bait shop's painted interior: the lit side of a face.
