@@ -241,6 +241,18 @@ G.scene.sailing = (function () {
     return out;
   }
 
+  // One weathered clapboard of the creek's cabins (LANDMARKS.cabin): a lit top, its tone from
+  // the hash hs, the shadow under its lap, a split in the grain, nail heads (one bleeding rust),
+  // moss on the low courses. Layer px; draws no rng.
+  function clap(ctx, bx, i, bw, hs, floor) {
+    var bk = (hs & 7) === 0 ? 'wood_mid' : ((hs & 7) === 1 ? 'wood_dark' : 'wood');
+    A.box(ctx, bk, bx, i, bw, 4); A.box(ctx, bk === 'wood_mid' ? 'wood_hi' : 'wood_mid', bx, i, bw, 1);
+    A.box(ctx, 'wood_dark', bx, i + 3, bw, 1); A.box(ctx, 'wood_deep', bx + bw - 1, i, 1, 4);
+    if ((hs & 8) && bw > 5) A.box(ctx, 'wood_dark', bx + 1 + ((hs >> 4) & 3), i + 2, 3, 1);
+    if (bw > 2) { A.px(ctx, 'stone_hi', bx + 1, i + 1); if ((hs & 16) && bw > 6) A.px(ctx, 'rust', bx + bw - 2, i + 1); }
+    if (i > floor - 9 && (hs & 32)) { A.box(ctx, 'moss_dark', bx, i + 2, bw, 2); A.px(ctx, 'moss', bx + ((hs >> 6) % bw), i + 2); }
+  }
+
   // Landmarks stand on the water at the boat's distance; each paints in layer pixels around
   // x and returns its extent [x0, x1] in layer pixels.
   var LANDMARKS = {
@@ -249,29 +261,58 @@ G.scene.sailing = (function () {
     // out from the shore (lm.from 'left' or 'right': from that edge of the world, the rail at
     // its shore end and the lamp at its water end), never standing alone in the water.
     pier: function (ctx, x, wy, rng, lm) {
-      var e = pierExtent(lm, PIER_EXT), x0 = e[0], x1 = e[1], right = lm && lm.from === 'right', deck = wy - 14, px, q;
+      var e = pierExtent(lm, PIER_EXT), x0 = e[0], x1 = e[1], right = lm && lm.from === 'right', deck = wy - 14, px, q, y, hs;
+      // the posts (where drawPosts expects them): grain, a weathered cap, weed and a wet band
+      // at the waterline, braced in X under the deck
       for (px = x0 + 4; px <= x1 - 6; px += 16) {
         A.slab(ctx, px, deck + 4, 5, wy - deck - 3, WOOD);
+        for (y = deck + 6; y < wy - 2; y += 3) if ((S.hash(px, y) & 3) === 0) A.px(ctx, 'wood_dark', px + 2, y); // the grain
+        A.box(ctx, 'wood_deep', px + 1, wy - 4, 4, 1); A.box(ctx, 'moss_dark', px, wy - 3, 5, 2); A.px(ctx, 'moss', px + 1, wy - 3); // wet, then weed
         if (px + 16 <= x1 - 6) for (q = 0; q < 9; q++) { A.px(ctx, 'wood_dark', px + 5 + q, deck + 5 + q * 0.5 | 0); A.px(ctx, 'wood_dark', px + 15 - q, deck + 5 + q * 0.5 | 0); }
+        if (px + 16 <= x1 - 6) A.px(ctx, 'stone_hi', px + 10, deck + 7);                 // the bolt where the braces cross
       }
-      A.box(ctx, 'wood_deep', x0, deck + 3, x1 - x0 + 1, 2);
+      // the stringer under the planks, its shadow and its bolts
+      A.box(ctx, 'wood_deep', x0, deck + 3, x1 - x0 + 1, 2); A.box(ctx, 'wood_dark', x0, deck + 3, x1 - x0 + 1, 1);
+      for (px = x0 + 6; px <= x1; px += 16) A.px(ctx, 'stone', px, deck + 3);
+      // the planks: each its own grey-brown, a lit edge, a dark end, nail heads, some gone
       for (px = x0; px <= x1; px += 7) {
-        if (rng.next() < 0.1) continue;                                 // a missing plank
-        var k = rng.next() < 0.3 ? 'wood_hi' : 'wood_mid';
-        A.box(ctx, k, px, deck, 6, 3); A.box(ctx, 'wood_lit', px, deck, 6, 1); A.box(ctx, 'wood', px + 5, deck + 1, 1, 2);
+        if (rng.next() < 0.1) { A.box(ctx, 'wood_deep', px, deck + 1, 6, 2); continue; } // a missing plank: the stringer shows
+        var t = rng.next(), k = t < 0.3 ? 'wood_hi' : (t < 0.8 ? 'wood_mid' : 'wood');
+        A.box(ctx, k, px, deck, 6, 3); A.box(ctx, k === 'wood' ? 'wood_mid' : 'wood_lit', px, deck, 6, 1);
+        A.box(ctx, 'wood', px + 5, deck + 1, 1, 2); A.box(ctx, 'wood_dark', px, deck + 2, 6, 1);
+        hs = S.hash(px, 61);
+        A.px(ctx, 'stone_dark', px + 1, deck + 1); A.px(ctx, 'stone_dark', px + 4, deck + 1); // nail heads
+        if ((hs & 3) === 0) A.box(ctx, 'wood', px + 2, deck + 1, 2, 1);                    // a knot
+        if ((hs & 12) === 4) A.px(ctx, 'bone', px + 3, deck);                              // a gull's mark
       }
-      var r0 = right ? x1 - 56 : x0 + 8;                                // the rail, at the shore end
-      for (px = r0; px <= r0 + 48; px += 24) if (rng.next() > 0.25) { A.slab(ctx, px, deck - 12, 3, 12, WOOD); }
-      A.box(ctx, 'wood_mid', r0, deck - 11, 48, 2); A.box(ctx, 'wood_hi', r0, deck - 11, 48, 1);
-      if (right) {                                                      // the lamp post at the water end
-        A.slab(ctx, x0 + 4, deck - 38, 3, 38, STONES);
-        A.box(ctx, 'stone', x0 + 5, deck - 38, 10, 2);
-        A.slab(ctx, x0 + 11, deck - 37, 7, 5, RUSTY); A.box(ctx, 'fog_dark', x0 + 12, deck - 33, 5, 2);
-      } else {
-        A.slab(ctx, x1 - 7, deck - 38, 3, 38, STONES);
-        A.box(ctx, 'stone', x1 - 15, deck - 38, 10, 2);
-        A.slab(ctx, x1 - 18, deck - 37, 7, 5, RUSTY); A.box(ctx, 'fog_dark', x1 - 17, deck - 33, 5, 2);
+      // the rail at the shore end: capped posts, a top rail and a mid rail
+      var r0 = right ? x1 - 56 : x0 + 8;
+      for (px = r0; px <= r0 + 48; px += 24) if (rng.next() > 0.25) {
+        A.slab(ctx, px, deck - 12, 3, 12, WOOD); A.box(ctx, 'wood_hi', px - 1, deck - 13, 5, 1); A.box(ctx, 'wood_dark', px - 1, deck - 12, 5, 1);
       }
+      A.box(ctx, 'wood_mid', r0, deck - 11, 48, 2); A.box(ctx, 'wood_hi', r0, deck - 11, 48, 1); A.box(ctx, 'wood_deep', r0, deck - 9, 48, 1);
+      A.box(ctx, 'wood', r0, deck - 6, 48, 1); A.box(ctx, 'wood_dark', r0, deck - 5, 48, 1);
+      // a cleat with a coil of rope, and a bucket, partway along
+      var cx = right ? x1 - 74 : x0 + 70;
+      if (cx > x0 + 4 && cx < x1 - 12) {
+        A.box(ctx, 'stone_dark', cx, deck - 2, 7, 1); A.box(ctx, 'stone', cx + 1, deck - 3, 5, 1); A.box(ctx, 'stone_hi', cx + 2, deck - 1, 3, 1);
+        for (q = 0; q < 3; q++) { A.box(ctx, 'paper_dark', cx + 8 + q, deck - 3 + q, 6 - q * 2, 1); A.px(ctx, 'paper', cx + 9 + q, deck - 3 + q); }
+        A.box(ctx, 'stone', cx + 17, deck - 6, 5, 6); A.box(ctx, 'stone_hi', cx + 17, deck - 6, 1, 6); A.box(ctx, 'stone_dark', cx + 21, deck - 6, 1, 6);
+        A.box(ctx, 'stone_lit', cx + 17, deck - 6, 5, 1); A.box(ctx, 'stone_dark', cx + 17, deck - 3, 5, 1); A.line(ctx, 'stone_dark', cx + 17, deck - 7, cx + 21, deck - 7);
+      }
+      // the lamp post at the water end: a footed post, an arm on a scroll bracket, a dead lamp
+      // under a rusted hood, its glass gone dull
+      var lp = right ? x0 + 4 : x1 - 7, dir = right ? 1 : -1, hx = right ? x0 + 11 : x1 - 18;
+      A.slab(ctx, lp, deck - 38, 3, 38, STONES);
+      A.box(ctx, 'stone_dark', lp - 1, deck - 3, 5, 3); A.box(ctx, 'stone_hi', lp - 1, deck - 3, 5, 1); // the foot
+      A.box(ctx, 'stone_hi', lp - 1, deck - 24, 5, 1); A.box(ctx, 'stone_dark', lp - 1, deck - 23, 5, 1); // a collar
+      A.box(ctx, 'stone', right ? lp + 1 : lp - 8, deck - 38, 10, 2); A.box(ctx, 'stone_hi', right ? lp + 1 : lp - 8, deck - 38, 10, 1);
+      for (q = 0; q < 5; q++) A.px(ctx, 'stone', lp + 1 + dir * (1 + q), deck - 35 + (q > 2 ? q - 2 : 0)); // the scroll under the arm
+      A.px(ctx, 'stone', lp + 1 + dir * 5, deck - 32); A.px(ctx, 'stone', lp + 1 + dir * 4, deck - 31);
+      A.box(ctx, 'rust_dark', hx - 1, deck - 37, 9, 1); A.box(ctx, 'rust', hx, deck - 38, 7, 1); A.px(ctx, 'rust_hi', hx + 3, deck - 39); // the hood
+      A.slab(ctx, hx, deck - 36, 7, 5, RUSTY);
+      A.box(ctx, 'fog_dark', hx + 1, deck - 35, 5, 3); A.px(ctx, 'fog_mid', hx + 2, deck - 35); A.px(ctx, 'stone_dark', hx + 3, deck - 34); // the dull glass
+      A.box(ctx, 'rust_dark', hx + 1, deck - 31, 5, 1); A.px(ctx, 'rust', hx + 3, deck - 30);
       return [x0, x1];
     },
     // A rusted channel buoy: a float at the waterline, a lattice cage, a dead lamp, a bell.
@@ -305,20 +346,79 @@ G.scene.sailing = (function () {
       return [x0, x0 + 55];
     },
     // 11.1: a decaying cabin on stilts at the water's edge; its roof sags by lm.sag (world px).
+    // Painted in the view's own pixels: braced stilts and a ladder down to the water, a floor
+    // beam, weathered clapboards (lit tops, nail heads, moss creeping up from the floor, boards
+    // gone), a window with broken panes and a shutter hanging by one hinge, the door ajar on
+    // the dark, a rusted corrugated tin roof with streaks and holes, a leaning stovepipe. The
+    // shared rng is drawn exactly as before (the boards gone, the holes), so nothing after it
+    // moves; the rest of the detail comes from a hash.
     cabin: function (ctx, x, wy, rng, lm) {
-      var x0 = x - 32, x1 = x + 32, floor = wy - 12, top = floor - 32, sag = (lm.sag || 1) * 2, i, r;
-      for (i = x0 + 2; i <= x1 - 4; i += 12) A.slab(ctx, i, floor, 4, wy - floor, WOOD);
+      var x0 = x - 32, x1 = x + 32, floor = wy - 12, top = floor - 32, sag = (lm.sag || 1) * 2, i, r, xx, y, hs;
+      // the stilts, braced in X, and a ladder down to the water by the door
+      for (i = x0 + 2; i <= x1 - 4; i += 12) {
+        A.slab(ctx, i, floor, 4, wy - floor, WOOD);
+        if ((S.hash(i, 3) & 3) === 0) A.box(ctx, 'moss_dark', i, wy - 4, 4, 3);          // green at the waterline
+        if (i + 12 <= x1 - 4) { A.line(ctx, 'wood_deep', i + 4, floor + 1, i + 11, wy - 2); A.line(ctx, 'wood_dark', i + 4, wy - 3, i + 11, floor + 2); }
+      }
+      for (y = floor + 2; y < wy; y += 3) A.box(ctx, 'wood_mid', x1 - 19, y, 6, 1);      // the ladder's rungs
+      A.box(ctx, 'wood_dark', x1 - 20, floor, 1, wy - floor); A.box(ctx, 'wood_dark', x1 - 13, floor, 1, wy - floor - 2);
+      A.box(ctx, 'wood_deep', x0 - 2, floor - 1, x1 - x0 + 5, 3); A.box(ctx, 'wood_mid', x0 - 2, floor - 1, x1 - x0 + 5, 1); // the floor beam
+      // the walls: the dark inside, then clapboards with gaps where boards are gone
       A.box(ctx, 'wood_deep', x0, top, x1 - x0 + 1, floor - top);
-      for (i = top + 1; i < floor; i += 5) for (var bx = x0; bx <= x1; bx += 9) if (rng.next() > 0.14) { A.box(ctx, 'wood', bx, i, 8, 4); A.box(ctx, 'wood_mid', bx, i, 8, 1); A.box(ctx, 'wood_dark', bx + 7, i, 1, 4); }
-      A.box(ctx, 'night_ink', x0 + 9, top + 8, 12, 10); A.box(ctx, 'wood_dark', x0 + 14, top + 8, 2, 10); A.box(ctx, 'wood_dark', x0 + 9, top + 12, 12, 2);
-      A.box(ctx, 'night_ink', x1 - 20, top + 9, 12, floor - top - 9); A.slab(ctx, x1 - 20, top + 9, 4, floor - top - 9, WOOD);
+      for (i = top + 1; i < floor; i += 5) for (var bx = x0; bx <= x1; bx += 9) if (rng.next() > 0.14) {
+        hs = S.hash(bx, i);
+        var off = ((i - top) / 5 | 0) & 1 ? 4 : 0, b0 = bx + off, bw = Math.min(8, x1 + 1 - b0);   // every other course staggered
+        if (off && bx === x0) clap(ctx, x0, i, off - 1, S.hash(bx, i + 1), floor);
+        if (bw > 0) clap(ctx, b0, i, bw, hs, floor);
+      }
+      A.box(ctx, 'wood_dark', x0, top, 2, floor - top); A.box(ctx, 'wood_mid', x0, top, 1, floor - top); // corner posts
+      A.box(ctx, 'wood_dark', x1 - 1, top, 2, floor - top);
+      // the window: a frame, four panes, two broken (the dark behind), a shutter on one hinge
+      var wx = x0 + 9, wyy = top + 8;
+      A.box(ctx, 'wood_mid', wx - 1, wyy - 1, 14, 12); A.box(ctx, 'wood_dark', wx + 12, wyy, 1, 11);
+      A.box(ctx, 'fog_dark', wx, wyy, 12, 10);
+      A.box(ctx, 'night_ink', wx + 6, wyy, 6, 5); A.box(ctx, 'night_ink', wx, wyy + 5, 6, 5);  // the broken panes
+      A.px(ctx, 'fog_dark', wx + 7, wyy); A.px(ctx, 'fog_dark', wx + 6, wyy + 1); A.px(ctx, 'fog_dark', wx + 11, wyy + 4); A.px(ctx, 'fog_dark', wx + 5, wyy + 9); // shards still in
+      A.px(ctx, 'fog_mid', wx + 1, wyy + 1); A.px(ctx, 'fog_mid', wx + 2, wyy + 1); A.px(ctx, 'fog_mid', wx + 7, wyy + 6); // the glass's glint
+      A.box(ctx, 'wood_dark', wx + 5, wyy, 2, 10); A.box(ctx, 'wood_dark', wx, wyy + 4, 12, 2);
+      A.box(ctx, 'wood_hi', wx - 2, wyy + 11, 16, 1); A.box(ctx, 'wood_deep', wx - 1, wyy + 12, 14, 1); // the sill
+      for (y = 0; y < 11; y++) { var shx = wx - 7 + (y >> 2); A.box(ctx, 'wood_deep', shx - 1, wyy + y + 1, 5, 1); A.box(ctx, y % 3 === 0 ? 'wood' : 'wood_mid', shx, wyy + y, 4, 1); A.px(ctx, 'wood_hi', shx, wyy + y); } // the shutter, hanging askew
+      A.px(ctx, 'rust_hi', wx - 2, wyy); A.px(ctx, 'rust_hi', wx - 3, wyy + 1);
+      // the door, ajar on the dark: its frame, the door swung in, a rusted latch
+      var dx = x1 - 20, dt = top + 9;
+      A.box(ctx, 'night_ink', dx, dt, 12, floor - dt);
+      A.box(ctx, 'wood_dark', dx - 1, dt - 1, 14, 1); A.box(ctx, 'wood_dark', dx - 1, dt, 1, floor - dt); A.box(ctx, 'wood_dark', dx + 12, dt, 1, floor - dt);
+      A.slab(ctx, dx, dt, 4, floor - dt, WOOD);
+      for (y = dt + 2; y < floor - 1; y += 4) A.px(ctx, 'wood_mid', dx + 1, y);
+      A.px(ctx, 'rust_hi', dx + 3, dt + 12); A.px(ctx, 'rust_dark', dx + 3, dt + 13);
+      // the roof: rusted corrugated tin, ridges lit on the left, streaks, the holes
       var peak = top - 20 + sag;
       for (r = peak; r < top + 2; r++) {
         var hw = Math.round(38 * (r - peak + 1) / (top + 2 - peak));
-        for (var xx = -hw; xx <= hw; xx++) A.px(ctx, (r - peak) % 4 === 3 ? 'rust_dark' : (xx < 0 ? 'rust' : 'rust_dark'), x + xx, r);
+        for (xx = -hw; xx <= hw; xx++) {
+          var ridge = ((xx + 40) % 3), k;
+          if (r === top + 1) k = 'rust_dark';                                            // the drip edge
+          else if (ridge === 0) k = xx < 0 ? 'rust_hi' : 'rust';
+          else if (ridge === 1) k = xx < 0 ? 'rust' : 'rust_dark';
+          else k = 'rust_dark';
+          if ((r - peak) % 7 === 6 && ridge !== 0) k = 'rust_dark';                        // the sheets' overlaps
+          hs = S.hash(x + xx, r);
+          if (ridge !== 2 && (hs & 31) === 0) k = 'stone';                                  // a bit of galvanising left
+          if (ridge === 0 && ((S.hash(x + xx, 77) & 7) === 0) && r > peak + 4) k = 'leaf_rust'; // a rust streak down a ridge
+          A.px(ctx, k, x + xx, r);
+        }
       }
-      for (i = 0; i < 6; i++) A.box(ctx, 'night_ink', x + rng.int(-20, 20), rng.int(peak + 6, top - 2), 2, 2); // holes
-      A.slab(ctx, x + 16, peak - 4, 4, 14, RUSTY);
+      for (xx = -38; xx <= 38; xx += 6) A.px(ctx, 'wood_hi', x + xx, top + 2);           // the rafter tails under the eave
+      for (i = 0; i < 6; i++) {                                                           // holes
+        var hx = x + rng.int(-20, 20), hy = rng.int(peak + 6, top - 2);
+        A.box(ctx, 'night_ink', hx, hy, 2, 2); A.px(ctx, 'rust_hi', hx - 1, hy); A.px(ctx, 'leaf_rust', hx + 2, hy + 1);
+      }
+      // the stovepipe: a rusted pipe with a band, its cap on short legs
+      var sx = x + 16, st = peak - 4;
+      A.slab(ctx, sx, st, 4, 14, RUSTY); A.px(ctx, 'rust_hi', sx + 1, st + 3);
+      A.box(ctx, 'rust_dark', sx - 1, st + 6, 6, 1);
+      A.box(ctx, 'rust', sx - 2, st - 3, 8, 1); A.box(ctx, 'rust_hi', sx - 1, st - 4, 6, 1); A.box(ctx, 'rust_dark', sx - 2, st - 2, 8, 1);
+      A.px(ctx, 'rust_dark', sx, st - 1); A.px(ctx, 'rust_dark', sx + 3, st - 1);
       return [x - 38, x + 38];
     },
     // 11.1: dead branches standing out of the water. They carry on down to the bottom in the

@@ -123,8 +123,16 @@ G.ui.tips = (function () {
     line(ctx, cap, s[1], cx, y, false);
   }
 
+  // From G.ui.menu.open: a menu page opened. The scene (and so update above) does not step while
+  // a menu is open, so the journal and chart tips are marked here, not by watching menu.current().
+  function opened(name) {
+    if (!G.state.save) return;
+    var id = name === 'journal' ? 'journal' : name === 'map' ? 'chart' : '';
+    if (id) { mark(id); if (cur && cur.id === id) cur = null; }
+  }
+
   return {
-    update: update, draw: draw, RETRIEVE: RETRIEVE, styleOf: styleOf,
+    update: update, draw: draw, opened: opened, RETRIEVE: RETRIEVE, styleOf: styleOf,
     // dbg.tips(): each tip with done or not, the one showing, the fight word, how many landed
     info: function () { var o = {}; for (var i = 0; i < TIPS.length; i++) o[TIPS[i].id] = done(TIPS[i].id); return { done: o, showing: homeT > 0 ? 'homescreen' : (cur ? cur.id : ''), homeScreen: { done: done('homescreen'), shown: homeShown }, word: word, landed: landed(), on: enabled() }; },
     reset: function () { G.state.save.tipsDone = { seeded: true }; return 'tips reset'; }

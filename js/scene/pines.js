@@ -88,54 +88,114 @@ G.scene.scenery = G.scene.scenery || {};
   }
   function cabin(ctx, L, x, wy, rng) {
     var dy = wy - CAB.deck, top = dy - CAB.h, k, xx, y;
-    // behind it: spruces and a gold birch on a dark bank
+    // behind it: spruces and a gold birch on a dark bank (the same draws from rng as ever)
     A.TREES.round(ctx, x + 30, wy - 6, rng.int(70, 82), GOLD, rng);
     for (k = 0; k < 3; k++) A.TREES.spruce(ctx, x + CAB.w + 8 + k * 11, wy - 5, rng.int(70, 96), SPRUCE, rng);
     A.TREES.spruce(ctx, x - 4, wy - 5, rng.int(60, 74), SPRUCE, rng);
     A.TREES.round(ctx, x + CAB.w + 44, wy - 5, rng.int(44, 56), GOLD, rng);
-    for (xx = x - 12; xx < x + CAB.w + 60; xx++) { var bh = 5 + ((S.hash(xx >> 2, 4) & 3)); A.box(ctx, 'rockv_dark', xx, wy - bh, 1, bh); }
-    // the deck on its stilts, out to the left over the water
-    var d0 = x - CAB.left, d1 = x + CAB.w + 4;
-    for (xx = d0 + 2; xx < d1; xx += 12) { A.box(ctx, 'wood_deep', xx, dy + 3, 2, wy - dy - 3); A.px(ctx, 'wood_dark', xx, dy + 3); }
-    A.box(ctx, 'wood_dark', d0, dy, d1 - d0, 3); A.box(ctx, 'wood_mid', d0, dy, d1 - d0, 1);
-    for (xx = d0; xx < d1; xx += 5) A.px(ctx, 'wood_deep', xx, dy + 1);              // the planks' ends
-    for (xx = d0 + 2; xx < x - 18; xx += 16) { A.box(ctx, 'wood_dark', xx, dy - 12, 2, 12); A.box(ctx, 'wood_mid', xx, dy - 12, 1, 12); A.box(ctx, 'wood', xx - 1, dy - 13, 4, 1); } // the mooring posts
-    // the walls: upright boards, lit along the left
+    for (xx = x - 12; xx < x + CAB.w + 60; xx++) {
+      var bh = 5 + ((S.hash(xx >> 2, 4) & 3));
+      A.box(ctx, 'rockv_dark', xx, wy - bh, 1, bh);
+      if ((S.hash(xx >> 1, 5) & 7) === 0) A.px(ctx, 'rockv', xx, wy - bh);           // a stone catching the light
+    }
+    // the deck on its stilts, out to the left over the water: braced stilts, a beam, planks
+    var d0 = x - CAB.left, d1 = x + CAB.w + 4, prev = -1;
+    for (xx = d0 + 2; xx < d1; xx += 12) {
+      A.box(ctx, 'wood_deep', xx, dy + 3, 2, wy - dy - 3); A.box(ctx, 'wood_dark', xx, dy + 3, 1, wy - dy - 3);
+      A.box(ctx, 'wood_dark', xx - 1, dy + 3, 4, 1);                                     // the stilt's cap under the beam
+      if (prev >= 0) { A.line(ctx, 'wood_deep', prev + 2, dy + 4, xx - 1, wy - 2); A.line(ctx, 'wood_deep', prev + 2, wy - 2, xx - 1, dy + 4); } // cross bracing
+      prev = xx;
+    }
+    A.box(ctx, 'wood_dark', d0, dy, d1 - d0, 3); A.box(ctx, 'wood_mid', d0, dy, d1 - d0, 1); A.box(ctx, 'wood_deep', d0, dy + 3, d1 - d0, 1);
+    for (xx = d0; xx < d1; xx += 5) { A.px(ctx, 'wood_deep', xx, dy + 1); A.px(ctx, (S.hash(xx, 9) & 1) ? 'wood_hi' : 'wood_mid', xx + 2, dy); } // the planks' ends, some lit
+    for (xx = d0 + 3; xx < d1; xx += 10) A.px(ctx, 'stone_hi', xx, dy + 2);            // bolt heads on the beam
+    for (xx = d0 + 2; xx < x - 18; xx += 16) {                                          // the mooring posts, a rope round one
+      A.box(ctx, 'wood_dark', xx, dy - 12, 2, 12); A.box(ctx, 'wood_mid', xx, dy - 12, 1, 12); A.box(ctx, 'wood', xx - 1, dy - 13, 4, 1); A.box(ctx, 'wood_hi', xx - 1, dy - 13, 2, 1);
+      if (xx === d0 + 18) { A.box(ctx, 'paper_dark', xx - 1, dy - 7, 4, 1); A.box(ctx, 'paper', xx - 1, dy - 6, 4, 1); A.px(ctx, 'paper_dark', xx + 3, dy - 5); }
+    }
+    // the deck's rail between the posts and the wall
+    var rr0 = x - 18, rr1 = x;
+    for (xx = rr0; xx <= rr1; xx += 6) { A.box(ctx, 'wood_dark', xx, dy - 9, 1, 9); A.px(ctx, 'wood_mid', xx, dy - 9); }
+    A.box(ctx, 'wood_mid', rr0, dy - 10, rr1 - rr0 + 1, 1); A.box(ctx, 'wood_dark', rr0, dy - 9, rr1 - rr0 + 1, 1);
+    // the walls: upright boards, lit along the left, grain and nail rows
     for (xx = 0; xx < CAB.w; xx++) {
       var seam = xx % 5 === 4, kk = xx < 2 ? 'cabin_red_hi' : (seam ? 'cabin_red_dk' : 'cabin_red');
       A.box(ctx, kk, x + xx, top, 1, CAB.h);
       if (!seam && (S.hash(x + xx, 11) & 7) === 0) A.box(ctx, 'cabin_red_dk', x + xx, top + (S.hash(x + xx, 12) & 31), 1, 3);
+      if (!seam && (S.hash(x + xx, 13) & 7) === 1) A.box(ctx, 'cabin_red_hi', x + xx, top + 4 + (S.hash(x + xx, 14) & 15), 1, 2);
+      if (xx % 5 === 1) { A.px(ctx, 'cabin_red_dk', x + xx, top + 3); A.px(ctx, 'cabin_red_dk', x + xx, dy - 5); } // nail heads at the girts
     }
     A.box(ctx, 'cabin_red_dk', x, dy - 2, CAB.w, 2);
-    // the roof: a gable end, its rafters overhanging, the slate edge lit
+    A.box(ctx, 'wood_mid', x, top + 25, CAB.w, 1); A.box(ctx, 'cabin_red_dk', x, top + 26, CAB.w, 1); // the belt board
+    A.box(ctx, 'wood_mid', x, top, 2, CAB.h - 2); A.box(ctx, 'wood_dark', x + CAB.w - 2, top, 2, CAB.h - 2); // corner boards
+    // the roof: a gable end, its rafters overhanging, two courses of slate, a lit edge, a fascia
     var peak = x + Math.round(CAB.w * 0.55), rise = 18;
     for (xx = x - 8; xx <= x + CAB.w + 8; xx++) {
       var ry = xx <= peak ? top + 2 - Math.round((xx - (x - 8)) / (peak - (x - 8)) * rise) : top + 2 - Math.round((x + CAB.w + 8 - xx) / (x + CAB.w + 8 - peak) * rise);
-      if (xx >= x && xx < x + CAB.w) A.box(ctx, 'cabin_red_dk', xx, ry + 4, 1, Math.max(0, top - ry - 4));   // the gable end
+      if (xx >= x && xx < x + CAB.w) {
+        A.box(ctx, 'cabin_red_dk', xx, ry + 6, 1, Math.max(0, top - ry - 6));           // the gable end
+        if ((xx - x) % 3 === 0) A.box(ctx, 'cabin_red', xx, ry + 7, 1, Math.max(0, top - ry - 7)); // its board and batten
+      }
+      A.box(ctx, 'wood_dark', xx, ry + 4, 1, 2);                                         // the fascia under the slates
       A.box(ctx, 'roof_slate', xx, ry, 1, 4); A.px(ctx, 'roof_slate_hi', xx, ry);
+      if (((xx - x) & 3) === 0) A.px(ctx, 'night_ink', xx, ry + 2);                      // the slates' joints
+      if (((xx - x + 2) & 3) === 0) A.px(ctx, 'night_ink', xx, ry + 1);
+      if ((S.hash(xx, 17) & 15) === 0) A.px(ctx, 'roof_slate_hi', xx, ry + 2);           // a slate catching the light
     }
-    A.box(ctx, 'stone_dark', peak + 12, top - 16, 4, 9);                               // the stovepipe
-    // the windows (lit live), the door, the life ring
+    A.px(ctx, 'wood_hi', x - 8, top + 3); A.px(ctx, 'wood_hi', x + CAB.w + 8, top + 3);    // the rafter tails
+    // the stovepipe: a pipe with a band, a rain cap, and the flashing where it meets the roof
+    var sp = peak + 12;
+    A.box(ctx, 'stone_dark', sp, top - 17, 3, 11); A.box(ctx, 'stone', sp, top - 17, 1, 11);
+    A.box(ctx, 'stone_hi', sp - 1, top - 12, 5, 1);
+    A.box(ctx, 'stone_dark', sp - 2, top - 19, 7, 1); A.box(ctx, 'stone_hi', sp - 1, top - 20, 5, 1); A.box(ctx, 'stone_dark', sp, top - 18, 3, 1);
+    A.box(ctx, 'stone_hi', sp - 1, top - 7, 5, 1);
+    // the windows (lit live): trim, a sill, crossbars; shutters by the two below
     var wins = [[x + 6, top + 12], [x + 40, top + 12], [peak - 3, top - 8]];
     for (k = 0; k < wins.length; k++) {
-      var ww = k === 2 ? 6 : 9, wh = k === 2 ? 6 : 11;
-      A.box(ctx, 'wood_deep', wins[k][0] - 1, wins[k][1] - 1, ww + 2, wh + 2);
-      A.box(ctx, 'night_ink', wins[k][0], wins[k][1], ww, wh);
-      live.windows.push({ layer: L.id, x: wins[k][0], y: wins[k][1], w: ww, h: wh });
+      var ww = k === 2 ? 6 : 9, wh = k === 2 ? 6 : 11, wx = wins[k][0], wy2 = wins[k][1];
+      A.box(ctx, 'stone_hi', wx - 1, wy2 - 1, ww + 2, wh + 2); A.box(ctx, 'stone', wx + ww, wy2, 1, wh + 1);
+      A.box(ctx, 'night_ink', wx, wy2, ww, wh);
+      A.px(ctx, 'roof_slate', wx + 1, wy2 + 1); A.px(ctx, 'roof_slate', wx + 2, wy2 + 1); A.px(ctx, 'roof_slate', wx + 1, wy2 + 2); // the glass's glint
+      A.box(ctx, 'wood_deep', wx + (ww >> 1), wy2, 1, wh); A.box(ctx, 'wood_deep', wx, wy2 + (wh >> 1), ww, 1);
+      if (k < 2) {
+        A.box(ctx, 'stone_lit', wx - 2, wy2 + wh + 1, ww + 4, 1); A.box(ctx, 'stone_dark', wx - 1, wy2 + wh + 2, ww + 2, 1); // the sill
+        for (var sh = -1; sh <= 1; sh += 2) {                                                  // the shutters, slatted
+          var sx = sh < 0 ? wx - 5 : wx + ww + 1;
+          A.box(ctx, 'cabin_red_dk', sx, wy2 - 1, 4, wh + 2);
+          for (y = wy2; y < wy2 + wh; y += 2) A.box(ctx, 'cabin_red_hi', sx + 1, y, 2, 1);
+        }
+      }
+      live.windows.push({ layer: L.id, x: wx, y: wy2, w: ww, h: wh, bars: 1 });
     }
-    A.box(ctx, 'wood_deep', x + 21, dy - 24, 12, 24); A.box(ctx, 'cabin_red_dk', x + 22, dy - 23, 10, 23); A.px(ctx, 'stone_hi', x + 30, dy - 12);
+    // the door: trim, planks, a Z brace, a knob, a lamp-lit step
+    var dx = x + 21, dt = dy - 24;
+    A.box(ctx, 'stone_hi', dx - 1, dt - 1, 14, 25);
+    A.box(ctx, 'wood_deep', dx, dt, 12, 24);
+    for (xx = 1; xx < 11; xx++) A.box(ctx, xx % 3 === 0 ? 'cabin_red_dk' : 'cabin_red', dx + xx, dt + 1, 1, 23);
+    A.box(ctx, 'cabin_red_hi', dx + 1, dt + 3, 10, 1); A.box(ctx, 'cabin_red_hi', dx + 1, dt + 19, 10, 1);
+    A.line(ctx, 'cabin_red_hi', dx + 2, dt + 18, dx + 9, dt + 4);
+    A.px(ctx, 'brass_hi', dx + 9, dt + 12); A.px(ctx, 'wood_deep', dx + 9, dt + 13);
+    A.box(ctx, 'wood_mid', dx - 2, dy - 1, 16, 1);
+    // the life ring on the wall, on its peg, with its rope
     var rx = x + 56, ry2 = top + 22;
     for (y = -6; y <= 6; y++) for (xx = -6; xx <= 6; xx++) {
       var rr = Math.sqrt(xx * xx + y * y);
       if (rr > 5.6 || rr < 3) continue;
       var band = Math.abs(xx) < 2 || Math.abs(y) < 2;
-      A.px(ctx, band ? 'bone' : (xx + y < 0 ? 'crimson' : 'blood'), rx + xx, ry2 + y);
+      A.px(ctx, band ? (xx + y < 0 ? 'cream' : 'bone') : (xx + y < -2 ? 'crimson' : (rr > 4.8 && xx + y > 2 ? 'cabin_red_dk' : 'blood')), rx + xx, ry2 + y);
     }
-    // the lamp post on the deck, its arm and lantern
+    A.px(ctx, 'wood_deep', rx, ry2 - 7); A.px(ctx, 'paper_dark', rx - 4, ry2 + 6); A.px(ctx, 'paper_dark', rx - 3, ry2 + 7); A.px(ctx, 'paper_dark', rx + 3, ry2 + 7);
+    // the lamp post on the deck: a footed post, a braced arm, a lantern with cap, cage and glass
     var lx = x - 16;
     A.box(ctx, 'wood_deep', lx, dy - 40, 2, 40); A.box(ctx, 'wood_dark', lx, dy - 40, 1, 40);
-    A.box(ctx, 'wood_deep', lx, dy - 40, 9, 2); A.box(ctx, 'ink', lx + 7, dy - 38, 1, 2);
-    A.box(ctx, 'ink', lx + 5, dy - 36, 5, 1); A.box(ctx, 'stone_dark', lx + 6, dy - 35, 3, 4); A.box(ctx, 'ink', lx + 5, dy - 31, 5, 1);
+    A.box(ctx, 'wood_dark', lx - 1, dy - 3, 4, 3); A.box(ctx, 'wood_mid', lx - 1, dy - 3, 4, 1);
+    A.box(ctx, 'wood_deep', lx, dy - 40, 9, 2); A.box(ctx, 'wood_mid', lx, dy - 40, 9, 1);
+    A.line(ctx, 'wood_deep', lx + 1, dy - 34, lx + 5, dy - 38);                          // the brace
+    A.box(ctx, 'ink', lx + 7, dy - 38, 1, 2);                                              // the hook
+    A.box(ctx, 'ink', lx + 5, dy - 36, 5, 1); A.px(ctx, 'stone', lx + 7, dy - 37);         // the cap
+    A.box(ctx, 'ink', lx + 5, dy - 35, 1, 4); A.box(ctx, 'ink', lx + 9, dy - 35, 1, 4);    // the cage
+    A.box(ctx, 'stone_dark', lx + 6, dy - 35, 3, 4); A.px(ctx, 'fog_mauve', lx + 6, dy - 35); // the glass
+    A.box(ctx, 'ink', lx + 5, dy - 31, 5, 1); A.px(ctx, 'ink', lx + 7, dy - 30);
     live.lamps.push({ layer: L.id, x: lx + 7, y: dy - 33 });
   }
 
@@ -148,24 +208,18 @@ G.scene.scenery = G.scene.scenery || {};
       if (wn.layer !== id) continue;
       if (h < 0) h = hourNow();
       if (!(h >= 17.25 || h < 7.25)) break;
-      var fl = 0.9 + 0.1 * Math.sin(t * 4.7 + i * 2), X = wn.x / HI - ox, Y = wn.y / HI - oy, W = wn.w / HI, H = wn.h / HI;
-      c.globalAlpha = 0.2 * fl; c.fillStyle = P.lamp_glow; c.fillRect(X - 2, Y - 2, W + 4, H + 4);
-      c.globalAlpha = fl; c.fillStyle = P.signal_amber; c.fillRect(X, Y, W, H);
-      c.fillStyle = P.lamp_glow; c.fillRect(X + 0.5, Y + 0.5, W - 1, H * 0.45);
-      c.fillStyle = P.dusk_amber; c.fillRect(X + W / 2 - 0.25, Y, 0.5, H);             // the mullion
-      c.globalAlpha = 1;
+      FB.window_(c, wn, ox, oy, 0.9 + 0.1 * Math.sin(t * 4.7 + i * 2));
     }
-    for (i = 0; i < live.lamps.length; i++) {                                         // the lantern, a soft warm halo
+    for (i = 0; i < live.lamps.length; i++) {                                         // the lantern, a soft round warm halo
       var lm = live.lamps[i];
       if (lm.layer !== id) continue;
       if (h < 0) h = hourNow();
       if (!(h >= 17 || h < 7.5)) continue;
       var a = 0.92 + 0.08 * Math.sin(t * 6.1), LX = lm.x / HI - ox, LY = lm.y / HI - oy;
-      c.fillStyle = P.signal_amber;
-      c.globalAlpha = 0.07 * a; c.fillRect(LX - 9, LY - 8, 18, 18);
-      c.globalAlpha = 0.12 * a; c.fillRect(LX - 5, LY - 4, 10, 10);
-      c.globalAlpha = 0.25 * a; c.fillRect(LX - 2.5, LY - 2, 5, 5);
-      c.globalAlpha = a; c.fillStyle = P.lamp_glow; c.fillRect(LX - 0.5, LY - 1, 1.5, 2);
+      FB.halo(c, LX + 0.25, LY + 0.5, 10, 0.8 * a, 'signal_amber');
+      c.globalAlpha = a; c.fillStyle = P.signal_amber; c.fillRect(LX - 0.5, LY - 1, 1.5, 2);  // the glass, lit
+      c.fillStyle = P.lamp_glow; c.fillRect(LX, LY - 0.5, 0.5, 1.5);
+      c.fillStyle = P.cream; c.fillRect(LX, LY, 0.5, 0.5);                  // the flame
       c.globalAlpha = 1;
     }
   }

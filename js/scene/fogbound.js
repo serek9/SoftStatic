@@ -173,24 +173,92 @@ G.scene.scenery = G.scene.scenery || {};
   }
 
   // ---- fbcabin ------------------------------------------------------------------------------
-  // L: features [{x}] (layer px, scaled), base (its ground y): a log cabin under a steep roof
-  // with a chimney, two windows (lit live), among the trees.
+  // L: features [{x}] (layer px, scaled), base (its ground y): a log cabin on a stone footing,
+  // painted in the view's own pixels: log courses with a lit top and dark chinking, the log
+  // ends at both corners, a shingled roof with a lit fascia and a ridge cap, a fieldstone
+  // chimney with its cap, two framed windows with sills and crossbars (the panes lit live), a
+  // plank door on a stone step, a woodpile under the eave, among the trees. The low sun is on
+  // the right, so the right-hand edges take the light. Its trees draw from rng as before; the
+  // detail draws from a hash, so nothing else moves.
+  var CABIN = { w: 40, h: 21, foot: 3, roof: 14, eave: 4 };
   function cabin(ctx, L, w, wy, rng) {
     var f = L.features || [], i;
     for (i = 0; i < f.length; i++) {
-      var x = f[i].x, gy = L.base, cw = 30, ch = 14, k;
-      A.box(ctx, 'wood_deep', x, gy - ch, cw, ch);
-      for (k = 0; k < ch; k += 3) A.box(ctx, 'wood_dark', x, gy - ch + k, cw, 1);  // the logs
-      for (k = 0; k < 12; k++) A.box(ctx, 'pinev_dark', x - 3 + k, gy - ch - k, cw + 6 - 2 * k, 1); // the roof
-      A.box(ctx, 'hill_dark', x - 3, gy - ch, cw + 6, 1);
-      A.box(ctx, 'stone_dark', x + cw - 9, gy - ch - 14, 4, 7);                     // the chimney
-      var wins = [[x + 5, gy - ch + 4], [x + 18, gy - ch + 4]];
-      for (k = 0; k < wins.length; k++) { A.box(ctx, 'night_ink', wins[k][0], wins[k][1], 6, 5); live.windows.push({ layer: L.id, x: wins[k][0], y: wins[k][1], w: 6, h: 5 }); }
-      A.box(ctx, 'wood_deep', x + 12, gy - 8, 4, 8);                                 // the door
-      for (k = 0; k < 3; k++) A.TREES.spruce(ctx, x - 8 - k * 9, gy + 1, rng.int(26, 40), PINEV, rng);
-      A.TREES.larch(ctx, x + cw + 8, gy + 1, rng.int(28, 38), LARCH, rng);
+      var x = f[i].x, gy = L.base, k;
+      logCabin(ctx, L, x, gy);
+      for (k = 0; k < 3; k++) A.TREES.spruce(ctx, x - 10 - k * 9, gy + 1, rng.int(26, 40), PINEV, rng);
+      A.TREES.larch(ctx, x + CABIN.w + 10, gy + 1, rng.int(28, 38), LARCH, rng);
     }
     return ['cabin'];
+  }
+  function logCabin(ctx, L, x, gy) {
+    var cw = CABIN.w, wall = gy - CABIN.foot, top = wall - CABIN.h, xx, y, k, hs;
+    // the stone footing
+    A.box(ctx, 'stone_dark', x - 1, wall, cw + 2, CABIN.foot);
+    for (xx = x - 1; xx < x + cw + 1; xx += 4) {
+      var sw = 3 + (S.hash(xx, 41) & 1);
+      A.box(ctx, (S.hash(xx, 42) & 3) ? 'stone' : 'stone_hi', xx, wall, sw - 1, CABIN.foot - 1);
+      A.px(ctx, 'stone_lit', xx + sw - 2, wall);
+    }
+    // the log courses: a lit top, the log, its shadowed belly, the chinking
+    for (y = top; y < wall; y++) {
+      var r = (y - top) % 3;
+      A.box(ctx, r === 0 ? 'wood_mid' : (r === 1 ? 'wood' : 'wood_dark'), x, y, cw, 1);
+      if (r === 0) for (xx = x; xx < x + cw; xx++) { hs = S.hash(xx, y); if ((hs & 15) === 0) A.px(ctx, 'wood', xx, y); else if ((hs & 31) === 1) A.px(ctx, 'wood_hi', xx, y); }
+      if (r === 1) for (xx = x; xx < x + cw; xx++) if ((S.hash(xx * 3, y) & 31) === 0) A.box(ctx, 'wood_dark', xx, y, 2, 1);   // knots and checks
+      A.px(ctx, 'wood_hi', x + cw - 1, y);                                               // the lit corner
+    }
+    for (y = top; y < wall - 1; y += 3) {                                                // the log ends at the corners
+      A.box(ctx, 'wood_mid', x - 2, y, 2, 2); A.px(ctx, 'wood_dark', x - 2, y + 1);
+      A.box(ctx, 'wood_hi', x + cw, y, 2, 2); A.px(ctx, 'wood_lit', x + cw + 1, y); A.px(ctx, 'wood', x + cw, y + 1);
+    }
+    // the windows: frame, sill, crossbars over the dark panes (lit live)
+    var wins = [x + 5, x + 27], wy0 = top + 5;
+    for (k = 0; k < wins.length; k++) {
+      var wx = wins[k];
+      A.box(ctx, 'wood_deep', wx - 1, wy0 - 1, 9, 9);
+      A.box(ctx, 'night_ink', wx, wy0, 7, 7);
+      A.px(ctx, 'fog_dark', wx + 1, wy0 + 1); A.px(ctx, 'fog_dark', wx + 4, wy0 + 1);    // a glint on the glass
+      A.box(ctx, 'wood_deep', wx + 3, wy0, 1, 7); A.box(ctx, 'wood_deep', wx, wy0 + 3, 7, 1);
+      A.box(ctx, 'wood_hi', wx - 2, wy0 + 8, 11, 1); A.box(ctx, 'wood_dark', wx - 2, wy0 + 9, 11, 1);
+      A.box(ctx, 'wood_mid', wx + 8, wy0 - 1, 1, 9);                                     // the frame's lit side
+      live.windows.push({ layer: L.id, x: wx, y: wy0, w: 7, h: 7, bars: 1 });
+    }
+    // the door: planks, a brace, a latch, on its stone step
+    var dx = x + 16, dh = 13;
+    A.box(ctx, 'wood_deep', dx - 1, wall - dh - 1, 9, dh + 1);
+    for (xx = 0; xx < 7; xx++) A.box(ctx, xx % 2 ? 'wood_dark' : 'wood', dx + xx, wall - dh, 1, dh);
+    A.line(ctx, 'wood_mid', dx, wall - 2, dx + 6, wall - dh + 2);
+    A.box(ctx, 'wood_mid', dx, wall - dh + 2, 7, 1); A.box(ctx, 'wood_mid', dx, wall - 3, 7, 1);
+    A.px(ctx, 'stone_lit', dx + 5, wall - 7);
+    A.box(ctx, 'stone', dx - 2, wall, 11, 2); A.box(ctx, 'stone_hi', dx - 2, wall, 11, 1);
+    // the woodpile by the left corner, under the eave
+    for (y = 0; y < 3; y++) for (xx = 0; xx < 4 - y; xx++) {
+      var lx = x - 11 + xx * 3 + y, ly = wall - 2 - y * 3;
+      A.box(ctx, 'wood_mid', lx, ly, 3, 3); A.px(ctx, 'wood_hi', lx + 2, ly); A.px(ctx, 'wood_dark', lx + 1, ly + 1); A.box(ctx, 'wood_deep', lx, ly + 2, 3, 1);
+    }
+    // the roof: rows of shingles, each row one in from the last, a lit fascia under the eave
+    var e = CABIN.eave, rows = CABIN.roof;
+    for (k = 0; k < rows; k++) {
+      var ry = top - 1 - k, r0 = x - e + k, r1 = x + cw + e - k;
+      if (r1 <= r0) break;
+      var band = k % 3;
+      A.box(ctx, band === 2 ? 'night_ink' : 'roof_slate', r0, ry, r1 - r0, 1);
+      if (band === 0) for (xx = r0 + ((k / 3) & 1) * 2; xx < r1; xx += 4) A.px(ctx, 'night_ink', xx, ry);   // the tabs' seams, staggered
+      if (band === 1) for (xx = r0; xx < r1; xx++) if ((S.hash(xx, ry) & 7) < 2) A.px(ctx, 'roof_slate_hi', xx, ry);
+      A.px(ctx, 'roof_slate_hi', r1 - 1, ry); A.px(ctx, 'roof_slate_hi', r1 - 2, ry);    // the lit hip
+    }
+    A.box(ctx, 'hill_dark', x - e + rows - 1, top - rows, cw + 2 * e - 2 * rows + 2, 1);  // the ridge cap
+    A.box(ctx, 'wood_mid', x - e, top, cw + 2 * e, 1); A.box(ctx, 'wood_deep', x - e, top + 1, cw + 2 * e, 1); // the fascia and its shadow
+    for (xx = x - e + 2; xx < x + cw + e - 1; xx += 6) A.px(ctx, 'wood_hi', xx, top);    // the rafter ends
+    // the chimney: fieldstones, mortar, a cap, standing through the roof on the right
+    var cx = x + cw - 11, ct = top - rows - 4;
+    for (y = ct; y < top - 3; y++) for (xx = 0; xx < 6; xx++) {
+      var st = ((y - ct) >> 1) * 3 + ((xx + (((y - ct) >> 1) & 1) * 2) >> 2), sk = S.hash(st, cx) & 3;
+      var mortar = (y - ct) % 2 === 1 && ((xx + (((y - ct) >> 1) & 1) * 2) & 3) === 3;
+      A.px(ctx, mortar ? 'stone_dark' : (xx === 5 ? 'stone_lit' : (sk === 0 ? 'stone_hi' : 'stone')), cx + xx, y);
+    }
+    A.box(ctx, 'stone_hi', cx - 1, ct - 2, 8, 2); A.box(ctx, 'stone_lit', cx - 1, ct - 2, 8, 1); A.box(ctx, 'night_ink', cx + 1, ct - 3, 4, 1);
   }
 
   // ---- The clouds: long thin bands ---------------------------------------------------------
@@ -254,18 +322,44 @@ G.scene.scenery = G.scene.scenery || {};
       if (wn.layer !== id) continue;
       var h = G.sim.clock.wrap(G.state.save.clock || 0), lit = h >= 17.25 || h < 7.25 ? 1 : 0;
       if (!lit) continue;
-      var flick = 0.9 + 0.1 * Math.sin(t * 5.3 + i);
-      c.globalAlpha = 0.22 * flick; c.fillStyle = P.lamp_glow; c.fillRect(wn.x / HI - ox - 2, wn.y / HI - oy - 2, wn.w / HI + 4, wn.h / HI + 4);
-      c.globalAlpha = flick; c.fillStyle = P.signal_amber; c.fillRect(wn.x / HI - ox, wn.y / HI - oy, wn.w / HI, wn.h / HI);
-      c.fillStyle = P.lamp_glow; c.fillRect(wn.x / HI - ox + 0.5, wn.y / HI - oy + 0.5, wn.w / HI - 1, wn.h / HI - 1.5);
-      c.globalAlpha = 1;
+      window_(c, wn, ox, oy, 0.9 + 0.1 * Math.sin(t * 5.3 + i));
     }
+  }
+
+  // A lit window, in world px with half-pixel detail: a round warm glow on the wall, the pane in
+  // amber going to lamplight at its top, a soft hot spot, and (wn.bars) its crossbars over it.
+  function window_(c, wn, ox, oy, fl) {
+    var X = wn.x / HI - ox, Y = wn.y / HI - oy, W = wn.w / HI, H = wn.h / HI;
+    halo(c, X + W / 2, Y + H / 2, Math.max(W, H) * 0.5 + 3, 0.5 * fl, 'lamp_glow');
+    c.globalAlpha = fl; c.fillStyle = P.signal_amber; c.fillRect(X, Y, W, H);
+    c.fillStyle = P.lamp_glow; c.fillRect(X + 0.5, Y + 0.5, W - 1, H * 0.45);
+    c.globalAlpha = 0.6 * fl; c.fillStyle = P.cream; c.fillRect(X + W / 2 - 0.5, Y + 0.5, 1, H * 0.3);
+    c.globalAlpha = fl; c.fillStyle = P.dusk_amber; c.fillRect(X, Y + H - 0.5, W, 0.5);   // the lower sash in shadow
+    if (wn.bars) { c.fillStyle = P.wood_deep; c.fillRect(X + W / 2 - 0.25, Y, 0.5, H); c.fillRect(X, Y + H / 2 - 0.25, W, 0.5); }
+    c.globalAlpha = 1;
+  }
+
+  // A soft round glow of radius r (world px) at X, Y: three nested discs, each in half-pixel
+  // rows, at a rising alpha toward the middle. a: the overall strength. No allocation.
+  function halo(c, X, Y, r, a, key) {
+    c.fillStyle = P[key];
+    for (var ring = 0; ring < 3; ring++) {
+      var rr = r * (1 - ring * 0.3), al = a * (ring === 0 ? 0.14 : (ring === 1 ? 0.18 : 0.3));
+      if (rr < 0.5) break;
+      c.globalAlpha = al;
+      for (var dy = -rr; dy < rr; dy += 0.5) {
+        var m = dy + 0.25, hw = Math.round(Math.sqrt(Math.max(0, rr * rr - m * m)) * 2) / 2;
+        if (hw > 0) c.fillRect(Math.round((X - hw) * 2) / 2, Math.round((Y + dy) * 2) / 2, hw * 2, 0.5);
+      }
+    }
+    c.globalAlpha = 1;
   }
 
   G.scene.scenery.fogbound = {
     paint: { fbhills: hills, falls: falls, fbcabin: cabin },
     cloudMask: bands,
     afterLayer: afterLayer,
+    halo: halo, window_: window_,
     debugLine: function () { return 'fogbound  masts ' + live.masts.length + '  drops ' + live.drops.length + '  windows ' + live.windows.length; },
     live: live
   };

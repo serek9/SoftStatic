@@ -39,6 +39,7 @@ G.ui.menu = (function () {
     var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, look: G.ui.look, controls: G.ui.controls, milestones: G.ui.milestones }[name] || null; // milestones: Phase 94.1
     if (!o) return false;
     cur = o; curName = name;
+    if (G.ui.tips) G.ui.tips.opened(name); // the journal / chart tip is done when the page opens (the scene does not step under a menu)
     o.open(arg);
     return true;
   }
