@@ -187,7 +187,7 @@ on the bed, paused for t s, flash, thump) that Phase 105 reads.
 motion) → 105 (the species) → 106 (testing every hook) → 107 (tuning and rewards). One commit per
 phase; one push and one PR at the end (the user's word).
 
-**To confirm with the user before starting:**
+**Confirmed by the user (2026-11-08):** all four, yes; on 3, "as close to reality as possible, not always" (the targets bend to realism). Was: **to confirm with the user before starting:**
 1. The new control: hold **Down (S / ↓)** to let out line, plus a LINE button on touch.
 2. The bite sound about 3× today's knock, under the limiter (firm but never startling, §0.14).
 3. Phase 106's targets (a first fish within 3 min with any hook at its best water, ≥ 70% hooked,

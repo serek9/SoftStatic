@@ -688,7 +688,7 @@ function session(G, seed, opts) {
     }
   }
 
-  return { st, save, school, bite, step, run(seconds, until) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) { step(); if (until && until(st, save)) break; } return st; } };
+  return { st, save, school, bite, lure, step, run(seconds, until) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) { step(); if (until && until(st, save)) break; } return st; } };
 }
 
 // ---- --tackle (Phase 43) ---------------------------------------------------------------------
@@ -980,6 +980,45 @@ function firstCheck() {
   const off = after === 0;
   console.log((off ? 'PASS ' : 'FAIL ') + 'the first-taker bias is off once a fish is landed (fish_ai ctx.first false on all ' + seeds.length + ')');
   return ok && off ? 0 : 1;
+}
+
+// ---- --bite (Phase 101, PLAN_FISHING.md) ---------------------------------------------------
+// One fish at a time: 20 seeds x 10 min at three waters (Fogbound on worms, the creek on worms,
+// the Pines on minnows; the Graphite Rod). At every bite exactly one fish (not leaving) within
+// NEAR px of the lure; two or more within NEAR px in under 2% of the steps the lure is in; and
+// the bites a minute (printed) against BITE_BASE, today's, within +-15%.
+const BITE = { near: 24, seeds: 20, minutes: 10, waters: [['fog', 'worm'], ['creek', 'worm'], ['pines', 'minnow']] };
+const BITE_BASE = { fog: 1.11, creek: 1.19, pines: 1.07 }; // bites a minute per water before Phase 101 (measured 2026-11-08)
+function biteStats(loc, bait, seeds, minutes) {
+  let bites = 0, crowdAtBite = 0, steps = 0, crowded = 0, maxAtBite = 0;
+  for (let k = 1; k <= seeds; k++) {
+    const G = load(), s = session(G, k * 37 + 5, { loc, rod: 2, bait, stay: true, shop: false });
+    let last = -1;
+    const n = Math.round(minutes * 60 * 60);
+    for (let i = 0; i < n; i++) {
+      s.step();
+      const L = s.school.fish, lure = s.st.phase === 'wait' || s.st.phase === 'sink';
+      if (!lure) { last = s.bite.slot; continue; }
+      const lx = BITE_LURE(s), near = L.filter(f => f.active && f.state !== 'leave' && Math.hypot(f.x - lx[0], f.y - lx[1]) < BITE.near).length;
+      steps++; if (near >= 2) crowded++;
+      if (s.bite.slot >= 0 && last < 0) { bites++; if (near !== 1) crowdAtBite++; maxAtBite = Math.max(maxAtBite, near); }
+      last = s.bite.slot;
+    }
+  }
+  return { perMin: bites / (seeds * minutes), bites, crowdAtBite, maxAtBite, crowdedShare: crowded / Math.max(1, steps) };
+}
+function BITE_LURE(s) { return [s.lure.x, s.lure.y]; }
+function biteCheck() {
+  let bad = 0;
+  for (const [loc, bait] of BITE.waters) {
+    const r = biteStats(loc, bait, BITE.seeds, BITE.minutes);
+    const one = r.crowdAtBite === 0, calm = r.crowdedShare < 0.02;
+    const base = BITE_BASE && BITE_BASE[loc], rate = !base || Math.abs(r.perMin - base) / base <= 0.15;
+    console.log((one && calm && rate ? 'PASS ' : 'FAIL ') + loc + ' (' + bait + '): ' + r.bites + ' bites, ' + r.perMin.toFixed(2) + '/min' + (base ? ' (was ' + base.toFixed(2) + ')' : '') +
+      '; bites with other fish within ' + BITE.near + ' px: ' + r.crowdAtBite + ' (most ' + r.maxAtBite + '); steps with 2+ near: ' + (r.crowdedShare * 100).toFixed(1) + '%');
+    if (!(one && calm && rate)) bad++;
+  }
+  return bad ? 1 : 0;
 }
 
 // Phase 80 (PLAN_WINTER.md 2.2 and 5): one seed played on past Russetwood: a sea, the Snow
@@ -1448,9 +1487,10 @@ if (require.main === module) {
   if (args.includes('--homes')) code = homesCheck() || code; // Phase 75
   if (args.includes('--first')) code = firstCheck() || code; // Phase 96.4
   if (args.includes('--milestones')) code = milestonesCheck() || code; // Phase 94
+  if (args.includes('--bite')) code = biteCheck() || code; // Phase 101
   if (args.includes('--tackle-water')) { console.log(JSON.stringify(tackleWater(args[args.indexOf('--tackle-water') + 1]))); process.exit(0); }
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes', '--first', '--milestones'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --first | --milestones | --replay <seed> [minutes]');
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes', '--first', '--milestones', '--bite'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --first | --milestones | --bite | --replay <seed> [minutes]');
     code = 2;
   }
   if (args.includes('--tackle')) tackleCheck().then(c => process.exit(c || code), e => { console.log('FAIL --tackle: ' + e.message); process.exit(1); }); // Phase 69: in four processes

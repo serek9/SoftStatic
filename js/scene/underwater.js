@@ -1878,5 +1878,5 @@ if (G.core.debug) G.core.debug.addLine(function () {
       (f.state === 'nibble' ? '(' + f.nibbles + '/' + f.nibbleN + ')' : '') + ' ' + (f.y * 0.25).toFixed(1) + 'm ' +
       f.spd.toFixed(1) + (f.gl ? 'g' : '') + (f.face > 0 ? '>' : '<'); // Phase 28: speed, gliding, facing
   }
-  return 'fish ' + n + '/' + G.sim.fish_ai.MAX + s;
+  return 'fish ' + n + '/' + G.sim.fish_ai.MAX + (school.suitor ? '  turn #' + school.suitor + ' holding ' + G.sim.fish_ai.holders(school) : '  turn free' + (school.gapT > 0 ? ' in ' + school.gapT.toFixed(1) + 's' : '')) + s; // Phase 101
 });

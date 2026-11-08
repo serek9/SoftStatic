@@ -347,6 +347,21 @@ G.core.debug = (function () {
     // lure's depth, the hour, what is on the hook and the rod. Each: {id, chance (share of the
     // total), weight}; with tooHeavy, the species the rod cannot hold. Phase 75: in the reach the
     // lure is in (or the boat, with no line out), which it names.
+    // Phase 101 (PLAN_FISHING.md): the turn: the suitor (the one fish allowed at the lure), the
+    // holders waiting their turn, and the fish within 24 px of the lure (never more than one).
+    school: function () {
+      var run = G.state.run, sc = run.school, L = run.lureIn, out = { suitor: null, holders: [], near: 0, gap: 0 };
+      if (!sc) return out;
+      out.gap = +sc.gapT.toFixed(2);
+      sc.fish.forEach(function (f) {
+        if (!f.active) return;
+        var o = { id: G.data.fish[f.sp].id, state: f.state, dist: L && L.active ? +Math.hypot(f.x - L.x, f.y - L.y).toFixed(1) : null };
+        if (f.uid === sc.suitor) out.suitor = o;
+        if (f.state === 'hold') out.holders.push(o);
+        if (o.dist !== null && o.dist < 24 && f.state !== 'leave') out.near++;
+      });
+      return out;
+    },
     who: function () {
       var run = G.state.run, ctx = run.school && run.school.ctx;
       if (!ctx) return 'no school yet';

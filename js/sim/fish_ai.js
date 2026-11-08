@@ -37,7 +37,14 @@ G.sim.fish_ai = (function () {
     scent: 3,                     // × awareness: how far a wandering fish senses the lure is there
     drift: 0.75,                  // chance per turn that it heads toward the lure
     deadGive: 1.5,                // s: the user's fixes: a fish after a lure gone dead gives up after this
-    passT: 8                      // s: and a fish only passing by swims on after this (it does not keep a place in the school)
+    passT: 8,                     // s: and a fish only passing by swims on after this (it does not keep a place in the school)
+    // Phase 101 (PLAN_FISHING.md): one fish at a time. Only the suitor (school.suitor) may come in,
+    // circle, nibble and bite; any other fish that notices the lure waits its turn in 'hold' at
+    // holdR px from it (at most holdMax of them, each for its patience s), and the rest swim by,
+    // keeping keepR px off the lure. After a suitor goes, the next turn waits turnGap s.
+    holdR: [30, 44], holdMax: 2, patience: [7, 13], turnGap: 0.6, keepR: 30,
+    circleW: 1.7,                 // rad/s: the slowest a suitor circles the lure
+    turnArrive: 1               // × the arrivals, so one-at-a-time keeps the bites a minute it had (--bite)
   };
   // Phase 28: how a fish swims. It has a heading (yaw: 0 swimming right, PI left, between them
   // across the view; pitch: up or down, never steeper than asin 0.6) and a speed, and steers
@@ -58,9 +65,9 @@ G.sim.fish_ai = (function () {
     dartIn: 2, dartOut: 7, dartK: 9, // nibbling: px from the lure in and back out, and how fast
     holdK: 6                      // 1/s: biting, how it holds at the lure
   };
-  var INTERESTED = { notice: 1, approach: 1, inspect: 1, nibble: 1, bite: 1 };
+  var INTERESTED = { notice: 1, approach: 1, inspect: 1, nibble: 1, bite: 1, hold: 1 };
   // How interested a fish in each state is, for the dog (V3.8): 0..1.
-  var INTEREST = { notice: 0.4, approach: 0.5, inspect: 0.7, nibble: 0.85, bite: 1 };
+  var INTEREST = { hold: 0.3, notice: 0.4, approach: 0.5, inspect: 0.7, nibble: 0.85, bite: 1 };
 
   // ---- Species selection ------------------------------------------------------------
 
@@ -117,7 +124,7 @@ G.sim.fish_ai = (function () {
 
   function createSchool(data) {
     var s = {
-      fish: [], spawnT: 0, uid: 0,
+      fish: [], spawnT: 0, uid: 0, suitor: 0, gapT: 0, // Phase 101: the fish whose turn it is (uid), and the gap before the next turn
       ctx: {
         species: data.fish, windows: data.windows, loc: '', reach: '', depthM: null, hour: 0, // reach: Phase 75, set from the lure's x (stepSchool)
         unease: 0, bait: '', latched: {}, rodMaxMass: 0, weights: null, tooHeavyNear: false,
@@ -134,7 +141,7 @@ G.sim.fish_ai = (function () {
     for (var i = 0; i < MAX; i++) {
       s.fish.push({ active: false, uid: 0, sp: -1, x: 0, y: 0, vx: 0, vy: 0, home: 0, dir: 1,
         state: 'wander', t: 0, turnT: 0, circles: 0, ang: 0, swept: 0, nibbles: 0, nibbleN: 0, nibbleT: 0, nibbleLen: 0, missed: 0,
-        yaw: 0, pitch: 0, spd: 0, back: 0, face: 1, gl: 0, glT: 0, bursts: 0, flow: 0, shied: 0, hab: null, pass: false, dead: 0 }); // Phase 28; shied: Phase 53; hab: Phase 75; pass, dead: the user's fixes
+        yaw: 0, pitch: 0, spd: 0, back: 0, face: 1, gl: 0, glT: 0, bursts: 0, flow: 0, shied: 0, hab: null, pass: false, dead: 0, side: 1, holdR: 36, patience: 0 }); // Phase 28; shied: Phase 53; hab: Phase 75; pass, dead: the user's fixes
     }
     return s;
   }
@@ -296,11 +303,26 @@ G.sim.fish_ai = (function () {
         // In a current a fish not drawn to the lure faces into it: it swims upstream, or slips
         // back tail first, never faster over the bed than 0.8 of the current, so it never turns
         // to swim with it. A fish heading for the lure swims after it, downstream or up.
-        var gw = speed * 0.35, fa = Math.abs(f.flow), drawn = lure.active && Math.abs(dx) < sp.awareness * A.scent && f.dir * dx > 0;
+        if (lure.active && dist < A.keepR && f.uid !== school.suitor) f.dir = dx >= 0 ? -1 : 1;     // Phase 101: not its turn: it keeps off the lure
+        var gw = speed * 0.35, fa = Math.abs(f.flow), drawn = lure.active && Math.abs(dx) < sp.awareness * A.scent && f.dir * dx > 0 && dist >= A.keepR;
         if (fa > 0.5 && !drawn && f.dir * f.flow > 0 && gw > fa * 0.8) gw = fa * 0.8;
         swim(f, sp, f.dir * gw, (f.home - f.y) * 0.5, speed, true, dt);
         if (lure.active && !f.pass && work >= W.workMin && baitOk(sp, lure.bait, lure.lure) &&
-            dist < sp.awareness * (lure.lure && interest(sp, lure.bait, true) === 2 ? W.lureLoved : 1) * (lure.lure ? W.workAware0 + (1 - W.workAware0) * work : 1)) setState(f, 'notice');
+            dist < sp.awareness * (lure.lure && interest(sp, lure.bait, true) === 2 ? W.lureLoved : 1) * (lure.lure ? W.workAware0 + (1 - W.workAware0) * work : 1)) {
+          if (!school.suitor && school.gapT <= 0) { school.suitor = f.uid; setState(f, 'notice'); }   // Phase 101: its turn
+          else if (holders(school) < A.holdMax) {                                                    // or it waits for one
+            setState(f, 'hold'); f.side = dx >= 0 ? -1 : 1; f.holdR = rng.range(A.holdR[0], A.holdR[1]); f.patience = rng.range(A.patience[0], A.patience[1]);
+          } else f.pass = true;                                                                       // or it swims on
+        }
+        break;
+
+      case 'hold': // Phase 101: waiting its turn, off to one side of the lure, facing it, finning
+        if (f.t > f.patience) { setState(f, 'leave'); break; }
+        var hx = lure.x + f.side * f.holdR, hlo = f.hab.habitat.depthMin * 4, hhi = f.hab.habitat.depthMax * 4;
+        var hy = clampDepth(school, f, lure.y < hlo ? hlo : (lure.y > hhi ? hhi : lure.y));
+        var hd = Math.sqrt((hx - f.x) * (hx - f.x) + (hy - f.y) * (hy - f.y)) || 0.001;
+        if (hd > 6) swim(f, sp, (hx - f.x) / hd * speed * 0.5 * Math.min(1, hd / M.arrive + 0.3), (hy - f.y) / hd * speed * 0.5, speed, true, dt);
+        else { f.dir = dx >= 0 ? 1 : -1; hover(f, sp, hx, hy, 1.2, dt); }
         break;
 
       case 'notice': // a pause: it stops (holding its place in a current) and turns toward the lure
@@ -314,7 +336,7 @@ G.sim.fish_ai = (function () {
         swim(f, sp, dx / dist * speed * 0.6 * ar, dy / dist * speed * 0.6 * ar, speed, true, dt);
         if (dist < A.inspectR + 2) {
           setState(f, 'inspect');
-          f.circles = rng.int(1, 3);
+          f.circles = rng.int(1, 2); // Phase 101: one fish at a time, so fewer circles each
           f.ang = Math.atan2(f.y - lure.y, f.x - lure.x);
           f.swept = 0;
           f.dir = rng.next() < 0.5 ? 1 : -1; // which way round
@@ -323,7 +345,7 @@ G.sim.fish_ai = (function () {
 
       case 'inspect': // circle the lure circles times (a flattened circle), steering after a point on it
         if (f.eager) { setState(f, 'nibble'); f.nibbleN = 2; f.nibbles = 0; f.nibbleT = f.nibbleLen = rng.range(0.25, 0.6); f.dir = f.x < lure.x ? 1 : -1; break; } // Phase 96.4: no circling
-        var w = speed * 0.4 / A.inspectR;
+        var w = Math.max(speed * 0.4 / A.inspectR, A.circleW); // Phase 101: a circle takes at most 2*PI/circleW s (a slow fish took 10)
         f.ang += f.dir * w * dt;
         f.swept += w * dt;
         var la = f.ang + f.dir * M.lead, R = A.inspectR;
@@ -384,7 +406,7 @@ G.sim.fish_ai = (function () {
       if (alive) return;
       school.firstSent = false; school.firstT = 0;
     }
-    if (count(school) >= MAX) return;
+    if (count(school) >= MAX || school.suitor || school.gapT > 0) return;          // Phase 101: it takes the next turn
     school.firstT = (school.firstT || 0) + dt;
     if (school.firstT < FIRST.delay) return;
     school.firstSent = true;
@@ -394,18 +416,40 @@ G.sim.fish_ai = (function () {
     if (!f) return;
     var h = f.hab.habitat;
     f.y = clampDepth(school, f, Math.max(h.depthMin * 4, Math.min(h.depthMax * 4, lure.y)));
-    f.eager = true; f.pass = false;
+    f.eager = true; f.pass = false; school.suitor = f.uid;
     setState(f, 'inspect');                                                          // already at the lure: straight to the nibbles (stepFish)
+  }
+
+  // Phase 101: the turn. The suitor's turn ends when it is gone or no longer after the lure
+  // (left, missed and wandering, hooked); after turnGap s the holder nearest the lure takes the next.
+  function holders(school) { var n = 0; for (var i = 0; i < MAX; i++) if (school.fish[i].active && school.fish[i].state === 'hold') n++; return n; }
+  function turnStep(school, lure, dt) {
+    var i, f, on = false;
+    if (school.suitor) {
+      for (i = 0; i < MAX; i++) { f = school.fish[i]; if (f.active && f.uid === school.suitor && INTERESTED[f.state] && f.state !== 'hold') on = true; }
+      if (!on) { school.suitor = 0; school.gapT = A.turnGap; }
+    }
+    if (school.gapT > 0) { school.gapT -= dt; return; }
+    if (school.suitor || !lure.active) return;
+    var best = null, bd = 1e9;
+    for (i = 0; i < MAX; i++) {
+      f = school.fish[i];
+      if (!f.active || f.state !== 'hold') continue;
+      var d = Math.abs(f.x - lure.x) + Math.abs(f.y - lure.y);
+      if (d < bd) { bd = d; best = f; }
+    }
+    if (best) { school.suitor = best.uid; setState(best, 'approach'); }
   }
 
   function stepSchool(school, lure, dt, rng, data) {
     school.ctx.reach = data.reachAt(data.locations[school.ctx.loc], lure.x); // Phase 75: the reach the lure is in
+    if (!lure.active) { school.suitor = 0; school.gapT = 0; } else turnStep(school, lure, dt);
     if (lure.active && school.ctx.first) firstTaker(school, lure, dt, rng, data);
     else if (!lure.active) { school.firstSent = false; school.firstT = 0; }
     if (lure.active) {
       school.spawnT -= dt;
       if (school.spawnT <= 0) {
-        school.spawnT = rng.range(A.spawnMin, A.spawnMax) * (1 - W.passBy) / ((school.ctx.attract || 1) * (school.ctx.cover || 1)); // Phase 69: cover from the last pick; the user's fixes: more come by, as some only pass
+        school.spawnT = rng.range(A.spawnMin, A.spawnMax) * (1 - W.passBy) / ((school.ctx.attract || 1) * (school.ctx.cover || 1) * A.turnArrive); // Phase 101: turnArrive, as fish now wait their turn // Phase 69: cover from the last pick; the user's fixes: more come by, as some only pass
         if (count(school) < MAX) {
           var sp = pickSpecies(school.ctx, rng);
           if (sp >= 0) {
@@ -449,12 +493,12 @@ G.sim.fish_ai = (function () {
     for (var i = 0; i < MAX; i++) if (school.fish[i].active) setState(school.fish[i], 'leave');
   }
 
-  function clear(school) { for (var i = 0; i < MAX; i++) school.fish[i].active = false; school.spawnT = 0; }
+  function clear(school) { for (var i = 0; i < MAX; i++) school.fish[i].active = false; school.spawnT = 0; school.suitor = 0; school.gapT = 0; }
 
   return {
     MAX: MAX, W: W, A: A, M: M, FIRST: FIRST,
     weightOf: weightOf, speciesWeights: speciesWeights, pickSpecies: pickSpecies,
     createSchool: createSchool, spawn: spawn, stepFish: stepFish, stepSchool: stepSchool,
-    interest: interest, count: count, interested: interested, interestLevel: interestLevel, scatter: scatter, clear: clear
+    interest: interest, count: count, interested: interested, interestLevel: interestLevel, scatter: scatter, clear: clear, holders: holders
   };
 })();
