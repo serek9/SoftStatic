@@ -951,7 +951,7 @@ G.scene.underwater = (function () {
     worm: { fall: 0.85, sway: 0.5, swayHz: 1.1, bed: 'puff', live: 1 },
     unlabelled: { fall: 0.85, sway: 0.4, swayHz: 1.4, bed: 'puff', live: 1 },
     cricket: { floats: true, live: 1, thump: 0.4 },
-    minnow: { fall: 0.6, swim: 7, tire: 40, live: 1, flash: 0.4, thump: 0.7 },
+    minnow: { fall: 0.6, swim: 7, tire: 40, live: 1, flash: 0.6, thump: 0.7 },
     float: { live: 1 },
     dive: { floats: true, bed: 'deflect', thump: 1, flash: 0.4 },
     mid: { fall: 0.55, sway: 0.6, swayHz: 3, flash: 1, thump: 0.6 },
@@ -1000,7 +1000,8 @@ G.scene.underwater = (function () {
     m.falling = m.vy > 1 && (c.rv || 0) <= RV.still; m.surface = c.ly - loc.waterY < 1.5; m.live = mv.live || 0; m.quiver = mv.quiver || 0;
     if (m.speed > 1.5) { m.runT += dt; m.still = 0; } else { if (m.runT > 0) m.lastRun = m.runT; m.still += dt; m.runT = 0; } // lastRun: how long it ran before this pause
     var moving = m.speed > 1.5 || m.falling;
-    m.flash = moving ? (mv.flash || 0) : 0; m.thump = moving || mv.floats && mv.live ? (mv.thump || 0) : 0; // a cricket kicks even resting
+    m.popT = (m.popT === undefined ? 99 : m.popT) + dt; if ((c.pops || 0) !== (m.pops || 0)) { m.pops = c.pops || 0; m.popT = 0; } // Phase 106: a popper's pop stirs the top
+    m.flash = moving ? (mv.flash || 0) : 0; m.thump = moving || (mv.floats && mv.live) || m.popT < 0.6 ? (mv.thump || 0.6) * (mv.thump || m.popT < 0.6 ? 1 : 0) : 0; // a cricket kicks even resting; a pop thumps
     m.puffT -= dt; m.bedT += dt;
     if (bed && (!m.onBed || (m.speed > 2 && m.puffT <= 0))) {
       if (m.puffT <= 0) { m.bedT = 0; m.bedN = (m.bedN || 0) + 1; if (mv.bed) fx.emit('silt', c.x1, c.ly, mv.bed === 'deflect' ? 5 : (m.onBed ? 2 : 4)); m.puffT = 0.4; }

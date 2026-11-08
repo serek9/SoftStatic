@@ -19,12 +19,16 @@ G.core.loop = (function () {
   var DT = 1 / 60;
   var MAX_FRAME = 0.1;  // seconds of real time accepted per frame (6 steps)
   var hooks = null, ctx = null, acc = 0, last = -1, paused = false, running = false;
+  // Phase 106 (debug only, tools/angler.js): a time scale (1 normal; the bot runs the game faster)
+  // and a hook called before each fixed step with the step's dt (it drives the input like a player).
+  var scale = 1, onStep = null;
   var stats = { fps: 0, ups: 0, steps: 0, dropped: 0, updMs: 0, drawMs: 0, worstMs: 0 };
   // 14.7: the cost of each frame (steps plus drawing), smoothed, and the worst in the last second.
   var worst = 0;
   var secT = 0, secFrames = 0, secSteps = 0;
 
   function step() {
+    if (onStep) onStep(DT);
     if (!paused && !G.core.save.lost()) hooks.update(DT);
     G.core.input.endStep();
   }
@@ -37,7 +41,7 @@ G.core.loop = (function () {
     if (ft > MAX_FRAME) { stats.dropped += ft - MAX_FRAME; ft = MAX_FRAME; }
     else if (ft < 0) ft = 0;
 
-    acc += ft;
+    acc += ft * scale;
     var n = 0, t0 = performance.now();
     while (acc >= DT) { step(); acc -= DT; n++; }
     stats.steps = n;
@@ -70,6 +74,9 @@ G.core.loop = (function () {
   return {
     DT: DT, MAX_FRAME: MAX_FRAME, stats: stats, start: start,
     setPaused: function (p) { paused = !!p; },
+    // Phase 106: debug only (dbg.speed, dbg.bot): the time scale and the per-step hook.
+    setScale: function (k) { if (G.core.debug && G.core.debug.on) scale = Math.max(0.25, Math.min(12, +k || 1)); return scale; },
+    setOnStep: function (fn) { if (G.core.debug && G.core.debug.on) onStep = fn || null; },
     isPaused: function () { return paused; }
   };
 })();

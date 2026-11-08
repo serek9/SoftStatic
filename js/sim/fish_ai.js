@@ -42,7 +42,7 @@ G.sim.fish_ai = (function () {
     // circle, nibble and bite; any other fish that notices the lure waits its turn in 'hold' at
     // holdR px from it (at most holdMax of them, each for its patience s), and the rest swim by,
     // keeping keepR px off the lure. After a suitor goes, the next turn waits turnGap s.
-    holdR: [34, 48], holdMax: 2, patience: [7, 13], turnGap: 0.6, keepR: 30, behindR: 22,
+    holdR: [34, 48], holdMax: 2, patience: [7, 13], turnGap: 0.6, keepR: 30, keepDy: 16, behindR: 22,
     circleW: 1.6,                 // rad/s: the slowest a suitor circles the lure
     turnArrive: 1               // × the arrivals, so one-at-a-time keeps the bites a minute it had (--bite)
   };
@@ -94,7 +94,7 @@ G.sim.fish_ai = (function () {
     for (var i = 0; i < t.length; i++) {
       var k = t[i];
       if ((k === 'fall' && m.falling) || (k === 'flash' && m.flash > 0.5) || (k === 'thump' && m.thump > 0.5) ||
-          (k === 'bed' && m.bedT < F.bedT) || (k === 'scent' && (m.live || m.quiver)) || (k === 'top' && m.surface && (m.speed > 1 || m.thump > 0)) ||
+          (k === 'bed' && m.bedT < F.bedT) || (k === 'scent' && (m.live || m.quiver)) || (k === 'top' && m.surface && (m.speed > 1 || m.thump > 0 || m.popT < 0.6)) ||
           (k === 'pause' && m.still > F.pauseMin && m.still < F.pauseMax && m.lastRun >= F.pauseRun)) n++;
     }
     return n;
@@ -353,10 +353,11 @@ G.sim.fish_ai = (function () {
         // In a current a fish not drawn to the lure faces into it: it swims upstream, or slips
         // back tail first, never faster over the bed than 0.8 of the current, so it never turns
         // to swim with it. A fish heading for the lure swims after it, downstream or up.
-        if (lure.active && dist < A.keepR && f.uid !== school.suitor) f.dir = dx >= 0 ? -1 : 1;     // Phase 101: not its turn: it keeps off the lure
+        var keepOff = lure.active && dist < A.keepR && f.uid !== school.suitor;
+        if (keepOff) { f.dir = dx >= 0 ? -1 : 1; f.home = clampDepth(school, f, lure.y + (f.y < lure.y ? -A.keepDy : A.keepDy)); } // Phase 101: not its turn: it keeps off the lure (Phase 106: above or below it too)
         var gw = speed * 0.35, fa = Math.abs(f.flow), drawn = lure.active && Math.abs(dx) < sp.awareness * A.scent && f.dir * dx > 0 && dist >= A.keepR;
         if (fa > 0.5 && !drawn && f.dir * f.flow > 0 && gw > fa * 0.8) gw = fa * 0.8;
-        swim(f, sp, f.dir * gw, (f.home - f.y) * 0.5, speed, true, dt);
+        swim(f, sp, f.dir * (keepOff ? Math.max(gw, speed * 0.7) : gw), (f.home - f.y) * (keepOff ? 1.5 : 0.5), speed, true, dt);
         var loud = lure.m && G.data.feedOf(sp).triggers.length && triggers(G.data.feedOf(sp), lure.m) > 0 ? F.loudK : 1; // Phase 105: a flash or a thump it answers draws it from farther
         if (lure.active && !f.pass && work >= W.workMin && baitOk(sp, lure.bait, lure.lure) &&
             dist < sp.awareness * loud * (lure.lure && interest(sp, lure.bait, true) === 2 ? W.lureLoved : 1) * (lure.m || lure.lure ? W.workAware0 + (1 - W.workAware0) * work : 1)) {

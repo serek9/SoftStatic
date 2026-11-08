@@ -698,7 +698,7 @@ G.data.FEED_BY_FAMILY = {
   'perches': { zone: 'low', pace: 'slow', triggers: ['bed', 'fall', 'scent'], follows: false },
   'sunfish & bass': { zone: 'mid', pace: 'slow', triggers: ['scent', 'fall'], follows: false },
   'temperate bass': { zone: 'mid', pace: 'fast', triggers: ['flash', 'thump'], follows: true },
-  'pikes': { zone: 'mid', pace: 'fast', triggers: ['flash', 'thump', 'pause'], follows: true },
+  'pikes': { zone: 'mid', pace: 'fast', triggers: ['flash', 'thump', 'pause', 'scent'], follows: true },
   'trout & salmon': { zone: 'mid', pace: 'steady', triggers: ['flash', 'scent'], follows: true },
   'whitefish': { zone: 'low', pace: 'slow', triggers: ['scent', 'fall', 'bed'], follows: false },
   'suckers': { zone: 'bed', pace: 'still', triggers: ['scent'], follows: false },
