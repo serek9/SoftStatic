@@ -869,7 +869,11 @@ G.scene.underwater = (function () {
         else if (sw === 'lift') {
           var rat = gx.vary === 'rattle';                                         // Phase 69: a bladebait's short sharp lifts
           c.hop = (c.hop || 0) + dt * RV.hops * (rat ? RV.rattle : 1);
-          vy = (c.hop % 1) < (rat ? 0.2 : 0.3) ? vy - v * (rat ? 1.7 : 1.3) : UW.sinkV * gx.sink * 0.7; vx *= 0.75;
+          // Phase 109: between lifts it falls, but never as far as the lift took it up (at most
+          // HOP_KEEP of it), so a heavy one still climbs on the reel and comes out at the boat;
+          // before, the Heavy Bladebait (sink 2.6) fell further than it rose and sat on the bed.
+          var upK = rat ? 0.2 : 0.3, vUp = vy - v * (rat ? 1.7 : 1.3), fallMax = Math.max(0, -vUp) * upK / (1 - upK) * RV.keep;
+          vy = (c.hop % 1) < upK ? vUp : Math.min(UW.sinkV * gx.sink * 0.7, fallMax); vx *= 0.75;
         }
         else if (sw === 'dropshot') { vx *= 0.45; vy = far ? clamp((floorPx - depth0) * 2, -UW.reelUp, UW.reelUp) : -UW.reelUp; } // Phase 69: along the bed
         else if (sw === 'wacky') vy *= 0.4;                                        // level
@@ -1013,7 +1017,7 @@ G.scene.underwater = (function () {
   // px/s under which the lure counts as paused; tight: s the line stays tight after the reel
   // stops (the pendulum); lift: the spinner's rise per px/s; hops: the jig's hops a second.
   // Phase 69: rattle: × the hops of a bladebait; glide: the glidebait's S-glides a second.
-  var RV = { up: 7, down: 4, still: 0.6, tight: 1.6, lift: 0.3, hops: 2.2, rattle: 1.6, glide: 0.45 }, TIPW = [0, 0];
+  var RV = { up: 7, down: 4, still: 0.6, tight: 1.6, lift: 0.3, hops: 2.2, rattle: 1.6, glide: 0.45, keep: 0.8 }, TIPW = [0, 0]; // keep: Phase 109
   // Phase 103: letting out line. extra: px of line past the rod's cast length; drift: px/s a
   // floating lure drifts away on a still lake's wind (x 0.5-1.5 by the grey hours' wind); fall: x
   // its sink speed as it free-falls on a slack line; clickGap: s between the spool's clicks.
