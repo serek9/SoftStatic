@@ -280,7 +280,8 @@ G.ui.hud = (function () {
       var held = I.held(p.act);
       ctx.globalAlpha = a * 0.85;
       keyBox(ctx, p.x, p.y, p.w, p.h, held);
-      arrow(ctx, p, p.act, held ? 'signal_amber' : 'fog_light');
+      if (L.mode === 'boat' && p.act === 'down') F.drawText(ctx, 'LINE', p.x + ((p.w - F.measure('LINE')) >> 1), p.y + ((p.h - F.FONT_H) >> 1), held ? 'signal_amber' : 'fog_light'); // Phase 103
+      else arrow(ctx, p, p.act, held ? 'signal_amber' : 'fog_light');
     }
     if (L.act.on) {
       var r = L.act, wd = word(), down = I.held('action');

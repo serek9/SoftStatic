@@ -802,7 +802,7 @@ G.scene.underwater = (function () {
     var popNow = (c.pops || 0) - (c.pops0 || 0); c.pops0 = c.pops || 0;
     c.wpop = (c.wpop || 0) + (popNow / dt - (c.wpop || 0)) * kg;
     var w;
-    if (run.fsm === 'sinking') w = st === 'stopgo' || st === 'jig' ? WK.sinkLift : (st === 'top' ? 0.3 : WK.sinkWork);
+    if (run.fsm === 'sinking' || c.free) w = st === 'stopgo' || st === 'jig' ? WK.sinkLift : (st === 'top' ? 0.3 : WK.sinkWork);
     else if (st === 'steady') w = c.wm / WK.steadyFull;
     else if (st === 'stopgo') w = c.wgo / WK.goFull;
     else if (st === 'jig') w = c.wgo / WK.goFull * (1 - Math.max(0, c.wm - WK.jigLong) * WK.jigK);
@@ -847,6 +847,8 @@ G.scene.underwater = (function () {
       // glidebait swings in wide slow S-glides at its running depth; a bladebait's lifts are
       // short and sharp (rattle); a swimbait's paddle tail holds it lower than a spinner (kick).
       var reel = inp.held('action') && run.bite.slot < 0, sw = lure ? gx.swim : '';
+      // Phase 103 (PLAN_FISHING.md): holding down (LINE on a phone) opens the bail: line pays out.
+      c.free = !reel && run.bite.slot < 0 && inp.held('down') && !ice ? 1 : 0;
       c.rv = (c.rv || 0) + ((reel ? UW.reelIn : 0) - (c.rv || 0)) * Math.min(1, (reel ? RV.up : RV.down) * dt);
       G.scene.boat.rodTip(run.boat, run.boat.x, wy, TIPW);
       var b = run.boat, home = b.x + b.facing * UW.reach, far = Math.abs(home - c.x1) > 14;
@@ -885,6 +887,25 @@ G.scene.underwater = (function () {
           return;
         }
         if (c.ly < wy + 0.5) c.ly = wy + 0.5;                                      // at the top it skitters along the surface
+      } else if (c.free) {
+        // Phase 103: the bail open. The line goes slack (no pendulum) and pays out, up to the rod's
+        // cast length and PAYOUT.extra px more: a sinking lure or bait falls straight down to the
+        // bed (a dropshot's hook its dropM over it), anything that floats (a popper, a resting
+        // crank, a float rig's float) drifts away on the wind; a current carries all of them (drift).
+        c.tight = 0;
+        var cap = gx.castMax + PAYOUT.extra, out0 = L, away = c.x1 >= TIPW[0] ? 1 : -1, moved = 0;
+        if (sw === 'top' || sw === 'dive' || sw === 'float') {
+          if (sw === 'dive' && c.ly > wy + FLOAT) c.ly = Math.max(wy + FLOAT, c.ly - UW.reelUp * 0.4 * dt);
+          if (sw === 'float' && c.ly < wy + floorPx) c.ly = Math.min(wy + floorPx, c.ly + UW.sinkV * 0.6 * dt);
+          if ((!loc.current || loc.current.lake) && out0 < cap) { var dv = PAYOUT.drift * (0.5 + wind()); c.x1 = clamp(c.x1 + away * dv * dt, 8, loc.width - 8); moved = dv; }
+        } else if (out0 < cap) {
+          var bedFloor = bottom - (lure ? (gx.dropM || 0) * 4 : 0), fv = UW.sinkV * (lure ? gx.sink : 0.6) * PAYOUT.fall;
+          if (c.ly < wy + bedFloor) { c.ly = Math.min(wy + bedFloor, c.ly + fv * dt); moved = fv; }
+        }
+        if (loc.drift && out0 < cap) moved = Math.max(moved, Math.abs(loc.drift(c.seed, c.tw, c.ly - wy, false, wind(), c.x1)));
+        c.lineOut = (c.lineOut || 0) + moved * dt;
+        c.payT = (c.payT || 0) - dt;
+        if (moved > 0.3 && c.payT <= 0) { c.payT = PAYOUT.clickGap / Math.min(3, 0.5 + moved / 6); G.audio.engine.cue('payout', c.x1, moved); }
       } else {
         c.tight = Math.max(0, (c.tight || 0) - dt);
         if (sw === 'dive') { if (c.ly > wy + FLOAT) c.ly = Math.max(wy + FLOAT, c.ly - UW.reelUp * 0.4 * dt); } // let go, the plug floats back up
@@ -904,7 +925,7 @@ G.scene.underwater = (function () {
       c.ly = Math.min(c.ly, wy + bottomAt(loc, c.x1));
       // Phase 22: a line held in a current lifts the lure off the bottom, the way it swings a
       // real one: up to LIFT px per px/s of flow (the creek's 1–2 m), at 1.5 px/s.
-      if (loc.drift && !inp.held('action')) {
+      if (loc.drift && !inp.held('action') && !c.free) {                       // Phase 103: a slack line lets it go down
         var hold = Math.min(8, LIFT * Math.abs(loc.drift(c.seed, c.tw, c.ly - wy, false, wind(), c.x1))), floor = wy + bottomAt(loc, c.x1) - hold;
         if (c.ly > floor) c.ly = Math.max(floor, c.ly - 1.5 * dt);
       }
@@ -915,6 +936,10 @@ G.scene.underwater = (function () {
   // stops (the pendulum); lift: the spinner's rise per px/s; hops: the jig's hops a second.
   // Phase 69: rattle: × the hops of a bladebait; glide: the glidebait's S-glides a second.
   var RV = { up: 7, down: 4, still: 0.6, tight: 1.6, lift: 0.3, hops: 2.2, rattle: 1.6, glide: 0.45 }, TIPW = [0, 0];
+  // Phase 103: letting out line. extra: px of line past the rod's cast length; drift: px/s a
+  // floating lure drifts away on a still lake's wind (x 0.5-1.5 by the grey hours' wind); fall: x
+  // its sink speed as it free-falls on a slack line; clickGap: s between the spool's clicks.
+  var PAYOUT = { extra: 40, drift: 3, fall: 1.15, clickGap: 0.12 };
 
   // 11.1: the current moves the lure (and where its line enters) by loc.drift, a pure
   // function of the cast's seed, its time in the water, its depth and (Phase 22, the lakes)

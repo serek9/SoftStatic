@@ -619,7 +619,7 @@ G.scene.sailing = (function () {
     c.dist = Math.abs(c.x1 - b.x);
     c.seed = G.rng.int(1, 0x7fffffff);
     c.n++;
-    c.work = 0; c.wm = 0; c.wgo = 0; c.wpop = 0; c.wasMv = 0; c.pops = 0; c.pops0 = 0; // the user's fixes: a fresh retrieve
+    c.work = 0; c.wm = 0; c.wgo = 0; c.wpop = 0; c.wasMv = 0; c.pops = 0; c.pops0 = 0; c.lineOut = 0; c.free = 0; c.payT = 0; // the user's fixes: a fresh retrieve
     c.t = 0;
     c.flying = false;
     G.core.state.go(run, 'casting');
@@ -1027,6 +1027,7 @@ G.scene.sailing = (function () {
       // A bite takes the slack out over about a third of a second, then holds the line straight.
       if (run.bite.slot >= 0) { r = span + (r - span) * Math.exp(-25 * dt); pull = Math.min(0.3, run.bite.t * 3); } // Phase 102: the strike snaps the line straight (was 1/7 s)
       else if (G.core.input.held('action')) r = Math.max(span, r - ROPE.reel * dt);  // reeling takes up the slack first
+      else if (run.cast.free) r = Math.max(r, span * 1.08 + 6);                      // Phase 103: the bail open: line pays out, slack
       else {
         // Waiting, the angler takes in the slack the sink left until a light belly remains;
         // a lure that drifts away draws line out.

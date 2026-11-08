@@ -368,6 +368,13 @@ G.core.debug = (function () {
       var st = G.scene.underwater.strike(), run = G.state.run, au = G.audio.engine.info();
       return { n: st.n, style: st.style, off: st.off, lunge: st.lunge, x: st.x, depthM: st.y, species: st.sp, inMouth: G.scene.underwater.lureTaken(run), burst: +st.t.toFixed(2), sound: au.strike || null };
     },
+    // Phase 103: the bail: open (line paying out), line given this cast (px), the line now from
+    // the rod tip to the lure (px), its cap (the rod's cast length + 40), the lure's depth (m).
+    bail: function () {
+      var run = G.state.run, c = run.cast, loc = G.scene.sailing.loc(), tip = [0, 0];
+      G.scene.boat.rodTip(run.boat, run.boat.x, loc.waterY, tip);
+      return { open: !!c.free, given: +(c.lineOut || 0).toFixed(1), line: +Math.hypot(c.x1 - tip[0], c.ly - tip[1]).toFixed(1), cap: run.gearFx.castMax + 40, x: +c.x1.toFixed(1), depthM: +((c.ly - loc.waterY) * 0.25).toFixed(2), fsm: run.fsm };
+    },
     who: function () {
       var run = G.state.run, ctx = run.school && run.school.ctx;
       if (!ctx) return 'no school yet';
