@@ -1025,7 +1025,7 @@ G.scene.sailing = (function () {
     else if (fsm === 'sinking') r = Math.max(r, span * 1.06 + 4);                    // the bail is open as it sinks
     else if (fsm === 'waiting' || fsm === 'interest') {
       // A bite takes the slack out over about a third of a second, then holds the line straight.
-      if (run.bite.slot >= 0) { r = span + (r - span) * Math.exp(-7 * dt); pull = Math.min(0.3, run.bite.t); }
+      if (run.bite.slot >= 0) { r = span + (r - span) * Math.exp(-25 * dt); pull = Math.min(0.3, run.bite.t * 3); } // Phase 102: the strike snaps the line straight (was 1/7 s)
       else if (G.core.input.held('action')) r = Math.max(span, r - ROPE.reel * dt);  // reeling takes up the slack first
       else {
         // Waiting, the angler takes in the slack the sink left until a light belly remains;
@@ -1103,6 +1103,7 @@ G.scene.sailing = (function () {
       G.scene.underwater.drawFloat(ctx, lx, ly, hx, hy, run.bite.slot < 0 && G.sim.fish_ai.interestLevel(run.school) >= 0.85, run.bite.slot >= 0 ? floatDip(run) : 0, b.t, run.gearFx.bait); // Phase 69: the Bobber or the Deep Bobber
       return;
     }
+    if (G.scene.underwater.lureTaken(run)) return;                                      // Phase 102: it is in the fish's mouth
     G.scene.underwater.drawLure(ctx, c.bait || run.gearFx.bait, lx, ly); // Phase 22: the bait's own body
   }
   function isFloat(run) { return run.gearFx.swim === 'float' && (run.cast.bait || run.gearFx.bait) === run.gearFx.bait; }

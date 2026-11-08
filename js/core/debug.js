@@ -362,6 +362,12 @@ G.core.debug = (function () {
       });
       return out;
     },
+    // Phase 102: the last strike: style, the lunge's start off the lure (px) and length (s), where
+    // (x, depth m), the species, the lure in the mouth now, the burst's time left, and its sound.
+    strike: function () {
+      var st = G.scene.underwater.strike(), run = G.state.run, au = G.audio.engine.info();
+      return { n: st.n, style: st.style, off: st.off, lunge: st.lunge, x: st.x, depthM: st.y, species: st.sp, inMouth: G.scene.underwater.lureTaken(run), burst: +st.t.toFixed(2), sound: au.strike || null };
+    },
     who: function () {
       var run = G.state.run, ctx = run.school && run.school.ctx;
       if (!ctx) return 'no school yet';

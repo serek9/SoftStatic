@@ -1070,7 +1070,12 @@ G.scene.underwater = (function () {
       // Phase 28: the sim has a heading now, so the body faces where the fish faces (a fish
       // slipping back tail first in a current, or backing off the lure, keeps its facing).
       swimOne(bodies[i], f.uid, f.sp, f.x, f.y, f.face, false, 0, dt, f);
+      // Phase 102: at the lure (nibbling, set, biting) the sim's x is the fish's mouth: the body is
+      // drawn back from it by most of its half length, eased so the change never jumps.
+      var mo = MOUTH[f.state] ? -f.dir * bodies[i].len * 0.42 : 0;
+      bodies[i].moff = (bodies[i].moff || 0) + (mo - (bodies[i].moff || 0)) * Math.min(1, 7 * dt);
     }
+    if (strike.t > 0) strike.t = Math.max(0, strike.t - dt);
     var fsm = run.fsm, h = run.hook;
     if ((fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') && h.trash < 0) {
       // The hooked fish faces where the fight sends it (away pulling, home tired); its beat
@@ -1119,8 +1124,30 @@ G.scene.underwater = (function () {
       // Deeper than gearFx.nightDepth at night: only a silhouette.
       var dark = night && f.y > G.state.run.gearFx.nightDepth;
       var a = bodyArt(bd, 0);
-      drawSwimmer(ctx, FG.swimmer(f.sp, a.fr, dark, a.face < 0), f.x - camPx, loc.waterY - camPy + f.y, bd.pitch, a.face);
+      drawSwimmer(ctx, FG.swimmer(f.sp, a.fr, dark, a.face < 0), f.x + (bd.moff || 0) - camPx, loc.waterY - camPy + f.y, bd.pitch, a.face);
     }
+    // Phase 102: the strike's burst: short strokes out from the lure for STRIKE.burst s (softer
+    // under Reduce flashes), the bubbles and silt are fx.
+    if (strike.t > 0) {
+      var c = G.state.run.cast, u = strike.t / STRIKE.burst, rr = 3 + (1 - u) * 7, red = G.state.save.settings && G.state.save.settings.reduceFlashes;
+      ctx.fillStyle = P.bone; ctx.globalAlpha = u * (red ? 0.3 : 0.85);
+      for (var k = 0; k < 8; k++) {
+        var an = k * Math.PI / 4 + 0.39, ex = c.lx - camPx + Math.cos(an) * rr, ey = c.ly - camPy + Math.sin(an) * rr * 0.8;
+        ctx.fillRect(Math.round(ex * HI) / HI, Math.round(ey * HI) / HI, 1, 0.5); ctx.fillRect(Math.round((ex + Math.cos(an) * 1.5) * HI) / HI, Math.round((ey + Math.sin(an)) * HI) / HI, 0.5, 0.5);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+  var MOUTH = { nibble: 1, set: 1, bite: 1 };
+  // Phase 102: the last strike (dbg.strike): its style, how far the fish lunged from (px), the
+  // lunge's length (s), where, whether the lure is in its mouth, and the burst's time left.
+  var STRIKE = { burst: 0.3, kick: { tap: 2.5, thump: 5, slam: 7, mouth: 2 } };
+  var strike = { n: 0, t: 0, style: '', off: 0, lunge: 0, x: 0, y: 0, sp: '', at: 0 };
+  // The lure is in the biting fish's mouth once its lunge is done (sailing.js stops drawing it).
+  function lureTaken(run) {
+    if (run.bite.slot < 0) return false;
+    var f = run.school.fish[run.bite.slot], st = G.sim.fish_ai.M.strike[G.data.biteStyle(G.data.fish[f.sp])] || G.sim.fish_ai.M.strike.tap;
+    return f.state === 'bite' && f.t >= st.lunge;
   }
 
   // Draws a swimmer's canvas (view pixels) centred on world point (x, y): its middle across,
@@ -1521,6 +1548,14 @@ G.scene.underwater = (function () {
       else if (!biting && run.bite.slot >= 0) { // audit P1-4: a ring where the line goes in, and a dent (Phase 20)
         fx.ripple(run.cast.x1, loc.waterY + 1, 1, 7, 0.6);
         G.gfx.surface.poke(run.cast.x1, 0.3, 1.5);
+        // Phase 102: the strike: a burst of bubbles at the lure (silt too on the bed), the rod
+        // tip yanked down by the style and the fish's weight, and the burst drawn for 0.3 s.
+        var bf = run.school.fish[run.bite.slot], bsp = G.data.fish[bf.sp], bst = G.data.biteStyle(bsp), ms = G.sim.fish_ai.M.strike[bst] || G.sim.fish_ai.M.strike.tap;
+        fx.emit('bubbles', run.cast.lx, run.cast.ly - 1, bst === 'slam' ? 8 : 5);
+        if (run.cast.ly - loc.waterY >= bottomAt(loc, run.cast.lx) - 3) fx.emit('silt', run.cast.lx, run.cast.ly, 7);
+        G.gfx.rod.kick((STRIKE.kick[bst] || 3) * (0.5 + 0.5 * G.gfx.rod.fishLoad(bsp.mass, run.gearFx.maxMass)));
+        strike.n++; strike.t = STRIKE.burst; strike.style = bst; strike.off = ms.off; strike.lunge = ms.lunge; strike.x = +run.cast.lx.toFixed(1); strike.y = +((run.cast.ly - loc.waterY) * 0.25).toFixed(2); strike.sp = bsp.id;
+        strike.at = run.boat ? run.boat.t : 0;
       }
     } else if (fsm === 'hooked') {
       run.hook.t += dt;
@@ -1841,7 +1876,7 @@ G.scene.underwater = (function () {
       var a = bodyArt(bd, 0);
   return { uid: bd.uid, face: a.face, turn: bd.turnT > 0 ? +(1 - bd.turnT / bd.turnLen).toFixed(2) : 0, beatHz: +bd.hz.toFixed(2), phase: +bd.phase.toFixed(2),
         glide: bd.glide, pitch: +bd.pitch.toFixed(3), pitchRaw: bd.pitch + bd.jerk, frame: a.fr, mode: ['swim', 'shake', 'roll'][bd.mode], speed: +bd.spd.toFixed(2), vy: +bd.vy.toFixed(2), len: +bd.len.toFixed(1) };
-    }, drawLure: drawLure, drawFloat: drawFloat, lureImg: lureImg, lureFrame: lureFrame, hookIds: hookIds, hookKind: hookKind, BAITS: BAITS, DIRS: DIRS,
+    }, drawLure: drawLure, drawFloat: drawFloat, lureTaken: lureTaken, strike: function () { return strike; }, mouthOff: function (i) { return bodies[i] ? +(bodies[i].moff || 0).toFixed(2) : 0; }, lureImg: lureImg, lureFrame: lureFrame, hookIds: hookIds, hookKind: hookKind, BAITS: BAITS, DIRS: DIRS,
     body: function () { var c = G.state.run.cast; return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3), sink: +body.sink.toFixed(2), reach: reachName(c.x1), // Phase 77
       work: +(c.work === undefined ? 1 : c.work).toFixed(2), style: (run0().gearFx.lure && c.bait === run0().gearFx.bait && STYLE[run0().gearFx.swim]) || 'bait', // the user's fixes
       retrieve: +(c.rv || 0).toFixed(2), swing: !!c.swing, action: (hookIds(), LURE_OF[c.bait || G.state.run.gearFx.bait] ? (LURE_OF[c.bait || G.state.run.gearFx.bait].vary || LURE_OF[c.bait || G.state.run.gearFx.bait].swim) : 'bait'), frame: LURE_OF[c.bait || G.state.run.gearFx.bait] ? body.frame : -1, frames: LURE_OF[c.bait || G.state.run.gearFx.bait] ? LG.frames(c.bait || G.state.run.gearFx.bait) : 0, depthM: +((c.ly - G.data.locations[G.state.run.loc].waterY) * 0.25).toFixed(2) }; },

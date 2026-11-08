@@ -42,8 +42,8 @@ G.sim.fish_ai = (function () {
     // circle, nibble and bite; any other fish that notices the lure waits its turn in 'hold' at
     // holdR px from it (at most holdMax of them, each for its patience s), and the rest swim by,
     // keeping keepR px off the lure. After a suitor goes, the next turn waits turnGap s.
-    holdR: [30, 44], holdMax: 2, patience: [7, 13], turnGap: 0.6, keepR: 30,
-    circleW: 1.7,                 // rad/s: the slowest a suitor circles the lure
+    holdR: [34, 48], holdMax: 2, patience: [7, 13], turnGap: 0.6, keepR: 30, behindR: 22,
+    circleW: 1.6,                 // rad/s: the slowest a suitor circles the lure
     turnArrive: 1               // × the arrivals, so one-at-a-time keeps the bites a minute it had (--bite)
   };
   // Phase 28: how a fish swims. It has a heading (yaw: 0 swimming right, PI left, between them
@@ -63,11 +63,16 @@ G.sim.fish_ai = (function () {
     circleK: 2.5,                 // 1/s: circling, how hard it closes on its place on the circle
     lead: 0.35,                   // rad: circling, how far ahead on the circle it aims
     dartIn: 2, dartOut: 7, dartK: 9, // nibbling: px from the lure in and back out, and how fast
-    holdK: 6                      // 1/s: biting, how it holds at the lure
+    holdK: 6,                     // 1/s: biting, how it holds at the lure
+    // Phase 102 (PLAN_FISHING.md): the strike. After its last nibble a taker sets itself off px
+    // off the lure (its mouth, as the scene draws it, an off from the lure), still for t s, then
+    // lunges onto it in lunge s (up to lungeK x its top speed); by its bite style (G.data.biteStyle).
+    strike: { tap: { off: 5, t: 0.2, lunge: 0.1 }, thump: { off: 8, t: 0.4, lunge: 0.14 }, slam: { off: 14, t: 0.25, lunge: 0.12 }, mouth: { off: 6, t: 0.55, lunge: 0.3 } },
+    lungeK: 4
   };
-  var INTERESTED = { notice: 1, approach: 1, inspect: 1, nibble: 1, bite: 1, hold: 1 };
+  var INTERESTED = { notice: 1, approach: 1, inspect: 1, nibble: 1, set: 1, bite: 1, hold: 1 };
   // How interested a fish in each state is, for the dog (V3.8): 0..1.
-  var INTEREST = { hold: 0.3, notice: 0.4, approach: 0.5, inspect: 0.7, nibble: 0.85, bite: 1 };
+  var INTEREST = { hold: 0.3, notice: 0.4, approach: 0.5, inspect: 0.7, nibble: 0.85, set: 0.9, bite: 1 };
 
   // ---- Species selection ------------------------------------------------------------
 
@@ -258,8 +263,8 @@ G.sim.fish_ai = (function () {
 
   // Hovering at the lure (nibbling, biting): it faces the lure (f.dir) and holds or darts to
   // world x tx by fins, backing when it must, its velocity set straight.
-  function hover(f, sp, tx, ty, k, dt) {
-    var max = sp.speed * A.swimPx, yt = f.dir >= 0 ? 0 : PI, turn = (M.turn0 + M.turnK * sp.speed) * dt;
+  function hover(f, sp, tx, ty, k, dt, fast) {
+    var max = sp.speed * A.swimPx * (fast || 1), yt = f.dir >= 0 ? 0 : PI, turn = (M.turn0 + M.turnK * sp.speed) * dt;
     f.yaw += yt > f.yaw ? Math.min(turn, yt - f.yaw) : -Math.min(turn, f.yaw - yt);
     f.pitch += (0 - f.pitch) * Math.min(1, 3 * dt);
     var vx = (tx - f.x) * k, vy = (ty - f.y) * k;
@@ -311,7 +316,9 @@ G.sim.fish_ai = (function () {
             dist < sp.awareness * (lure.lure && interest(sp, lure.bait, true) === 2 ? W.lureLoved : 1) * (lure.lure ? W.workAware0 + (1 - W.workAware0) * work : 1)) {
           if (!school.suitor && school.gapT <= 0) { school.suitor = f.uid; setState(f, 'notice'); }   // Phase 101: its turn
           else if (holders(school) < A.holdMax) {                                                    // or it waits for one
+            var su = suitorOf(school);
             setState(f, 'hold'); f.side = dx >= 0 ? -1 : 1; f.holdR = rng.range(A.holdR[0], A.holdR[1]); f.patience = rng.range(A.patience[0], A.patience[1]);
+            if (su && (su.x - lure.x) * f.side > 0) f.holdR += A.behindR;                             // Phase 102: on the suitor's side it waits clear of its body
           } else f.pass = true;                                                                       // or it swims on
         }
         break;
@@ -371,12 +378,19 @@ G.sim.fish_ai = (function () {
         if (f.nibbleT <= 0) {
           f.nibbles++;
           f.nibbleT = f.nibbleLen = rng.range(0.25, 0.6);
-          if (f.nibbles >= f.nibbleN) setState(f, rng.next() >= sp.caution || f.eager ? 'bite' : 'leave'); // Phase 96.4: the first taker takes it
+          if (f.nibbles >= f.nibbleN) setState(f, rng.next() >= sp.caution || f.eager ? 'set' : 'leave'); // Phase 96.4: the first taker takes it; Phase 102: it sets itself to strike
         }
         break;
 
-      case 'bite':
-        hover(f, sp, lure.x - f.dir * 4, lure.y, M.holdK, dt);
+      case 'set': // Phase 102: still, a little off the lure, the moment before it strikes
+        var ss = M.strike[G.data.biteStyle(sp)] || M.strike.tap;
+        hover(f, sp, lure.x - f.dir * ss.off, lure.y, M.holdK, dt);
+        if (f.t >= ss.t) setState(f, 'bite');
+        break;
+
+      case 'bite': // Phase 102: the lunge onto the lure, then it holds it in its mouth
+        var sb = M.strike[G.data.biteStyle(sp)] || M.strike.tap, lunging = f.t < sb.lunge;
+        hover(f, sp, lure.x - f.dir, lure.y, lunging ? 3 / sb.lunge : M.holdK, dt, lunging ? M.lungeK : 1);
         if (f.t >= A.biteHold) setState(f, 'leave');
         break;
 
@@ -422,6 +436,7 @@ G.sim.fish_ai = (function () {
 
   // Phase 101: the turn. The suitor's turn ends when it is gone or no longer after the lure
   // (left, missed and wandering, hooked); after turnGap s the holder nearest the lure takes the next.
+  function suitorOf(school) { if (!school.suitor) return null; for (var i = 0; i < MAX; i++) if (school.fish[i].active && school.fish[i].uid === school.suitor) return school.fish[i]; return null; }
   function holders(school) { var n = 0; for (var i = 0; i < MAX; i++) if (school.fish[i].active && school.fish[i].state === 'hold') n++; return n; }
   function turnStep(school, lure, dt) {
     var i, f, on = false;
