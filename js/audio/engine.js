@@ -285,6 +285,7 @@ G.audio.engine = (function () {
     if (!ac || ac.state !== 'running' || !KIT) return;
     var run = G.state.run, s;
     switch (name) {
+      case 'cleanset': playBuf(pick(KIT.click[0]), 0.05, panAt(run.boat.x), 1.9); tone('triangle', 520, 880, 0.12, 0.03, panAt(run.boat.x), 0.02, bus.sfx); note('cleanset'); break; // Phase 107: a crisp click and a rising note
       case 'payout': playBuf(pick(KIT.click[0]), 0.012, panAt(run.boat.x), 2.3 + 0.4 * G.vrng.next()); note('payout'); break; // Phase 103: the open spool's soft clicks
       case 'rise': s = spotAt(x); playBuf(pick(KIT.rise), 0.03 * s.att, s.pan, 0.9 + 0.2 * G.vrng.next(), bus.water); note('rise'); break;
       case 'jump': waterSplash(a ? 1 : 0.6, x, a ? 'jumpin' : 'jumpout'); break; // a: back in (the biggest)

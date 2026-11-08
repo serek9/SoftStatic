@@ -1179,6 +1179,7 @@ G.scene.underwater = (function () {
       bodies[i].moff = (bodies[i].moff || 0) + (mo - (bodies[i].moff || 0)) * Math.min(1, 7 * dt);
     }
     if (strike.t > 0) strike.t = Math.max(0, strike.t - dt);
+    if (clean.t > 0) clean.t = Math.max(0, clean.t - dt);
     var fsm = run.fsm, h = run.hook;
     if ((fsm === 'hooked' || fsm === 'fighting' || fsm === 'landing') && h.trash < 0) {
       // The hooked fish faces where the fight sends it (away pulling, home tired); its beat
@@ -1242,6 +1243,14 @@ G.scene.underwater = (function () {
     }
   }
   var MOUTH = { nibble: 1, set: 1, bite: 1 };
+  // Phase 107: "Clean set" rises from where the hook was set, for 0.9 s.
+  function drawClean(ctx, camPx, camPy) {
+    if (clean.t <= 0) return;
+    var F = G.gfx.sprites.fine, w = F.measure('Clean set'), u = clean.t / 0.9;      // the fine font draws in the view's pixels
+    ctx.save(); ctx.scale(1 / HI, 1 / HI); ctx.globalAlpha = Math.min(1, u * 2);
+    F.drawText(ctx, 'Clean set', Math.round((clean.x - camPx) * HI - w / 2), Math.round((clean.y - camPy - 18 - (1 - u) * 6) * HI), 'signal_amber');
+    ctx.restore();
+  }
   // Phase 102: the last strike (dbg.strike): its style, how far the fish lunged from (px), the
   // lunge's length (s), where, whether the lure is in its mouth, and the burst's time left.
   var STRIKE = { burst: 0.3, kick: { tap: 2.5, thump: 5, slam: 7, mouth: 2 } };
@@ -1457,6 +1466,7 @@ G.scene.underwater = (function () {
     drawHeavy(ctx, loc, camPx, camPy, alpha);
     var tf = performance.now();
     drawFish(ctx, loc, camPx, camPy, t);
+    drawClean(ctx, camPx, camPy);                                                    // Phase 107
     stats.fishMs = performance.now() - tf; // Phase 27
 
     ctx.fillStyle = P.water_hi;
@@ -1506,6 +1516,10 @@ G.scene.underwater = (function () {
     if (G.scene.sailing.loc().ice) h.dist = Math.max(8, Math.abs(f.x - h.hx) + h.depth * 0.5);
     h.depth = f.y;
     h.how = howTaken(run, sp);                                                       // Phase 105: for the journal
+    if (b.t < CLEAN) {                                                               // Phase 107: a clean set: the word, a crisp click, the rod snapping up
+      clean.t = 0.9; clean.x = run.cast.lx; clean.y = run.cast.ly; clean.n++;
+      G.audio.engine.cue('cleanset'); G.gfx.rod.kick(-4);
+    }
     h.q = G.sim.economy.hookQ(sp, run.cast.bait, G.rng.next(), G.data); // Phase 44: the size curve; Phase 68: in the lure's sizes
     G.sim.economy.size(sp, h.q, h);
     h.pondK = -1;                                                                    // Phase 85: at the pond, the stocked fish it is
@@ -1522,6 +1536,15 @@ G.scene.underwater = (function () {
   // Phase 105: how a fish took the hook, in words for its journal page: the hook, how it was
   // moving, and where. E.g. "a Jighead hopped along the bed", "Nightcrawlers lying still on the bed".
   var ZONE_SAYS = ['on the bed', 'near the bed', 'in open water', 'on the top'];
+  // Phase 107 (PLAN_FISHING.md): a missed bite says how the fish took it and when to strike (at
+  // most once every MISS_GAP s); a set inside CLEAN s of the strike is a clean set (setT, drawn).
+  var MISS_SAYS = { tap: 'A tap and gone: strike at the first tap.', thump: 'A thump: strike as the line goes tight.', slam: 'It hit it and let go: strike at once.', mouth: 'It mouthed it: a slow pull, then strike.' };
+  var MISS_GAP = 20, missAt = -99, CLEAN = 0.4, clean = { t: 0, x: 0, y: 0, n: 0 };
+  function missSays(style, run) {
+    var t = run.boat ? run.boat.t : 0;
+    if (t - missAt < MISS_GAP || !MISS_SAYS[style]) return;
+    missAt = t; G.ui.hud.say(MISS_SAYS[style]);
+  }
   function howTaken(run, sp) {
     var li = run.lureIn, m = li.m, b = G.sim.economy.baitById(li.bait, G.data), name = b ? (b.name || 'the odd bait') : li.bait;
     if (!m) return '';
@@ -1678,8 +1701,10 @@ G.scene.underwater = (function () {
       followSays(run);                                                                 // Phase 105
       if (loc.pond && run.bite.slot < 0 && trashTouch(run, loc)) return;            // Phase 84: the lure on a piece of trash
       biteIn.reel = inp.held('action') || inp.pressed('action'); // Phase 88: a tap shorter than a step still sets the hook
-      var biting = run.bite.slot >= 0;
-      if (G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school) === G.sim.bite.HOOK) hook(run);
+      var biting = run.bite.slot >= 0, missStyle = biting ? strike.style : '';
+      var br = G.sim.bite.step(run.bite, biteIn, dt, G.rng, G.data, run.school);
+      if (br === G.sim.bite.HOOK) hook(run);
+      else if (br === G.sim.bite.MISS) missSays(missStyle, run);                      // Phase 107: how it took it, said
       else if (!biting && run.bite.slot >= 0) { // audit P1-4: a ring where the line goes in, and a dent (Phase 20)
         fx.ripple(run.cast.x1, loc.waterY + 1, 1, 7, 0.6);
         G.gfx.surface.poke(run.cast.x1, 0.3, 1.5);
@@ -2013,7 +2038,7 @@ G.scene.underwater = (function () {
       var a = bodyArt(bd, 0);
   return { uid: bd.uid, face: a.face, turn: bd.turnT > 0 ? +(1 - bd.turnT / bd.turnLen).toFixed(2) : 0, beatHz: +bd.hz.toFixed(2), phase: +bd.phase.toFixed(2),
         glide: bd.glide, pitch: +bd.pitch.toFixed(3), pitchRaw: bd.pitch + bd.jerk, frame: a.fr, mode: ['swim', 'shake', 'roll'][bd.mode], speed: +bd.spd.toFixed(2), vy: +bd.vy.toFixed(2), len: +bd.len.toFixed(1) };
-    }, drawLure: drawLure, drawFloat: drawFloat, lureTaken: lureTaken, moveOf: moveOf, MOVE: MOVE, strike: function () { return strike; }, mouthOff: function (i) { return bodies[i] ? +(bodies[i].moff || 0).toFixed(2) : 0; }, lureImg: lureImg, lureFrame: lureFrame, hookIds: hookIds, hookKind: hookKind, BAITS: BAITS, DIRS: DIRS,
+    }, drawLure: drawLure, drawFloat: drawFloat, lureTaken: lureTaken, moveOf: moveOf, MOVE: MOVE, strike: function () { return strike; }, clean: function () { return { n: clean.n, t: +clean.t.toFixed(2) }; }, mouthOff: function (i) { return bodies[i] ? +(bodies[i].moff || 0).toFixed(2) : 0; }, lureImg: lureImg, lureFrame: lureFrame, hookIds: hookIds, hookKind: hookKind, BAITS: BAITS, DIRS: DIRS,
     body: function () { var c = G.state.run.cast; return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3), sink: +body.sink.toFixed(2), reach: reachName(c.x1), // Phase 77
       work: +(c.work === undefined ? 1 : c.work).toFixed(2), style: (run0().gearFx.lure && c.bait === run0().gearFx.bait && STYLE[run0().gearFx.swim]) || 'bait', // the user's fixes
       retrieve: +(c.rv || 0).toFixed(2), swing: !!c.swing, action: (hookIds(), LURE_OF[c.bait || G.state.run.gearFx.bait] ? (LURE_OF[c.bait || G.state.run.gearFx.bait].vary || LURE_OF[c.bait || G.state.run.gearFx.bait].swim) : 'bait'), frame: LURE_OF[c.bait || G.state.run.gearFx.bait] ? body.frame : -1, frames: LURE_OF[c.bait || G.state.run.gearFx.bait] ? LG.frames(c.bait || G.state.run.gearFx.bait) : 0, depthM: +((c.ly - G.data.locations[G.state.run.loc].waterY) * 0.25).toFixed(2) }; },

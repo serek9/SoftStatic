@@ -79,7 +79,7 @@ G.sim.fish_ai = (function () {
   // caller) the appeal is 1 and the fish take it as before.
   var F = { bedPx: 2.5, lowPx: 10, topPx: 4, paceAt: [1.5, 6, 14], near: 0.55, far: 0.15, trigK: 0.3, trigMax: 2,
     pauseRun: 0.8, pauseMax: 2.5, pauseMin: 0.15, bedT: 1, weightK: 0.75, loudK: 1.3,
-    followV: 6, followGap: 12, followMax: 6, strikeStill: 0.25, deadAfter: 1.5, deadK: 0.25, chaseHit: 0.6, slowK: 0.5 };
+    followV: 6, followGap: 12, followMax: 8, strikeStill: 0.25, deadAfter: 1.5, deadK: 0.25, chaseHit: 0.9, slowK: 0.5 };
   var ZONES = ['bed', 'low', 'mid', 'top'], PACES = ['still', 'slow', 'steady', 'fast'];
   function zoneOf(lure, school) {
     if (lure.y < F.topPx || (lure.m && lure.m.surface)) return 3;
