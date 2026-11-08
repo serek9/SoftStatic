@@ -268,6 +268,7 @@ G.sim.economy = (function () {
       j.sized = (j.sized || 0) + 1;
     }
     if (c.bait) { if (!j.took) j.took = []; if (j.took.indexOf(c.bait) < 0) j.took.push(c.bait); } // Phase 43: what it was caught on
+    if (c.how) { if (!j.ways) j.ways = []; if (j.ways.indexOf(c.how) < 0) { j.ways.unshift(c.how); if (j.ways.length > 3) j.ways.length = 3; } } // Phase 105: how it took it, the last three ways
     if (choice === 'sell') save.coins += c.price;
     else if (choice === 'release') j.released = (j.released || 0) + 1;
     else save.kept.push({ id: c.id, len: c.len, w: c.w });

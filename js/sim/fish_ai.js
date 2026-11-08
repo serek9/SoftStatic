@@ -70,9 +70,53 @@ G.sim.fish_ai = (function () {
     strike: { tap: { off: 5, t: 0.2, lunge: 0.1 }, thump: { off: 8, t: 0.4, lunge: 0.14 }, slam: { off: 14, t: 0.25, lunge: 0.12 }, mouth: { off: 6, t: 0.55, lunge: 0.3 } },
     lungeK: 4
   };
-  var INTERESTED = { notice: 1, approach: 1, inspect: 1, nibble: 1, set: 1, bite: 1, hold: 1 };
+  // ---- Phase 105 (PLAN_FISHING.md): how each species takes it -------------------------
+  // lure.m (the scene's motion of the hook, underwater.motionStep) is scored against the species'
+  // feeding (G.data.feedOf: zone, pace, triggers, follows): appeal = zone x pace + trigK per
+  // trigger it sets off (at most trigMax of them). Where the hook is: top (under 1 m), bed (within
+  // bedPx of the bottom), low (within lowPx), mid. Its pace: still, slow, steady, fast (paceAt px/s).
+  // Same zone or pace 1, next to it near, else far. Without lure.m (the balance model, an old
+  // caller) the appeal is 1 and the fish take it as before.
+  var F = { bedPx: 2.5, lowPx: 10, topPx: 4, paceAt: [1.5, 6, 14], near: 0.55, far: 0.15, trigK: 0.3, trigMax: 2,
+    pauseRun: 0.8, pauseMax: 2.5, pauseMin: 0.15, bedT: 1, weightK: 0.75, loudK: 1.3,
+    followV: 6, followGap: 12, followMax: 6, strikeStill: 0.25, deadAfter: 1.5, deadK: 0.25, chaseHit: 0.6, slowK: 0.5 };
+  var ZONES = ['bed', 'low', 'mid', 'top'], PACES = ['still', 'slow', 'steady', 'fast'];
+  function zoneOf(lure, school) {
+    if (lure.y < F.topPx || (lure.m && lure.m.surface)) return 3;
+    var gap = floor(school, lure.x) - lure.y;
+    return gap <= F.bedPx || (lure.m && lure.m.onBed) ? 0 : (gap <= F.lowPx ? 1 : 2);
+  }
+  function paceOf(m) { var v = m.falling ? Math.max(m.speed, F.paceAt[0] + 0.1) : m.speed; return v < F.paceAt[0] ? 0 : (v < F.paceAt[1] ? 1 : (v < F.paceAt[2] ? 2 : 3)); }
+  function near(a, b) { return a === b ? 1 : (Math.abs(a - b) === 1 ? F.near : F.far); }
+  // The triggers the hook sets off now, as a count of those the species answers.
+  function triggers(fd, m) {
+    var n = 0, t = fd.triggers;
+    for (var i = 0; i < t.length; i++) {
+      var k = t[i];
+      if ((k === 'fall' && m.falling) || (k === 'flash' && m.flash > 0.5) || (k === 'thump' && m.thump > 0.5) ||
+          (k === 'bed' && m.bedT < F.bedT) || (k === 'scent' && (m.live || m.quiver)) || (k === 'top' && m.surface && (m.speed > 1 || m.thump > 0)) ||
+          (k === 'pause' && m.still > F.pauseMin && m.still < F.pauseMax && m.lastRun >= F.pauseRun)) n++;
+    }
+    return n;
+  }
+  function appeal(sp, lure, school) {
+    var m = lure.m;
+    if (!m) return 1;
+    var fd = G.data.feedOf(sp), fp = PACES.indexOf(fd.pace), pc = paceOf(m);
+    var pk = m.live && pc === 0 && fp === 1 ? 1 : near(fp, pc);                       // a live bait wriggles: still to the eye, alive to a slow feeder
+    var v = near(ZONES.indexOf(fd.zone), zoneOf(lure, school)) * pk + F.trigK * Math.min(F.trigMax, triggers(fd, m));
+    if (!m.live && !m.quiver && m.speed < 0.4 && !m.falling && m.still > F.deadAfter) v *= F.deadK; // a lure left lying dead is soon seen for what it is
+    return v;
+  }
+  // What a fish makes of the hook now, 0..1: its appeal, times how well a lure is worked as before.
+  function effOf(sp, lure, school) {
+    var a = Math.min(1, appeal(sp, lure, school));
+    return lure.lure ? a * (0.6 + 0.4 * (lure.work === undefined ? 1 : lure.work)) : a;
+  }
+
+  var INTERESTED = { notice: 1, approach: 1, follow: 1, inspect: 1, nibble: 1, set: 1, bite: 1, hold: 1 };
   // How interested a fish in each state is, for the dog (V3.8): 0..1.
-  var INTEREST = { hold: 0.3, notice: 0.4, approach: 0.5, inspect: 0.7, nibble: 0.85, set: 0.9, bite: 1 };
+  var INTEREST = { hold: 0.3, notice: 0.4, approach: 0.5, follow: 0.75, inspect: 0.7, nibble: 0.85, set: 0.9, bite: 1 };
 
   // ---- Species selection ------------------------------------------------------------
 
@@ -94,6 +138,7 @@ G.sim.fish_ai = (function () {
     }
     if (hm.timeLikes.length) v *= hm.timeLikes.indexOf(Math.floor(ctx.hour)) >= 0 ? W.hourLiked : W.hourOther;
     if (f.turnUp) v *= f.turnUp;
+    if (ctx.motion) v *= (1 - F.weightK) + F.weightK * Math.min(1, appeal(f, ctx.motion, ctx.school)); // Phase 105: the way it is fished draws its fish
     if (ctx.pondN) v *= ctx.pondN[f.id];                                               // Phase 85: how many of it are in the pond                                                       // Phase 80: the (Ice) species' rarity
     full = v;
     if (COVER[0] < 1) v *= Math.pow(COVER[0], W.coverK);                                // Phase 69: only the fish of its sizes come
@@ -285,7 +330,7 @@ G.sim.fish_ai = (function () {
     f.flow = school.ctx.flowAt ? school.ctx.flowAt(f.x, f.y) : 0;
     if (!lure.active && f.state !== 'leave') setState(f, 'leave'); // reeled in: everyone drifts off
     // The user's fixes: a lure gone dead in the water loses the fish after it.
-    var work = lure.lure ? (lure.work === undefined ? 1 : lure.work) : 1;
+    var work = effOf(sp, lure, school); // Phase 105: what this species makes of it (was the lure's work alone)
     if (INTERESTED[f.state] && f.state !== 'bite') { f.dead = work < W.workMin ? f.dead + dt : 0; if (f.dead > A.deadGive) setState(f, 'leave'); }
 
     switch (f.state) {
@@ -312,8 +357,9 @@ G.sim.fish_ai = (function () {
         var gw = speed * 0.35, fa = Math.abs(f.flow), drawn = lure.active && Math.abs(dx) < sp.awareness * A.scent && f.dir * dx > 0 && dist >= A.keepR;
         if (fa > 0.5 && !drawn && f.dir * f.flow > 0 && gw > fa * 0.8) gw = fa * 0.8;
         swim(f, sp, f.dir * gw, (f.home - f.y) * 0.5, speed, true, dt);
+        var loud = lure.m && G.data.feedOf(sp).triggers.length && triggers(G.data.feedOf(sp), lure.m) > 0 ? F.loudK : 1; // Phase 105: a flash or a thump it answers draws it from farther
         if (lure.active && !f.pass && work >= W.workMin && baitOk(sp, lure.bait, lure.lure) &&
-            dist < sp.awareness * (lure.lure && interest(sp, lure.bait, true) === 2 ? W.lureLoved : 1) * (lure.lure ? W.workAware0 + (1 - W.workAware0) * work : 1)) {
+            dist < sp.awareness * loud * (lure.lure && interest(sp, lure.bait, true) === 2 ? W.lureLoved : 1) * (lure.m || lure.lure ? W.workAware0 + (1 - W.workAware0) * work : 1)) {
           if (!school.suitor && school.gapT <= 0) { school.suitor = f.uid; setState(f, 'notice'); }   // Phase 101: its turn
           else if (holders(school) < A.holdMax) {                                                    // or it waits for one
             var su = suitorOf(school);
@@ -339,6 +385,7 @@ G.sim.fish_ai = (function () {
         break;
 
       case 'approach': // toward the lure in bursts, slowing as it arrives
+        if (lure.m && G.data.feedOf(sp).follows && lure.m.speed > F.followV && !f.eager && dist < A.inspectR * 3) { setState(f, 'follow'); f.followed = 1; break; } // Phase 105: a predator gives chase
         var ar = dist < M.arrive ? Math.max(0.3, dist / M.arrive) : 1;
         swim(f, sp, dx / dist * speed * 0.6 * ar, dy / dist * speed * 0.6 * ar, speed, true, dt);
         if (dist < A.inspectR + 2) {
@@ -348,6 +395,14 @@ G.sim.fish_ai = (function () {
           f.swept = 0;
           f.dir = rng.next() < 0.5 ? 1 : -1; // which way round
         }
+        break;
+
+      case 'follow': // Phase 105: on the lure's tail as it runs; it strikes the moment the lure stops or drops, and turns away if it runs on too long
+        var mv = lure.m, back = mv && Math.abs(mv.vx) > 0.5 ? (mv.vx > 0 ? -1 : 1) : (f.x < lure.x ? -1 : 1);
+        f.dir = back > 0 ? -1 : 1;
+        swim(f, sp, (lure.x + back * F.followGap - f.x) * 3 + (mv ? mv.vx : 0), (lure.y - f.y) * 3, speed * 1.3, false, dt);
+        if ((mv && (mv.still > F.strikeStill || mv.speed < F.followV * F.slowK || (mv.falling && mv.speed < F.followV))) || (f.t > 0.6 && rng.next() < F.chaseHit * dt)) { f.dir = f.x < lure.x ? 1 : -1; setState(f, 'set'); break; } // the pause makes it strike; some hit it on the run
+        if (f.t > F.followMax || (mv && mv.speed < 0.5 && f.t > 1)) { setState(f, 'leave'); f.shied = 2; } // ran on too long: it turns away (a near miss)
         break;
 
       case 'inspect': // circle the lure circles times (a flattened circle), steering after a point on it
@@ -459,6 +514,7 @@ G.sim.fish_ai = (function () {
   function stepSchool(school, lure, dt, rng, data) {
     school.ctx.reach = data.reachAt(data.locations[school.ctx.loc], lure.x); // Phase 75: the reach the lure is in
     if (!lure.active) { school.suitor = 0; school.gapT = 0; } else turnStep(school, lure, dt);
+    school.ctx.motion = lure.active && lure.m ? lure : null; school.ctx.school = school; // Phase 105: the hook's motion, for which fish come (weightOf)
     if (lure.active && school.ctx.first) firstTaker(school, lure, dt, rng, data);
     else if (!lure.active) { school.firstSent = false; school.firstT = 0; }
     if (lure.active) {
@@ -514,6 +570,7 @@ G.sim.fish_ai = (function () {
     MAX: MAX, W: W, A: A, M: M, FIRST: FIRST,
     weightOf: weightOf, speciesWeights: speciesWeights, pickSpecies: pickSpecies,
     createSchool: createSchool, spawn: spawn, stepFish: stepFish, stepSchool: stepSchool,
+    appeal: appeal, effOf: effOf, F: F, zoneOf: zoneOf,
     interest: interest, count: count, interested: interested, interestLevel: interestLevel, scatter: scatter, clear: clear, holders: holders
   };
 })();

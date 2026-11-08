@@ -232,6 +232,7 @@ G.ui.journal = (function () {
     if (j.hints.indexOf('depth') < 0) note('depth');                // Phase 75: where, how deep and when, from the first catch
     if (sp.ice) para(ICE_SAYS[sp.turnUpName] || '', 'wood', true);   // Phase 80: how often it turns up under the ice
     sizesNote(sp, j, para);
+    if (j.ways && j.ways.length) para('Took ' + j.ways.join('; ') + '.', 'wood', true); // Phase 105: how it took the hook
     if (sp.trophyKg && j.bestW >= sp.trophyKg) para('The ice monster. ' + j.bestW.toFixed(2) + ' kg, out of a hole in the ice.', 'rust', true); // Phase 80: the one named trophy
   }
   // Phase 85: the size classes caught, of those the species comes in; and the STOCK row's state.

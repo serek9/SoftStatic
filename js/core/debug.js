@@ -388,11 +388,12 @@ G.core.debug = (function () {
       var rn = ''; (L.reaches || []).forEach(function (r) { if (r.id === rid) rn = r.name; });
       var c = { species: ctx.species, loc: lc, reach: rid, depthM: run.lureIn && run.lureIn.active ? run.lureIn.y * 0.25 : null,
         hour: G.state.save.clock, bait: run.gearFx.bait, lure: run.gearFx.lure, rodMaxMass: run.gearFx.maxMass,
-        smallBoost: run.gearFx.smallBoost, smallMass: run.gearFx.smallMass, weights: null };
+        smallBoost: run.gearFx.smallBoost, smallMass: run.gearFx.smallMass, weights: null,
+        motion: run.lureIn && run.lureIn.active && run.lureIn.m ? run.lureIn : null, school: run.school }; // Phase 105: weighed by how the hook moves now
       var total = G.sim.fish_ai.speciesWeights(c), out = [], heavy = [];
       for (var i = 0; i < c.species.length; i++) {
         var sp = c.species[i];
-        if (c.weights[i] > 0) out.push({ id: sp.id, chance: +(c.weights[i] / total).toFixed(3), weight: +c.weights[i].toFixed(3) });
+        if (c.weights[i] > 0) out.push({ id: sp.id, chance: +(c.weights[i] / total).toFixed(3), weight: +c.weights[i].toFixed(3), appeal: c.motion ? +G.sim.fish_ai.appeal(sp, c.motion, run.school).toFixed(2) : null });
         else if (G.data.homeOf(sp, c.loc, c.reach) && sp.mass > c.rodMaxMass && G.sim.fish_ai.weightOf(sp, c) > 0) heavy.push(sp.id);
       }
       out.sort(function (a, b) { return b.chance - a.chance; });

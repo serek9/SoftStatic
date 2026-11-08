@@ -27,6 +27,7 @@ G.ui.card = (function () {
       price: G.sim.economy.price(sp, h.q, G.data), isNew: !j || !j.caught, isRecord: !!j && j.caught > 0 && h.w > j.bestW,
       windowCatch: win,
       bait: G.state.run && G.state.run.cast ? G.state.run.cast.bait : '', // Phase 43: what it was caught on (the journal's "Caught on")
+      how: h.how || '', // Phase 105: how it took it (underwater.hook)
       pondK: h.pondK >= 0 ? h.pondK : -1, // Phase 85: one of the Back Pond's own fish (no SELL: stocking is free)
       trophy: h.w >= G.sim.pond.trophyKg(sp),
       bonus: (!j || !j.caught) && !(h.pondK >= 0) ? G.sim.economy.firstBonus(sp, G.data) : 0 // Phase 94.2: paid with any choice
