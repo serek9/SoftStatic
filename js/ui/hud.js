@@ -280,12 +280,14 @@ G.ui.hud = (function () {
       var held = I.held(p.act);
       ctx.globalAlpha = a * 0.85;
       keyBox(ctx, p.x, p.y, p.w, p.h, held);
-      arrow(ctx, p, p.act, held ? 'signal_amber' : 'fog_light');
+      if (L.mode === 'boat' && p.act === 'down') F.drawText(ctx, 'LINE', p.x + ((p.w - F.measure('LINE')) >> 1), p.y + ((p.h - F.FONT_H) >> 1), held ? 'signal_amber' : 'fog_light'); // Phase 103
+      else arrow(ctx, p, p.act, held ? 'signal_amber' : 'fog_light');
     }
     if (L.act.on) {
       var r = L.act, wd = word(), down = I.held('action');
       ctx.globalAlpha = a * (wd ? 0.85 : 0.4);
-      ctx.drawImage(roundImg(r.w, down), r.x, r.y);
+      var strikeOn = wd === 'HOOK' && ((G.state.run.bite.t * 6.6) % 1) < 0.5;                         // Phase 102: HOOK pulses while a fish has it
+      ctx.drawImage(roundImg(r.w, down || strikeOn), r.x, r.y);
       if (!wd && L.mode === 'room') wd = 'WALK';                                    // 90.4: never an empty circle in a room
       if (wd) F.bold(ctx, wd, r.x + ((r.w - F.measureBold(wd)) >> 1), r.y + ((r.h - F.FONT_H) >> 1), down ? 'signal_amber' : (word() ? 'bone' : 'fog_mid'));
     }

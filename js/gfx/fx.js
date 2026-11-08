@@ -6,8 +6,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.gfx = G.gfx || {};
 G.gfx.fx = (function () {
   var MAX = 256;
-  var SPLASH = 0, WAKE = 1, BUBBLE = 2, DUST = 3, SNOW = 4;
-  var KINDS = { splash: SPLASH, wake: WAKE, bubbles: BUBBLE, dust: DUST, snow: SNOW };
+  var SPLASH = 0, WAKE = 1, BUBBLE = 2, DUST = 3, SNOW = 4, SILT = 5;
+  var KINDS = { splash: SPLASH, wake: WAKE, bubbles: BUBBLE, dust: DUST, snow: SNOW, silt: SILT };
   // Phase 81: on the ice (frozen) nothing ripples, and what would splash or wake on open water
   // throws up snow instead.
   var frozen = false;
@@ -17,7 +17,8 @@ G.gfx.fx = (function () {
     { color: 'water_hi', life0: 0.6, life1: 1.2, sp0: 3, sp1: 10, grav: 0 },       // wake: slow sideways spread
     { color: 'fog_mid', life0: 1.0, life1: 2.2, sp0: 6, sp1: 14, grav: -6 },       // bubbles: rise and wobble
     { color: 'paper', life0: 2.0, life1: 4.0, sp0: 1, sp1: 4, grav: 0 },           // dust: drifts in the air
-    { color: 'snow_lit', life0: 0.3, life1: 0.8, sp0: 8, sp1: 30, grav: 70 }       // snow: chips and spray, thrown up, falling back (Phase 81)
+    { color: 'snow_lit', life0: 0.3, life1: 0.8, sp0: 8, sp1: 30, grav: 70 },      // snow: chips and spray, thrown up, falling back (Phase 81)
+    { color: 'wood_mid', life0: 0.9, life1: 1.8, sp0: 2, sp1: 7, grav: 3 }          // silt: Phase 102, a puff off the bed under water, settling
   ];
 
   var x = new Float32Array(MAX), y = new Float32Array(MAX);
@@ -86,6 +87,7 @@ G.gfx.fx = (function () {
       vy[i] += SPEC[k].grav * dt;
       if (k === BUBBLE) { phase[i] += dt * 6; x[i] += (Math.sin(phase[i]) * 6 + flow) * dt; } // Phase 22: carried by the current
       else if (k === WAKE) { vx[i] *= 1 - 1.5 * dt; }
+      else if (k === SILT) { vx[i] *= 1 - 2 * dt; vy[i] *= 1 - 2 * dt; } // Phase 102: a puff of silt slows and hangs
       x[i] += vx[i] * dt;
       y[i] += vy[i] * dt;
     }

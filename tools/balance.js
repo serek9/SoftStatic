@@ -556,6 +556,28 @@ const P = {
 // next tier of gear (the creek after the first line, Russetwood after the Pines).
 const PLAN = ['line', 'creek', 'reel', 'rod', 'fluoro', 'line', 'rod', 'reel', 'pines', 'russet', 'line', 'rod', 'reel', 'line', 'rod', 'reel', 'sound', 'snow', 'tamarack'];
 
+// Phase 105 (PLAN_FISHING.md): the model's hook moves as the game's does when fished as it should
+// be (underwater.motionStep's cast.m): a worm lies still and smells, a minnow swims (steady,
+// flashing and thumping), a cricket floats; a lure is worked in its own style (MODEL_STYLE: its
+// speed px/s, falling, on the bed, flash, thump, and a pause after a run for the stop-and-go ones).
+const MODEL_STYLE = {
+  float: { speed: 0.5 }, dive: { speed: 10, flash: 0.4, thump: 1 }, mid: { speed: 9, flash: 1, thump: 0.6 },
+  kick: { speed: 9, flash: 0.3, thump: 0.9 }, flutter: { speed: 4, falling: true, flash: 1 }, dropshot: { speed: 0.5, onBed: true, quiver: 1 },
+  wacky: { speed: 2, falling: true, quiver: 1 }, lift: { speed: 5, falling: true, bed: true, thump: 0.3, pause: true },
+  rattle: { speed: 7, bed: true, thump: 1, flash: 0.7, pause: true }, glide: { speed: 8, flash: 0.5, thump: 0.3 }, top: { speed: 3, surface: true, thump: 0.6 }
+};
+function modelMotion(lure, fx, bait) {
+  const m = lure.m || (lure.m = { vx: 0, lastRun: 0, speed: 0, vy: 0, falling: false, onBed: false, still: 0, runT: 0, surface: false, flash: 0, thump: 0, live: 0, bedT: 99, quiver: 0 });
+  if (!fx.lure) {
+    const minnow = bait === 'minnow', cricket = bait === 'cricket';
+    m.speed = minnow ? 5 : 0; m.falling = false; m.onBed = false; m.still = minnow ? 0 : 5; m.lastRun = 0; m.surface = cricket;
+    m.flash = minnow ? 0.4 : 0; m.thump = minnow ? 0.7 : (cricket ? 0.4 : 0); m.live = 1; m.bedT = 99; return;
+  }
+  const S = MODEL_STYLE[fx.vary] || MODEL_STYLE[fx.swim] || { speed: 5 };
+  m.speed = S.speed; m.falling = !!S.falling; m.onBed = !!S.onBed; m.surface = !!S.surface; m.flash = S.flash || 0; m.thump = S.thump || 0; m.live = fx.swim === 'float' ? 1 : 0;
+  m.bedT = S.bed ? 0.5 : 99; m.still = S.pause ? 0.5 : 0; m.lastRun = S.pause ? 1 : 0; m.quiver = S.quiver || 0;
+}
+
 function session(G, seed, opts) {
   const S = G.sim, rng = new G.core.rng.Rng(seed), data = G.data;
   const save = G.core.save.defaults();
@@ -625,6 +647,7 @@ function session(G, seed, opts) {
     c.attract = fx.attract; c.depthM = lure.y * 0.25; c.first = !S.economy.anyCaught(save); // Phase 96.4
     c.lure = lure.lure = fx.lure; c.smallBoost = fx.smallBoost; c.smallMass = fx.smallMass; // Phase 43
     c.lineSeen = fx.lineSeen && !(opts && opts.unseen); // Phase 53
+      if (lure.active) { modelMotion(lure, fx, lure.bait); if (opts && opts.dead) { const m = lure.m; m.speed = 0; m.falling = false; m.still = 9; m.lastRun = 0; m.flash = 0; m.thump = 0; m.bedT = 99; m.onBed = false; m.surface = false; m.quiver = 0; } } // Phase 105: how the hook moves (--feed: left dead)
     st.t += DT;
     switch (st.phase) {
       case 'cast':
@@ -688,7 +711,7 @@ function session(G, seed, opts) {
     }
   }
 
-  return { st, save, school, bite, step, run(seconds, until) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) { step(); if (until && until(st, save)) break; } return st; } };
+  return { st, save, school, bite, lure, step, run(seconds, until) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) { step(); if (until && until(st, save)) break; } return st; } };
 }
 
 // ---- --tackle (Phase 43) ---------------------------------------------------------------------
@@ -980,6 +1003,103 @@ function firstCheck() {
   const off = after === 0;
   console.log((off ? 'PASS ' : 'FAIL ') + 'the first-taker bias is off once a fish is landed (fish_ai ctx.first false on all ' + seeds.length + ')');
   return ok && off ? 0 : 1;
+}
+
+// ---- --bite (Phase 101, PLAN_FISHING.md) ---------------------------------------------------
+// One fish at a time: 20 seeds x 10 min at three waters (Fogbound on worms, the creek on worms,
+// the Pines on minnows; the Graphite Rod). At every bite exactly one fish (not leaving) within
+// NEAR px of the lure; two or more within NEAR px in under 2% of the steps the lure is in; and
+// the bites a minute (printed) against BITE_BASE, today's, within +-15%.
+const BITE = { near: 24, seeds: 20, minutes: 10, waters: [['fog', 'worm'], ['creek', 'worm'], ['pines', 'minnow']] };
+const BITE_BASE = { fog: 1.11, creek: 1.19, pines: 1.07 }; // bites a minute per water before Phase 101 (measured 2026-11-08)
+function biteStats(loc, bait, seeds, minutes) {
+  let bites = 0, crowdAtBite = 0, steps = 0, crowded = 0, maxAtBite = 0;
+  for (let k = 1; k <= seeds; k++) {
+    const G = load(), s = session(G, k * 37 + 5, { loc, rod: 2, bait, stay: true, shop: false });
+    let last = -1;
+    const n = Math.round(minutes * 60 * 60);
+    for (let i = 0; i < n; i++) {
+      s.step();
+      const L = s.school.fish, lure = s.st.phase === 'wait' || s.st.phase === 'sink';
+      if (!lure) { last = s.bite.slot; continue; }
+      const lx = BITE_LURE(s), near = L.filter(f => f.active && f.state !== 'leave' && Math.hypot(f.x - lx[0], f.y - lx[1]) < BITE.near).length;
+      steps++; if (near >= 2) crowded++;
+      if (s.bite.slot >= 0 && last < 0) { bites++; if (near !== 1) crowdAtBite++; maxAtBite = Math.max(maxAtBite, near); }
+      last = s.bite.slot;
+    }
+  }
+  return { perMin: bites / (seeds * minutes), bites, crowdAtBite, maxAtBite, crowdedShare: crowded / Math.max(1, steps) };
+}
+function BITE_LURE(s) { return [s.lure.x, s.lure.y]; }
+function biteCheck() {
+  let bad = 0;
+  for (const [loc, bait] of BITE.waters) {
+    const r = biteStats(loc, bait, BITE.seeds, BITE.minutes);
+    const one = r.crowdAtBite === 0, calm = r.crowdedShare < 0.02;
+    const base = BITE_BASE && BITE_BASE[loc], rate = !base || Math.abs(r.perMin - base) / base <= 0.15;
+    console.log((one && calm && rate ? 'PASS ' : 'FAIL ') + loc + ' (' + bait + '): ' + r.bites + ' bites, ' + r.perMin.toFixed(2) + '/min' + (base ? ' (was ' + base.toFixed(2) + ')' : '') +
+      '; bites with other fish within ' + BITE.near + ' px: ' + r.crowdAtBite + ' (most ' + r.maxAtBite + '); steps with 2+ near: ' + (r.crowdedShare * 100).toFixed(1) + '%');
+    if (!(one && calm && rate)) bad++;
+  }
+  return bad ? 1 : 0;
+}
+
+// ---- --feed (Phase 105, PLAN_FISHING.md) ----------------------------------------------------
+// Every species against the ways a hook can be fished (FEED_WAYS: where it is and how it moves).
+// 1. Each species has a way it takes well (appeal >= 1) and turns down a dead lure in open water
+//    (< 0.2) unless it feeds on still things. 2. Each way is in the top three of some species.
+// 3. In play (the model, 10 seeds x 10 min): a lure worked in its style draws at least twice the
+//    bites of the same lure left dead, at the water it suits.
+const FEED_WAYS = {
+  'worm still on the bed': { y: 98, m: { live: 1, still: 9 } },
+  'worm hanging mid-water': { y: 50, m: { live: 1, still: 9 } },
+  'minnow swimming': { y: 50, m: { live: 1, speed: 5, flash: 0.4, thump: 0.7 } },
+  'cricket on the top': { y: 1, m: { live: 1, surface: true, still: 9, thump: 0.4 } },
+  'jig hopped on the bed': { y: 98.5, m: { speed: 5, falling: true, bedT: 0.5, thump: 0.3, still: 0.5, lastRun: 1 } },
+  'crank run steady': { y: 70, m: { speed: 10, flash: 0.4, thump: 1 } },
+  'spinner run fast': { y: 50, m: { speed: 16, flash: 1, thump: 0.6 } },
+  'spoon fluttering down': { y: 60, m: { speed: 4, falling: true, flash: 1 } },
+  'dropshot on the bed': { y: 98, m: { speed: 0.5, onBed: true, quiver: 1 } },
+  'wacky worm falling': { y: 70, m: { speed: 2, falling: true, quiver: 1 } },
+  'popper on the top': { y: 1, m: { speed: 6, surface: true, thump: 0.6 } },
+  'bladebait lifted': { y: 92, m: { speed: 7, bedT: 0.5, thump: 1, flash: 0.7, still: 0.5, lastRun: 1 } },
+  'swimbait run steady': { y: 50, m: { speed: 9, flash: 0.3, thump: 0.9 } },
+  'lure dead mid-water': { y: 50, m: { still: 9 } }
+};
+function feedCheck() {
+  const G = load(), A = G.sim.fish_ai, school = { ctx: { maxDepthPx: 100, floorAt: null } }, ways = Object.keys(FEED_WAYS), favs = {};
+  ways.forEach(w => favs[w] = []);
+  let bad = 0, noGood = [], takesDead = [];
+  for (const sp of G.data.fish) {
+    const sc = ways.map(w => { const W = FEED_WAYS[w], m = Object.assign({ vx: 0, lastRun: 0, speed: 0, vy: 0, falling: false, onBed: false, still: 0, runT: 0, surface: false, flash: 0, thump: 0, live: 0, bedT: 99 }, W.m); return [w, A.appeal(sp, { x: 0, y: W.y, m }, school)]; }).sort((a, b) => b[1] - a[1]);
+    if (sc[0][1] < 1) noGood.push(sp.id);
+    const dead = sc.find(r => r[0] === 'lure dead mid-water')[1];
+    if (dead >= 0.2 && G.data.feedOf(sp).pace !== 'still') takesDead.push(sp.id);
+    for (let q = 0; q < 3; q++) favs[sc[q][0]].push(sp.id);
+  }
+  console.log((noGood.length ? 'FAIL ' : 'PASS ') + 'every species has a way it takes well (appeal >= 1)' + (noGood.length ? ': not ' + noGood.join(' ') : ''));
+  console.log((takesDead.length ? 'FAIL ' : 'PASS ') + 'a dead lure in open water is turned down by every fish that wants it moving' + (takesDead.length ? ': ' + takesDead.join(' ') : ''));
+  if (noGood.length || takesDead.length) bad++;
+  const orphan = ways.filter(w => w !== 'lure dead mid-water' && !favs[w].length);
+  console.log((orphan.length ? 'FAIL ' : 'PASS ') + 'every way of fishing is in some species\' top three' + (orphan.length ? ': not ' + orphan.join(', ') : ''));
+  for (const w of ways) if (w !== 'lure dead mid-water') console.log('     ' + w + ': ' + favs[w].length + ' (' + favs[w].slice(0, 6).join(' ') + (favs[w].length > 6 ? ' ...' : '') + ')');
+  if (orphan.length) bad++;
+  for (const [loc, hook, rod] of [['fog', 'jighead', 2], ['pines', 'spinnerbait', 3], ['creek', 'small_spoon', 2], ['harts', 'crankbait', 2]]) {
+    let right = 0, dead = 0;
+    for (let k = 1; k <= 10; k++) {
+      for (const d of [false, true]) {
+        const s = session(load(), k * 41 + 3, { loc, rod, bait: hook, stay: true, shop: false, dead: d });
+        s.save.journal.yellow_perch = { caught: 1, bestLen: 20, bestW: 0.1, hints: [], seen: true }; // not a first session: no eager first taker
+        let last = -1, n = 0;
+        for (let i = 0; i < 600 * 60; i++) { s.step(); if (s.bite.slot >= 0 && last < 0) n++; last = s.bite.slot; }
+        if (d) dead += n; else right += n;
+      }
+    }
+    const ok = right >= 2 * Math.max(1, dead);
+    console.log((ok ? 'PASS ' : 'FAIL ') + loc + ' ' + hook + ': worked ' + right + ' bites, left dead ' + dead + ' (10 seeds x 10 min)');
+    if (!ok) bad++;
+  }
+  return bad ? 1 : 0;
 }
 
 // Phase 80 (PLAN_WINTER.md 2.2 and 5): one seed played on past Russetwood: a sea, the Snow
@@ -1448,9 +1568,11 @@ if (require.main === module) {
   if (args.includes('--homes')) code = homesCheck() || code; // Phase 75
   if (args.includes('--first')) code = firstCheck() || code; // Phase 96.4
   if (args.includes('--milestones')) code = milestonesCheck() || code; // Phase 94
+  if (args.includes('--bite')) code = biteCheck() || code; // Phase 101
+  if (args.includes('--feed')) code = feedCheck() || code; // Phase 105
   if (args.includes('--tackle-water')) { console.log(JSON.stringify(tackleWater(args[args.indexOf('--tackle-water') + 1]))); process.exit(0); }
-  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes', '--first', '--milestones'].includes(a))) {
-    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --first | --milestones | --replay <seed> [minutes]');
+  if (!args.some(a => ['--validate', '--replay', '--pacing', '--passive', '--saves', '--fight', '--rod', '--tackle', '--homes', '--first', '--milestones', '--bite', '--feed'].includes(a))) {
+    console.log('usage: node tools/balance.js --validate [--strict] | --pacing | --passive | --saves | --fight | --rod | --tackle | --homes | --first | --milestones | --bite | --feed | --replay <seed> [minutes]');
     code = 2;
   }
   if (args.includes('--tackle')) tackleCheck().then(c => process.exit(c || code), e => { console.log('FAIL --tackle: ' + e.message); process.exit(1); }); // Phase 69: in four processes

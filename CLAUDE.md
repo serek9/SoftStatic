@@ -39,6 +39,10 @@ node tools/balance.js --homes                    # where each species lives, aga
 node tools/balance.js --first                    # a fresh save's first fish inside 60 s, on 20 seeds (Phase 96)
 node tools/balance.js --milestones               # each milestone against fixture saves; the first-catch bonus (Phase 94)
 node tools/icon.js --check                       # the home-screen icon files match the grid they are painted from (Phase 61)
+node tools/balance.js --bite                     # one fish at a time: no bite with another fish near the lure (Phase 101)
+node tools/balance.js --feed                     # each species against the ways of fishing; worked beats left dead (Phase 105)
+node tools/lures.js                              # every hook dropped, slacked and worked in the real game (Phase 104; needs the server)
+node tools/angler.js 4                           # the angler bot fishes all 27 hooks in the real game, ~25 min (Phase 106; needs the server)
 ```
 
 On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`, `?tour` (every water open on the map, nothing saved), `?sw` (use the offline service worker on localhost too).

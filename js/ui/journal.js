@@ -232,7 +232,20 @@ G.ui.journal = (function () {
     if (j.hints.indexOf('depth') < 0) note('depth');                // Phase 75: where, how deep and when, from the first catch
     if (sp.ice) para(ICE_SAYS[sp.turnUpName] || '', 'wood', true);   // Phase 80: how often it turns up under the ice
     sizesNote(sp, j, para);
+    if (j.ways && j.ways.length) para('Took ' + j.ways.join('; ') + '.', 'wood', true); // Phase 105: how it took the hook
+    para(feedSays(sp, j.caught), 'wood', true);                                      // Phase 107: how it feeds, learnt catch by catch
     if (sp.trophyKg && j.bestW >= sp.trophyKg) para('The ice monster. ' + j.bestW.toFixed(2) + ' kg, out of a hole in the ice.', 'rust', true); // Phase 80: the one named trophy
+  }
+  // Phase 107 (PLAN_FISHING.md): what the journal has learnt of how a species feeds: where after one
+  // catch, its pace after two, what sets it off (and whether it follows) after three.
+  var ZONE_W = { bed: 'on the bed', low: 'near the bed', mid: 'in open water', top: 'at the top' };
+  var PACE_W = { still: 'lying still', slow: 'moving slowly', steady: 'at a steady pace', fast: 'moving fast' };
+  var TRIG_W = { fall: 'the fall', pause: 'a pause after a run', flash: 'flash', thump: 'a thump', bed: 'a knock on the bed', scent: 'live bait', top: 'a stir on the top' };
+  function feedSays(sp, n) {
+    var fd = G.data.feedOf(sp), s = 'Feeds ' + ZONE_W[fd.zone] + (n >= 2 ? ', on food ' + PACE_W[fd.pace] : '') + '.';
+    if (n >= 3) s += ' Set off by ' + fd.triggers.map(function (t) { return TRIG_W[t]; }).join(', ') + '.' + (fd.follows ? ' Follows a running lure; strikes when it stops.' : '');
+    else s += ' (More with each catch.)';
+    return s;
   }
   // Phase 85: the size classes caught, of those the species comes in; and the STOCK row's state.
   function sizesNote(sp, j, para) {

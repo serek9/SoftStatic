@@ -688,6 +688,53 @@ G.data.BITE_BY_FAMILY = {
   'mooneyes': 'tap', 'herring & shad': 'tap', 'smelt': 'tap', 'greenlings': 'slam', 'flatfish': 'thump', 'rockfish': 'thump'
 };
 G.data.BITE_OWN = { walleye: 'thump', smallmouth_bass: 'thump', largemouth_bass: 'thump', common_carp: 'mouth', northern_pikeminnow: 'slam', american_shad: 'slam' };
+// Phase 105 (PLAN_FISHING.md): how each fish feeds, after the real fish. zone: where it takes
+// food (bed: on the bottom; low: within 2-3 m of it; mid: open water; top: at the surface); pace:
+// how fast it likes its food to move (still, slow, steady, fast); triggers: what sets it off
+// (fall: something sinking past; pause: a running bait that stops dead; flash; thump: vibration;
+// bed: a bait knocking the bottom; scent: live bait; top: a commotion on the surface); follows: it
+// chases a moving lure and strikes when it stops. By family, with a few species of their own.
+G.data.FEED_BY_FAMILY = {
+  'perches': { zone: 'low', pace: 'slow', triggers: ['bed', 'fall', 'scent'], follows: false },
+  'sunfish & bass': { zone: 'mid', pace: 'slow', triggers: ['scent', 'fall'], follows: false },
+  'temperate bass': { zone: 'mid', pace: 'fast', triggers: ['flash', 'thump'], follows: true },
+  'pikes': { zone: 'mid', pace: 'fast', triggers: ['flash', 'thump', 'pause', 'scent'], follows: true },
+  'trout & salmon': { zone: 'mid', pace: 'steady', triggers: ['flash', 'scent'], follows: true },
+  'whitefish': { zone: 'low', pace: 'slow', triggers: ['scent', 'fall', 'bed'], follows: false },
+  'suckers': { zone: 'bed', pace: 'still', triggers: ['scent'], follows: false },
+  'carp & minnows': { zone: 'mid', pace: 'slow', triggers: ['scent', 'flash'], follows: false },
+  'catfish': { zone: 'bed', pace: 'still', triggers: ['scent', 'thump'], follows: false },
+  'cod': { zone: 'bed', pace: 'slow', triggers: ['scent', 'bed', 'thump'], follows: false },
+  'sturgeon': { zone: 'bed', pace: 'still', triggers: ['scent'], follows: false },
+  'mooneyes': { zone: 'top', pace: 'steady', triggers: ['flash', 'top'], follows: false },
+  'herring & shad': { zone: 'mid', pace: 'fast', triggers: ['flash'], follows: false },
+  'smelt': { zone: 'mid', pace: 'slow', triggers: ['flash', 'scent'], follows: false },
+  'greenlings': { zone: 'bed', pace: 'slow', triggers: ['bed', 'thump', 'fall'], follows: false },
+  'flatfish': { zone: 'bed', pace: 'slow', triggers: ['bed', 'scent', 'fall'], follows: false },
+  'rockfish': { zone: 'low', pace: 'slow', triggers: ['fall', 'scent', 'bed'], follows: false }
+};
+G.data.FEED_OWN = {
+  walleye: { zone: 'low', pace: 'slow', triggers: ['bed', 'scent', 'pause'], follows: false },
+  ice_walleye: { zone: 'low', pace: 'slow', triggers: ['bed', 'scent', 'pause'], follows: false },
+  smallmouth_bass: { zone: 'low', pace: 'steady', triggers: ['bed', 'thump', 'pause'], follows: true },
+  ice_smallmouth_bass: { zone: 'low', pace: 'steady', triggers: ['bed', 'thump', 'pause'], follows: true },
+  largemouth_bass: { zone: 'mid', pace: 'steady', triggers: ['thump', 'pause', 'top', 'fall'], follows: true },
+  ice_largemouth_bass: { zone: 'mid', pace: 'steady', triggers: ['thump', 'pause', 'fall'], follows: true },
+  crappie: { zone: 'mid', pace: 'slow', triggers: ['fall', 'flash', 'scent'], follows: false },
+  lake_trout: { zone: 'low', pace: 'steady', triggers: ['flash', 'thump', 'fall'], follows: true },
+  ice_lake_trout: { zone: 'low', pace: 'steady', triggers: ['flash', 'thump', 'fall'], follows: true },
+  arctic_char: { zone: 'low', pace: 'steady', triggers: ['flash', 'fall'], follows: true },
+  ice_arctic_char: { zone: 'low', pace: 'steady', triggers: ['flash', 'fall'], follows: true },
+  brook_trout: { zone: 'mid', pace: 'steady', triggers: ['flash', 'scent', 'top'], follows: true },
+  arctic_grayling: { zone: 'top', pace: 'slow', triggers: ['top', 'flash', 'scent'], follows: false },
+  common_carp: { zone: 'bed', pace: 'still', triggers: ['scent'], follows: false },
+  northern_pikeminnow: { zone: 'mid', pace: 'fast', triggers: ['flash', 'thump'], follows: true },
+  lingcod: { zone: 'bed', pace: 'slow', triggers: ['bed', 'thump', 'fall', 'pause'], follows: false },
+  white_sturgeon: { zone: 'bed', pace: 'still', triggers: ['scent', 'thump'], follows: false }
+};
+G.data.FEED_ANY = { zone: 'mid', pace: 'slow', triggers: ['scent'], follows: false };
+G.data.feedOf = function (f) { return (f && (f.feed || G.data.FEED_OWN[f.id] || G.data.FEED_BY_FAMILY[f.family])) || G.data.FEED_ANY; };
+
 G.data.biteStyle = function (f) {
   return (f && (f.bite || G.data.BITE_OWN[f.id] || G.data.BITE_BY_FAMILY[f.family])) || 'tap';
 };

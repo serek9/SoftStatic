@@ -134,6 +134,7 @@ G.core.input = (function () {
     b.on = false;
   }
 
+  function lureIn() { var r = G.state && G.state.run; return !!(r && (r.fsm === 'sinking' || r.fsm === 'waiting' || r.fsm === 'interest')); }
   function layout() {
     var Pn = G.ui && G.ui.panel, mode = where(), i;
     if (!Pn) { LAY.mode = ''; return LAY; }
@@ -161,6 +162,9 @@ G.core.input = (function () {
       put(PAD[0], true, x0, top + ps, ps, ps); put(PAD[1], true, x0 + 2 * ps, top + ps, ps, ps);
     } else for (i = 0; i < PAD.length; i++) PAD[i].on = false;
     if (mode === 'boat' || mode === 'room') put(ACT, true, VW - insR - EDGE - ad, VH - EDGE - ad, ad, ad); else ACT.on = false;
+    // Phase 103 (PLAN_FISHING.md): on the boat, while the lure is in the water, LINE over the
+    // action button: hold it to open the bail and let out line (the down key's job on a keyboard).
+    if (mode === 'boat' && lureIn()) put(PAD[3], true, ACT.x + ((ad - ps) >> 1), ACT.y - ps - 2 * GAP, ps, ps);
     return LAY;
   }
 

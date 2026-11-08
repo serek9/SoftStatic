@@ -285,6 +285,8 @@ G.audio.engine = (function () {
     if (!ac || ac.state !== 'running' || !KIT) return;
     var run = G.state.run, s;
     switch (name) {
+      case 'cleanset': playBuf(pick(KIT.click[0]), 0.05, panAt(run.boat.x), 1.9); tone('triangle', 520, 880, 0.12, 0.03, panAt(run.boat.x), 0.02, bus.sfx); note('cleanset'); break; // Phase 107: a crisp click and a rising note
+      case 'payout': playBuf(pick(KIT.click[0]), 0.012, panAt(run.boat.x), 2.3 + 0.4 * G.vrng.next()); note('payout'); break; // Phase 103: the open spool's soft clicks
       case 'rise': s = spotAt(x); playBuf(pick(KIT.rise), 0.03 * s.att, s.pan, 0.9 + 0.2 * G.vrng.next(), bus.water); note('rise'); break;
       case 'jump': waterSplash(a ? 1 : 0.6, x, a ? 'jumpin' : 'jumpout'); break; // a: back in (the biggest)
       case 'thrash': waterSplash(0.15 + 0.3 * (a || 0), x, 'thrash'); break;
@@ -457,6 +459,15 @@ G.audio.engine = (function () {
   }
 
   // A tone from f0 to f1 over dur seconds with a soft attack (never under 5 ms).
+  // Phase 102: the strike's layers by bite style: the thump (Hz from f0 to f1 over dur s, gain), the
+  // knock (x the style's own knock), the twang's gain, the splash's size near the surface, clicks.
+  var STRIKE_SND = {
+    tap: { f0: 120, f1: 60, dur: 0.14, thump: 0.12, knock: 3, twang: 0.03, splash: 1, clicks: 2 },
+    thump: { f0: 95, f1: 42, dur: 0.22, thump: 0.2, knock: 3, twang: 0.05, splash: 2, clicks: 4 },
+    slam: { f0: 85, f1: 38, dur: 0.26, thump: 0.24, knock: 3, twang: 0.06, splash: 3, clicks: 6 },
+    mouth: { f0: 70, f1: 40, dur: 0.3, thump: 0.14, knock: 3, twang: 0.03, splash: 1, clicks: 2 }
+  };
+  var strikeSnd = { n: 0, style: '', thump: 0, knock: 0, oldKnock: 0, shallow: false };
   function tone(type, f0, f1, dur, g, pan, at, to, attack) {
     var t0 = ac.currentTime + (at || 0), o = ac.createOscillator(), e = ac.createGain();
     o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t0 + dur);
@@ -667,10 +678,20 @@ G.audio.engine = (function () {
       // The bite: a firm knock up the line and the rod tip ticking; near the surface, a pop.
       // The user's fixes (2026-11-03): in the species' way (sailing.biteFeel): a tap's knock is light
       // with a run of ticks after it, a thump's one solid knock, a slam's hard knock, a mouth's soft one.
-      var bf = G.scene.sailing.biteFeel ? G.scene.sailing.biteFeel() : null, kf = bf ? bf.feel : null;
-      playBuf(pick(KIT.knock), kf ? kf.knock : 0.05, boatPan, bf && bf.style === 'slam' ? 0.85 : 1);
-      for (var tk = 0; tk < (kf ? kf.ticks : 2); tk++) playBuf(pick(KIT.tick), 0.018 - tk * 0.002, boatPan, 1 + 0.1 * tk, null, 0.1 + tk * (bf && bf.style === 'tap' ? 0.08 : 0.12));
-      if (c.ly - G.scene.sailing.loc().waterY < 8) { var bs = spotAt(c.x1); playBuf(pick(KIT.pop), 0.03 * bs.att, bs.pan, 1, bus.water); }
+      var bf = G.scene.sailing.biteFeel ? G.scene.sailing.biteFeel() : null, kf = bf ? bf.feel : null, sty = bf ? bf.style : 'tap';
+      // Phase 102 (PLAN_FISHING.md): the strike, loud and clear, in layers: a deep thump through
+      // the rod, the knock (about 3x the old one), the line's twang, the water's gulp at the lure
+      // (a splash near the surface, a muffled chomp deep down) and a quick run of ratchet clicks.
+      // Firm, not startling: on the effects bus, under the master limiter (§0.14).
+      var SK = STRIKE_SND[sty] || STRIKE_SND.tap, shallow = c.ly - G.scene.sailing.loc().waterY < 8, bs = spotAt(c.x1);
+      tone('sine', SK.f0, SK.f1, SK.dur, SK.thump, boatPan, 0, bus.sfx, 0.004);
+      playBuf(pick(KIT.knock), (kf ? kf.knock : 0.05) * SK.knock, boatPan, sty === 'slam' ? 0.8 : 0.95);
+      playBuf(pick(KIT.twang), SK.twang, boatPan, 1.25 + 0.1 * G.vrng.next(), null, 0.02);
+      if (shallow) playBuf(pick(KIT.splash[Math.min(4, SK.splash)]), 0.07 * bs.att + 0.03, bs.pan, 0.95, bus.water, 0.01);
+      else playBuf(pick(KIT.splash[2]), 0.06, bs.pan, 0.55, bus.water, 0.01);
+      for (var tk = 0; tk < SK.clicks; tk++) playBuf(pick(KIT.click[0]), 0.03, boatPan, 1.6, null, 0.06 + tk * 0.03);
+      for (tk = 0; tk < (kf ? kf.ticks : 2); tk++) playBuf(pick(KIT.tick), 0.02 - tk * 0.002, boatPan, 1 + 0.1 * tk, null, 0.2 + tk * (sty === 'tap' ? 0.08 : 0.12));
+      strikeSnd.n++; strikeSnd.style = sty; strikeSnd.thump = SK.thump; strikeSnd.knock = +((kf ? kf.knock : 0.05) * SK.knock).toFixed(3); strikeSnd.oldKnock = kf ? kf.knock : 0.05; strikeSnd.shallow = shallow;
       note('bite');
     }
     prev.bite = run.bite.slot;
@@ -808,6 +829,7 @@ G.audio.engine = (function () {
         limiter: { threshold: limiter.threshold.value, knee: limiter.knee.value, ratio: limiter.ratio.value, attack: limiter.attack.value, release: limiter.release.value, reduction: +limiter.reduction.toFixed(2) },
         tension: +amb.tensO.frequency.value.toFixed(1), detune: +amb.sour.detune.value.toFixed(1), drone: +amb.drone.gain.value.toFixed(3), wind: +amb.wind.gain.value.toFixed(3),
         voices: voices, events: log.slice(), noted: noted,
+        strike: { n: strikeSnd.n, style: strikeSnd.style, thump: strikeSnd.thump, knock: strikeSnd.knock, oldKnock: strikeSnd.oldKnock, shallow: strikeSnd.shallow }, // Phase 102
         motor: { gain: +amb.motor.out.gain.value.toFixed(4), rpm: G.state.run.boat ? Math.round(G.state.run.boat.rpm) : 0 },
         kit: { ms: +kitMs.toFixed(1), splash: KIT.splash.length + ' sizes x ' + KIT.splash[0].length, rise: KIT.rise.length, drip: KIT.drip.length, pop: KIT.pop.length,
           click: KIT.click.length + ' reels x ' + KIT.click[0].length, twang: KIT.twang.length, tick: KIT.tick.length, knock: KIT.knock.length, ir: Object.keys(KIT.ir).join(',') },

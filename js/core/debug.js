@@ -347,6 +347,40 @@ G.core.debug = (function () {
     // lure's depth, the hour, what is on the hook and the rod. Each: {id, chance (share of the
     // total), weight}; with tooHeavy, the species the rod cannot hold. Phase 75: in the reach the
     // lure is in (or the boat, with no line out), which it names.
+    // Phase 101 (PLAN_FISHING.md): the turn: the suitor (the one fish allowed at the lure), the
+    // holders waiting their turn, and the fish within 24 px of the lure (never more than one).
+    school: function () {
+      var run = G.state.run, sc = run.school, L = run.lureIn, out = { suitor: null, holders: [], near: 0, gap: 0 };
+      if (!sc) return out;
+      out.gap = +sc.gapT.toFixed(2);
+      sc.fish.forEach(function (f) {
+        if (!f.active) return;
+        var o = { id: G.data.fish[f.sp].id, state: f.state, dist: L && L.active ? +Math.hypot(f.x - L.x, f.y - L.y).toFixed(1) : null };
+        if (f.uid === sc.suitor) out.suitor = o;
+        if (f.state === 'hold') out.holders.push(o);
+        if (o.dist !== null && o.dist < 24 && f.state !== 'leave') out.near++;
+      });
+      return out;
+    },
+    // Phase 102: the last strike: style, the lunge's start off the lure (px) and length (s), where
+    // (x, depth m), the species, the lure in the mouth now, the burst's time left, and its sound.
+    strike: function () {
+      var st = G.scene.underwater.strike(), run = G.state.run, au = G.audio.engine.info();
+      return { n: st.n, style: st.style, off: st.off, lunge: st.lunge, x: st.x, depthM: st.y, species: st.sp, inMouth: G.scene.underwater.lureTaken(run), burst: +st.t.toFixed(2), sound: au.strike || null };
+    },
+    // Phase 103: the bail: open (line paying out), line given this cast (px), the line now from
+    // the rod tip to the lure (px), its cap (the rod's cast length + 40), the lure's depth (m).
+    bail: function () {
+      var run = G.state.run, c = run.cast, loc = G.scene.sailing.loc(), tip = [0, 0];
+      G.scene.boat.rodTip(run.boat, run.boat.x, loc.waterY, tip);
+      return { open: !!c.free, given: +(c.lineOut || 0).toFixed(1), line: +Math.hypot(c.x1 - tip[0], c.ly - tip[1]).toFixed(1), cap: run.gearFx.castMax + 40, x: +c.x1.toFixed(1), depthM: +((c.ly - loc.waterY) * 0.25).toFixed(2), fsm: run.fsm };
+    },
+    // Phase 104: how the hook in the water moves now (underwater.motionStep) and its profile (MOVE).
+    lureMotion: function () {
+      var run = G.state.run, m = run.cast.m, mv = G.scene.underwater.moveOf(run), o = { hook: run.cast.bait || run.gearFx.bait, profile: mv, fsm: run.fsm };
+      if (m) { o.speed = +m.speed.toFixed(2); o.vy = +m.vy.toFixed(2); o.falling = m.falling; o.onBed = m.onBed; o.still = +m.still.toFixed(2); o.runT = +m.runT.toFixed(2); o.surface = m.surface; o.flash = m.flash; o.thump = m.thump; o.live = m.live; o.bedT = +m.bedT.toFixed(2); o.bedN = m.bedN || 0; }
+      return o;
+    },
     who: function () {
       var run = G.state.run, ctx = run.school && run.school.ctx;
       if (!ctx) return 'no school yet';
@@ -354,11 +388,12 @@ G.core.debug = (function () {
       var rn = ''; (L.reaches || []).forEach(function (r) { if (r.id === rid) rn = r.name; });
       var c = { species: ctx.species, loc: lc, reach: rid, depthM: run.lureIn && run.lureIn.active ? run.lureIn.y * 0.25 : null,
         hour: G.state.save.clock, bait: run.gearFx.bait, lure: run.gearFx.lure, rodMaxMass: run.gearFx.maxMass,
-        smallBoost: run.gearFx.smallBoost, smallMass: run.gearFx.smallMass, weights: null };
+        smallBoost: run.gearFx.smallBoost, smallMass: run.gearFx.smallMass, weights: null,
+        motion: run.lureIn && run.lureIn.active && run.lureIn.m ? run.lureIn : null, school: run.school }; // Phase 105: weighed by how the hook moves now
       var total = G.sim.fish_ai.speciesWeights(c), out = [], heavy = [];
       for (var i = 0; i < c.species.length; i++) {
         var sp = c.species[i];
-        if (c.weights[i] > 0) out.push({ id: sp.id, chance: +(c.weights[i] / total).toFixed(3), weight: +c.weights[i].toFixed(3) });
+        if (c.weights[i] > 0) out.push({ id: sp.id, chance: +(c.weights[i] / total).toFixed(3), weight: +c.weights[i].toFixed(3), appeal: c.motion ? +G.sim.fish_ai.appeal(sp, c.motion, run.school).toFixed(2) : null });
         else if (G.data.homeOf(sp, c.loc, c.reach) && sp.mass > c.rodMaxMass && G.sim.fish_ai.weightOf(sp, c) > 0) heavy.push(sp.id);
       }
       out.sort(function (a, b) { return b.chance - a.chance; });

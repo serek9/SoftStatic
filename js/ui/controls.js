@@ -14,6 +14,7 @@ G.ui.controls = (function () {
     ['Cast', 'hold SPACE, let go', 'hold CAST, let go', ['action']],
     ['Stop a sinking lure', 'tap SPACE', 'tap REEL', []],
     ['Reel in, work a lure', 'hold SPACE', 'hold REEL', []],
+    ['Let out line (the lure falls or drifts)', 'hold S or down arrow', 'hold LINE', []], // Phase 103
     ['Set the hook', 'SPACE when it bites', 'tap HOOK', []],
     ['Fight a fish', 'hold to reel, let go when it runs', 'the same, on REEL', []],
     ['Sell, keep, release', 'A D and SPACE, or click', 'tap the card\'s key', []],
