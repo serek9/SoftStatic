@@ -375,6 +375,12 @@ G.core.debug = (function () {
       G.scene.boat.rodTip(run.boat, run.boat.x, loc.waterY, tip);
       return { open: !!c.free, given: +(c.lineOut || 0).toFixed(1), line: +Math.hypot(c.x1 - tip[0], c.ly - tip[1]).toFixed(1), cap: run.gearFx.castMax + 40, x: +c.x1.toFixed(1), depthM: +((c.ly - loc.waterY) * 0.25).toFixed(2), fsm: run.fsm };
     },
+    // Phase 104: how the hook in the water moves now (underwater.motionStep) and its profile (MOVE).
+    lureMotion: function () {
+      var run = G.state.run, m = run.cast.m, mv = G.scene.underwater.moveOf(run), o = { hook: run.cast.bait || run.gearFx.bait, profile: mv, fsm: run.fsm };
+      if (m) { o.speed = +m.speed.toFixed(2); o.vy = +m.vy.toFixed(2); o.falling = m.falling; o.onBed = m.onBed; o.still = +m.still.toFixed(2); o.runT = +m.runT.toFixed(2); o.surface = m.surface; o.flash = m.flash; o.thump = m.thump; o.live = m.live; o.bedT = +m.bedT.toFixed(2); o.bedN = m.bedN || 0; }
+      return o;
+    },
     who: function () {
       var run = G.state.run, ctx = run.school && run.school.ctx;
       if (!ctx) return 'no school yet';

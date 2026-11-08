@@ -580,9 +580,11 @@ G.scene.sailing = (function () {
     li.bait = c.bait || gx.bait;
     li.lure = G.sim.economy.isLure(li.bait, G.data); // Phase 43
     li.work = c.work === undefined ? 1 : c.work;      // the user's fixes: how well it is worked (underwater.workStep)
+    li.m = c.m || null;                               // Phase 104: how it moves now (underwater.motionStep)
     ctx.loc = loc.id;
     ctx.depthM = li.y * 0.25;
     if (li.lure && gx.swim === 'top') ctx.depthM = Math.max(ctx.depthM, gx.topDepthM); // Phase 43: fish rise to a surface lure
+    if (!li.lure && li.bait === 'cricket') ctx.depthM = Math.max(ctx.depthM, gx.topDepthM); // Phase 104: a cricket floats: fish rise to it
     ctx.hour = save.clock;
     ctx.unease = G.sim.unease.get(save, loc.id);
     ctx.bait = li.bait; ctx.lure = li.lure;
@@ -619,7 +621,7 @@ G.scene.sailing = (function () {
     c.dist = Math.abs(c.x1 - b.x);
     c.seed = G.rng.int(1, 0x7fffffff);
     c.n++;
-    c.work = 0; c.wm = 0; c.wgo = 0; c.wpop = 0; c.wasMv = 0; c.pops = 0; c.pops0 = 0; c.lineOut = 0; c.free = 0; c.payT = 0; // the user's fixes: a fresh retrieve
+    c.work = 0; c.wm = 0; c.wgo = 0; c.wpop = 0; c.wasMv = 0; c.pops = 0; c.pops0 = 0; c.lineOut = 0; c.free = 0; c.payT = 0; c.m = null; c.minT = 0; c.swPh = 0; // Phase 103-104; the user's fixes: a fresh retrieve
     c.t = 0;
     c.flying = false;
     G.core.state.go(run, 'casting');

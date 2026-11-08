@@ -818,14 +818,17 @@ G.scene.underwater = (function () {
     // gx.maxDepthM m; a popper ('top') stays on the surface; a plug ('dive') dives as it is reeled.
     // Phase 69: a dropshot's hook hangs gx.dropM m over its weight on the bed.
     var gx = run.gearFx, lure = gx.lure && c.bait === gx.bait, sinkK = lure ? gx.sink : 1, floorPx = lure ? Math.min(bottom - gx.dropM * 4, gx.maxDepthM * 4) : bottom;
+    var mv = moveOf(run), floats = !!mv.floats;                                   // Phase 104: how this hook moves (MOVE)
+    if (floats && !lure) sinkK = 0;                                              // a cricket floats
     var ice = loc.ice; // Phase 81: straight down a hole: the float rig's bait hangs its depth under the ice, not in it
     if (ice && lure && gx.swim === 'float') floorPx = Math.min(bottom - 2, gx.maxDepthM * 4 + ice.thick);
     if (run.fsm === 'sinking') {
-      if (inp.pressed('action') || (lure && sinkK === 0)) { if (lure && sinkK === 0) c.ly = wy + (gx.swim === 'top' ? 0.5 : FLOAT); c.rv = 0; c.tight = 0; G.core.state.go(run, 'waiting'); return; }
+      if (inp.pressed('action') || sinkK === 0) { if (sinkK === 0) c.ly = wy + (gx.swim === 'top' || !lure ? 0.5 : FLOAT); c.rv = 0; c.tight = 0; motionStep(run, loc, dt, mv); G.core.state.go(run, 'waiting'); return; }
       var depth = c.ly - wy;
       // Phase 77: in fast water (a reach's `sink` under 1, G.data.reachK) the lure barely sinks
       var rk = loc.current && loc.current.reach ? G.data.reachK(loc, c.x1, 'sink', 1) : 1;
-      depth += UW.sinkV * sinkK * rk * Math.min(1, 0.15 + (bottom - depth) / 6) * dt;
+      depth += UW.sinkV * sinkK * (mv.fall || 1) * rk * Math.min(1, 0.15 + (bottom - depth) / 6) * dt; // Phase 104: its own fall
+      sway(c, mv, dt, loc);
       if (depth >= floorPx) { depth = floorPx; c.rv = 0; c.tight = 0; G.core.state.go(run, 'waiting'); }
       c.ly = wy + depth;
       drift(c, loc, dt, depth >= bottom);
@@ -833,6 +836,7 @@ G.scene.underwater = (function () {
       c.lx = c.x1;
       c.bubT = (c.bubT || 0) - dt;
       if (c.bubT <= 0) { c.bubT = 0.4; fx.emit('bubbles', c.lx, c.ly - 2, 1); }
+      motionStep(run, loc, dt, mv);                                              // Phase 104
     } else if (run.fsm === 'waiting' || run.fsm === 'interest') {
       if (lure && gx.swim === 'top' && inp.pressed('action') && run.bite.slot < 0) { // the popper pops: a spit and a ring
         fx.ripple(c.x1, wy + 1, 1, 6, 0.6); G.gfx.surface.poke(c.x1, 0.2, 1); body.kick = 0.3; c.pops = (c.pops || 0) + 1;
@@ -857,7 +861,7 @@ G.scene.underwater = (function () {
       if (v > RV.still) {
         c.tight = RV.tight;                                                       // the line stays tight a moment after the reel stops
         var vx = dx / L * v, vy = dy / L * v;
-        if (sw === 'top') { vx = toward * v; vy = 0; c.ly = far ? wy + 0.5 : wy; }
+        if (sw === 'top' || floats) { vx = toward * v; vy = 0; c.ly = far ? wy + 0.5 : wy; } // Phase 104: a cricket skitters on the top too
         else if (sw === 'float') { vx = toward * v; vy = far ? 0 : -UW.reelUp; }  // the float skates in; the bait comes up at the boat
         else if (sw === 'dive') { var runD = floorPx * Math.min(1, v / UW.reelIn); vx = toward * v * 0.9; vy = far ? clamp((runD - depth0) * 2.2, -UW.reelUp, UW.reelUp) : -UW.reelUp; }
         else if (sw === 'mid') vy -= RV.lift * v * (gx.vary === 'kick' ? 0.5 : 1); // the blade's lift (a paddle tail lifts it less)
@@ -894,13 +898,13 @@ G.scene.underwater = (function () {
         // crank, a float rig's float) drifts away on the wind; a current carries all of them (drift).
         c.tight = 0;
         var cap = gx.castMax + PAYOUT.extra, out0 = L, away = c.x1 >= TIPW[0] ? 1 : -1, moved = 0;
-        if (sw === 'top' || sw === 'dive' || sw === 'float') {
+        if (sw === 'top' || sw === 'dive' || sw === 'float' || floats) {
           if (sw === 'dive' && c.ly > wy + FLOAT) c.ly = Math.max(wy + FLOAT, c.ly - UW.reelUp * 0.4 * dt);
           if (sw === 'float' && c.ly < wy + floorPx) c.ly = Math.min(wy + floorPx, c.ly + UW.sinkV * 0.6 * dt);
           if ((!loc.current || loc.current.lake) && out0 < cap) { var dv = PAYOUT.drift * (0.5 + wind()); c.x1 = clamp(c.x1 + away * dv * dt, 8, loc.width - 8); moved = dv; }
         } else if (out0 < cap) {
-          var bedFloor = bottom - (lure ? (gx.dropM || 0) * 4 : 0), fv = UW.sinkV * (lure ? gx.sink : 0.6) * PAYOUT.fall;
-          if (c.ly < wy + bedFloor) { c.ly = Math.min(wy + bedFloor, c.ly + fv * dt); moved = fv; }
+          var bedFloor = bottom - (lure ? (gx.dropM || 0) * 4 : 0), fv = UW.sinkV * (lure ? gx.sink : 0.6) * PAYOUT.fall * (mv.fall || 1);
+          if (c.ly < wy + bedFloor) { c.ly = Math.min(wy + bedFloor, c.ly + fv * dt); moved = fv; sway(c, mv, dt, loc); }
         }
         if (loc.drift && out0 < cap) moved = Math.max(moved, Math.abs(loc.drift(c.seed, c.tw, c.ly - wy, false, wind(), c.x1)));
         c.lineOut = (c.lineOut || 0) + moved * dt;
@@ -910,11 +914,14 @@ G.scene.underwater = (function () {
         c.tight = Math.max(0, (c.tight || 0) - dt);
         if (sw === 'dive') { if (c.ly > wy + FLOAT) c.ly = Math.max(wy + FLOAT, c.ly - UW.reelUp * 0.4 * dt); } // let go, the plug floats back up
         else if (sw === 'float') { if (c.ly < wy + floorPx) c.ly = Math.min(wy + floorPx, c.ly + UW.sinkV * 0.6 * dt); } // the bait sinks back under its float
+        else if (floats) { if (c.ly > wy + 0.5) c.ly = Math.max(wy + 0.5, c.ly - UW.reelUp * 0.5 * dt); } // Phase 104: a cricket bobs back up
+        else if (mv.swim && !lure) minnowSwim(c, mv, dt, wy, bottom, TIPW, gx);                            // Phase 104: a minnow swims on the hook
         else if (sw !== 'top' && (c.tight > 0 || (lure && gx.sink > 0)) && depth0 < floorPx) {
           // Paused: a sinking lure falls back, on a tight line in a pendulum toward the rod
           // (the line's length from the tip held), then straight down on a slack one; a live
           // bait only swings while the line is tight, then hangs where it is.
-          var sv = UW.sinkV * (lure ? gx.sink : 0.6) * (sw === 'flutter' ? 0.55 : 0.75), ny = Math.min(wy + floorPx, c.ly + sv * dt);
+          var sv = UW.sinkV * (lure ? gx.sink : 0.6) * 0.75 * (mv.fall || 1), ny = Math.min(wy + floorPx, c.ly + sv * dt); // Phase 104: its own fall (a spoon's was a flat 0.55)
+          if (c.tight <= 0) sway(c, mv, dt, loc);
           if (c.tight > 0 && !ice) { var R = L, h = ny - TIPW[1]; if (R > h + 1) { var nx = TIPW[0] - (dx >= 0 ? 1 : -1) * Math.sqrt(R * R - h * h); c.x1 += clamp(nx - c.x1, -sv * dt * 2, sv * dt * 2); } }
           c.ly = ny;
         }
@@ -929,7 +936,77 @@ G.scene.underwater = (function () {
         var hold = Math.min(8, LIFT * Math.abs(loc.drift(c.seed, c.tw, c.ly - wy, false, wind(), c.x1))), floor = wy + bottomAt(loc, c.x1) - hold;
         if (c.ly > floor) c.ly = Math.max(floor, c.ly - 1.5 * dt);
       }
+      motionStep(run, loc, dt, mv);
     }
+  }
+
+  // ---- Phase 104 (PLAN_FISHING.md): how each hook really moves --------------------------
+  // By its action (a lure's vary or swim; a live bait's id): fall (x its sink speed whenever it
+  // falls: a cast's sink, a pause on a tight line, a free fall on a slack one), sway (px either
+  // side as it falls, swayHz a second: a spoon's flutter, a spinnerbait's helicopter), floats (a
+  // cricket, a resting crank, a popper), swim (a minnow swims on the hook, px/s, tiring over tire s),
+  // bed (what touching the bed does: 'puff' of silt, 'deflect' a crank's lip off it), flash and
+  // thump (what a fish sees and feels of it while it moves: 0..1).
+  var MOVE = {
+    worm: { fall: 0.85, sway: 0.5, swayHz: 1.1, bed: 'puff', live: 1 },
+    unlabelled: { fall: 0.85, sway: 0.4, swayHz: 1.4, bed: 'puff', live: 1 },
+    cricket: { floats: true, live: 1 },
+    minnow: { fall: 0.6, swim: 7, tire: 40, live: 1, flash: 0.4 },
+    float: { live: 1 },
+    dive: { floats: true, bed: 'deflect', thump: 1, flash: 0.4 },
+    mid: { fall: 0.55, sway: 0.6, swayHz: 3, flash: 1, thump: 0.6 },
+    kick: { fall: 0.8, nose: -0.45, thump: 0.9, flash: 0.3 },
+    flutter: { fall: 0.7, sway: 3, swayHz: 1.4, flash: 1 },
+    dropshot: { fall: 1.25, bed: 'puff' },
+    wacky: { fall: 0.65, sway: 0.4, swayHz: 0.8 },
+    lift: { fall: 1.3, nose: 1.1, bed: 'puff', thump: 0.3 },
+    rattle: { fall: 1.2, sway: 0.4, swayHz: 6, bed: 'puff', thump: 1, flash: 0.7 },
+    glide: { fall: 0.85, flash: 0.5, thump: 0.3 },
+    top: { floats: true, thump: 0.6 }
+  };
+  var NOMOVE = {};
+  function moveOf(run) {
+    var gx = run.gearFx, b = run.cast.bait || gx.bait, lure = gx.lure && b === gx.bait;
+    return lure ? (MOVE[gx.vary] || MOVE[gx.swim] || NOMOVE) : (MOVE[b] || MOVE.worm);
+  }
+  function sway(c, mv, dt, loc) {
+    if (!mv.sway) return;
+    c.swPh = (c.swPh || 0) + dt * mv.swayHz * 2 * Math.PI;
+    c.x1 = clamp(c.x1 + Math.cos(c.swPh) * mv.sway * mv.swayHz * 2 * Math.PI * dt, 8, loc.width - 8);
+  }
+  // A live minnow on the hook: it swims round in loose loops, mostly down toward the bed, and
+  // tires (to a quarter) over mv.tire s; it never pulls past the line it has.
+  function minnowSwim(c, mv, dt, wy, bottom, tip, gx) {
+    c.minT = (c.minT || 0) + dt; c.minPh = (c.minPh || 0) + dt * 1.3;
+    var tire = Math.max(0.25, 1 - c.minT / mv.tire), v = mv.swim * tire;
+    var vx = Math.cos(c.minPh) * v, vy = Math.sin(c.minPh * 1.6) * v * 0.6 + (c.ly < wy + bottom - 3 ? v * 0.25 : -v * 0.2);
+    var nx = c.x1 + vx * dt, ny = Math.min(wy + bottom - 1, Math.max(wy + 1, c.ly + vy * dt));
+    if (Math.hypot(nx - tip[0], ny - tip[1]) <= Math.hypot(c.x1 - tip[0], c.ly - tip[1]) + 0.05) { c.x1 = nx; c.ly = ny; }
+    else c.ly = ny;
+  }
+  // The motion a fish reads (run.cast.m; Phase 105's fish_ai scores it by species): speed (px/s
+  // through the water), vy (down +), falling, onBed, still (s it has been nearly still), runT (s it
+  // has been moving), surface, flash and thump now (0..1), live, bedT (s since it last touched the
+  // bed: a jig's hop, a crank's bump). Touching the bed puffs silt (rate-limited) and a crank deflects.
+  function motionStep(run, loc, dt, mv) {
+    var c = run.cast, m = c.m || (c.m = { speed: 0, vy: 0, falling: false, onBed: false, still: 0, runT: 0, surface: false, flash: 0, thump: 0, live: 0, bedT: 99, px: c.x1, py: c.ly, puffT: 0 });
+    var fl = loc.drift ? loc.drift(c.seed, c.tw, c.ly - loc.waterY, false, wind(), c.x1) : 0;
+    var vx = (c.x1 - m.px) / dt - fl, vy = (c.ly - m.py) / dt;
+    m.px = c.x1; m.py = c.ly;
+    var sp = Math.sqrt(vx * vx + vy * vy);
+    m.speed += (sp - m.speed) * Math.min(1, dt * 6); m.vy += (vy - m.vy) * Math.min(1, dt * 6);
+    var gx = run.gearFx, ds = gx.lure && (c.bait || gx.bait) === gx.bait && gx.dropM ? gx.dropM * 4 : 0; // a dropshot's weight is on the bed, its hook over it
+    var bed = c.ly - loc.waterY >= bottomAt(loc, c.x1) - 1.5 - ds;
+    m.falling = m.vy > 1 && (c.rv || 0) <= RV.still; m.surface = c.ly - loc.waterY < 1.5; m.live = mv.live || 0;
+    if (m.speed > 1.5) { m.runT += dt; m.still = 0; } else { m.still += dt; m.runT = 0; }
+    var moving = m.speed > 1.5 || m.falling;
+    m.flash = moving ? (mv.flash || 0) : 0; m.thump = moving ? (mv.thump || 0) : 0;
+    m.puffT -= dt; m.bedT += dt;
+    if (bed && (!m.onBed || (m.speed > 2 && m.puffT <= 0))) {
+      if (m.puffT <= 0) { m.bedT = 0; m.bedN = (m.bedN || 0) + 1; if (mv.bed) fx.emit('silt', c.x1, c.ly, mv.bed === 'deflect' ? 5 : (m.onBed ? 2 : 4)); m.puffT = 0.4; }
+      if (mv.bed === 'deflect' && (c.rv || 0) > RV.still) c.ly -= 2;                // the lip knocks it up off the bed
+    }
+    m.onBed = bed;
   }
   // Phase 65: the retrieve's numbers. up/down: 1/s the reel spins up and runs down; still:
   // px/s under which the lure counts as paused; tight: s the line stays tight after the reel
@@ -1717,7 +1794,9 @@ G.scene.underwater = (function () {
     body.flow = inAir ? 0 : (loc.drift ? loc.drift(c.seed, c.tw, c.ly - loc.waterY, false, wind(), c.x1) : 0);
     body.sink = loc.current && loc.current.reach ? G.data.reachK(loc, c.x1, 'sink', 1) : 1; // Phase 77
     var rx = body.vx - body.flow, ry = body.vy, target, home = run.boat.x - x;
-    if (rx * rx + ry * ry > 4) target = Math.atan2(ry, rx);                         // moving: nose first
+    var mvb = moveOf(run);
+    if (mvb.nose && ry > 2 && Math.abs(rx) < ry) target = Math.atan2(mvb.nose < 0 ? -0.5 : 1, (home >= 0 ? 1 : -1) * (mvb.nose < 0 ? 1 : 0.25)); // Phase 104: a jig falls head first, a swimbait nose up
+    else if (rx * rx + ry * ry > 4) target = Math.atan2(ry, rx);                    // moving: nose first
     else if (Math.abs(body.flow) > 0.05) target = Math.atan2(0.15, -Math.sign(body.flow)); // nose into the flow
     else target = Math.atan2(0.2, home >= 0 ? 1 : -1);                               // still: toward the line
     var d = target - body.a;
@@ -1901,7 +1980,7 @@ G.scene.underwater = (function () {
       var a = bodyArt(bd, 0);
   return { uid: bd.uid, face: a.face, turn: bd.turnT > 0 ? +(1 - bd.turnT / bd.turnLen).toFixed(2) : 0, beatHz: +bd.hz.toFixed(2), phase: +bd.phase.toFixed(2),
         glide: bd.glide, pitch: +bd.pitch.toFixed(3), pitchRaw: bd.pitch + bd.jerk, frame: a.fr, mode: ['swim', 'shake', 'roll'][bd.mode], speed: +bd.spd.toFixed(2), vy: +bd.vy.toFixed(2), len: +bd.len.toFixed(1) };
-    }, drawLure: drawLure, drawFloat: drawFloat, lureTaken: lureTaken, strike: function () { return strike; }, mouthOff: function (i) { return bodies[i] ? +(bodies[i].moff || 0).toFixed(2) : 0; }, lureImg: lureImg, lureFrame: lureFrame, hookIds: hookIds, hookKind: hookKind, BAITS: BAITS, DIRS: DIRS,
+    }, drawLure: drawLure, drawFloat: drawFloat, lureTaken: lureTaken, moveOf: moveOf, MOVE: MOVE, strike: function () { return strike; }, mouthOff: function (i) { return bodies[i] ? +(bodies[i].moff || 0).toFixed(2) : 0; }, lureImg: lureImg, lureFrame: lureFrame, hookIds: hookIds, hookKind: hookKind, BAITS: BAITS, DIRS: DIRS,
     body: function () { var c = G.state.run.cast; return { angle: Math.round(body.a * 180 / Math.PI), flutter: +body.flutter.toFixed(2), vx: +body.vx.toFixed(2), vy: +body.vy.toFixed(2), flow: +body.flow.toFixed(3), sink: +body.sink.toFixed(2), reach: reachName(c.x1), // Phase 77
       work: +(c.work === undefined ? 1 : c.work).toFixed(2), style: (run0().gearFx.lure && c.bait === run0().gearFx.bait && STYLE[run0().gearFx.swim]) || 'bait', // the user's fixes
       retrieve: +(c.rv || 0).toFixed(2), swing: !!c.swing, action: (hookIds(), LURE_OF[c.bait || G.state.run.gearFx.bait] ? (LURE_OF[c.bait || G.state.run.gearFx.bait].vary || LURE_OF[c.bait || G.state.run.gearFx.bait].swim) : 'bait'), frame: LURE_OF[c.bait || G.state.run.gearFx.bait] ? body.frame : -1, frames: LURE_OF[c.bait || G.state.run.gearFx.bait] ? LG.frames(c.bait || G.state.run.gearFx.bait) : 0, depthM: +((c.ly - G.data.locations[G.state.run.loc].waterY) * 0.25).toFixed(2) }; },
