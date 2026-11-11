@@ -823,6 +823,7 @@ G.scene.underwater = (function () {
     var ice = loc.ice; // Phase 81: straight down a hole: the float rig's bait hangs its depth under the ice, not in it
     if (ice && lure && gx.swim === 'float') floorPx = Math.min(bottom - 2, gx.maxDepthM * 4 + ice.thick);
     if (run.fsm === 'sinking') {
+      c.held = 0;                                                                // Phase 111: a new cast starts unheld (the cast object is reused)
       if (inp.pressed('action') || sinkK === 0) { if (sinkK === 0) c.ly = wy + (gx.swim === 'top' || !lure ? 0.5 : FLOAT); c.rv = 0; c.tight = 0; motionStep(run, loc, dt, mv); G.core.state.go(run, 'waiting'); return; }
       var depth = c.ly - wy;
       // Phase 77: in fast water (a reach's `sink` under 1, G.data.reachK) the lure barely sinks
@@ -854,7 +855,7 @@ G.scene.underwater = (function () {
       // Phase 103 (PLAN_FISHING.md): holding down (LINE on a phone) opens the bail: line pays out.
       c.free = !reel && run.bite.slot < 0 && inp.held('down') && !ice ? 1 : 0;
       c.rv = (c.rv || 0) + ((reel ? UW.reelIn : 0) - (c.rv || 0)) * Math.min(1, (reel ? RV.up : RV.down) * dt);
-      c.held = reel ? (c.held || 0) + dt : 0;                                     // Phase 110: s the reel has been held
+      c.held = reel ? (c.held || 0) + dt : Math.max(0, (c.held || 0) - dt);       // Phase 110: s the reel has been held (Phase 111: running down as long as it was let go, so pumping it counts too)
       G.scene.boat.rodTip(run.boat, run.boat.x, wy, TIPW);
       var b = run.boat, home = b.x + b.facing * UW.reach, far = Math.abs(home - c.x1) > 14;
       var dx = TIPW[0] - c.x1, dy = TIPW[1] - c.ly, L = Math.sqrt(dx * dx + dy * dy) || 1, toward = home > c.x1 ? 1 : -1;
@@ -877,8 +878,10 @@ G.scene.underwater = (function () {
           // a spoon does), so held on the reel it comes up as fast as the other lures; before, a
           // bladebait under the boat crept up 3 px/s and took 25 s to come out from the bed.
           var upK = rat ? 0.2 : 0.3, vUp = vy - v * (rat ? 1.7 : 1.3), fallMax = Math.max(0, -vUp) * upK / (1 - upK) * RV.keep;
+          // Phase 111: climb 1 (the line's whole pull, as a plain lure) and no more held back sideways:
+          // a bladebait still came in 40% slower than a worm when the reel was pumped.
           var fallLine = (RV.climb * vy - upK * vUp) / (1 - upK);
-          vy = (c.hop % 1) < upK ? vUp : Math.min(UW.sinkV * gx.sink * 0.7, fallMax, fallLine); vx *= 0.75;
+          vy = (c.hop % 1) < upK ? vUp : Math.min(UW.sinkV * gx.sink * 0.7, fallMax, fallLine);
         }
         else if (sw === 'dropshot') {
           // Phase 69: dragged slowly along the bed. Phase 110: held on past RV.drag s, the reel
@@ -886,7 +889,7 @@ G.scene.underwater = (function () {
           if (c.held < RV.drag) { vx *= 0.45; vy = far ? clamp((floorPx - depth0) * 2, -UW.reelUp, UW.reelUp) : -UW.reelUp; }
           else vy *= RV.climb;
         }
-        else if (sw === 'wacky') vy *= 0.4;                                        // level
+        else if (sw === 'wacky') vy *= far ? 0.4 : 1;                              // level (Phase 111: and up at the boat; it was 9-13 s from the bed)
         else if (sw === 'glide') {                                                  // wide slow S-glides at its depth
           c.glide = (c.glide || 0) + dt * RV.glide;
           var sg = Math.sin(c.glide * 2 * Math.PI);
@@ -1027,7 +1030,7 @@ G.scene.underwater = (function () {
   // px/s under which the lure counts as paused; tight: s the line stays tight after the reel
   // stops (the pendulum); lift: the spinner's rise per px/s; hops: the jig's hops a second.
   // Phase 69: rattle: × the hops of a bladebait; glide: the glidebait's S-glides a second.
-  var RV = { up: 7, down: 4, still: 0.6, tight: 1.6, lift: 0.3, hops: 2.2, rattle: 1.6, glide: 0.45, keep: 0.8, climb: 0.6, drag: 1.2 }, TIPW = [0, 0]; // keep: Phase 109; climb, drag: Phase 110
+  var RV = { up: 7, down: 4, still: 0.6, tight: 1.6, lift: 0.3, hops: 2.2, rattle: 1.6, glide: 0.45, keep: 0.8, climb: 1, drag: 0.6 }, TIPW = [0, 0]; // keep: Phase 109; climb, drag: Phase 110 (Phase 111: climb 0.6 -> 1, drag 1.2 -> 0.6 s)
   // Phase 103: letting out line. extra: px of line past the rod's cast length; drift: px/s a
   // floating lure drifts away on a still lake's wind (x 0.5-1.5 by the grey hours' wind); fall: x
   // its sink speed as it free-falls on a slack line; clickGap: s between the spool's clicks.

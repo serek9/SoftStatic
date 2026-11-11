@@ -4,9 +4,11 @@
 // Two casts each (charge 0.3 and 0.9). FAIL if any hook takes over LIMIT game s or never comes
 // out. Needs the game served:
 //   python3 -m http.server 5517 --bind 127.0.0.1
-//   node tools/reel.js [water,water = pines] [hook,hook,...]     (exit 1 on a FAIL)
+//   node tools/reel.js [water,water = pines] [hook,hook,...] [pump]     (exit 1 on a FAIL)
+// Phase 111: pump reels in pulses (0.5 s held, 0.3 s let go), the way a player taps it in;
+// its limit is 20 s.
 const { chromium } = require('playwright');
-const LIMIT = 15;
+const PUMP = process.argv[4] === 'pump', LIMIT = PUMP ? 20 : 15;
 const HOOKS = 'worm,cricket,minnow,unlabelled,bobber,deep_bobber,crankbait,big_crankbait,deep_crankbait,spinnerbait,big_spinnerbait,small_spoon,heavy_spoon,huge_spoon,dropshot,heavy_dropshot,wacky_worm,jighead,deep_jighead,topwater,medium_blade,large_blade,heavy_blade,glidebait,deep_glidebait,minnow_swimbait,bluegill_swimbait'.split(',');
 (async () => {
   const locs = (process.argv[2] || 'pines').split(','), hooks = process.argv[3] ? process.argv[3].split(',') : HOOKS;
@@ -23,7 +25,7 @@ const HOOKS = 'worm,cricket,minnow,unlabelled,bobber,deep_bobber,crankbait,big_c
       for (const ch of [0.3, 0.9]) {
         await p.evaluate(h => { G.state.save.baits[h] = 9; dbg.tackle(null, h); dbg.hour(12); }, h);
         await p.waitForTimeout(150);
-        const r = await p.evaluate(async ch => {
+        const r = await p.evaluate(async ([ch, PUMP]) => {
           const I = G.core.input, run = () => G.state.run, wy = () => G.scene.sailing.loc().waterY;
           dbg.cast(ch);
           const M = { t: 0, phase: 'wait', reelT: 0, depth0: 0, maxStall: 0 };
@@ -36,7 +38,7 @@ const HOOKS = 'worm,cricket,minnow,unlabelled,bobber,deep_bobber,crankbait,big_c
               return;
             }
             if (M.phase === 'reel') {
-              I.inject('action', true); M.reelT += dt;
+              I.inject('action', !PUMP || (M.reelT % 0.8) < 0.5); M.reelT += dt;
               if (f === 'sailing') { M.phase = 'done'; I.inject('action', false); }
             }
           });
@@ -48,7 +50,7 @@ const HOOKS = 'worm,cricket,minnow,unlabelled,bobber,deep_bobber,crankbait,big_c
           for (let i = 0; i < 300 && run().fsm !== 'sailing'; i++) { await new Promise(res => setTimeout(res, 100)); if (i > 150) { run().fsm = 'sailing'; } }
           G.core.loop.setOnStep(null); G.core.loop.setScale(1); I.inject('action', false);
           return out;
-        }, ch);
+        }, [ch, PUMP]);
         if (!r.out || r.secs > LIMIT) bad++;
         row.push(r.out ? r.depth + 'm ' + r.secs + 's' : 'STUCK ' + r.depth + 'm->' + r.at + 'm ' + r.fsm);
         await p.waitForTimeout(300);
