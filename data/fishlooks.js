@@ -15,8 +15,9 @@ G.data = G.data || {};
   var FIN_OR = ['fish_orange_0', 'fish_orange_1', 'fish_orange_2', 'fish_orange_3'];
   function ramp(n) { return ['fish_' + n + '_0', 'fish_' + n + '_1', 'fish_' + n + '_2', 'fish_' + n + '_3', 'fish_' + n + '_4', 'fish_' + n + '_5']; }
   // The fins most of these share: a pelvic hanging back under the pectoral, a pectoral over the flank.
-  function pelvic(x, len, r) { return { k: 'pelvic', x: x, v: 0.9, ang: 124, len: len * 1.4, spread: 46, prof: [0.7, 1, 0.9, 0.6], rays: 6, ramp: r }; }
-  function pectoral(x, v, len, r) { return { k: 'pectoral', x: x + 0.01, v: v, ang: 172, len: len * 1.6, spread: 64, prof: [0.4, 0.75, 0.95, 1, 0.8], rays: 8, front: true, clear: true, ramp: r }; }
+  // Compact, swept fins like the reference plates; the flank stays the main silhouette.
+  function pelvic(x, len, r) { return { k: 'pelvic', x: x, v: 0.9, ang: 136, len: len * 1.1, spread: 38, prof: [0.7, 1, 0.9, 0.6], rays: 5, ramp: r }; }
+  function pectoral(x, v, len, r) { return { k: 'pectoral', x: x + 0.01, v: v, ang: 162, len: len * 1.2, spread: 40, prof: [0.4, 0.75, 0.95, 1, 0.8], rays: 5, front: true, clear: true, ramp: r }; }
 
   // Phase 71: the salmonids' fins: a soft dorsal tallest in front, the adipose behind it, the anal,
   // the pelvics under the dorsal (far back, as in every trout), the pectoral low behind the gill.
