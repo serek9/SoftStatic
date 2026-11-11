@@ -259,7 +259,7 @@ G.gfx.fishgen = (function () {
 
     // 1. The fins behind the body: the tail, the edge fins, the fan fins not in front.
     var r0 = (profile(L.body, 2, 0) - profile(L.body, 1, 0)) / 2, c0 = (profile(L.body, 2, 0) + profile(L.body, 1, 0)) / 2;
-    var sp = T.spread * ts, thMax = Math.atan2(sp, 0.06 + T.len), tRays = Math.max(2, Math.min(T.rays || 12, Math.floor(2 * sp * Lp / 2.6) + 1)); // rays 2-3 px apart at the edge
+    var sp = T.spread * ts, thMax = Math.atan2(sp, 0.06 + T.len), tRays = Math.max(2, Math.min(T.rays || 12, Math.floor(2 * sp * Lp / 3.5) + 1)); // leave clusters of membrane between the rays
     for (py = 0; py < H; py++) for (px = 0; px < W; px++) {
       var X = Xs[px], Y = Ys[py], p = py * W + px;
       if (X < 0.03) {
@@ -274,7 +274,7 @@ G.gfx.fishgen = (function () {
           if (Math.abs(dy) <= hh && s <= smax) {
             var ang = Math.atan2(dy, 0.06 - Xt), q = (ang / thMax + 1) / 2 * (tRays - 1), fr = Math.abs(q - Math.round(q));
             var spacing = 2 * thMax / (tRays - 1) * Math.sqrt(dy * dy + (0.06 - Xt) * (0.06 - Xt)) * Lp * tc;
-            var n = s < 0.05 ? 1 : (fr * spacing < 0.6 ? 0 : ((smax - s) * T.len * Lp * tc < 1.2 ? 3 : 2));
+            var n = s < 0.05 ? 1 : (fr * spacing < 0.45 ? 1 : ((smax - s) * T.len * Lp * tc < 1.2 ? 3 : 2));
             if (away) n -= 1;
             var key = fk(tailR, n);
             if (T.tip && dy > 0 && u > 0.55 && (smax - s) * T.len * Lp < 3.2) key = T.tip;
@@ -289,7 +289,7 @@ G.gfx.fishgen = (function () {
       f = fins[k];
       var fr2 = f.ramp || finR;
       if (isEdgeFin(f)) {
-        var up = f.k !== 'anal', lean = f.lean || 0, span = f.b - f.a, nR = Math.min(f.rays || 0, Math.floor(span * Lp * sq / 3) + 1);
+        var up = f.k !== 'anal', lean = f.lean || 0, span = f.b - f.a, nR = Math.min(f.rays || 0, Math.floor(span * Lp * sq / 4) + 1);
         var pa = Math.max(0, PX(f.a - 0.08) - 2), pb = Math.min(W - 1, PX(f.b + 0.02) + 2);
         for (px = pa; px <= pb; px++) for (py = 0; py < H; py++) {
           var p2 = py * W + px; if (kind[p2] === 2) continue;
@@ -302,7 +302,7 @@ G.gfx.fishgen = (function () {
           if (nR > 1) { var qq = t * (nR - 1); frR = Math.abs(qq - Math.round(qq)); isRay = frR * span * Lp * sq / (nR - 1) < 0.65; }
           var lim = f.spiny && !isRay ? hm * (1 - 0.45 * Math.min(1, frR * 2)) : hm;
           if (d > lim) continue;
-          var nn = f.k === 'adipose' ? 1 : (d < 1.2 / Lp ? 1 : (isRay ? 0 : (lim - d < 1.2 / Lp ? 3 : 2)));
+          var nn = f.k === 'adipose' ? 1 : (d < 1.2 / Lp ? 1 : (isRay ? 1 : (lim - d < 1.2 / Lp ? 3 : 2)));
           var key2 = fk(fr2, away ? nn - 1 : nn);
           if (f.spot && t >= f.spot[0] && t <= f.spot[1] && d / Math.max(1e-6, hm) >= f.spot[2] && d / Math.max(1e-6, hm) <= f.spot[3]) key2 = f.spot[4];
           if (f.mottle && nn === 2 && h2(px >> 1, py >> 1) < 0.3) key2 = f.mottle;
@@ -323,7 +323,10 @@ G.gfx.fishgen = (function () {
     }
     var maxBody = 0;
     for (px = 0; px < W; px++) maxBody = Math.max(maxBody, bt[px] - tp[px]);
-    var nRows = sc ? Math.max(3, Math.round(maxBody * Lp / sc.size)) : 0;
+    // Scale strokes suggest a few rows, rather than covering every band in a checkerboard.
+    // At swimmer size the species' bars/spots carry the detail; scales would only add noise.
+    var scaleSize = sc ? Math.max(4, sc.size) : 0;
+    var nRows = sc ? Math.max(3, Math.round(maxBody * Lp / scaleSize)) : 0;
     for (px = 0; px < W; px++) {
       var X3 = Xs[px];
       if (X3 < 0 || X3 > 1) continue;
@@ -334,16 +337,20 @@ G.gfx.fishgen = (function () {
         if (roll) v = 0.3 + 0.7 * v;
         var ramp = L.ramp, zs = L.zones, z;
         if (zs) for (z = 0; z < zs.length; z++) {
-          var Z = zs[z], wob = (h2(px, 7) - 0.5) * 0.06;
+          var Z = zs[z], wob = (h2(px >> 2, 7) - 0.5) * 0.035;
           if (X3 >= Z.x0 && X3 <= Z.x1 && v + wob >= Z.v0 && v <= Z.v1) ramp = Z.ramp;
         }
         var id0 = 0;
         while (id0 < L.stops.length && v >= L.stops[id0]) id0++;
-        if (L.sheen && v >= L.sheen[0] && v <= L.sheen[1] && X3 > 0.08 && X3 < gill) id0++;
-        if (sc && X3 > (sc.x0 || 0.03) && X3 < gill - 0.02 && v >= sc.v0 && v <= sc.v1) {
-          var rowf = v * nRows, row = Math.floor(rowf), colf = (px + ((row & 1) ? sc.size / 2 : 0)) / sc.size;
-          var cu = Math.floor((colf - Math.floor(colf)) * sc.size), cv = Math.floor((rowf - row) * sc.size);
-          if (STAMP[sc.size] && STAMP[sc.size][cv] && STAMP[sc.size][cv].charAt(cu) === 'x' && h2(Math.floor(colf), row + 17) < (sc.n || 0.6)) id0 += sc.d;
+        if (L.sheen && X3 > 0.08 && X3 < gill) {
+          var shine = Math.sin(Math.PI * clamp01((X3 - 0.08) / (gill - 0.08)));
+          var shineMid = (L.sheen[0] + L.sheen[1]) / 2 + 0.035 * (1 - shine);
+          if (Math.abs(v - shineMid) <= (L.sheen[1] - L.sheen[0]) * 0.5 * shine) id0++;
+        }
+        if (sc && Lp >= 40 && X3 > (sc.x0 || 0.03) && X3 < gill - 0.02 && v >= sc.v0 && v <= sc.v1) {
+          var rowf = v * nRows, row = Math.floor(rowf), colf = (px + ((row & 1) ? scaleSize / 2 : 0)) / scaleSize;
+          var cu = Math.floor((colf - Math.floor(colf)) * scaleSize), cv = Math.floor((rowf - row) * scaleSize);
+          if (STAMP[scaleSize] && STAMP[scaleSize][cv] && STAMP[scaleSize][cv].charAt(cu) === 'x' && h2(Math.floor(colf), row + 17) < (sc.n === undefined ? 0.38 : sc.n)) id0 += sc.d;
         }
         if (py === llY[px]) id0 += ll.d;
         if (X3 > gill - H0.bulge - 0.02) {
@@ -385,14 +392,16 @@ G.gfx.fishgen = (function () {
     eye(H0.eye);
     if (H0.eye2) eye(H0.eye2); // Phase 72: a flatfish's second eye, over the top of its head
     function eye(E) {
-      var ex = PX(E[0]), ey = PY(E[1]), R = Math.max(1, E[2] * Lp), Ri = Math.ceil(R + 1);
+      // A small dark eye with a fine iris, not a large gold ring. Keep one readable pixel
+      // when reduced for the journal grid or a swimmer.
+      var ex = PX(E[0]), ey = PY(E[1]), R = Math.max(1, E[2] * Lp * 0.72), Ri = Math.ceil(R + 1);
       for (var yy = -Ri; yy <= Ri; yy++) for (var xx = -Ri; xx <= Ri; xx++) {
         var qx = ex + xx, qy = ey + yy, dd = Math.sqrt((xx / sq) * (xx / sq) + yy * yy);
         if (qx < 0 || qy < 0 || qx >= W || qy >= H || dd > R + 0.3) continue;
         var pd = Math.sqrt(((xx - R * 0.12) / sq) * ((xx - R * 0.12) / sq) + yy * yy);
-        g[qy * W + qx] = dd > R - 0.8 && R >= 2 ? (H0.rim || 'ink') : (pd < R * 0.55 ? 'ink' : H0.iris);
+        g[qy * W + qx] = dd > R - 0.55 && R >= 2 ? (H0.rim || 'ink') : (pd < R * 0.68 ? 'fish_spot' : H0.iris);
       }
-      if (R >= 2) { var hx = ex + Math.round(R * 0.15 * sq), hy = ey - Math.round(R * 0.35); if (hx >= 0 && hy >= 0 && hx < W && hy < H) g[hy * W + hx] = 'cream'; }
+      if (R >= 2) { var hx = ex + Math.round(R * 0.15 * sq), hy = ey - Math.round(R * 0.35); if (hx >= 0 && hy >= 0 && hx < W && hy < H) g[hy * W + hx] = 'fish_white'; }
       else if (ex + 1 < W) g[ey * W + ex] = 'ink';
     }
 
@@ -422,11 +431,11 @@ G.gfx.fishgen = (function () {
         if (!front && kind[p5] === 2) continue;
         var q3 = uu * (nR - 1), fr4 = Math.abs(q3 - Math.round(q3)), ray = r > 1.5 && fr4 * (f.spread * D2R / (nR - 1)) * r < 0.55;
         var nn2 = r < 1.6 ? 1 : (ray ? 0 : (Rr - r < 1.1 ? 3 : 2));
-        // In front of the flank a fin needs its own edge to read: a dark rim, pale webbing, rays between.
-        if (front) nn2 = Rr - r < 1.1 || Math.abs(phi) > f.spread / 2 - 0.9 / Math.max(1, r) / D2R ? 0 : (ray ? 1 : 3);
+        // A swept translucent fin: a subdued rim and ribs, with the flank's colour in the web.
+        if (front) nn2 = Rr - r < 1.1 || Math.abs(phi) > f.spread / 2 - 0.9 / Math.max(1, r) / D2R ? 1 : (ray ? 1 : 2);
         if (roll && front) nn2 = Math.min(3, nn2 + 1);
         var key3 = fk(fr3, away && !front ? nn2 - 1 : nn2);
-        if (front && nn2 === 3 && kind[p5] === 2 && idx[p5] >= 0 && f.clear) key3 = rmp[p5][Math.min(rmp[p5].length - 1, idx[p5] + 1)];
+        if (front && nn2 === 2 && kind[p5] === 2 && idx[p5] >= 0 && f.clear) key3 = rmp[p5][idx[p5]];
         if (f.speck && r > 2 && speckAt(f.speck, xx2, yy2)) key3 = f.speck.key;
         if (f.lead && r > 1.5) { var dl2 = (f.lead[2] ? f.spread / 2 - phi : phi + f.spread / 2) * D2R * r; if (dl2 < 1.2) key3 = f.lead[0]; else if (f.lead[1] && dl2 < 2.4) key3 = f.lead[1]; }
         put(p5, key3, front ? 3 : 1);
