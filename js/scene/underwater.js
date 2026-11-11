@@ -854,6 +854,7 @@ G.scene.underwater = (function () {
       // Phase 103 (PLAN_FISHING.md): holding down (LINE on a phone) opens the bail: line pays out.
       c.free = !reel && run.bite.slot < 0 && inp.held('down') && !ice ? 1 : 0;
       c.rv = (c.rv || 0) + ((reel ? UW.reelIn : 0) - (c.rv || 0)) * Math.min(1, (reel ? RV.up : RV.down) * dt);
+      c.held = reel ? (c.held || 0) + dt : 0;                                     // Phase 110: s the reel has been held
       G.scene.boat.rodTip(run.boat, run.boat.x, wy, TIPW);
       var b = run.boat, home = b.x + b.facing * UW.reach, far = Math.abs(home - c.x1) > 14;
       var dx = TIPW[0] - c.x1, dy = TIPW[1] - c.ly, L = Math.sqrt(dx * dx + dy * dy) || 1, toward = home > c.x1 ? 1 : -1;
@@ -870,12 +871,21 @@ G.scene.underwater = (function () {
           var rat = gx.vary === 'rattle';                                         // Phase 69: a bladebait's short sharp lifts
           c.hop = (c.hop || 0) + dt * RV.hops * (rat ? RV.rattle : 1);
           // Phase 109: between lifts it falls, but never as far as the lift took it up (at most
-          // HOP_KEEP of it), so a heavy one still climbs on the reel and comes out at the boat;
+          // RV.keep of it), so a heavy one still climbs on the reel and comes out at the boat;
           // before, the Heavy Bladebait (sink 2.6) fell further than it rose and sat on the bed.
+          // Phase 110: and over a whole hop it climbs at least RV.climb of the line's own pull (as
+          // a spoon does), so held on the reel it comes up as fast as the other lures; before, a
+          // bladebait under the boat crept up 3 px/s and took 25 s to come out from the bed.
           var upK = rat ? 0.2 : 0.3, vUp = vy - v * (rat ? 1.7 : 1.3), fallMax = Math.max(0, -vUp) * upK / (1 - upK) * RV.keep;
-          vy = (c.hop % 1) < upK ? vUp : Math.min(UW.sinkV * gx.sink * 0.7, fallMax); vx *= 0.75;
+          var fallLine = (RV.climb * vy - upK * vUp) / (1 - upK);
+          vy = (c.hop % 1) < upK ? vUp : Math.min(UW.sinkV * gx.sink * 0.7, fallMax, fallLine); vx *= 0.75;
         }
-        else if (sw === 'dropshot') { vx *= 0.45; vy = far ? clamp((floorPx - depth0) * 2, -UW.reelUp, UW.reelUp) : -UW.reelUp; } // Phase 69: along the bed
+        else if (sw === 'dropshot') {
+          // Phase 69: dragged slowly along the bed. Phase 110: held on past RV.drag s, the reel
+          // lifts the weight off the bed and it comes in like a spoon (before, 23-43 s from the bed).
+          if (c.held < RV.drag) { vx *= 0.45; vy = far ? clamp((floorPx - depth0) * 2, -UW.reelUp, UW.reelUp) : -UW.reelUp; }
+          else vy *= RV.climb;
+        }
         else if (sw === 'wacky') vy *= 0.4;                                        // level
         else if (sw === 'glide') {                                                  // wide slow S-glides at its depth
           c.glide = (c.glide || 0) + dt * RV.glide;
@@ -1017,7 +1027,7 @@ G.scene.underwater = (function () {
   // px/s under which the lure counts as paused; tight: s the line stays tight after the reel
   // stops (the pendulum); lift: the spinner's rise per px/s; hops: the jig's hops a second.
   // Phase 69: rattle: × the hops of a bladebait; glide: the glidebait's S-glides a second.
-  var RV = { up: 7, down: 4, still: 0.6, tight: 1.6, lift: 0.3, hops: 2.2, rattle: 1.6, glide: 0.45, keep: 0.8 }, TIPW = [0, 0]; // keep: Phase 109
+  var RV = { up: 7, down: 4, still: 0.6, tight: 1.6, lift: 0.3, hops: 2.2, rattle: 1.6, glide: 0.45, keep: 0.8, climb: 0.6, drag: 1.2 }, TIPW = [0, 0]; // keep: Phase 109; climb, drag: Phase 110
   // Phase 103: letting out line. extra: px of line past the rod's cast length; drift: px/s a
   // floating lure drifts away on a still lake's wind (x 0.5-1.5 by the grey hours' wind); fall: x
   // its sink speed as it free-falls on a slack line; clickGap: s between the spool's clicks.
