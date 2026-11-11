@@ -113,8 +113,8 @@ G.gfx.sprites = (function () {
     fish_orange_0: '#9a4826', fish_orange_1: '#b05a2c', fish_orange_2: '#cc7840', fish_orange_3: '#e29c6c',
     // Phase 71: the trouts, salmon, chars and whitefish: body ramps as above, the zones' ramps
     // (a rainbow's band, a char's belly, a sockeye's green head), fin ramps and the markings' keys.
-    fish_rainbow_0: '#2e2c1c', fish_rainbow_1: '#4a4630', fish_rainbow_2: '#6c6a4a', fish_rainbow_3: '#928e6e', fish_rainbow_4: '#bab49c', fish_rainbow_5: '#dedacc',
-    fish_pinkband_0: '#6e403c', fish_pinkband_1: '#8e5650', fish_pinkband_2: '#ac746a', fish_pinkband_3: '#c89488',
+    fish_rainbow_0: '#23352e', fish_rainbow_1: '#3e5544', fish_rainbow_2: '#687c61', fish_rainbow_3: '#9baa91', fish_rainbow_4: '#c3cdb8', fish_rainbow_5: '#e5e8d9',
+    fish_pinkband_0: '#71494f', fish_pinkband_1: '#a06877', fish_pinkband_2: '#c38f9a', fish_pinkband_3: '#debbc0',
     fish_steel_0: '#262a30', fish_steel_1: '#3a4048', fish_steel_2: '#565e68', fish_steel_3: '#7a828c', fish_steel_4: '#a2a8ae', fish_steel_5: '#ced2d0',
     fish_brown_0: '#3a2a16', fish_brown_1: '#584020', fish_brown_2: '#7c5c2e', fish_brown_3: '#a28040', fish_brown_4: '#c4a462', fish_brown_5: '#e0cc9a',
     fish_brook_0: '#202418', fish_brook_1: '#323a24', fish_brook_2: '#4a5432', fish_brook_3: '#667046', fish_brook_4: '#8a8e62', fish_brook_5: '#c2bea0',
@@ -220,6 +220,22 @@ G.gfx.sprites = (function () {
   for (var k in PALETTE) {
     var h = parseInt(PALETTE[k].slice(1), 16);
     RGB[k] = [(h >> 16) & 255, (h >> 8) & 255, h & 255];
+  }
+  // Fish material ramps can place an intermediate plane between any two species colours,
+  // including zone and winter ramps. Register it once at bake time, never during drawing.
+  var fishMixes = {};
+  function fishBlend(a, b) {
+    if (a === b) return a;
+    var id = a + ':' + b, key = fishMixes[id];
+    if (key) return key;
+    key = a + '_mix_' + b;
+    var ac = RGB[a], bc = RGB[b], rgb = [], hex = '#';
+    for (var i = 0; i < 3; i++) {
+      rgb[i] = Math.round((ac[i] + bc[i]) / 2);
+      hex += (rgb[i] < 16 ? '0' : '') + rgb[i].toString(16);
+    }
+    PALETTE[key] = hex; RGB[key] = rgb; fishMixes[id] = key;
+    return key;
   }
 
   function lumOf(r, g, b) { return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
@@ -561,7 +577,7 @@ G.gfx.sprites = (function () {
 
   return {
     PALETTE: PALETTE, RGB: RGB, CEILING_KEY: CEILING_KEY, CEILING: CEILING, SKY_WATER: SKY_WATER,
-    lum: lum, skySafe: skySafe, shift: shift,
+    lum: lum, skySafe: skySafe, shift: shift, fishBlend: fishBlend,
     def: def, get: get, draw: draw, verify: verify, names: names,
     FONT_H: FONT_H, LINE_H: LINE_H, drawText: BASE.drawText, measure: BASE.measure, wrap: BASE.wrap, hash: hash,
     makeFont: makeFont, fine: FINE
