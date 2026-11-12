@@ -44,6 +44,7 @@ node tools/balance.js --feed                     # each species against the ways
 node tools/lures.js                              # every hook dropped, slacked and worked in the real game (Phase 104; needs the server)
 node tools/angler.js 4                           # the angler bot fishes all 27 hooks in the real game, ~25 min (Phase 106; needs the server)
 node tools/reel.js                               # every hook reeled in from the bed within 15 s, in the real game (Phase 110; needs the server)
+node tools/reel.js pines "" pump                 # the same, reeled in pulses, within 20 s (Phase 113)
 ```
 
 On Windows, use `python` instead of `python3`. URL flags: `?debug` (overlay, `dbg` console API), `?seed=N`, `?gallery`, `?tour` (every water open on the map, nothing saved), `?sw` (use the offline service worker on localhost too).
