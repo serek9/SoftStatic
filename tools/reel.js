@@ -5,7 +5,7 @@
 // out. Needs the game served:
 //   python3 -m http.server 5517 --bind 127.0.0.1
 //   node tools/reel.js [water,water = pines] [hook,hook,...] [pump]     (exit 1 on a FAIL)
-// Phase 111: pump reels in pulses (0.5 s held, 0.3 s let go), the way a player taps it in;
+// Phase 113: pump reels in pulses (0.5 s held, 0.3 s let go), the way a player taps it in;
 // its limit is 20 s.
 const { chromium } = require('playwright');
 const PUMP = process.argv[4] === 'pump', LIMIT = PUMP ? 20 : 15;
