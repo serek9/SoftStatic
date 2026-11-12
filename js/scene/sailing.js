@@ -528,6 +528,8 @@ G.scene.sailing = (function () {
   //   surface(c, run, loc): Phase 77, after the waterline and the pier's posts: what moves on the
   //     water (a river's riffles, white water, spill and mist), in world px at the view's scale
   //   things(loc): Phase 77, the live parts by world x [{kind, x: [from, to]}], for dbg.shore()
+  //   afterMist(c, run, loc, fogA): Phase 114, after the mist (main pass only, not the mirror):
+  //     a light's halo scattered in it; fogA is the mist's alpha
   //   debugLine(run): the module's overlay line
   var NO_SCENERY = {}, scen = NO_SCENERY;
   // Phase 49: what each layer's painter says it painted (kinds of tree, the shore's things),
@@ -2185,6 +2187,7 @@ G.scene.sailing = (function () {
     }
     drawRelease(ctx, run);
     drawMist(ctx);
+    if (scen.afterMist) scen.afterMist(ctx, run, loc, fogMul() / FOG_HEAD); // Phase 114: lights scattered in the mist
     drawRain(ctx);
     G.scene.underwater.drawHooked(ctx, loc, camPx, camPy, run.boat.t);
     drawCast(ctx);

@@ -31,6 +31,24 @@ G.scene.scenery = (function () {
   // Geometry shared by the painters and the live parts, in layer pixels, relative to each
   // feature's x (the data's x times HI).
   var DINER = { w: 56, h: 18, signX: 36, signW: 24, signH: 11 };
+  // Phase 114: the diner's sign reads GREAT / NORTHERN in neon channel letters on a slim rail
+  // held high over the roof on two poles, above the woods in front (it was EAT in a black box on
+  // the roof, behind those trees). lift: px from the roof's top to the rail; lineH:
+  // px between the two rows' tops. x[i] is each row's left edge from the diner's x, off[i][k] each
+  // letter's from its row's (filled once, from the fine font, by signLayout).
+  var SIGN = { words: ['GREAT', 'NORTHERN'], lift: 54, lineH: 9, x: [0, 0], w: [0, 0], off: [[], []], ready: false, left: 0, right: 0 };
+  function signLayout() {
+    if (SIGN.ready) return SIGN;
+    SIGN.left = DINER.w; SIGN.right = 0;
+    for (var i = 0; i < 2; i++) {
+      var wd = SIGN.words[i];
+      SIGN.w[i] = F.measure(wd); SIGN.x[i] = (DINER.w - SIGN.w[i]) >> 1;
+      for (var k = 0; k < wd.length; k++) SIGN.off[i][k] = k ? F.measure(wd.substring(0, k)) + 1 : 0;
+      SIGN.left = Math.min(SIGN.left, SIGN.x[i]); SIGN.right = Math.max(SIGN.right, SIGN.x[i] + SIGN.w[i]);
+    }
+    SIGN.ready = true;
+    return SIGN;
+  }
   var LOT = { w: 88, lampGap: 28, lampH: 22 };
   var SIGNAL = { pole: 24, top: 60, boxH: 18 }; // pole offset, its height, the housing's height
 
@@ -70,8 +88,12 @@ G.scene.scenery = (function () {
             for (x = dx + 4; x < dx + DINER.w - 8; x += 7) { A.box(ctx, 'dusk_amber', x, dy + 5, 6, 5); A.box(ctx, 'dusk_high', x, dy + 5, 6, 1); }   // the long window
             A.box(ctx, 'rust_dark', dx + DINER.w - 7, dy + 6, 5, DINER.h - 6);               // the door
             A.box(ctx, 'stone_lit', dx, dy + 13, DINER.w, 1);                              // the chrome strip
-            A.box(ctx, 'stone_dark', dx + DINER.signX + 10, dy - 14, 2, 12);                // sign post
-            A.box(ctx, 'ink', dx + DINER.signX, dy - 14 - DINER.signH, DINER.signW, DINER.signH);
+            // Phase 114: the sign's slim rail on two thin posts; its letters are lit live (afterLayer).
+            var sg = signLayout(), ry = dy - 2 - SIGN.lift;
+            A.box(ctx, 'stone_dark', dx + sg.left - 3, ry, sg.right - sg.left + 6, 1);
+            A.box(ctx, 'ink', dx + sg.left - 3, ry + 1, sg.right - sg.left + 6, 1);
+            A.box(ctx, 'stone_dark', dx + sg.left, ry + 2, 1, SIGN.lift - 2);
+            A.box(ctx, 'stone_dark', dx + sg.right - 1, ry + 2, 1, SIGN.lift - 2);
           } else if (f.kind === 'lot') {
             A.box(ctx, 'stone_dark', f.x, L.base - 2, LOT.w, 4); A.box(ctx, 'stone', f.x, L.base - 2, LOT.w, 1);
             for (x = f.x + 4; x < f.x + LOT.w; x += 10) A.box(ctx, 'stone_hi', x, L.base - 1, 1, 2);   // painted bays
@@ -149,15 +171,24 @@ G.scene.scenery = (function () {
       var s = run.scen, k, x, y, oxN = Math.round(ox * HI), oyN = Math.round(oy * HI);
       if (id === 'farshore') {
         native(c);
-        // Neon: EAT in red on the sign, mostly lit, dropping out for a beat now and then.
-        var dx = s.diner.x * HI - oxN + DINER.signX, dy = s.far.base * HI - DINER.h - 14 - DINER.signH - oyN;
-        if ((S.hash(17, Math.floor(s.t * 8)) & 31) > 1) {
-          c.globalAlpha = 0.22; c.fillStyle = P.neon_red; c.fillRect(dx - 3, dy - 3, DINER.signW + 6, DINER.signH + 6);
-          c.globalAlpha = 1;
-          c.fillRect(dx, dy, DINER.signW, 1); c.fillRect(dx, dy + DINER.signH - 1, DINER.signW, 1);
-          c.fillRect(dx, dy, 1, DINER.signH); c.fillRect(dx + DINER.signW - 1, dy, 1, DINER.signH);
-          F.drawText(c, 'EAT', dx + ((DINER.signW - F.measure('EAT')) >> 1), dy + 2, 'neon_teal');
+        // Phase 114: GREAT / NORTHERN in pale neon over the diner, airy: a wide lilac haze that
+        // breathes, warm light spilling under each letter, mist drifting through, and letters that
+        // each falter on their own now and then (one tired letter more often); once in a while the
+        // whole sign sags to a glimmer for a beat, never quite off.
+        var sg = signLayout(), x0 = s.diner.x * HI - oxN, ry = s.far.base * HI - DINER.h - 2 - SIGN.lift - oyN;
+        var top = ry - 8 - SIGN.lineH, sw = sg.right - sg.left, sh = ry - top;
+        var br = 0.82 + 0.18 * Math.sin(s.t * 0.9), sag = (S.hash(17, Math.floor(s.t * 8)) & 63) === 0 ? 0.25 : 1;
+        s.signCx = x0 + ((sg.left + sg.right) >> 1); s.signCy = top + (sh >> 1); s.signW = sw; s.signH = sh; s.signA = br * sag; // for afterMist
+        for (var li = 0; li < 2; li++) {
+          var wd = SIGN.words[li], wx = x0 + SIGN.x[li], wy2 = top + li * SIGN.lineH;
+          for (var ki = 0; ki < wd.length; ki++) {
+            var hz = S.hash(31 + li * 16 + ki, Math.floor(s.t * 6)) & 63, tired = li === 1 && ki === 4 && (S.hash(29, Math.floor(s.t * 3)) & 7) < 2;
+            var la = (hz === 0 ? 0.3 : 1) * (tired ? 0.45 : 1) * sag;
+            c.globalAlpha = 0.3 * la; F.drawText(c, wd[ki], wx + SIGN.off[li][ki], wy2 + 1, 'signal_amber');
+            c.globalAlpha = la * (0.75 + 0.25 * br); F.drawText(c, wd[ki], wx + SIGN.off[li][ki], wy2, 'lamp_glow');
+          }
         }
+        c.globalAlpha = 1;
         // The lot's fluorescent lamps; the middle one has a bad starter and stutters in bursts.
         for (k = 0; k < s.lot.lamps; k++) {
           if (k === 1 && !lampLit(s.t)) continue;
@@ -186,6 +217,31 @@ G.scene.scenery = (function () {
         var owl = G.scene.sailing.owl(s.eyes);
         c.drawImage(owl, s.owl.x + 6 - ox - owl.width / HI / 2, loc.waterY - 27 - owl.height / HI - oy + 1, owl.width / HI, owl.height / HI);
       }
+    },
+
+    // Phase 114: the sign's halo, drawn over the mist (sailing.js, after drawMist): its light
+    // scattered in the fog, stronger the thicker the fog (fogA), with mist drifting through it.
+    afterMist: function (c, run, loc, fogA) {
+      var s = run.scen, k;
+      if (s.signA === undefined) return;
+      native(c);
+      var hcx = s.signCx, hcy = s.signCy, sw = s.signW, sh = s.signH, top = hcy - (sh >> 1), sg = SIGN, x0 = hcx - (sw >> 1) - sg.left;
+      var f = 0.6 + 0.8 * Math.min(1, fogA || 0), br = s.signA;
+      for (k = 0; k < 6; k++) {
+        var rx = (sw >> 1) + 4 + k * 6, ryy = (sh >> 1) + 3 + k * 4;
+        c.globalAlpha = (k < 2 ? 0.07 : 0.04) * br * f; c.fillStyle = k < 2 ? P.lamp_glow : P.fog_lav_hi;
+        for (var yy = -ryy; yy < ryy; yy += 2) {
+          var e = (yy + 1) / ryy, hw = Math.round(rx * Math.sqrt(Math.max(0, 1 - e * e)));
+          if (hw > 0) c.fillRect(hcx - hw, hcy + yy, hw * 2, 2);
+        }
+      }
+      c.fillStyle = P.fog_light;                                         // mist drifting through the letters
+      for (k = 0; k < 3; k++) {
+        c.globalAlpha = 0.09;
+        c.fillRect(x0 + sg.left - 24 + ((s.t * (3 + k) + k * 37) % (sw + 48)), top + 2 + k * 6, 16 - k * 3, 1);
+      }
+      c.globalAlpha = 1;
+      c.restore();
     },
 
     debugLine: function (run) {
