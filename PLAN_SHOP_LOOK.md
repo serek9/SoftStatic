@@ -1,6 +1,6 @@
 # Tienda: redibujado procedural cozy y misterio rural
 
-**Fecha:** 2026-11-13. **Estado:** fases 117–120 implementadas; 121–123 en curso.
+**Fecha:** 2026-11-13. **Estado:** fases 117–121 implementadas; 122–123 en curso.
 
 La petición es cambiar todo el lenguaje visual de la tienda usando el sistema de
 dibujo que ya tiene SoftStatic. Las ilustraciones generadas son referencias de
@@ -147,6 +147,10 @@ fragmentos del sprite antiguo. La cabaña y las apariencias guardadas siguen fun
 
 ### Fase 121 — Luz, ventanas y atmósfera del lago
 
+**Implementada (2026-11-13):** Baked warm floor pools under furniture, cool translucent night shadow with local light falloff, muted warm string bulbs and matte timber. Original lake windows still follow actual game hour, rain and fog.
+
+**Verificación:** No browser errors in noon, dusk and night captures. Floor light precedes sorted furniture and characters.
+
 **Archivos:** `js/ui/shop_room.js`, opciones locales de `js/ui/room_kit.js`.
 
 1. Establecer una luz dominante y focos secundarios: lámpara de pie, lámpara de
@@ -211,4 +215,4 @@ buscado. La revisión se hace con capturas y una secuencia del juego funcionando
 - Medir el presupuesto en el mismo ejecutor, con sprites ya preparados. Mantener
   ausencia de arte regenerado durante `draw` y explicar cualquier coste adicional.
 
-**Siguiente trabajo previsto:** fase 121. El usuario ha autorizado continuar con todas las fases.
+**Siguiente trabajo previsto:** fase 122. El usuario ha autorizado continuar con todas las fases.

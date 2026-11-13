@@ -1,12 +1,12 @@
 # SoftStatic: Handoff
 
-## Latest work: procedural shop, phase 120 (2026-11-13)
+## Latest work: procedural shop, phase 121 (2026-11-13)
 
-Fresh native shop-only geometry for the fisher, Rusty and four dog breeds, with all facings, walking poses and shopkeeper gestures. Cosmetic coats, hats and breed silhouettes retained; original cabin painters unchanged.
+Baked warm floor pools under furniture, cool translucent night shadow with local light falloff, muted warm string bulbs and matte timber. Original lake windows still follow actual game hour, rain and fog.
 
-Checks: Three-hour native captures without browser errors; all active figures prebaked on shop entry.
+Checks: No browser errors in noon, dusk and night captures. Floor light precedes sorted furniture and characters.
 
-The user authorized all remaining shop phases on 2026-11-13. Phase 120 is done. Continue with phase 121; no further phase-start confirmation is needed.
+The user authorized all remaining shop phases on 2026-11-13. Phase 121 is done. Continue with phase 122; no further phase-start confirmation is needed.
 
 ## State in one paragraph
 

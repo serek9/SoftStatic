@@ -496,10 +496,29 @@ G.ui.shopRoom = (function () {
     F.drawText(ctx, s, x, y, on ? 'neon_pink_hi' : 'pink_dark');
     F.drawText(ctx, s, x + 1, y, on ? 'neon_pink' : 'pink_dark');
   }
+  var floorGlow = null;
+  function bakeLight() {
+    if (mask) return;
+    mask = G.gfx.bake.layer(W, RH, function (c) {
+      for (var y=0;y<RH;y+=2) for(var x=0;x<W;x+=2) {
+        if(clearAt(x,y))continue;
+        var lamp=Math.max(0,1-Math.pow((x-LAMP[0])/100,2)-Math.pow((y-LAMP[1]+8)/95,2));
+        var desk=Math.max(0,1-Math.pow((x-DESK[0])/62,2)-Math.pow((y-DESK[1])/70,2));
+        c.globalAlpha=.49-Math.max(lamp*.38,desk*.37);c.fillStyle=P.shop117_edge;c.fillRect(x,y,2,2);
+      } c.globalAlpha=1;
+    });
+    floorGlow=G.gfx.bake.layer(W,RH,function(c){
+      for(var y=ty(2);y<ty(7);y+=2)for(var x=T;x<W-T;x+=2){
+        var a=Math.max(0,1-Math.pow((x-LAMP[0]-28)/88,2)-Math.pow((y-ty(5))/46,2));
+        var b=Math.max(0,1-Math.pow((x-DESK[0]+15)/65,2)-Math.pow((y-ty(4))/31,2));
+        c.globalAlpha=Math.max(a*.19,b*.13);c.fillStyle=P.shop117_lamp;c.fillRect(x,y,2,2);
+      }c.globalAlpha=1;
+    });
+  }
   function drawLight(ctx, env, t, rusty, ox, oy) {
     var i;
     if (env.night > 0.02) {
-      if (!mask) mask = K.nightMask(W, RH, [{ x: LAMP[0], y: LAMP[1], r: 118 }, { x: DESK[0], y: DESK[1] - 6, r: 52 }, { x: tvRect ? tvRect[0] + 8 : 0, y: tvRect ? tvRect[1] + 18 : 0, r: 34 }], clearAt);
+      bakeLight();
       ctx.globalAlpha = env.night; ctx.drawImage(mask, ox, oy); ctx.globalAlpha = 1;
       ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.45 * env.night;                 // dust in the lamplight
       for (i = 0; i < 11; i++) {
@@ -508,12 +527,12 @@ G.ui.shopRoom = (function () {
       }
       ctx.globalAlpha = 1;
     } else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + T, oy + TOP + 2, W - 2 * T, RH - TOP - 2); ctx.globalAlpha = 1; }
-    K.bulbs(ctx, bulbPts(ox, oy), t, env.night);
+    for(i=0;i<cable.length;i++){var bulb=cable[i];ctx.fillStyle=P.shop117_metal_dk;ctx.fillRect(ox+bulb[0],oy+bulb[1],2,2);ctx.fillStyle=P[i%4===0?'shop117_cloth':'shop117_lamp'];ctx.fillRect(ox+bulb[0],oy+bulb[1]+2,1,2);}
     moths(ctx, env, t, ox, oy);
     K.lavaLamp(ctx, ox + tx(6) + 22, oy + ty(1) - 30, t, true, env.night);             // Phase 64: on top of the gear shelf
     if (tvRect) K.glare(ctx, ox + tvRect[0], oy + tvRect[1], tvRect[2], tvRect[3]);
     // The floor lamp's shade, lit at night.
-    if (env.night > 0.3) K.glow(ctx, ox + LAMP[0], oy + LAMP[1] - 22, 15, 'lamp_glow', 0.06 * env.night);
+    if(env.night>.3){ctx.globalAlpha=env.night*.3;ctx.fillStyle=P.shop117_lamp;ctx.fillRect(ox+tx(3)+10,oy+ty(5)-53,11,12);ctx.globalAlpha=1;}
     // The tank's bubbles; steam from Rusty's cup; smoke from the ashtray.
     ctx.fillStyle = P.water_foam;
     for (i = 0; i < 4; i++) { var u = (t * 0.5 + i / 4) % 1; ctx.fillRect(ox + tx(1) + 26 - (i % 2), oy + ty(5) + 11 - Math.floor(u * 15), 1, 1); }
@@ -532,8 +551,7 @@ G.ui.shopRoom = (function () {
   // cooler's glass, the lava lamp on the counter's top; the windows give back the lamps.
   function reflections(ctx, env, t, ox, oy) {
     var n = env.night;
-    K.reflect(ctx, ox + LAMP[0], oy + ty(5) - 1, 10, 26, 'lamp_glow', 0.2 * n, 0);
-    K.reflect(ctx, ox + tx(10) + 16, oy + ty(6), 18, 22, 'crt_glow', 0.06 + 0.1 * n, 0);
+    bakeLight();ctx.globalAlpha=.4+.6*n;ctx.drawImage(floorGlow,ox,oy);ctx.globalAlpha=1;
     for (var i = 0; i < WINS.length; i++) { var g = glassRect(i); K.glassLamps(ctx, ox + g[0], oy + g[1], g[2], g[3], n); }
   }
   // Moths round the floor lamp's shade and the banker's lamp at night.
@@ -645,7 +663,7 @@ G.ui.shopRoom = (function () {
     create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: prebake,
     bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
     // Phase 64 (dbg.roomLife): the live things in the room.
-    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 120, study: ['wall/floor bay', 'linen lamp', 'enamel counter corner', 'faceted monstera'], live: n, things: ['lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 121, study: ['wall/floor bay', 'linen lamp', 'enamel counter corner', 'faceted monstera'], live: n, things: ['lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {
