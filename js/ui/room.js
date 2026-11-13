@@ -511,11 +511,13 @@ G.ui.room = (function () {
   }
 
   // ---- Phase 116: the people as minis -------------------------------------------------------
-  // The fisher and Rusty are drawn for a 32×48 box; a mini view paints them into 24×34 shape by
-  // shape (as X.scaled does), the head at 0.78 and the body below the neck at 0.58, so they
-  // stand a tile tall with a big head, as the user's reference has them. Callbacks get the
-  // painter's own coordinates.
-  var MH = 0.78, MB = 0.58, MY = 17, MC = 12, MW = 24, MHT = 34;
+  // The fisher and Rusty are drawn for a 32×48 box; a mini view paints them shape by shape (as
+  // X.scaled does), the head (above y 17) and the body each at their own scale. Callbacks get
+  // the painter's own coordinates.
+  // Phase 117: chibi, as the reference has them: the head at 1.45 (Rusty's 1.95), the body at 0.82.
+  var MH = 1.45, MB = 0.82, MY = 17, MC = 24, MW = 48, MHT = 52;
+  var MINI = { fisher: [1.45, 0.82], rusty: [1.95, 0.82] };
+  function useMini(kind) { var m = MINI[kind] || MINI.fisher; MH = m[0]; MB = m[1]; MC = Math.ceil(16 * Math.max(MH, MB)) + 1; MW = MC * 2; MHT = Math.ceil(mY(48)) + 1; }
   function msc(y) { return y < MY ? MH : MB; }
   function mY(y) { return 1 + (y < MY ? y * MH : MY * MH + (y - MY) * MB); }
   function mX(x, y) { return MC + (x - 16) * msc(y); }
@@ -577,10 +579,10 @@ G.ui.room = (function () {
     // box; a scaled grid paints them at the breed's size (data/looks.js size: a golden
     // retriever's back comes to a third of his height, as a real one's comes to a man's hip).
     if (kind === 'dog') { var s = dogScale(L); g = X.grid(Math.ceil(w * s) + 1, Math.ceil(h * s) + 1); paintDog(X.scaled(g, s), d, fr, L); }
-    else { g = X.grid(MW, MHT); var m = new Mini(g); if (kind === 'rusty') paintRusty(m, d, fr); else paintFisher(m, d, fr, L); }
+    else { useMini(kind); g = X.grid(MW, MHT); var m = new Mini(g); if (kind === 'rusty') paintRusty(m, d, fr); else paintFisher(m, d, fr, L); }
     return (art[key] = g.canvas());
   }
-  function dogScale(L) { return (L && L.size ? L.size : 0.7) * 0.72; }                 // Phase 116: a mini beside the mini fisher
+  function dogScale(L) { return (L && L.size ? L.size : 0.7) * 1.12; }                 // Phase 117: beside the chibi fisher
   // Where a sprite's feet are within it: [x, y]. lk: the dog's look (its size).
   var anc = [0, 0];
   function anchor(kind, dir, lk) {
@@ -589,7 +591,7 @@ G.ui.room = (function () {
       anc[0] = Math.round((dir === 'left' || dir === 'right' ? 20 : 16) * s); anc[1] = Math.round(30 * s);
       return anc;
     }
-    anc[0] = MC; anc[1] = Math.round(mY(46));
+    useMini(kind); anc[0] = MC; anc[1] = Math.round(mY(46));
     return anc;
   }
   // Paints a look's fisher or dog in every facing and frame. Returns the ms it took.
@@ -609,7 +611,7 @@ G.ui.room = (function () {
   // Draws a walking figure with its feet at (x, y), its shadow under it.
   function drawFigure(ctx, kind, dir, fr, x, y, lk) {
     var img = sprite(kind, dir, fr, lk), a = anchor(kind, dir, lk), ds = kind === 'dog' ? dogScale(look('dog', lk)) : 1;
-    shadow(ctx, x, y, kind === 'dog' ? Math.round((dir === 'left' || dir === 'right' ? 26 : 18) * ds) : 15);
+    shadow(ctx, x, y, kind === 'dog' ? Math.round((dir === 'left' || dir === 'right' ? 26 : 18) * ds) : 22);
     ctx.drawImage(img, Math.round(x - a[0]), Math.round(y - a[1]));
   }
 

@@ -631,9 +631,10 @@ G.ui.roomKit = (function () {
       g.set('pink_hi', 5, 9); g.set('cream', 4, 10); g.set('cream', 6, 10);                    // the nose, the muzzle
     }));
   }
-  function cat(ctx, x, y, t) {
+  function cat(ctx, x, y, t, s) {
     var f = (t % 11) < 0.5 || (t % 17) > 16.6 ? 2 : (Math.sin(t * 1.6) > 0 ? 1 : 0);
-    ctx.drawImage(catFrame(f), x, y - 13);
+    s = s || 1;                                                                                 // Phase 117: the shop's cat at 2×
+    ctx.drawImage(catFrame(f), x, y - 13 * s, 20 * s, 13 * s);
   }
 
   return { hash: hash, FLOOR: FLOOR, PANEL: PANEL, WOOD: WOOD, LOG: LOG,
