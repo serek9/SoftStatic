@@ -13,15 +13,10 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // he stands behind, with the till stuck at 3:33, a banker's lamp, a bell and an ashtray; a
 // bait station of cooler, cricket cage and aerated tank; a chest freezer, a tall plant, a 70s
 // rug, a worn path to the counter. Visual and input only: no randomness, nothing saved.
-// Phase 115: the same room and footprints as a cozy dusk refuge: sage wall panels,
-// walnut boards, a teal counter, a woven rug and amber light, with violet lake shadows.
-// The existing quiet window figure and backwards clock keep their original triggers.
-// Phase 116: the user's approved mini illustration now supplies the room and character
-// art (shop_art.js); this painter remains an interactive fallback if an asset cannot load.
 G.ui = G.ui || {};
 G.ui.shopRoom = (function () {
   var A = G.gfx.paint, P = G.gfx.sprites.PALETTE, K = G.ui.roomKit, R = G.ui.room, X = G.gfx.pix, tone = X.tone;
-  var T = 32, COLS = 12, ROWS = 8, W = COLS * T, H = ROWS * T, OX = (640 - W) >> 1, OY = 95, TOP = 90, RH = H + TOP;
+  var T = 32, COLS = 12, ROWS = 8, W = COLS * T, H = ROWS * T, OX = (640 - W) >> 1, OY = (360 - H) >> 1, TOP = 44, RH = H + TOP;
   var STEP = R.STEP;
 
   // The map: w wall face (the north wall, seen), W a window in it, s side or south wall (its
@@ -47,17 +42,17 @@ G.ui.shopRoom = (function () {
     { id: 'counter2', c: 9, r: 3, w: 2, h: 1, block: true, talk: 'rusty' },
     { id: 'behind', c: 8, r: 1, w: 3, h: 1, block: true, talk: '' },         // Rusty's side of the counter
     { id: 'behind2', c: 9, r: 2, w: 2, h: 1, block: true, talk: '' },
-    { id: 'worms', c: 1, r: 2, w: 1, h: 1, block: true, talk: 'worms' },
-    { id: 'crickets', c: 1, r: 3, w: 1, h: 1, block: true, talk: 'crickets' },
-    { id: 'tank', c: 1, r: 4, w: 1, h: 1, block: true, talk: 'tank' },
+    { id: 'worms', c: 1, r: 3, w: 1, h: 1, block: true, talk: 'worms' },
+    { id: 'crickets', c: 1, r: 4, w: 1, h: 1, block: true, talk: 'crickets' },
+    { id: 'tank', c: 1, r: 5, w: 1, h: 1, block: true, talk: 'tank' },
     // Phase 56: the room's things in its corners and between the shelves.
     { id: 'fern', c: 5, r: 1, w: 1, h: 1, block: true, talk: '' },
     { id: 'guitar', c: 7, r: 1, w: 1, h: 1, block: true, talk: 'guitar' },
-    { id: 'freezer', c: 1, r: 5, w: 1, h: 2, block: true, talk: 'cat' },
+    { id: 'freezer', c: 1, r: 6, w: 1, h: 1, block: true, talk: 'cat' },
     { id: 'palm', c: 10, r: 6, w: 1, h: 1, block: true, talk: '' },
     { id: 'lamp', c: 3, r: 4, w: 1, h: 1, block: true, talk: '' },
     // Phase 64: a drinks cooler humming by the east wall; the freezer's cat.
-    { id: 'cooler', c: 10, r: 4, w: 1, h: 2, block: true, talk: 'cooler' }
+    { id: 'cooler', c: 10, r: 5, w: 1, h: 1, block: true, talk: 'cooler' }
   ];
   var DOOR = [6, 7], MAT = [6, 6], RUSTY = [9, 2], CLOCK = 7;
   var WK = R.walker(MAP, OBJECTS, MAT);
@@ -88,112 +83,189 @@ G.ui.shopRoom = (function () {
 
   // ---- Painting ---------------------------------------------------------------------------
   var box = A.box, px = A.px;
-  var BRASS = ['rust', 'leaf_gold', 'brass_hi'], WOODK = K.WOOD;
   function img(c, im, x, y) { c.drawImage(im, Math.round(x), Math.round(y)); A.reset(); }
 
-  // A local material pass, baked once: the room kit also belongs to the cabin, so its
-  // colours are never changed globally. No canvas readbacks or filters in the frame loop.
-  var MATERIALS = {
-    outline: 'shop_ink', wood_deep: 'shop_ink', wood_dark: 'shop_edge', wood: 'shop_wood_dk',
-    wood_mid: 'shop_wood', wood_hi: 'shop_wood_mid', wood_lit: 'shop_wood_hi',
-    panel_deep: 'shop_edge', panel: 'shop_wood_dk', panel_mid: 'shop_wood', panel_hi: 'shop_wood_mid', panel_lit: 'shop_wood_hi',
-    paper_dark: 'shop_paper_dk', paper: 'shop_paper', bone: 'shop_cream', ivory: 'shop_cream',
-    teal_dark: 'shop_teal_dk', teal: 'shop_teal', teal_hi: 'shop_teal_hi', teal_lit: 'shop_teal_lit',
-    olive_dark: 'shop_sage_dk', olive: 'shop_sage', olive_hi: 'shop_sage_hi', olive_lit: 'shop_sage_lit',
-    leaf_deep: 'shop_teal_dk', leaf_dark: 'shop_sage_dk', leaf: 'shop_sage', leaf_hi: 'shop_sage_hi', leaf_lit: 'shop_sage_lit',
-    blood: 'shop_rug_dk', crimson: 'shop_rug'
-  }, materialRGB = null;
-  function finish(cv) {
-    if (!materialRGB) {
-      materialRGB = {};
-      for (var key in MATERIALS) {
-        var rgb = G.gfx.sprites.RGB[key];
-        materialRGB[(rgb[0] << 16) | (rgb[1] << 8) | rgb[2]] = G.gfx.sprites.RGB[MATERIALS[key]];
-      }
-    }
-    var c = cv.getContext('2d'), image = c.getImageData(0, 0, cv.width, cv.height), d = image.data;
-    for (var i = 0; i < d.length; i += 4) {
-      if (!d[i + 3]) continue;
-      var to = materialRGB[(d[i] << 16) | (d[i + 1] << 8) | d[i + 2]];
-      if (to) { d[i] = to[0]; d[i + 1] = to[1]; d[i + 2] = to[2]; }
-    }
-    c.putImageData(image, 0, 0);
-    return cv;
-  }
-  var FLOOR_KEYS = ['shop_edge', 'shop_wood_dk', 'shop_wood', 'shop_wood_mid', 'shop_wood_hi', 'shop_wood_lit'];
-  function cozyFloor(c) {
-    var y0 = ty(1), width = W - 2 * T;
-    A.area(c, T, y0, width, H - 2 * T, function (x, y) {
-      var row = Math.floor((y - y0) / 12), yy = (y - y0) % 12;
-      var offset = (row % 3) * 29, segment = Math.floor((x - T + offset) / 80), xx = (x - T + offset) % 80;
-      var lit = light(T + segment * 80 + 40 - offset, y0 + row * 12 + 6);
-      var value = 0.18 + lit * 0.38 + K.hash(row, segment + 3) * 0.1;
-      if (yy === 11 || xx === 0) return 'shop_wood_dk';
-      if (yy === 0) value += 0.13;
-      if (yy === 10) value -= 0.08;
-      if ((yy === 4 && xx > 18 && xx < 37) || (yy === 7 && xx > 51 && xx < 62)) value -= 0.09;
-      // A knot is a short curved stroke within the grain, never random speckle.
-      if (K.hash(row, segment + 31) < 0.22 && Math.abs(xx - 47) + Math.abs(yy - 6) * 2 < 5) value -= 0.13;
-      return tone(FLOOR_KEYS, value + wear(x, y));
-    });
-  }
-  function cozyWall(c) {
-    var keys = ['shop_sage_dk', 'shop_sage', 'shop_sage_hi'];
-    A.area(c, T, 7, W - T * 2, TOP + 22, function (x, y) {
-      var board = Math.floor((x - T) / 16), xx = (x - T) % 16;
-      if (xx === 0) return 'shop_sage_dk';
-      return tone(keys, 0.38 + K.hash(board, 21) * 0.15 + (xx === 1 ? 0.15 : 0) - y * 0.001);
-    });
-    // Deep walnut beams and honey-coloured mouldings give the pale green wall a frame.
-    box(c, 'shop_ink', T, 0, W - 2 * T, 7);
-    box(c, 'shop_wood_mid', T, 1, W - 2 * T, 2);
-    box(c, 'shop_wood', T, 3, W - 2 * T, 2);
-    for (var y = TOP + 2; y <= TOP + 24; y += 22) {
-      box(c, 'shop_edge', T, y, W - 2 * T, 4);
-      box(c, 'shop_wood_hi', T, y, W - 2 * T, 1);
-      box(c, 'shop_wood', T, y + 1, W - 2 * T, 1);
-    }
-  }
-  function cozyRug(c) {
-    var x0 = 4 * T + 2, y0 = ty(4) + 4, w = 3 * T - 4, h = 2 * T - 10;
-    box(c, 'shop_edge', x0 - 1, y0 + 2, w + 3, h + 1);
+  // The procedural shop material family. All geometry is native and baked; shared
+  // room-kit/cabin painters and the complete walk map remain untouched.
+  var STUDY_WOOD = ['shop117_edge', 'shop117_wood_dk', 'shop117_wood', 'shop117_wood_mid', 'shop117_wood_hi', 'shop117_wood_lit'];
+  var STUDY_METAL = ['shop117_edge', 'shop117_metal_dk', 'shop117_metal', 'shop117_metal_hi'];
+  var ENAMEL = ['shop117_edge', 'shop117_paint_dk', 'shop117_paint', 'shop117_paint_hi'];
+  var PAPER = ['shop117_cloth_dk', 'shop117_cloth', 'shop117_paper'];
+  var CLAY = ['shop117_clay_dk', 'shop117_clay', 'shop117_clay_hi'];
+  function solid(c, x0, y0, w, h, keys) {
     A.area(c, x0, y0, w, h, function (x, y) {
-      var u = x - x0, v = y - y0, e = Math.min(u, w - u - 1, v, h - v - 1);
-      if (e < 2) return 'shop_rug_dk';
-      if (e < 4) return 'shop_gold';
-      if (e < 6) return 'shop_rug_dk';
-      if (e < 8) return 'shop_rug_hi';
-      var diamond = Math.abs(u - w / 2) / 2 + Math.abs(v - h / 2);
-      if (diamond < 7) return 'shop_gold';
-      if (diamond < 9) return 'shop_rug_dk';
-      if ((u === 18 || u === w - 19) && v > 16 && v < h - 16) return 'shop_gold';
-      return 'shop_rug';
+      var u = x - x0, v = y - y0, right = w - 1 - u, bottom = h - 1 - v;
+      if ((u < 2 && v < 2 && u + v < 2) || (right < 2 && v < 2 && right + v < 2)) return '';
+      if (v === 0) return keys[keys.length - 1];
+      if (u === 0) return keys[Math.max(0, keys.length - 2)];
+      if (right < 2 || bottom < 2) return keys[0];
+      if (v < 3) return keys[Math.max(0, keys.length - 2)];
+      return keys[Math.max(1, keys.length - 3)];
     });
-    for (var fy = 2; fy < h; fy += 3) {
-      box(c, 'shop_paper_dk', x0 - 3, y0 + fy, 3, 1);
-      box(c, 'shop_paper_dk', x0 + w, y0 + fy, 3, 1);
-    }
   }
-
+  function shopProp(kind) {
+    return G.gfx.bake.cached('shop:prop119:' + kind, function () {
+      var w = kind === 'snake' ? 16 : (kind === 'guitar' ? 20 : (kind === 'banker' ? 18 : (kind === 'crt' ? 32 : (kind === 'cooler' ? 28 : 30))));
+      var h = kind === 'guitar' ? 44 : (kind === 'banker' ? 15 : (kind === 'radio' ? 17 : (kind === 'amp' ? 23 : (kind === 'cooler' ? 52 : 30))));
+      var g = X.grid(w, h), i;
+      if (kind === 'guitar') {
+        g.poly([[6,20],[4,23],[5,27],[1,31],[1,38],[5,42],[13,42],[18,38],[18,31],[14,27],[14,22],[11,20]], 'shop117_clay_dk');
+        g.ell(9,34,7,7,CLAY,{}); g.ell(10,25,4,5,CLAY,{});
+        g.rect('shop117_wood_dk',9,5,3,28); g.rect('shop117_wood_hi',10,5,1,27);
+        g.ell(10,30,2.5,2.5,'shop117_edge',{}); g.rect('shop117_paper',6,37,8,1);
+        g.slab(7,0,6,8,STUDY_METAL); for(i=1;i<7;i+=2){g.set('shop117_paper',6,i);g.set('shop117_paper',13,i);}
+      } else if (kind === 'banker') {
+        g.ell(9,12,7,2.2,STUDY_METAL,{}); g.rect('shop117_metal',8,5,2,7);
+        g.poly([[3,1],[14,1],[17,4],[16,7],[2,7],[1,4]],'shop117_paint_dk');
+        g.poly([[4,2],[13,2],[15,4],[3,4]],'shop117_paint_hi');g.rect('shop117_paint',3,4,12,2);g.rect('shop117_lamp',4,7,11,1);
+      } else if (kind === 'snake' || kind === 'fern' || kind === 'trail') {
+        var cx=w>>1;
+        if(kind==='snake') for(i=0;i<5;i++){var x=2+i*3,y=3+(i%3)*3;g.poly([[x,22],[x-1,y+3],[x,y],[x+2,y+2],[x+2,22]],i%2?'shop117_leaf':'shop117_leaf_hi');g.line('shop117_leaf_dk',x,21,x,y+4);}
+        else {
+          for(i=0;i<5;i++){var xx=3+i*5,yy=7+(i%2)*5;g.line('shop117_leaf_dk',cx,23,xx,yy);g.poly([[xx,yy-4],[xx+4,yy-2],[xx+5,yy+3],[xx+2,yy+5],[xx-2,yy+1]],'shop117_leaf');g.line('shop117_leaf_hi',xx,yy-2,xx+2,yy+2);}
+          if(kind==='trail')for(i=0;i<4;i++){g.line('shop117_leaf_dk',22+i,17,20+i,28);g.ell(21+i,22+(i%2)*4,2.5,2,'shop117_leaf',{});}
+        }
+        g.poly([[cx-6,21],[cx+6,21],[cx+5,28],[cx+3,29],[cx-4,29],[cx-5,27]],'shop117_clay');g.rect('shop117_clay_hi',cx-7,20,14,2);g.rect('shop117_edge',cx-4,20,8,1);g.line('shop117_clay_dk',cx+4,23,cx+4,27);
+      } else if(kind==='cooler') {
+        g.poly([[3,0],[25,0],[27,2],[27,49],[24,51],[3,51],[0,48],[0,3]],'shop117_paint_dk');
+        g.rect('shop117_paint',2,3,24,45);g.rect('shop117_paint_hi',3,2,22,2);
+        g.slab(3,1,22,7,PAPER);g.rect('shop117_rug',6,4,15,2);g.rect('shop117_edge',3,9,22,37);g.rect('shop117_metal_hi',24,20,1,12);
+      } else if(kind==='amp') {
+        g.slab(1,2,28,21,ENAMEL);g.rect('shop117_cloth_dk',4,7,22,12);g.rect('shop117_cloth',5,8,20,10);
+        for(i=0;i<5;i++)g.rect('shop117_wood',5+i*4,8,1,10);g.rect('shop117_edge',6,0,16,2);g.set('shop117_lamp',6,4);g.set('shop117_metal_hi',11,4);
+      } else if(kind==='radio') {
+        g.slab(0,3,30,14,STUDY_METAL);g.rect('shop117_metal',7,0,16,2);
+        for(i=0;i<2;i++){g.ell(6+i*18,10,4.5,4.5,'shop117_metal_dk',{});g.ell(6+i*18,10,2,2,'shop117_edge',{});g.set('shop117_metal_hi',4+i*18,8);}
+        g.rect('shop117_edge',11,7,8,6);g.rect('shop117_cloth',12,9,6,2);g.rect('shop117_lamp',12,5,5,1);
+      } else if(kind==='crt') {
+        g.poly([[3,0],[29,0],[31,3],[31,24],[28,27],[3,27],[0,23],[0,3]],'shop117_paint_dk');g.rect('shop117_paint',3,2,26,23);g.rect('shop117_paint_hi',4,2,24,2);
+        g.rect('shop117_edge',5,3,18,14);g.rect('crt_dark',6,4,16,12);g.rect('shop117_metal_dk',25,7,3,9);g.set('shop117_lamp',26,21);g.rect('shop117_edge',6,28,21,2);
+      }
+      g.outline('shop117_edge');return g.canvas();
+    });
+  }
+  function materialStudy(c) {
+    // Broad boards with a top plane and a recessed join; a few chosen strokes replace
+    // the old continuous grain/nail pattern. Lighting is sampled once per board.
+    var x0 = T, y0 = ty(1), w = W - 2 * T, h = H - 2 * T;
+    A.area(c, x0, y0, w, h, function (x, y) {
+      var row = Math.floor((y - y0) / 14), v = (y - y0) % 14;
+      var offset = (row % 3) * 23, segment = Math.floor((x - x0 + offset) / 68), u = (x - x0 + offset) % 68;
+      var lit = light(x0 + segment * 68 + 34 - offset, y0 + row * 14 + 7);
+      if (v === 13 || u === 0) return 'shop117_wood_dk';
+      if (v === 0) return 'shop117_wood_mid';
+      if (v === 12 || u === 1) return 'shop117_wood_dk';
+      if (v === 6 && u > 17 && u < 34) return 'shop117_wood_dk';
+      return tone(STUDY_WOOD, 0.28 + lit * 0.25 + (K.hash(row, segment + 61) - 0.5) * 0.1);
+    });
+    // A wall bay with wide structural boards, a bevelled beam and three quiet planes.
+    var wx = T, ww = W - 2 * T;
+    A.area(c, wx, 7, ww, TOP + 32 - 7, function (x, y) {
+      var u = (x - wx) % 16;
+      if (u === 0 || y === TOP + 30) return 'shop117_edge';
+      if (u === 1) return 'shop117_wood_hi';
+      if (u > 13) return 'shop117_wood_dk';
+      return y > TOP + 4 ? 'shop117_wood' : 'shop117_wood_mid';
+    });
+    box(c, 'shop117_edge', wx, 0, ww, 7);
+    box(c, 'shop117_wood_hi', wx + 2, 1, ww - 4, 2);
+    box(c, 'shop117_wood', wx, 3, ww, 2);
+    box(c, 'shop117_wood_dk', wx + 1, 5, ww - 2, 1);
+    // The rail is a solid piece with a visible upper ledge, not another dark stripe.
+    box(c, 'shop117_edge', wx, TOP + 1, ww, 5);
+    box(c, 'shop117_wood_hi', wx + 1, TOP + 1, ww - 2, 2);
+    box(c, 'shop117_wood', wx + 1, TOP + 3, ww - 2, 2);
+  }
+  function roomEdges(c) {
+    for (var side = 0; side < 2; side++) {
+      var x0 = side ? W - T : 0;
+      A.area(c, x0, 0, T, RH, function (x, y) {
+        var edge = side ? x - x0 : T - 1 - x;
+        if ((x === 0 || x === W - 1) && (y < 3 || y > RH - 4)) return '';
+        if (edge === 0) return 'shop117_edge';
+        if (edge === 1) return 'shop117_wood_mid';
+        if (edge < 4) return 'shop117_wood_dk';
+        return y % 14 === 13 ? 'shop117_edge' : 'wood_deep';
+      });
+    }
+    var y0 = ty(7);
+    A.area(c, T, y0, W - T * 2, T, function (x, y) {
+      if (x >= tx(DOOR[0]) && x < tx(DOOR[0] + 1)) return y < y0 + 3 ? 'shop117_wood_dk' : 'night_deep';
+      var u = (x - T) % 16;
+      if (y === y0) return 'shop117_wood_hi';
+      if (y < y0 + 3) return 'shop117_wood';
+      if (u < 2 || y > RH - 3) return 'shop117_edge';
+      return u === 2 ? 'shop117_wood' : 'shop117_wood_dk';
+    });
+    box(c, 'shop117_metal_dk', tx(DOOR[0]) + 3, y0 + 12, T - 6, 2);
+  }
+  function wovenRug(c) {
+    var x0 = 4 * T + 2, y0 = ty(4) + 4, w = 3 * T - 4, h = 2 * T - 10;
+    box(c, 'shop117_edge', x0, y0 + 2, w + 1, h + 1);
+    A.area(c, x0, y0, w, h, function (x, y) {
+      var u = x - x0, v = y - y0, e = Math.min(u, w - 1 - u, v, h - 1 - v);
+      if (e < 2) return 'shop117_rug_dk';
+      if (e < 4) return 'shop117_ochre';
+      if (e < 7) return 'shop117_rug';
+      if (e < 8) return 'shop117_rug_hi';
+      var diamond = Math.abs(u - w / 2) * 0.55 + Math.abs(v - h / 2);
+      if (diamond < 6) return 'shop117_ochre';
+      if (diamond < 8) return 'shop117_rug_dk';
+      if (diamond > 18 && diamond < 20) return 'shop117_rug_hi';
+      return 'shop117_rug';
+    });
+    for (var y = 2; y < h; y += 3) { box(c, 'shop117_cloth', x0 - 3, y0 + y, 3, 1); box(c, 'shop117_cloth', x0 + w, y0 + y, 3, 1); }
+  }
+  function studyLamp() {
+    var g = X.grid(22, 54);
+    g.ell(11, 51, 10, 2, 'shop117_edge', {});
+    g.ell(11, 49, 8.5, 2.6, STUDY_METAL, { rim: 0.1 });
+    g.rect('shop117_metal_dk', 9, 17, 4, 32);
+    g.rect('shop117_metal', 10, 18, 2, 29); g.rect('shop117_metal_hi', 10, 19, 1, 27);
+    // A bell-shaped linen shade: chunky faceted volume rather than thin vertical pleats.
+    g.poly([[6,1],[16,1],[18,4],[21,15],[20,18],[2,18],[1,15],[4,4]], function (x, y) {
+      if (y > 15) return 'shop117_cloth_dk';
+      if (x < 5 || x > 17) return 'shop117_cloth_dk';
+      if (x < 9 || x > 14) return 'shop117_cloth';
+      return 'shop117_cloth_hi';
+    });
+    g.line('shop117_paper', 7, 1, 15, 1);
+    g.line('shop117_lamp', 4, 17, 18, 17);
+    g.set('shop117_metal', 15, 19); g.set('shop117_metal_dk', 15, 20);
+    g.outline('shop117_edge');
+    return g.canvas();
+  }
+  function studyPlant() {
+    var g = X.grid(28, 40), leaves = ['shop117_leaf_dk', 'shop117_leaf', 'shop117_leaf_hi'];
+    g.line(leaves[0], 14, 31, 13, 9); g.line(leaves[1], 15, 30, 17, 10);
+    g.poly([[13,17],[5,15],[2,10],[3,5],[9,4],[13,7]], leaves[0]);
+    g.poly([[3,7],[8,5],[12,8],[12,14],[7,13]], leaves[1]);
+    g.poly([[14,13],[17,3],[23,1],[27,5],[26,11],[21,15]], leaves[1]);
+    g.poly([[17,5],[23,2],[25,5],[21,10],[16,12]], leaves[2]);
+    g.poly([[13,26],[5,25],[0,20],[1,16],[6,14],[11,18]], leaves[0]);
+    g.poly([[2,18],[6,16],[10,19],[11,23],[5,22]], leaves[1]);
+    g.poly([[14,25],[19,17],[25,17],[27,21],[26,27],[22,30],[16,29]], leaves[1]);
+    g.poly([[19,19],[24,18],[25,22],[21,26],[17,27]], leaves[2]);
+    g.line(leaves[0], 4, 8, 12, 15); g.line(leaves[0], 23, 5, 15, 13);
+    g.line(leaves[0], 3, 19, 12, 24); g.line(leaves[0], 24, 21, 16, 28);
+    // A heavy terracotta lip, recessed soil and a tapered pot with distinct faces.
+    g.poly([[7,30],[21,30],[20,37],[18,39],[10,39],[8,37]], 'shop117_clay_dk');
+    g.poly([[8,31],[14,31],[14,38],[10,37]], 'shop117_clay_hi');
+    g.poly([[14,31],[20,31],[19,37],[14,38]], 'shop117_clay');
+    g.rect('shop117_clay_hi', 6, 29, 16, 2); g.rect('shop117_clay_dk', 7, 31, 14, 1);
+    g.rect('shop117_edge', 9, 29, 10, 1);
+    g.outline('shop117_edge'); return g.canvas();
+  }
   function paintBase(c) {
     A.reset();
-    cozyWall(c);
-    cozyFloor(c);
-    K.wallTops(c, W, RH, TOP, T, DOOR[0]);
+    materialStudy(c);
+    roomEdges(c);
     // The rug and the mat.
-    cozyRug(c);
-    A.area(c, tx(6) + 3, ty(6) + 6, T - 6, T - 9, function (x, y) { return (y - ty(6)) % 3 === 0 ? 'reed' : ((x + y) % 4 ? 'rust' : 'rust_dark'); });
+    wovenRug(c);
+    A.area(c, tx(6) + 3, ty(6) + 6, T - 6, T - 9, function (x, y) { return (y - ty(6)) % 4 === 0 ? 'shop117_cloth_dk' : 'shop117_paint_dk'; });
     box(c, 'outline', tx(6) + 3, ty(6) + T - 3, T - 6, 1);
-    // Pools of lamplight sit on the floor and rug; a cool trace from the lake and cooler.
-    // All broad light is baked. Only the lamp cores and dust move during drawing.
-    c.save(); c.beginPath(); c.rect(T, ty(1), W - T * 2, H - T * 2); c.clip();
-    softGlow(c, LAMP[0] + 10, ty(5) - 2, 69, 47, 'shop_lamp', 0.105);
-    softGlow(c, DESK[0] + 12, ty(4) - 2, 58, 38, 'shop_lamp', 0.09);
-    softGlow(c, tx(10) + 10, ty(6) + 2, 33, 26, 'shop_teal_hi', 0.08);
-    c.restore(); A.reset();
-    // One small web remains tucked in the shadow: a lived-in refuge, quietly odd.
-    A.line(c, 'shop_sage', T + 1, 8, T + 11, 14);
-    A.line(c, 'shop_sage', T + 1, 8, T + 6, 19);
+    // Cobwebs in the top corners; a loose board.
+    for (var w = 0; w < 2; w++) { var cx = w ? W - T - 1 : T, dir = w ? -1 : 1; for (var k = 0; k < 4; k++) A.line(c, 'fog_mid', cx, 7, cx + dir * (22 - k * 5), 7 + k * 5); for (k = 1; k < 3; k++) A.line(c, 'fog_dark', cx + dir * k * 7, 7, cx, 7 + k * 7); }
     box(c, 'panel_deep', tx(3) + 4, ty(6) + 15, 30, 1); box(c, 'panel_hi', tx(3) + 4, ty(6) + 8, 30, 1);
     // The string lights' cable along the beam.
     cable = K.lightCable(c, T + 4, W - T - 4, 7, 46, 5);
@@ -201,12 +273,6 @@ G.ui.shopRoom = (function () {
     shelves(c);
     behindCounter(c);
     baitStation(c);
-    // Contact shadows sit on the boards, inside the same footprints as the furniture.
-    c.fillStyle = P.shop_ink; c.globalAlpha = 0.18;
-    c.fillRect(tx(1), ty(2) - 6, T * 6, 4);
-    c.fillRect(tx(8) + 3, ty(4) + 2, T * 3 - 3, 5);
-    c.fillRect(tx(1) + 3, ty(7) - 2, T + 2, 3);
-    c.globalAlpha = 1;
     A.reset();
   }
   var cable = [];
@@ -214,211 +280,150 @@ G.ui.shopRoom = (function () {
   // The back wall: windows, the trophy, the chart, the clock and calendar, the pegboard.
   function wallThings(c) {
     var i;
-    for (i = 0; i < WINS.length; i++) { var g = glassRect(i); K.windowFrame(c, g[0], g[1], g[2], g[3]); }
-    // Short linen side curtains, leaving the lake and its dusk visible.
-    for (i = 0; i < WINS.length; i++) {
-      var curtain = glassRect(i);
-      box(c, 'shop_wood_hi', curtain[0] - 5, curtain[1] - 4, curtain[2] + 10, 1);
-      for (var side = 0; side < 2; side++) {
-        var edge = curtain[0] + (side ? curtain[2] - 2 : -2);
-        box(c, 'shop_paper', edge, curtain[1], 4, 19);
-        box(c, 'shop_cream', edge + 1, curtain[1], 1, 15);
-        box(c, 'shop_paper_dk', edge + 3, curtain[1] + 1, 1, 18);
-      }
+    for(i=0;i<WINS.length;i++){
+      var g=glassRect(i);solid(c,g[0]-5,g[1]-5,g[2]+10,g[3]+11,STUDY_WOOD);
+      box(c,'shop117_edge',g[0]-1,g[1]-1,g[2]+2,g[3]+2);box(c,'night_deep',g[0],g[1],g[2],g[3]);
+      solid(c,g[0]-7,g[1]+g[3]+3,g[2]+14,5,STUDY_WOOD);
     }
-    // The trophy over the rack: a perch on an oval plaque, a brass plate.
-    A.blob(c, tx(2), 26, 26, 11, ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit'], { bias: 0.1 });
-    var fi = 0; for (i = 0; i < G.data.fish.length; i++) if (G.data.fish[i].id === 'yellow_perch') fi = i;
-    var fp = G.gfx.fishgen.portrait(fi, 40, 14, false); img(c, fp, tx(2) - (fp.width >> 1), 26 - (fp.height >> 1));
-    A.slab(c, tx(2) - 7, 33, 14, 3, BRASS);
-    // A fish chart beside the window, its corner torn and curling.
-    A.slab(c, tx(5) + 4, 12, 24, 30, ['paper_dark', 'paper_dark', 'paper', 'bone', 'cream']);
-    for (i = 0; i < 4; i++) { var fy = 17 + i * 6; A.blob(c, tx(5) + 13, fy, 6, 1.6, ['moss_dark', 'moss', 'moss_hi'], {}); box(c, 'stone', tx(5) + 21, fy, 4, 1); px(c, 'moss_dark', tx(5) + 7, fy); }
-    box(c, 'brick', tx(5) + 6, 13, 16, 2);
-    A.area(c, tx(5) + 22, 36, 6, 6, function (x, y) { return x - (tx(5) + 22) > 41 - y ? 'paper_dark' : ''; });
-    px(c, 'stone_hi', tx(5) + 15, 12);
-    // The clock (its hands are live) and a calendar on the wrong month.
-    A.blob(c, tx(CLOCK) + 16, 20, 8, 8, ['outline', 'wood_dark', 'wood_mid', 'wood_hi'], { bias: 0.1 });
-    A.blob(c, tx(CLOCK) + 16, 20, 6, 6, ['paper_dark', 'paper', 'bone', 'cream'], { rim: 0 });
-    for (i = 0; i < 12; i++) px(c, i % 3 ? 'stone_hi' : 'outline', Math.round(tx(CLOCK) + 16 + Math.sin(i / 6 * Math.PI) * 5), Math.round(20 - Math.cos(i / 6 * Math.PI) * 5));
-    A.slab(c, tx(CLOCK) + 8, 31, 16, 14, ['paper_dark', 'paper_dark', 'paper', 'bone', 'ivory']);
-    A.area(c, tx(CLOCK) + 9, 32, 14, 6, function (x, y) { return y < 37 ? (x > tx(CLOCK) + 14 && y < 35 ? 'crt_hi' : 'crt') : 'pink'; });
-    for (i = 0; i < 9; i++) px(c, i === 6 ? 'neon_red' : 'stone_hi', tx(CLOCK) + 10 + (i % 5) * 3, 39 + ((i / 5) | 0) * 3);
-    // The pegboard behind the counter: holes, and hanging packets in faded colours.
-    A.area(c, tx(8) + 2, 10, T - 4, 34, function (x, y) { return (x % 4 === 1 && y % 4 === 1) ? 'panel_deep' : ((x + y) % 7 ? 'panel_mid' : 'panel_hi'); });
-    A.slab(c, tx(8) + 1, 9, T - 2, 36, ['outline', 'panel_deep', 'panel_mid', 'panel_hi']);
-    A.area(c, tx(8) + 3, 11, T - 6, 32, function (x, y) { return (x % 4 === 1 && y % 4 === 1) ? 'panel_deep' : 'panel_mid'; });
-    var PK = ['orange', 'mustard', 'lav', 'crt_hi', 'pink', 'olive_hi', 'brick_hi', 'paper'];
-    for (i = 0; i < 8; i++) {
-      var kx = tx(8) + 4 + (i % 4) * 6, ky = 13 + ((i / 4) | 0) * 15, k = PK[i];
-      if (i === 5) { px(c, 'stone_hi', kx + 2, ky); continue; }                         // an empty hook
-      px(c, 'stone_hi', kx + 2, ky); A.slab(c, kx, ky + 1, 5, 11, ['outline', G.gfx.sprites.shift(k, -1), k, G.gfx.sprites.shift(k, 1)]);
-      box(c, 'ivory', kx + 1, ky + 3, 3, 3); px(c, i % 2 ? 'rust_hi' : 'brass_hi', kx + 2, ky + 4);
-    }
+    // Carved plaque, pinned field chart and a heavy clock, all in native planes.
+    A.blob(c,tx(2),26,26,11,STUDY_WOOD,{rim:0.12});
+    var fi=0;for(i=0;i<G.data.fish.length;i++)if(G.data.fish[i].id==='yellow_perch')fi=i;
+    var fp=G.gfx.fishgen.portrait(fi,40,14,false);img(c,fp,tx(2)-(fp.width>>1),26-(fp.height>>1));
+    solid(c,tx(2)-8,33,16,3,STUDY_METAL);
+    solid(c,tx(5)+4,12,24,30,PAPER);box(c,'shop117_rug',tx(5)+6,14,17,2);
+    for(i=0;i<4;i++){var y=19+i*5;A.blob(c,tx(5)+13,y,5,1.6,['shop117_leaf_dk','shop117_leaf','shop117_leaf_hi'],{});box(c,'shop117_cloth_dk',tx(5)+21,y,4,1);}
+    px(c,'shop117_metal_hi',tx(5)+15,12);
+    A.blob(c,tx(CLOCK)+16,20,8,8,STUDY_WOOD,{rim:0.15});A.blob(c,tx(CLOCK)+16,20,6,6,PAPER,{rim:0});
+    for(i=0;i<12;i++)px(c,'shop117_wood_dk',Math.round(tx(CLOCK)+16+Math.sin(i*Math.PI/6)*5),Math.round(20-Math.cos(i*Math.PI/6)*5));
+    solid(c,tx(CLOCK)+8,31,16,14,PAPER);box(c,'shop117_paint',tx(CLOCK)+9,32,14,4);
+    for(i=0;i<9;i++)px(c,i===6?'shop117_rug':'shop117_cloth_dk',tx(CLOCK)+10+(i%5)*3,39+Math.floor(i/5)*3);
+    solid(c,tx(8)+1,9,T-2,36,STUDY_WOOD);box(c,'shop117_wood_dk',tx(8)+3,11,T-6,32);
+    for(i=0;i<8;i++){var x=tx(8)+4+(i%4)*6,y=13+Math.floor(i/4)*15;px(c,'shop117_metal_hi',x+2,y);if(i===5)continue;
+      solid(c,x,y+2,5,10,i%3===0?CLAY:ENAMEL);box(c,'shop117_paper',x+1,y+4,3,3);px(c,'shop117_ochre',x+2,y+5);}
   }
 
   // The rack, the jar shelf, the lure case, the fern, the gear shelf, the guitar on its amp.
   function shelves(c) {
-    var x0 = tx(1), y0 = ty(1), i;
-    // The rack: a rail on the wall the rods lean on, a slotted base (the rods are live).
-    A.slab(c, x0 + 4, y0 - 26, 56, 4, WOODK); for (i = 0; i < 5; i++) box(c, 'outline', x0 + 9 + i * 10, y0 - 25, 3, 2);
-    A.slab(c, x0 + 2, y0 + 6, 60, 18, ['outline', 'wood_dark', 'wood', 'wood_mid', 'wood_hi']);
-    box(c, 'wood_deep', x0 + 3, y0 + 12, 58, 11);
-    for (i = 0; i < 5; i++) { box(c, 'outline', x0 + 8 + i * 10, y0 + 8, 4, 3); }
-    A.slab(c, x0 + 44, y0 + 14, 14, 8, ['outline', 'chrome_dark', 'chrome', 'chrome_hi']); A.blob(c, x0 + 51, y0 + 18, 3, 3, ['outline', 'water_mid', 'water_hi', 'water_foam'], {}); // a line spool
-    A.slab(c, x0 + 6, y0 + 14, 12, 8, ['outline', 'olive_dark', 'olive', 'olive_hi']); box(c, 'ivory', x0 + 9, y0 + 16, 6, 2);   // a box of hooks
-    // The jar shelf under the window: jars with peeled labels, the unlabelled one, a tin.
-    var jx = tx(3), jy = ty(1);
-    A.slab(c, jx + 2, jy + 4, 28, 20, ['outline', 'wood_dark', 'wood', 'wood_mid', 'wood_hi']); box(c, 'wood_deep', jx + 4, jy + 14, 24, 8); box(c, 'wood_dark', jx + 15, jy + 14, 1, 8);
-    for (i = 0; i < 3; i++) {
-      var gx = jx + 4 + i * 8, unl = i === 1, k = unl ? ['outline', 'teal_dark', 'teal', 'teal_lit'] : ['outline', 'mustard_dark', 'mustard', 'mustard_hi'];
-      A.slab(c, gx, jy - 6, 7, 10, k); box(c, 'chrome', gx, jy - 7, 7, 2);
-      if (!unl) { box(c, 'paper', gx + 1, jy - 2, 5, 3); box(c, 'outline', gx + 2, jy - 1, 1, 1); px(c, 'outline', gx + 4, jy - 1); }
-      else px(c, 'neon_teal', gx + 3, jy - 3);
-    }
-    // The lure case: glass over trays of little lures on short legs.
-    var lx = tx(4), ly = ty(1);
-    A.slab(c, lx + 2, ly + 2, 28, 18, ['outline', 'wood_dark', 'wood_mid', 'wood_hi', 'wood_lit']);
-    box(c, 'outline', lx + 4, ly + 4, 24, 12); box(c, 'water_dark', lx + 5, ly + 5, 22, 10);
-    var LK = ['brass_hi', 'orange_hi', 'olive_lit', 'signal_amber', 'pink_hi', 'crt_glow', 'flame', 'ivory'];
-    for (i = 0; i < 12; i++) { var ux = lx + 6 + (i % 6) * 4, uy = ly + 6 + ((i / 6) | 0) * 5; box(c, LK[i % 8], ux, uy, 2, 1); px(c, 'chrome_hi', ux + 2, uy + 1); }
-    A.line(c, 'fog_light', lx + 6, ly + 5, lx + 11, ly + 5); A.line(c, 'fog_mid', lx + 20, ly + 14, lx + 26, ly + 9);
-    box(c, 'wood_deep', lx + 4, ly + 20, 3, 6); box(c, 'wood_deep', lx + 25, ly + 20, 3, 6);
-    // The fern on a stool, and a landing net leaning by it.
-    A.slab(c, tx(5) + 8, ty(1) + 14, 16, 5, WOODK); box(c, 'wood_dark', tx(5) + 10, ty(1) + 19, 2, 9); box(c, 'wood_dark', tx(5) + 20, ty(1) + 19, 2, 9);
-    img(c, K.plant('fern', ['brick_dark', 'brick', 'brick_hi', 'orange_hi']), tx(5) + 2, ty(1) - 16);
-    A.line(c, 'wood_mid', tx(5) + 28, ty(1) + 26, tx(5) + 30, ty(1) - 14);
-    A.blob(c, tx(5) + 30, ty(1) - 20, 5, 6, ['outline', 'stone_dark', 'stone'], { rim: 0 });
-    for (i = 0; i < 4; i++) A.line(c, 'stone_hi', tx(5) + 26 + i * 3, ty(1) - 25, tx(5) + 26 + i * 2, ty(1) - 15);
-    // The gear shelf: a tall unit against the wall, three shelves; boxes and a coil of rope.
-    var sx = tx(6), sy = ty(1);
-    A.slab(c, sx + 1, sy - 30, 30, 56, ['outline', 'wood_dark', 'wood', 'wood_mid', 'wood_hi']); box(c, 'wood_deep', sx + 3, sy - 28, 26, 52);
-    for (i = 0; i < 3; i++) A.slab(c, sx + 3, sy - 14 + i * 14, 26, 3, ['outline', 'wood_mid', 'wood_hi', 'wood_lit']);
-    A.slab(c, sx + 4, sy - 8, 9, 6, ['outline', 'orange_dark', 'orange', 'orange_hi']); A.slab(c, sx + 14, sy - 6, 7, 4, ['outline', 'olive_dark', 'olive', 'olive_hi']);
-    A.blob(c, sx + 9, sy + 20, 6, 3, ['outline', 'reed', 'reed_hi', 'paper_dark'], {}); A.blob(c, sx + 9, sy + 20, 2, 1, 'outline', {});
-    A.slab(c, sx + 18, sy + 16, 9, 8, ['outline', 'brick_dark', 'brick', 'brick_hi']); box(c, 'ivory', sx + 20, sy + 18, 5, 2);
-    // A guitar leaning on its amp, under the clock.
-    img(c, K.amp(), tx(7) + 3, ty(1) + 4);
-    img(c, K.guitar('sun'), tx(7) + 15, ty(1) - 18);
+    var x=tx(1),y=ty(1),i;
+    solid(c,x+4,y-26,56,5,STUDY_WOOD);solid(c,x+2,y+6,60,18,ENAMEL);
+    box(c,'shop117_paint_dk',x+4,y+12,56,10);for(i=0;i<5;i++){box(c,'shop117_edge',x+8+i*10,y+8,4,3);}
+    solid(c,x+6,y+14,13,8,STUDY_WOOD);box(c,'shop117_paper',x+9,y+16,7,2);solid(c,x+44,y+14,14,8,STUDY_METAL);A.blob(c,x+51,y+18,3,3,ENAMEL,{});
+    x=tx(3);solid(c,x+2,y+4,28,20,STUDY_WOOD);box(c,'shop117_edge',x+5,y+15,22,7);box(c,'shop117_wood',x+15,y+15,2,7);
+    for(i=0;i<3;i++){var jx=x+4+i*8;solid(c,jx,y-6,7,10,i===1?ENAMEL:CLAY);box(c,'shop117_metal',jx,y-7,7,2);if(i!==1){box(c,'shop117_paper',jx+1,y-2,5,3);px(c,'shop117_wood_dk',jx+3,y-1);}else px(c,'shop117_paint_hi',jx+3,y-3);}
+    x=tx(4);solid(c,x+2,y+2,28,19,STUDY_WOOD);box(c,'shop117_paint_dk',x+5,y+5,22,11);
+    for(i=0;i<12;i++){var xx=x+6+(i%6)*4,yy=y+7+Math.floor(i/6)*5;box(c,i%2?'shop117_paper':'shop117_ochre',xx,yy,2,1);px(c,'shop117_metal',xx+2,yy+1);}
+    A.line(c,'shop117_metal_hi',x+6,y+5,x+12,y+5);box(c,'shop117_wood_dk',x+4,y+21,3,5);box(c,'shop117_wood_dk',x+25,y+21,3,5);
+    solid(c,tx(5)+8,y+14,16,5,STUDY_WOOD);box(c,'shop117_wood_dk',tx(5)+10,y+19,2,9);box(c,'shop117_wood_dk',tx(5)+20,y+19,2,9);
+    img(c,shopProp('fern'),tx(5)+2,y-16);A.line(c,'shop117_metal',tx(5)+28,y+26,tx(5)+30,y-14);A.blob(c,tx(5)+30,y-20,5,6,STUDY_METAL,{rim:0.1});
+    x=tx(6);solid(c,x+1,y-30,30,56,STUDY_WOOD);box(c,'shop117_edge',x+4,y-27,23,50);
+    for(i=0;i<3;i++)solid(c,x+3,y-14+i*14,26,3,STUDY_WOOD);
+    solid(c,x+5,y-8,9,6,CLAY);solid(c,x+15,y-6,8,4,ENAMEL);A.blob(c,x+10,y+20,6,3,['shop117_cloth_dk','shop117_cloth','shop117_paper'],{});A.blob(c,x+10,y+20,2,1,'shop117_edge',{});
+    solid(c,x+18,y+16,9,8,CLAY);box(c,'shop117_paper',x+20,y+18,5,2);
+    img(c,shopProp('amp'),tx(7)+3,y+4);img(c,shopProp('guitar'),tx(7)+15,y-18);
   }
 
   // Behind the counter: a back counter with the coffee maker, the boombox and its tapes, the
   // CRT (its screen live), a stack of cans.
   var tvRect = null;
   function behindCounter(c) {
-    var bx = tx(8), by = ty(1), i;
-    A.slab(c, bx + 1, by - 4, 3 * T - 3, 24, ['outline', 'wood_dark', 'wood', 'wood_mid', 'wood_hi']);
-    box(c, 'wood_deep', bx + 3, by + 6, 3 * T - 7, 12); for (i = 1; i < 6; i++) box(c, 'outline', bx + 3 + i * 15, by + 6, 1, 12);
-    box(c, 'panel_lit', bx + 1, by - 4, 3 * T - 3, 1);
-    // The coffee maker and its pot.
-    A.slab(c, bx + 4, by - 20, 12, 16, ['outline', 'vinyl', 'vinyl_hi', 'chrome_dark']); box(c, 'outline', bx + 6, by - 12, 8, 7);
-    A.blob(c, bx + 10, by - 8, 4, 3, ['outline', 'rust_dark', 'rust', 'rust_hi'], {}); px(c, 'neon_red', bx + 13, by - 18);
-    // The boombox and the tapes.
-    img(c, K.boombox(), bx + 18, by - 16);
-    for (i = 0; i < 4; i++) { A.slab(c, bx + 18 + i * 6, by - 1, 5, 3, ['outline', ['lav_dark', 'orange_dark', 'olive_dark', 'brick_dark'][i], ['lav', 'orange', 'olive', 'brick'][i], 'ivory']); }
-    // The CRT and a stack of empty cans beside it.
-    var tv = K.crt(false);
-    img(c, tv.img, tx(10) - 2, by - 32);
-    tvRect = [tx(10) - 2 + tv.sx, by - 32 + tv.sy, tv.sw, tv.sh];
-    var g = X.grid(14, 16); for (i = 0; i < 3; i++) K.can(g, 1 + i * 4, 10, ['brick_hi', 'olive_hi', 'crt_hi'][i]); K.can(g, 3, 4, 'mustard_hi'); K.can(g, 7, 4, 'brick_hi'); K.can(g, 5, -1, 'olive_hi'); g.outline('outline'); g.paint(c, tx(10) + 18, by - 18);
+    var x=tx(8),y=ty(1),i;
+    solid(c,x+1,y-4,3*T-3,24,STUDY_WOOD);box(c,'shop117_edge',x+4,y+6,3*T-9,12);
+    for(i=1;i<6;i++)box(c,'shop117_wood',x+3+i*15,y+6,2,12);
+    solid(c,x+4,y-20,12,16,ENAMEL);box(c,'shop117_edge',x+7,y-12,7,6);A.blob(c,x+10,y-8,4,3,CLAY,{});px(c,'shop117_lamp',x+13,y-18);
+    img(c,shopProp('radio'),x+18,y-17);
+    for(i=0;i<4;i++){solid(c,x+18+i*6,y-1,5,3,i%2?CLAY:ENAMEL);}
+    img(c,shopProp('crt'),tx(10)-2,y-32);tvRect=[tx(10)+4,y-28,16,12];
+    for(i=0;i<6;i++){var xx=tx(10)+19+(i%3)*4,yy=y-9-Math.floor(i/3)*6;solid(c,xx,yy,3,5,i%2?CLAY:ENAMEL);box(c,'shop117_paper',xx,yy+2,2,1);}
   }
 
   // The bait station against the west wall: the worm cooler, the cricket cage, the tank.
   function baitStation(c) {
-    var x0 = tx(1), y = ty(2);
-    // The cooler, lid ajar, cups of worms in dark earth.
-    A.slab(c, x0 + 3, y + 6, 26, 20, ['outline', 'paper_dark', 'paper', 'bone', 'ivory']); box(c, 'crt_hi', x0 + 3, y + 18, 26, 3);
-    A.slab(c, x0 + 2, y - 2, 28, 9, ['outline', 'paper_dark', 'bone', 'ivory', 'cream']);
-    for (var i = 0; i < 3; i++) { A.blob(c, x0 + 8 + i * 8, y + 2, 3, 2, ['outline', 'wood_deep', 'wood_dark'], {}); A.line(c, 'flesh', x0 + 6 + i * 8, y + 2, x0 + 10 + i * 8, y + 1); }
-    box(c, 'brick', x0 + 6, y + 10, 10, 4); box(c, 'ivory', x0 + 7, y + 11, 8, 1);
-    // The cricket cage: a mesh box on a crate (its crickets are live).
-    y = ty(3);
-    A.slab(c, x0 + 4, y + 16, 24, 12, WOODK);
-    A.slab(c, x0 + 3, y - 2, 26, 19, ['outline', 'reed_dark', 'reed', 'reed_hi']);
-    box(c, 'reed_dark', x0 + 5, y, 22, 15);
-    // The minnow tank on its stand: water, gravel, a weed, the pump (bubbles are live).
-    y = ty(4);
-    A.slab(c, x0 + 3, y + 18, 26, 10, ['outline', 'chrome_dark', 'chrome', 'chrome_hi']);
-    box(c, 'outline', x0 + 3, y - 4, 26, 23); box(c, 'water_dark', x0 + 4, y - 3, 24, 21); box(c, 'water_mid', x0 + 4, y - 3, 24, 3);
-    A.area(c, x0 + 4, y + 14, 24, 4, function (x, yy) { return (x + yy) % 3 ? 'stone' : 'stone_hi'; });
-    A.line(c, 'leaf_hi', x0 + 7, y + 14, x0 + 6, y + 4); A.line(c, 'leaf', x0 + 8, y + 14, x0 + 10, y + 6);
-    box(c, 'vinyl', x0 + 24, y - 6, 4, 4); A.line(c, 'outline', x0 + 26, y - 2, x0 + 26, y + 12);
-    box(c, 'fog_light', x0 + 5, y - 2, 6, 1);
+    var x=tx(1),y=ty(3),i;
+    solid(c,x+3,y+6,26,20,PAPER);solid(c,x+2,y-2,28,9,PAPER);box(c,'shop117_paint',x+4,y+18,24,3);
+    for(i=0;i<3;i++){A.blob(c,x+8+i*8,y+2,3,2,STUDY_WOOD,{});A.line(c,'shop117_rug',x+6+i*8,y+2,x+10+i*8,y+1);}
+    box(c,'shop117_rug',x+6,y+10,10,4);box(c,'shop117_paper',x+8,y+11,6,1);
+    y=ty(4);solid(c,x+4,y+16,24,12,STUDY_WOOD);solid(c,x+3,y-2,26,19,STUDY_WOOD);box(c,'shop117_edge',x+5,y,22,15);
+    for(i=0;i<5;i++)box(c,'shop117_metal',x+7+i*4,y+1,1,13);for(i=0;i<3;i++)box(c,'shop117_metal_dk',x+5,y+3+i*4,22,1);
+    y=ty(5);solid(c,x+3,y+18,26,10,ENAMEL);solid(c,x+3,y-4,26,23,STUDY_METAL);box(c,'water_dark',x+4,y-3,24,21);box(c,'water_hi',x+4,y-3,24,2);
+    box(c,'shop117_cloth_dk',x+4,y+14,24,4);for(i=0;i<4;i++)box(c,'shop117_cloth',x+5+i*6,y+14+(i%2),3,1);
+    A.line(c,'shop117_leaf',x+7,y+14,x+6,y+4);A.line(c,'shop117_leaf_hi',x+8,y+14,x+10,y+6);solid(c,x+24,y-6,4,4,ENAMEL);A.line(c,'shop117_metal_dk',x+26,y-2,x+26,y+12);box(c,'shop117_metal_hi',x+5,y-2,5,1);
   }
 
   // Props drawn in order of their feet with the people: the counter, the freezer, the palm.
   function paintCounter(c) {
-    // An L: the leg down Rusty's left (col 8, rows 2-3), then along row 3 to the wall. Top
-    // surface first, then the front face. In the prop's own pixels: x from tx(8), y from ty(2) - 14.
-    var x0 = 2, y0 = 0, legW = T - 4, longW = 3 * T - 4, topY = T - 2, frontY = 2 * T - 2;
-    var TOPK = ['wood_dark', 'wood', 'wood_mid', 'wood_hi', 'wood_lit'];
-    A.area(c, x0, y0, legW, frontY, function (x, y) { return x === x0 || y === y0 ? 'outline' : tone(TOPK, 0.62 - (x - x0) / legW * 0.2 + (((y + 1) % 6) === 0 ? -0.18 : 0)); });
-    A.area(c, x0, topY, longW, frontY - topY, function (x, y) { return y === topY && x > x0 + legW - 1 ? 'outline' : tone(TOPK, 0.55 + (((y - topY) % 6) === 0 ? 0.12 : 0) - (x - x0) / longW * 0.1); });
-    box(c, 'outline', x0 + longW - 1, topY, 1, frontY - topY);
-    // The leg's top is a glass display: velvet trays of lures and spoons, the glass's glints.
-    var gx = x0 + 3, gy = 34, gw = legW - 6, gh = 22;
-    box(c, 'outline', gx - 1, gy - 1, gw + 2, gh + 2);
-    A.area(c, gx, gy, gw, gh, function (x, y) { return ((y - gy) % 9 === 8) ? 'chrome_dark' : ((x + y) % 5 ? 'blood' : 'rust_dark'); });
-    var DK = ['brass_hi', 'chrome_lit', 'orange_hi', 'olive_lit', 'pink_hi', 'signal_amber', 'crt_glow'];
-    for (var j = 0; j < 12; j++) { var dx = gx + 2 + (j % 3) * 7, dy = gy + 2 + ((j / 3) | 0) * 9; if (dy + 4 > gy + gh) break; box(c, DK[j % DK.length], dx, dy, 3, 2); A.px(c, 'chrome', dx + 3, dy + 2); A.px(c, 'outline', dx + 1, dy + 3); }
-    A.line(c, 'fog_light', gx + 1, gy + 1, gx + 6, gy + 1); A.line(c, 'fog_mid', gx + gw - 8, gy + gh - 2, gx + gw - 2, gy + gh - 7);
-    // The front face: tongue-and-groove, a kick plate, a sticker.
-    A.area(c, x0, frontY, longW, 16, function (x, y) { var e = y - frontY; return e === 0 ? 'shop_wood_lit' : (e > 12 ? (e === 15 ? 'shop_ink' : 'shop_teal_dk') : ((x - x0) % 12 === 0 ? 'shop_teal_dk' : (e === 2 ? 'shop_teal_hi' : 'shop_teal'))); });
-    box(c, 'outline', x0, frontY, 1, 16); box(c, 'outline', x0 + longW - 1, frontY, 1, 16);
-    A.slab(c, x0 + 40, frontY + 3, 10, 7, ['outline', 'teal', 'teal_hi', 'teal_lit']); box(c, 'ivory', x0 + 42, frontY + 5, 6, 1);
-    // What stands on it: the till (its display stuck), a bell, an ashtray, a newspaper, a jar.
-    var g = X.grid(longW + 4, frontY + 4);
-    g.slab(66, topY - 10, 22, 14, ['outline', 'chrome_dark', 'chrome', 'chrome_hi', 'chrome_lit']);
-    g.rect('outline', 69, topY - 8, 13, 4); for (var i = 0; i < 3; i++) g.set('signal_amber', 71 + i * 3 + (i > 0 ? 1 : 0), topY - 7);
-    for (i = 0; i < 8; i++) g.set(i % 3 ? 'chrome_lit' : 'ivory', 69 + (i % 4) * 3, topY - 2 + ((i / 4) | 0) * 2);
-    g.ell(48, topY + 6, 3, 2, ['rust', 'leaf_gold', 'brass_hi'], {}); g.set('brass_hi', 48, topY + 3);
-    g.ell(36, topY + 8, 4, 2, ['outline', 'stone_dark', 'stone', 'stone_hi'], {}); g.rect('ivory', 37, topY + 7, 3, 1); g.set('orange_hi', 40, topY + 7);
-    g.slab(52, topY + 8, 12, 7, ['paper_dark', 'paper_dark', 'paper', 'bone']); g.rect('stone_hi', 54, topY + 10, 8, 1); g.rect('stone_hi', 54, topY + 12, 6, 1);
-    g.slab(8, T - 10, 9, 10, ['outline', 'pink_dark', 'pink', 'pink_hi']); g.rect('chrome', 8, T - 12, 9, 2);    // a jar of sweets on the leg
-    for (i = 0; i < 4; i++) g.set(['mustard_lit', 'crt_glow', 'orange_lit', 'olive_lit'][i], 10 + (i % 2) * 3, T - 8 + ((i / 2) | 0) * 3);
-    g.outline('outline'); g.paint(c, 0, 0);
-    img(c, K.bankerLamp(), 7, 12);
+    var g=X.grid(96,82);
+    g.poly([[4,0],[27,0],[30,3],[30,28],[90,28],[94,32],[94,76],[91,80],[4,80],[1,76],[1,4]],'shop117_edge');
+    g.poly([[5,1],[26,1],[28,4],[28,31],[91,31],[92,34],[92,62],[3,62],[3,5]],'shop117_wood_mid');
+    g.poly([[5,1],[26,1],[27,3],[5,3]],'shop117_wood_hi');g.rect('shop117_wood_hi',29,31,61,2);
+    g.rect('shop117_wood',4,5,2,25);g.rect('shop117_wood',5,60,86,2);g.rect('shop117_wood',42,44,18,1);g.rect('shop117_wood_hi',47,48,23,1);
+    g.rect('shop117_paint_dk',3,64,89,14);g.rect('shop117_paint',5,65,85,10);g.rect('shop117_paint_hi',5,65,85,1);
+    for(var i=0;i<3;i++){var x=7+i*27;g.rect('shop117_metal_dk',x,68,23,6);g.rect('shop117_paint',x+1,69,21,4);}
+    g.rect('shop117_wood_hi',4,62,87,2);g.rect('shop117_metal_dk',5,76,84,2);
+    g.slab(4,33,24,25,STUDY_METAL);g.rect('shop117_rug_dk',6,35,20,21);
+    for(i=0;i<9;i++){var xx=8+(i%3)*6,yy=38+Math.floor(i/3)*6;g.rect(i%2?'shop117_ochre':'shop117_paper',xx,yy,3,2);g.set('shop117_metal_hi',xx+3,yy+2);}
+    g.line('shop117_metal_hi',6,35,13,35);g.line('shop117_metal',21,53,25,49);
+    g.slab(66,20,23,14,STUDY_METAL);g.rect('shop117_edge',69,22,15,4);for(i=0;i<3;i++)g.set('shop117_lamp',71+i*4,23);
+    for(i=0;i<8;i++)g.set('shop117_paper',69+(i%4)*4,28+Math.floor(i/4)*3);
+    g.ell(49,37,3.5,2,['shop117_wood_dk','shop117_ochre','shop117_wood_lit'],{});g.set('shop117_ochre',49,34);
+    g.ell(37,39,4,2,STUDY_METAL,{});g.rect('shop117_paper',38,38,3,1);
+    g.slab(53,39,12,7,PAPER);g.rect('shop117_cloth_dk',55,41,8,1);g.rect('shop117_cloth_dk',55,43,6,1);
+    g.slab(8,22,9,10,CLAY);g.rect('shop117_metal',8,20,9,2);g.set('shop117_paper',11,26);g.set('shop117_ochre',14,29);
+    g.paint(c,0,0);img(c,shopProp('banker'),7,12);A.reset();
   }
+
   function paintFreezer(c) {
-    A.slab(c, 1, 8, 30, 22, ['outline', 'paper_dark', 'paper', 'bone', 'ivory']);
-    A.slab(c, 0, 0, 32, 10, ['outline', 'paper_dark', 'bone', 'ivory', 'cream']);
-    box(c, 'chrome_hi', 12, 9, 8, 2); box(c, 'outline', 12, 11, 8, 1);
-    box(c, 'brick', 4, 15, 14, 6); A.area(c, 5, 16, 12, 4, function (x, y) { return y === 17 && x % 2 ? 'ivory' : ''; });
-    box(c, 'reed', 22, 24, 6, 4); px(c, 'neon_red', 28, 13);
+    solid(c,1,8,30,22,ENAMEL);solid(c,0,0,32,10,PAPER);
+    box(c,'shop117_metal_hi',11,9,9,2);box(c,'shop117_edge',12,11,7,1);
+    solid(c,4,15,15,6,CLAY);box(c,'shop117_paper',6,17,10,1);box(c,'shop117_paint_dk',22,23,6,5);px(c,'shop117_lamp',28,13);
   }
 
   // ---- Baking ------------------------------------------------------------------------------
   var base = null, front = null, props = null, bakeMs = 0;
+  var cats = [], wax = [];
+  function bakeLife() {
+    if(cats.length)return;
+    for(var f=0;f<3;f++){
+      var g=X.grid(24,14);g.ell(12,9,9,4,CLAY,{});g.ell(7,7,5,4,PAPER,{});
+      g.poly([[3,6],[3,2],[7,5],[10,3+(f===2?1:0)],[11,8]],'shop117_clay_hi');
+      g.line('shop117_clay_dk',4,8,6,8);g.line('shop117_clay_dk',8,8,10,8);g.line('shop117_clay_dk',16,10,21,10);g.line('shop117_paper',16,11,21,11);
+      if(f===1)g.rect('shop117_clay',12,5,6,1);g.outline('shop117_edge');cats.push(g.canvas());
+      var w=X.grid(11,29);w.poly([[3,1],[8,1],[10,24],[1,24]],'shop117_metal_dk');w.poly([[4,4],[7,4],[9,22],[2,22]],'shop117_clay_dk');
+      w.ell(5,9+f*2,2,3,'shop117_clay_hi',{});w.ell(6,19-f*3,2.5,2,'shop117_rug',{});w.rect('shop117_metal',2,24,7,3);w.rect('shop117_metal_hi',3,0,5,3);wax.push(w.canvas());
+    }
+  }
+  function coolerLife(ctx,x,y,t,env){
+    ctx.fillStyle=P.shop117_paint_dk;ctx.fillRect(x,y,20,35);
+    for(var row=0;row<3;row++)for(var col=0;col<5;col++){
+      var xx=x+1+col*4, yy=y+4+row*10;ctx.fillStyle=P[col%2?'shop117_clay':'shop117_paint_hi'];ctx.fillRect(xx,yy,2,6);ctx.fillRect(xx,yy-1,1,1);ctx.fillStyle=P.shop117_cloth;ctx.fillRect(xx,yy+2,2,2);
+    }
+    ctx.fillStyle=P.shop117_metal;ctx.fillRect(x,y+11,20,1);ctx.fillRect(x,y+21,20,1);ctx.fillRect(x,y+31,20,1);
+    ctx.globalAlpha=.12;ctx.fillStyle=P.shop117_metal_hi;ctx.fillRect(x+2,y,2,34);ctx.globalAlpha=1;
+  }
   function bake() {
     if (!base) {
       var t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       base = G.gfx.bake.cached('shop:room56', function () { return G.gfx.bake.layer(W, RH, paintBase); });
       front = G.gfx.bake.cached('shop:front56', function () {
         return G.gfx.bake.layer(W, RH, function (c) {
-          for (var i = 0; i < WINS.length; i++) { var g = glassRect(i); K.windowFront(c, g[0], g[1], g[2], g[3], true); }
+          for (var i = 0; i < WINS.length; i++) { var g = glassRect(i); box(c,'shop117_wood',g[0]+(g[2]>>1)-1,g[1],3,g[3]); box(c,'shop117_wood_hi',g[0]+(g[2]>>1)-1,g[1],1,g[3]); box(c,'shop117_wood',g[0],g[1]+(g[3]>>1)-1,g[2],3); box(c,'shop117_wood_hi',g[0],g[1]+(g[3]>>1)-1,g[2],1); }
           // A plant on each sill, a trailing pothos over the first.
-          c.drawImage(K.plant('snake', ['mustard_dark', 'mustard', 'mustard_hi', 'mustard_lit']), glassRect(0)[0] + 2, TOP - 22);
-          c.drawImage(K.plant('trail'), glassRect(1)[0] + glassRect(1)[2] - 26, TOP - 22);
+          c.drawImage(shopProp('snake'), glassRect(0)[0] + 2, TOP - 22);
+          c.drawImage(shopProp('trail'), glassRect(1)[0] + glassRect(1)[2] - 26, TOP - 22);
           A.reset();
         });
       });
       props = [
         { img: G.gfx.bake.cached('shop:counter56', function () { return G.gfx.bake.layer(3 * T, 2 * T + 18, paintCounter); }), x: tx(8), y: ty(2) - 14, foot: ty(4) },
         { img: G.gfx.bake.cached('shop:freezer56', function () { return G.gfx.bake.layer(32, 31, paintFreezer); }), x: tx(1), y: ty(6) - 2, foot: ty(7) - 1 },
-        { img: G.gfx.bake.cached('shop:lamp56', function () { return K.floorLamp(); }), x: tx(3) + 9, y: ty(5) - 56, foot: ty(5) - 2 },
-        { img: G.gfx.bake.cached('shop:palm56', function () { return K.plant('monstera', ['orange_dark', 'orange', 'orange_hi', 'orange_lit']); }), x: tx(10) + 2, y: ty(7) - 42, foot: ty(7) - 1 },
-        { img: G.gfx.bake.cached('shop:cooler64', function () { return K.cooler(); }), x: tx(10) + 2, y: ty(6) - 53, foot: ty(6) - 1 }
+        { img: G.gfx.bake.cached('shop:lamp117', studyLamp), x: tx(3) + 5, y: ty(5) - 56, foot: ty(5) - 2 },
+        { img: G.gfx.bake.cached('shop:palm117', studyPlant), x: tx(10) + 2, y: ty(7) - 42, foot: ty(7) - 1 },
+        { img: G.gfx.bake.cached('shop:cooler64', function () { return shopProp('cooler'); }), x: tx(10) + 2, y: ty(6) - 53, foot: ty(6) - 1 }
       ];
-      finish(base); finish(front);
-      // Room-kit props are shared cached canvases; clone before grading this room only.
-      for (var pi = 0; pi < props.length; pi++) {
-        var source = props[pi].img;
-        props[pi].img = finish(G.gfx.bake.layer(source.width, source.height, function (c) { c.drawImage(source, 0, 0); }));
-      }
+      bakeLife();
       // Phase 64: what moves on the props, drawn with them in their place in the order: the
       // lava lamp on the counter, the cat on the freezer, the lit drinks in the cooler.
-      props[1].live = function (ctx, x, y, t) { K.cat(ctx, x + 6, y + 8, t); };
-      props[4].live = function (ctx, x, y, t, env) { K.coolerInside(ctx, x + 4, y + 10, t, env ? env.night : 0); };
+      props[1].live = function (ctx, x, y, t) { ctx.drawImage(cats[(t%17>16?2:Math.floor(t*.5)%2)],x+4,y-5); };
+      props[4].live = function (ctx, x, y, t, env) { coolerLife(ctx, x + 4, y + 10, t, env); };
       if (t0) bakeMs = performance.now() - t0;
     }
     return base;
@@ -441,14 +446,14 @@ G.ui.shopRoom = (function () {
     }
     shown.rods = n;
     // Minnows in the tank, crickets in the cage now and then hopping.
-    var mx = ox + tx(1) + 5, my = oy + ty(4) - 1;
+    var mx = ox + tx(1) + 5, my = oy + ty(5) - 1;
     shown.minnows = stock.minnows;
     for (i = 0; i < stock.minnows; i++) {
       var ph = t * (0.35 + i * 0.07) + i * 1.7, u = (Math.sin(ph) + 1) / 2, dir = Math.cos(ph) > 0;
       ctx.fillStyle = P.water_foam; ctx.fillRect(mx + Math.round(u * 18), my + (i * 5) % 13, 3, 1);
       ctx.fillStyle = P.chrome_lit; ctx.fillRect(mx + Math.round(u * 18) + (dir ? 2 : 0), my + (i * 5) % 13, 1, 1);
     }
-    var cx = ox + tx(1) + 6, cy = oy + ty(3) + 1;
+    var cx = ox + tx(1) + 6, cy = oy + ty(4) + 1;
     shown.crickets = stock.crickets;
     for (i = 0; i < stock.crickets; i++) {
       var hop = (t * 0.6 + i * 0.37) % 1 < 0.06 ? 2 : 0;
@@ -464,8 +469,6 @@ G.ui.shopRoom = (function () {
   // hour; at night the room darkens but for the lamps' stepped pools.
   var FIGURE_WIN = 10, mask = null;
   function clearAt(x, y) {
-    // The cut-away wall tops keep their solid silhouette against the black surround.
-    if (x < T || x >= W - T || y >= ty(7)) return true;
     for (var i = 0; i < WINS.length; i++) { var g = glassRect(i); if (x >= g[0] && x < g[0] + g[2] && y >= g[1] && y < g[1] + g[3]) return true; }
     return tvRect && x >= tvRect[0] && x < tvRect[0] + tvRect[2] && y >= tvRect[1] && y < tvRect[1] + tvRect[3];
   }
@@ -487,7 +490,7 @@ G.ui.shopRoom = (function () {
     for (i = 1; i <= 3; i++) ctx.fillRect(Math.round(cx + Math.sin(ha) * i * 0.8), Math.round(cy - Math.cos(ha) * i * 0.8), 1, 1);
     ctx.fillStyle = P.neon_red; ctx.fillRect(cx, cy, 1, 1);
     // The CRT behind the counter, a fishing show on it.
-    if (tvRect) K.screen(ctx, ox + tvRect[0], oy + tvRect[1], tvRect[2], tvRect[3], t, 1);
+    if(tvRect){var sx=ox+tvRect[0],sy=oy+tvRect[1];ctx.fillStyle=P.shop117_paint_dk;ctx.fillRect(sx,sy,16,12);ctx.fillStyle=P.shop117_paint_hi;ctx.fillRect(sx+1,sy+7,14,1);ctx.fillStyle=P.shop117_cloth;ctx.fillRect(sx+3+Math.floor(t*.5)%3,sy+5,4,1);ctx.fillRect(sx+11,sy+3,1,5);}
   }
   // A word in neon tubes (the font's own pixels, doubled, outlined): lit or dark.
   function neon(ctx, s, x, y, on, night) {
@@ -496,14 +499,30 @@ G.ui.shopRoom = (function () {
     F.drawText(ctx, s, x, y, on ? 'neon_pink_hi' : 'pink_dark');
     F.drawText(ctx, s, x + 1, y, on ? 'neon_pink' : 'pink_dark');
   }
+  var floorGlow = null;
+  function bakeLight() {
+    if (mask) return;
+    mask = G.gfx.bake.layer(W, RH, function (c) {
+      for (var y=0;y<RH;y+=2) for(var x=0;x<W;x+=2) {
+        if(clearAt(x,y))continue;
+        var lamp=Math.max(0,1-Math.pow((x-LAMP[0])/100,2)-Math.pow((y-LAMP[1]+8)/95,2));
+        var desk=Math.max(0,1-Math.pow((x-DESK[0])/62,2)-Math.pow((y-DESK[1])/70,2));
+        c.globalAlpha=.49-Math.max(lamp*.38,desk*.37);c.fillStyle=P.shop117_edge;c.fillRect(x,y,2,2);
+      } c.globalAlpha=1;
+    });
+    floorGlow=G.gfx.bake.layer(W,RH,function(c){
+      for(var y=ty(2);y<ty(7);y+=2)for(var x=T;x<W-T;x+=2){
+        var a=Math.max(0,1-Math.pow((x-LAMP[0]-28)/88,2)-Math.pow((y-ty(5))/46,2));
+        var b=Math.max(0,1-Math.pow((x-DESK[0]+15)/65,2)-Math.pow((y-ty(4))/31,2));
+        c.globalAlpha=Math.max(a*.19,b*.13);c.fillStyle=P.shop117_lamp;c.fillRect(x,y,2,2);
+      }c.globalAlpha=1;
+    });
+  }
   function drawLight(ctx, env, t, rusty, ox, oy) {
     var i;
     if (env.night > 0.02) {
-      if (!mask) {
-        mask = K.nightMask(W, RH, [{ x: LAMP[0], y: LAMP[1], r: 118 }, { x: DESK[0], y: DESK[1] - 6, r: 65 }, { x: tvRect ? tvRect[0] + 8 : 0, y: tvRect ? tvRect[1] + 18 : 0, r: 34 }], clearAt);
-        var mc = mask.getContext('2d'); mc.globalCompositeOperation = 'source-in'; mc.fillStyle = P.shop_dusk; mc.fillRect(0, 0, W, RH); mc.globalCompositeOperation = 'source-over';
-      }
-      ctx.globalAlpha = env.night * 0.65; ctx.drawImage(mask, ox, oy); ctx.globalAlpha = 1;
+      bakeLight();
+      ctx.globalAlpha = env.night; ctx.drawImage(mask, ox, oy); ctx.globalAlpha = 1;
       ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.45 * env.night;                 // dust in the lamplight
       for (i = 0; i < 11; i++) {
         var a = t * (0.05 + i * 0.011) + i * 2.1, r = 10 + (i * 7) % 34;
@@ -511,13 +530,12 @@ G.ui.shopRoom = (function () {
       }
       ctx.globalAlpha = 1;
     } else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + T, oy + TOP + 2, W - 2 * T, RH - TOP - 2); ctx.globalAlpha = 1; }
-    cozyBulbs(ctx, t, ox, oy);
+    for(i=0;i<cable.length;i++){var bulb=cable[i];ctx.fillStyle=P.shop117_metal_dk;ctx.fillRect(ox+bulb[0],oy+bulb[1],2,2);ctx.fillStyle=P[i%4===0?'shop117_cloth':'shop117_lamp'];ctx.fillRect(ox+bulb[0],oy+bulb[1]+2,1,2);}
     moths(ctx, env, t, ox, oy);
-    K.lavaLamp(ctx, ox + tx(6) + 22, oy + ty(1) - 30, t, true, env.night);             // Phase 64: on top of the gear shelf
+    ctx.drawImage(wax[Math.floor(t*.4)%3],ox+tx(6)+22,oy+ty(1)-30);             // Phase 64: on top of the gear shelf
     if (tvRect) K.glare(ctx, ox + tvRect[0], oy + tvRect[1], tvRect[2], tvRect[3]);
     // The floor lamp's shade, lit at night.
-    softGlow(ctx, ox + LAMP[0], oy + LAMP[1] - 22, 23, 17, 'shop_lamp', 0.07 + 0.03 * env.night);
-    softGlow(ctx, ox + DESK[0], oy + DESK[1] - 7, 17, 12, 'shop_lamp', 0.075);
+    if(env.night>.3){ctx.globalAlpha=env.night*.3;ctx.fillStyle=P.shop117_lamp;ctx.fillRect(ox+tx(3)+10,oy+ty(5)-53,11,12);ctx.globalAlpha=1;}
     // The tank's bubbles; steam from Rusty's cup; smoke from the ashtray.
     ctx.fillStyle = P.water_foam;
     for (i = 0; i < 4; i++) { var u = (t * 0.5 + i / 4) % 1; ctx.fillRect(ox + tx(1) + 26 - (i % 2), oy + ty(5) + 11 - Math.floor(u * 15), 1, 1); }
@@ -536,8 +554,7 @@ G.ui.shopRoom = (function () {
   // cooler's glass, the lava lamp on the counter's top; the windows give back the lamps.
   function reflections(ctx, env, t, ox, oy) {
     var n = env.night;
-    K.reflect(ctx, ox + LAMP[0], oy + ty(5) - 1, 10, 26, 'lamp_glow', 0.2 * n, 0);
-    K.reflect(ctx, ox + tx(10) + 16, oy + ty(6), 18, 22, 'crt_glow', 0.06 + 0.1 * n, 0);
+    bakeLight();ctx.globalAlpha=.4+.6*n;ctx.drawImage(floorGlow,ox,oy);ctx.globalAlpha=1;
     for (var i = 0; i < WINS.length; i++) { var g = glassRect(i); K.glassLamps(ctx, ox + g[0], oy + g[1], g[2], g[3], n); }
   }
   // Moths round the floor lamp's shade and the banker's lamp at night.
@@ -549,29 +566,6 @@ G.ui.shopRoom = (function () {
       ctx.fillRect(Math.round(ox + L[0] + Math.cos(a) * r), Math.round(oy + L[1] - (i < 2 ? 22 : 8) + Math.sin(a * 1.7) * r * 0.6), 1 + (Math.floor(t * 12 + i) & 1), 1);
     }
   }
-  function softGlow(ctx, x, y, rx, ry, key, alpha) {
-    ctx.fillStyle = P[key];
-    for (var ring = 0; ring < 3; ring++) {
-      var scale = 1 - ring * 0.27, h = Math.round(ry * scale), w = rx * scale;
-      ctx.globalAlpha = alpha * (0.5 + ring * 0.2);
-      for (var dy = -h; dy <= h; dy += 2) {
-        var span = Math.round(w * Math.sqrt(Math.max(0, 1 - dy * dy / (h * h))));
-        if (span) ctx.fillRect(Math.round(x - span), Math.round(y + dy), span * 2, 2);
-      }
-    }
-    ctx.globalAlpha = 1;
-  }
-  function cozyBulbs(ctx, t, ox, oy) {
-    for (var i = 0; i < cable.length; i++) {
-      var x = ox + cable[i][0], y = oy + cable[i][1];
-      var warm = 0.035 + 0.008 * Math.sin(t * 0.35 + i);
-      // A quiet amber string, with one tired bulb above the empty lure hook.
-      if (i === 25) warm *= 0.6;
-      softGlow(ctx, x, y + 1, 7, 6, 'shop_lamp', warm);
-      ctx.fillStyle = P.shop_gold; ctx.fillRect(x, y, 1, 3);
-      ctx.fillStyle = P.shop_cream; ctx.fillRect(x, y + 1, 1, 1);
-    }
-  }
 
   // Draws the room, the glass, Rusty behind his counter, the props, the dog and the fisher in
   // order of their feet. rusty: {face, fr} (Phase 37); stock: what the shelves hold (38); env:
@@ -579,14 +573,6 @@ G.ui.shopRoom = (function () {
   var order = [];
   function draw(ctx, st, t, hour, rusty, stock, env) {
     var ox = OX, oy = OY - TOP, i;
-    if (G.ui.shopArt && G.ui.shopArt.draw(ctx, st, t, rusty, stock, env)) {
-      shown.rods = 0;
-      if (stock) {
-        for (i = 1; i < G.data.gear.rods.length; i++) if (!G.data.gear.rods[i].ice && (!stock.rods || stock.rods.indexOf(i) < 0)) shown.rods++;
-        shown.minnows = stock.minnows; shown.crickets = stock.crickets;
-      }
-      return;
-    }
     ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
     ctx.drawImage(bake(), ox, oy);
     if (env) drawLive(ctx, env, t, rusty, ox, oy);
@@ -604,18 +590,83 @@ G.ui.shopRoom = (function () {
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
       if (id < 100) { ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y); if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y, t, env); }
-      else if (id === 100) R.drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 16, oy + ty(3) - 2);
-      else if (id === 101) R.drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
-      else R.drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
+      else if (id === 100) drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 16, oy + ty(3) - 2);
+      else if (id === 101) drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
+      else drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
     }
     if (env) drawLight(ctx, env, t, rusty, ox, oy);
   }
 
-  function sprite(kind, dir, fr, lk) { return R.sprite(kind, dir, fr, lk); }
+  // Shop figures have their own native geometry; cabin figures and their cache are untouched.
+  var figures = {};
+  function shopLook(kind, lk) {
+    var list = kind === 'dog' ? G.data.looks.dogs : G.data.looks.fishers;
+    return typeof lk === 'object' && lk ? lk : G.data.lookOf(list, lk || (G.state.save.look && G.state.save.look[kind]));
+  }
+  function sprite(kind, dir, fr, lk) {
+    var L = shopLook(kind, lk), key = kind + L.id + dir + fr;
+    if (figures[key]) return figures[key];
+    if (dir === 'left') return (figures[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, L), 'x'));
+    var side = dir === 'right', back = dir === 'up', dog = kind === 'dog', s = dog ? L.size : 1;
+    var raw = X.grid(dog ? Math.ceil((side ? 40 : 32) * s) + 1 : 32, dog ? Math.ceil(32 * s) + 1 : 48);
+    var g = dog ? X.scaled(raw, s) : raw, stride = fr === 1 ? 2 : fr === 2 ? -2 : 0;
+    if (dog) {
+      var C = L.coat, E = L.ear, M = L.muzzle, sit = fr === 3;
+      if (side) {
+        g.poly([[7,20],[10,15],[25,15],[29,19],[27,25],[10,25]], C[1]);
+        g.rect(C[2],11,16,13,3); g.rect(C[0],10,24,16,2);
+        g.line(C[1],9,19,4,sit ? 25 : 14); g.line(C[2],5,15,3,L.tail === 'curl' ? 11 : 16);
+        for (var leg=0;leg<2;leg++) { var xx=leg ? 25 : 11, step=leg ? -stride : stride; g.rect(L.paleLegs ? M[1] : C[0],xx+step,24,3,sit ? 5 : 6); g.rect(M[2],xx+step,29,4,1); }
+        g.poly([[23,15],[24,8],[30,7],[34,11],[34,15],[37,16],[36,20],[29,21]],C[1]);
+        g.rect(M[1],31,16,6,3); g.rect(E[1],24,10,4,L.ears === 'prick' ? 4 : 10); g.set('shop117_edge',32,12); g.rect('shop117_edge',36,16,2,2);
+        if(L.ears==='prick')g.poly([[24,10],[24,4],[28,9]],E[0]);
+      } else {
+        g.poly([[10,17],[22,17],[24,25],[21,29],[11,29],[8,25]],C[1]); g.rect(L.chest,13,21,6,6);
+        g.rect(M[1],10+stride,27,4,3); g.rect(M[1],18-stride,27,4,3);
+        g.poly([[10,9],[14,7],[20,7],[23,10],[22,20],[18,23],[12,21],[9,17]],back ? C[0] : C[1]);
+        g.rect(E[1],8,10,4,L.ears==='prick'?4:10);g.rect(E[0],21,10,4,L.ears==='prick'?4:10);
+        if(L.ears==='prick'){g.poly([[9,11],[10,4],[14,9]],E[0]);g.poly([[19,9],[23,4],[24,12]],E[0]);}
+        if(!back){g.rect(M[1],12,16,9,4);g.set('shop117_edge',12,13);g.set('shop117_edge',20,13);g.rect('shop117_edge',15,16,3,2);if(L.face)g.rect(M[2],16,9,2,7);}
+      }
+      if(L.curly)for(var ci=0;ci<6;ci++)g.rect(C[2],10+(ci*7)%15,18+(ci*3)%7,2,2);
+    } else {
+      var rusty=kind==='rusty', CO=rusty?['shop117_clay_dk','shop117_clay','shop117_clay_hi']:L.coat;
+      var SK=rusty?['skin_shadow','flesh','skin_hi','bone']:L.skin, HK=rusty?['shop117_paint_dk','shop117_paint','shop117_paint_hi']:L.hatKeys;
+      var tr=rusty?'denim_dark':L.trousers;
+      g.rect(tr,11,35,5,9-Math.max(0,stride));g.rect(tr,18,35,5,9-Math.max(0,-stride));
+      g.rect('shop117_edge',10,43-Math.max(0,stride),7,3);g.rect('shop117_edge',18,43-Math.max(0,-stride),7,3);
+      g.poly([[10,23],[22,23],[24,26],[23,36],[10,36],[8,27]],CO[1]);g.rect(CO[2],11,24,3,9);g.rect(CO[0],21,25,3,11);
+      g.rect(CO[1],7,26+stride,4,10);g.rect(CO[0],24,26-stride,3,10);g.rect(SK[1],7,35+stride,3,3);g.rect(SK[0],24,35-stride,3,3);
+      if(!back){g.rect(CO[0],16,25,1,11);g.rect(CO[0],11,30,4,3);g.rect(CO[2],11,30,4,1);g.set('shop117_metal_hi',17,28);}
+      else {g.rect(CO[0],11,26,11,1);g.rect(CO[2],11,24,10,1);}
+      if(L.check && !rusty)for(var ch=0;ch<3;ch++)g.rect(L.check,11,27+ch*3,10,1);
+      g.rect(SK[0],14,21,5,3);
+      g.poly([[11,10],[20,10],[23,13],[23,20],[20,23],[13,23],[10,20],[9,14]],back?(rusty?'shop117_cloth_dk':L.hair):SK[1]);
+      if(!back){g.rect(SK[2],11,13,3,7);g.rect(SK[0],21,14,2,6);g.rect(SK[1],side?23:9,16,2,4);if(fr!==1||!rusty){g.set('shop117_edge',side?20:13,16);if(!side)g.set('shop117_edge',20,16);}g.rect(SK[0],side?22:16,18,2,2);g.rect('shop117_clay_dk',side?19:15,21,4,1);
+        if(rusty||L.beard){var beard=rusty?'shop117_paper':L.beard[1];g.poly([[11,19],[14,21],[20,21],[23,18],[21,24],[15,25],[11,22]],beard);}
+        if(rusty){g.rect('shop117_metal_dk',11,15,5,3);g.rect('shop117_metal_dk',18,15,5,3);g.rect('shop117_metal_hi',12,16,3,1);g.set('shop117_metal_hi',19,16);g.set('shop117_metal_dk',16,16);}
+      }
+      var hat=rusty?'cap':L.hat;
+      g.poly([[10,10],[12,7],[20,7],[23,10],[23,13],[10,13]],HK[1]);g.rect(HK[2],12,8,6,2);g.rect(HK[0],10,12,14,2);
+      if(hat==='cap')g.rect(HK[0],side?19:10,13,side?9:15,2);
+      if(hat==='bucket'){g.rect(HK[1],8,13,18,2);g.rect(HK[0],9,15,16,1);}
+      if(hat==='knit')g.rect(HK[2],11,12,12,2);
+      if(hat==='lamp'){g.rect('shop117_edge',15,10,5,4);g.rect('shop117_lamp',16,11,3,2);}
+      if(rusty&&fr===2){g.rect(CO[0],20,24,6,4);g.rect('shop117_paper',21,22,4,4);}
+      if(rusty&&fr===3){g.rect('shop117_paper',10,29,16,6);g.rect('shop117_cloth_dk',12,31,5,1);g.rect('shop117_cloth_dk',19,31,5,1);}
+    }
+    raw.outline('shop117_edge'); return (figures[key]=raw.canvas());
+  }
+  function prebake(kind, lk) { var dirs=['down','up','right','left'];for(var d=0;d<4;d++)for(var f=0;f<4;f++)sprite(kind,dirs[d],f,lk); }
+  function drawFigure(ctx,kind,dir,fr,x,y) {var a=R.anchor(kind,dir);R.shadow(ctx,x,y,kind==='dog'?16:18);ctx.drawImage(sprite(kind,dir,fr),Math.round(x-a[0]),Math.round(y-a[1]));}
 
   return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, TOP: TOP, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,
-    create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: function (kind, look) { R.prebake(kind, look); if (G.ui.shopArt) G.ui.shopArt.prebake(); },
+    create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: prebake,
     bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
     // Phase 64 (dbg.roomLife): the live things in the room.
-    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', style: 'approved miniature concept', artwork: G.ui.shopArt ? G.ui.shopArt.info() : null, layout: '12x8, miniature furniture footprints', live: n, things: ['four-facing mini characters', 'dog trot', 'lake weather', 'game-hour clock', 'quiet strange events', 'steam and bubbles'] }; } };
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 123, study: ['native timber room', 'enamel furniture', 'compact characters', 'warm matte lighting'], live: n, things: ['slow wax lamp', 'sleeping cat', 'bottled drinks', 'moths', 'lake windows', 'stock-aware bait'] }; } };
 })();
+
+if (G.core && G.core.debug) G.core.debug.addLine(function () {
+  return G.core.state.sceneName() === 'shop' ? 'shop style 123: native room, furniture, characters, light and quiet life' : '';
+});
