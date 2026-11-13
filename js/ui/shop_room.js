@@ -397,6 +397,26 @@ G.ui.shopRoom = (function () {
 
   // ---- Baking ------------------------------------------------------------------------------
   var base = null, front = null, props = null, bakeMs = 0;
+  var cats = [], wax = [];
+  function bakeLife() {
+    if(cats.length)return;
+    for(var f=0;f<3;f++){
+      var g=X.grid(24,14);g.ell(12,9,9,4,CLAY,{});g.ell(7,7,5,4,PAPER,{});
+      g.poly([[3,6],[3,2],[7,5],[10,3+(f===2?1:0)],[11,8]],'shop117_clay_hi');
+      g.line('shop117_clay_dk',4,8,6,8);g.line('shop117_clay_dk',8,8,10,8);g.line('shop117_clay_dk',16,10,21,10);g.line('shop117_paper',16,11,21,11);
+      if(f===1)g.rect('shop117_clay',12,5,6,1);g.outline('shop117_edge');cats.push(g.canvas());
+      var w=X.grid(11,29);w.poly([[3,1],[8,1],[10,24],[1,24]],'shop117_metal_dk');w.poly([[4,4],[7,4],[9,22],[2,22]],'shop117_clay_dk');
+      w.ell(5,9+f*2,2,3,'shop117_clay_hi',{});w.ell(6,19-f*3,2.5,2,'shop117_rug',{});w.rect('shop117_metal',2,24,7,3);w.rect('shop117_metal_hi',3,0,5,3);wax.push(w.canvas());
+    }
+  }
+  function coolerLife(ctx,x,y,t,env){
+    ctx.fillStyle=P.shop117_paint_dk;ctx.fillRect(x,y,20,35);
+    for(var row=0;row<3;row++)for(var col=0;col<5;col++){
+      var xx=x+1+col*4, yy=y+4+row*10;ctx.fillStyle=P[col%2?'shop117_clay':'shop117_paint_hi'];ctx.fillRect(xx,yy,2,6);ctx.fillRect(xx,yy-1,1,1);ctx.fillStyle=P.shop117_cloth;ctx.fillRect(xx,yy+2,2,2);
+    }
+    ctx.fillStyle=P.shop117_metal;ctx.fillRect(x,y+11,20,1);ctx.fillRect(x,y+21,20,1);ctx.fillRect(x,y+31,20,1);
+    ctx.globalAlpha=.12;ctx.fillStyle=P.shop117_metal_hi;ctx.fillRect(x+2,y,2,34);ctx.globalAlpha=1;
+  }
   function bake() {
     if (!base) {
       var t0 = typeof performance !== 'undefined' ? performance.now() : 0;
@@ -417,10 +437,11 @@ G.ui.shopRoom = (function () {
         { img: G.gfx.bake.cached('shop:palm117', studyPlant), x: tx(10) + 2, y: ty(7) - 42, foot: ty(7) - 1 },
         { img: G.gfx.bake.cached('shop:cooler64', function () { return shopProp('cooler'); }), x: tx(10) + 2, y: ty(6) - 53, foot: ty(6) - 1 }
       ];
+      bakeLife();
       // Phase 64: what moves on the props, drawn with them in their place in the order: the
       // lava lamp on the counter, the cat on the freezer, the lit drinks in the cooler.
-      props[1].live = function (ctx, x, y, t) { K.cat(ctx, x + 6, y + 8, t); };
-      props[4].live = function (ctx, x, y, t, env) { K.coolerInside(ctx, x + 4, y + 10, t, env ? env.night : 0); };
+      props[1].live = function (ctx, x, y, t) { ctx.drawImage(cats[(t%17>16?2:Math.floor(t*.5)%2)],x+4,y-5); };
+      props[4].live = function (ctx, x, y, t, env) { coolerLife(ctx, x + 4, y + 10, t, env); };
       if (t0) bakeMs = performance.now() - t0;
     }
     return base;
@@ -487,7 +508,7 @@ G.ui.shopRoom = (function () {
     for (i = 1; i <= 3; i++) ctx.fillRect(Math.round(cx + Math.sin(ha) * i * 0.8), Math.round(cy - Math.cos(ha) * i * 0.8), 1, 1);
     ctx.fillStyle = P.neon_red; ctx.fillRect(cx, cy, 1, 1);
     // The CRT behind the counter, a fishing show on it.
-    if (tvRect) K.screen(ctx, ox + tvRect[0], oy + tvRect[1], tvRect[2], tvRect[3], t, 1);
+    if(tvRect){var sx=ox+tvRect[0],sy=oy+tvRect[1];ctx.fillStyle=P.shop117_paint_dk;ctx.fillRect(sx,sy,16,12);ctx.fillStyle=P.shop117_paint_hi;ctx.fillRect(sx+1,sy+7,14,1);ctx.fillStyle=P.shop117_cloth;ctx.fillRect(sx+3+Math.floor(t*.5)%3,sy+5,4,1);ctx.fillRect(sx+11,sy+3,1,5);}
   }
   // A word in neon tubes (the font's own pixels, doubled, outlined): lit or dark.
   function neon(ctx, s, x, y, on, night) {
@@ -529,7 +550,7 @@ G.ui.shopRoom = (function () {
     } else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + T, oy + TOP + 2, W - 2 * T, RH - TOP - 2); ctx.globalAlpha = 1; }
     for(i=0;i<cable.length;i++){var bulb=cable[i];ctx.fillStyle=P.shop117_metal_dk;ctx.fillRect(ox+bulb[0],oy+bulb[1],2,2);ctx.fillStyle=P[i%4===0?'shop117_cloth':'shop117_lamp'];ctx.fillRect(ox+bulb[0],oy+bulb[1]+2,1,2);}
     moths(ctx, env, t, ox, oy);
-    K.lavaLamp(ctx, ox + tx(6) + 22, oy + ty(1) - 30, t, true, env.night);             // Phase 64: on top of the gear shelf
+    ctx.drawImage(wax[Math.floor(t*.4)%3],ox+tx(6)+22,oy+ty(1)-30);             // Phase 64: on top of the gear shelf
     if (tvRect) K.glare(ctx, ox + tvRect[0], oy + tvRect[1], tvRect[2], tvRect[3]);
     // The floor lamp's shade, lit at night.
     if(env.night>.3){ctx.globalAlpha=env.night*.3;ctx.fillStyle=P.shop117_lamp;ctx.fillRect(ox+tx(3)+10,oy+ty(5)-53,11,12);ctx.globalAlpha=1;}
@@ -663,7 +684,7 @@ G.ui.shopRoom = (function () {
     create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: prebake,
     bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
     // Phase 64 (dbg.roomLife): the live things in the room.
-    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 121, study: ['wall/floor bay', 'linen lamp', 'enamel counter corner', 'faceted monstera'], live: n, things: ['lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 122, study: ['native timber room', 'enamel furniture', 'compact characters', 'warm matte lighting'], live: n, things: ['slow wax lamp', 'sleeping cat', 'bottled drinks', 'moths', 'lake windows', 'stock-aware bait'] }; } };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {

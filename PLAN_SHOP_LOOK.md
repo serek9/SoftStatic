@@ -1,6 +1,6 @@
 # Tienda: redibujado procedural cozy y misterio rural
 
-**Fecha:** 2026-11-13. **Estado:** fases 117–121 implementadas; 122–123 en curso.
+**Fecha:** 2026-11-13. **Estado:** fases 117–122 implementadas; 123–123 en curso.
 
 La petición es cambiar todo el lenguaje visual de la tienda usando el sistema de
 dibujo que ya tiene SoftStatic. Las ilustraciones generadas son referencias de
@@ -168,6 +168,10 @@ perder sus siluetas en negro. Las luces amplias se precalculan y se mide el cost
 
 ### Fase 122 — Movimiento ambiental y misterio discreto
 
+**Implementada (2026-11-13):** Native sleeping cat with breathing and ear frames, slow wax lamp, subdued bottled drinks and CRT fishing programme. Existing stock-aware bait, clock anomaly, distant figure and Rusty events retained with original depth ordering.
+
+**Verificación:** Three time-of-day captures without browser errors; animation frames baked with room.
+
 **Archivos:** `js/ui/shop_room.js`, `js/ui/room_kit.js`; `js/ui/shop.js` solo para
 exponer estado visual existente si resulta necesario.
 
@@ -215,4 +219,4 @@ buscado. La revisión se hace con capturas y una secuencia del juego funcionando
 - Medir el presupuesto en el mismo ejecutor, con sprites ya preparados. Mantener
   ausencia de arte regenerado durante `draw` y explicar cualquier coste adicional.
 
-**Siguiente trabajo previsto:** fase 122. El usuario ha autorizado continuar con todas las fases.
+**Siguiente trabajo previsto:** fase 123. El usuario ha autorizado continuar con todas las fases.

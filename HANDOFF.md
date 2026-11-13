@@ -1,12 +1,12 @@
 # SoftStatic: Handoff
 
-## Latest work: procedural shop, phase 121 (2026-11-13)
+## Latest work: procedural shop, phase 122 (2026-11-13)
 
-Baked warm floor pools under furniture, cool translucent night shadow with local light falloff, muted warm string bulbs and matte timber. Original lake windows still follow actual game hour, rain and fog.
+Native sleeping cat with breathing and ear frames, slow wax lamp, subdued bottled drinks and CRT fishing programme. Existing stock-aware bait, clock anomaly, distant figure and Rusty events retained with original depth ordering.
 
-Checks: No browser errors in noon, dusk and night captures. Floor light precedes sorted furniture and characters.
+Checks: Three time-of-day captures without browser errors; animation frames baked with room.
 
-The user authorized all remaining shop phases on 2026-11-13. Phase 121 is done. Continue with phase 122; no further phase-start confirmation is needed.
+The user authorized all remaining shop phases on 2026-11-13. Phase 122 is done. Continue with phase 123; no further phase-start confirmation is needed.
 
 ## State in one paragraph
 

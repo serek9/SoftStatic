@@ -510,7 +510,7 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 119 Furniture and shop fittings | Done | `Phase 119: Furniture and shop fittings` | Repainted every shop fitting procedurally: shelves, rod rack, bait station, counter, freezer, radio, guitar, amplifier and window frames. Original anchors and collision geometry retained. |
 | 120 Shop characters | Done | `Phase 120: Shop characters` | Fresh native shop-only geometry for the fisher, Rusty and four dog breeds, with all facings, walking poses and shopkeeper gestures. Cosmetic coats, hats and breed silhouettes retained; original cabin painters unchanged. |
 | 121 Warm interior light | Done | `Phase 121: Warm interior light` | Baked warm floor pools under furniture, cool translucent night shadow with local light falloff, muted warm string bulbs and matte timber. Original lake windows still follow actual game hour, rain and fog. |
-| 122 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
+| 122 Ambient life and subtle unease | Done | `Phase 122: Ambient life and subtle unease` | Native sleeping cat with breathing and ear frames, slow wax lamp, subdued bottled drinks and CRT fishing programme. Existing stock-aware bait, clock anomaly, distant figure and Rusty events retained with original depth ordering. |
 | 123 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
 
 ### 8.2 Architecture as built
@@ -1276,6 +1276,8 @@ These are interpretations and additions made while building, where the spec abov
 
 589. **Warm interior light (121):** Baked warm floor pools under furniture, cool translucent night shadow with local light falloff, muted warm string bulbs and matte timber. Original lake windows still follow actual game hour, rain and fog.
 
+590. **Ambient life and subtle unease (122):** Native sleeping cat with breathing and ear frames, slow wax lamp, subdued bottled drinks and CRT fishing programme. Existing stock-aware bait, clock anomaly, distant figure and Rusty events retained with original depth ordering.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1590,9 +1592,11 @@ Phase 120 checks: Three-hour native captures without browser errors; all active 
 
 Phase 121 checks: No browser errors in noon, dusk and night captures. Floor light precedes sorted furniture and characters.
 
+Phase 122 checks: Three time-of-day captures without browser errors; animation frames baked with room.
+
 ### 8.6 Next task
 
-The user authorized all remaining shop phases on 2026-11-13. Phase 121 is done. Continue with phase 122; no further phase-start confirmation is needed.
+The user authorized all remaining shop phases on 2026-11-13. Phase 122 is done. Continue with phase 123; no further phase-start confirmation is needed.
 
 Phase 114 (the Great Northern sign at the Pines) is done, on the user's request of 2026-11-12; its look waits for the user's check (8.4 #75). Phase 113 (the bladebait as quick as a worm, held or pumped; the dropshot pumped in too) is done, on the user's request of 2026-11-11. Phase 112 (fish detail and realism) is done on the user's follow-up of 2026-11-11; visual feedback is pending (8.4 #74). Phase 111 (fish illustration style) is done on the user's request of 2026-11-11; visual feedback is pending (8.4 #74). Phase 110 (every hook comes in at a held reel: the bladebaits, jigheads and dropshots were 20-43 s from the bed) is done, on the user's request of 2026-11-11. Phase 109 (the Heavy Bladebait that would not come in) is done, on the user's request of 2026-11-08. Phase 108 (the journal tip that stayed up; finer cabins, piers and lamps) is done, on the user's request of 2026-11-08. Nothing is planned next: waiting on the user (8.4 #73). Before that: PLAN_FISHING.md is done (Phases 101-107, the user's OK of 2026-11-08); one push and one PR for all of it. Nothing is planned next: waiting on the user. **To check with the user:** PLAN_FISHING.md's look and feel (8.4 #72), the slower mid-game since Phase 105 (8.4 #71: a sea at 282 min, in the band), and as before Fogbound's, the Pines' and Blackwater's looks (#68-#70), the pacing bands and early rewards, #45 and #46, #54 and #55, #34 and #53.
 
