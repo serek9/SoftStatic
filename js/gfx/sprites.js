@@ -96,6 +96,15 @@ G.gfx.sprites = (function () {
     sun_dark: '#32100a', sun: '#702614', sun_hi: '#ac521c', sun_lit: '#d89a40',
     vinyl: '#121016', vinyl_hi: '#3a3642', neon_pink: '#d0507e', neon_pink_hi: '#f0a0b8',
     ivory: '#efe6cc', denim_lit: '#6880a4', outline: '#120e0c',
+    // Phase 117: the procedural shop's material study. Muted matte planes, warm linen
+    // and ash timber against cool green shadows. Interior-only: shift leaves these out.
+    shop117_edge: '#252e30', shop117_wood_dk: '#454338', shop117_wood: '#685e49',
+    shop117_wood_mid: '#8d7e60', shop117_wood_hi: '#b1a080', shop117_wood_lit: '#cbb28d',
+    shop117_paint_dk: '#293e3d', shop117_paint: '#4e655b', shop117_paint_hi: '#819180',
+    shop117_leaf_dk: '#263c33', shop117_leaf: '#4d6750', shop117_leaf_hi: '#829568',
+    shop117_cloth_dk: '#665c48', shop117_cloth: '#a28d69', shop117_cloth_hi: '#d4b98c',
+    shop117_paper: '#d7c7a6', shop117_metal_dk: '#314345', shop117_metal: '#617575', shop117_metal_hi: '#99aaa0',
+    shop117_clay_dk: '#553e39', shop117_clay: '#895e49', shop117_clay_hi: '#b68c63', shop117_lamp: '#e7c790',
     // Phase 70 (real fish, PLAN_SPECIES.md 3.5): each species' body ramp, back (dark) to belly
     // (pale), six keys; shared fin ramps (ray, root, membrane, edge); eyes. Fish keys only:
     // shift() never picks them, so no earlier sprite changes colour.
@@ -211,6 +220,7 @@ G.gfx.sprites = (function () {
    'olive_dark olive olive_hi olive_lit pink_dark pink pink_hi pink_lit lav_dark lav lav_hi lav_lit crt_dark crt crt_hi crt_glow ' +
    'chrome_dark chrome chrome_hi chrome_lit brick_dark brick brick_hi leaf_deep leaf_dark leaf leaf_hi leaf_lit sun_dark sun sun_hi sun_lit ' +
    'vinyl vinyl_hi neon_pink neon_pink_hi ivory denim_lit outline').split(' ').forEach(function (k) { INTERIOR[k] = true; });
+  for (var shopKey in PALETTE) if (shopKey.indexOf('shop117_') === 0) INTERIOR[shopKey] = true;
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.
   var CEILING_KEY = 'dusk_high';

@@ -86,10 +86,105 @@ G.ui.shopRoom = (function () {
   var BRASS = ['rust', 'leaf_gold', 'brass_hi'], WOODK = K.WOOD;
   function img(c, im, x, y) { c.drawImage(im, Math.round(x), Math.round(y)); A.reset(); }
 
+  // Phase 117 is a native-size material/shape study, not the full room redesign yet.
+  // Only a wall/floor bay, the floor lamp, the counter corner and the monstera change.
+  // The complete walk map and the shared room-kit/cabin artwork remain untouched.
+  var STUDY_WOOD = ['shop117_edge', 'shop117_wood_dk', 'shop117_wood', 'shop117_wood_mid', 'shop117_wood_hi', 'shop117_wood_lit'];
+  var STUDY_METAL = ['shop117_edge', 'shop117_metal_dk', 'shop117_metal', 'shop117_metal_hi'];
+  function materialStudy(c) {
+    // Broad boards with a top plane and a recessed join; a few chosen strokes replace
+    // the old continuous grain/nail pattern. Lighting is sampled once per board.
+    var x0 = tx(2), y0 = ty(3), w = 6 * T, h = 3 * T;
+    A.area(c, x0, y0, w, h, function (x, y) {
+      var row = Math.floor((y - y0) / 14), v = (y - y0) % 14;
+      var offset = (row % 3) * 23, segment = Math.floor((x - x0 + offset) / 68), u = (x - x0 + offset) % 68;
+      var lit = light(x0 + segment * 68 + 34 - offset, y0 + row * 14 + 7);
+      if (v === 13 || u === 0) return 'shop117_wood_dk';
+      if (v === 0) return 'shop117_wood_mid';
+      if (v === 12 || u === 1) return 'shop117_wood_dk';
+      if (v === 6 && u > 17 && u < 34) return 'shop117_wood_dk';
+      return tone(STUDY_WOOD, 0.28 + lit * 0.25 + (K.hash(row, segment + 61) - 0.5) * 0.1);
+    });
+    // A wall bay with wide structural boards, a bevelled beam and three quiet planes.
+    var wx = tx(3) - 2, ww = 4 * T + 4;
+    A.area(c, wx, 7, ww, TOP + 32 - 7, function (x, y) {
+      var u = (x - wx) % 16;
+      if (u === 0 || y === TOP + 30) return 'shop117_edge';
+      if (u === 1) return 'shop117_wood_hi';
+      if (u > 13) return 'shop117_wood_dk';
+      return y > TOP + 4 ? 'shop117_wood' : 'shop117_wood_mid';
+    });
+    box(c, 'shop117_edge', wx, 0, ww, 7);
+    box(c, 'shop117_wood_hi', wx + 2, 1, ww - 4, 2);
+    box(c, 'shop117_wood', wx, 3, ww, 2);
+    box(c, 'shop117_wood_dk', wx + 1, 5, ww - 2, 1);
+    // The rail is a solid piece with a visible upper ledge, not another dark stripe.
+    box(c, 'shop117_edge', wx, TOP + 1, ww, 5);
+    box(c, 'shop117_wood_hi', wx + 1, TOP + 1, ww - 2, 2);
+    box(c, 'shop117_wood', wx + 1, TOP + 3, ww - 2, 2);
+  }
+  function studyLamp() {
+    var g = X.grid(22, 54);
+    g.ell(11, 51, 10, 2, 'shop117_edge', {});
+    g.ell(11, 49, 8.5, 2.6, STUDY_METAL, { rim: 0.1 });
+    g.rect('shop117_metal_dk', 9, 17, 4, 32);
+    g.rect('shop117_metal', 10, 18, 2, 29); g.rect('shop117_metal_hi', 10, 19, 1, 27);
+    // A bell-shaped linen shade: chunky faceted volume rather than thin vertical pleats.
+    g.poly([[6,1],[16,1],[18,4],[21,15],[20,18],[2,18],[1,15],[4,4]], function (x, y) {
+      if (y > 15) return 'shop117_cloth_dk';
+      if (x < 5 || x > 17) return 'shop117_cloth_dk';
+      if (x < 9 || x > 14) return 'shop117_cloth';
+      return 'shop117_cloth_hi';
+    });
+    g.line('shop117_paper', 7, 1, 15, 1);
+    g.line('shop117_lamp', 4, 17, 18, 17);
+    g.set('shop117_metal', 15, 19); g.set('shop117_metal_dk', 15, 20);
+    g.outline('shop117_edge');
+    return g.canvas();
+  }
+  function studyPlant() {
+    var g = X.grid(28, 40), leaves = ['shop117_leaf_dk', 'shop117_leaf', 'shop117_leaf_hi'];
+    g.line(leaves[0], 14, 31, 13, 9); g.line(leaves[1], 15, 30, 17, 10);
+    g.poly([[13,17],[5,15],[2,10],[3,5],[9,4],[13,7]], leaves[0]);
+    g.poly([[3,7],[8,5],[12,8],[12,14],[7,13]], leaves[1]);
+    g.poly([[14,13],[17,3],[23,1],[27,5],[26,11],[21,15]], leaves[1]);
+    g.poly([[17,5],[23,2],[25,5],[21,10],[16,12]], leaves[2]);
+    g.poly([[13,26],[5,25],[0,20],[1,16],[6,14],[11,18]], leaves[0]);
+    g.poly([[2,18],[6,16],[10,19],[11,23],[5,22]], leaves[1]);
+    g.poly([[14,25],[19,17],[25,17],[27,21],[26,27],[22,30],[16,29]], leaves[1]);
+    g.poly([[19,19],[24,18],[25,22],[21,26],[17,27]], leaves[2]);
+    g.line(leaves[0], 4, 8, 12, 15); g.line(leaves[0], 23, 5, 15, 13);
+    g.line(leaves[0], 3, 19, 12, 24); g.line(leaves[0], 24, 21, 16, 28);
+    // A heavy terracotta lip, recessed soil and a tapered pot with distinct faces.
+    g.poly([[7,30],[21,30],[20,37],[18,39],[10,39],[8,37]], 'shop117_clay_dk');
+    g.poly([[8,31],[14,31],[14,38],[10,37]], 'shop117_clay_hi');
+    g.poly([[14,31],[20,31],[19,37],[14,38]], 'shop117_clay');
+    g.rect('shop117_clay_hi', 6, 29, 16, 2); g.rect('shop117_clay_dk', 7, 31, 14, 1);
+    g.rect('shop117_edge', 9, 29, 10, 1);
+    g.outline('shop117_edge'); return g.canvas();
+  }
+  function studyCounterCorner(c) {
+    var g = X.grid(32, 80);
+    g.poly([[4,0],[28,0],[30,2],[30,31],[28,33],[2,33],[2,3]], 'shop117_edge');
+    g.poly([[5,1],[27,1],[29,3],[29,30],[3,30],[3,4]], 'shop117_wood_mid');
+    g.poly([[5,1],[27,1],[28,3],[4,3]], 'shop117_wood_hi');
+    g.poly([[3,5],[5,3],[5,30],[3,32]], 'shop117_wood');
+    g.rect('shop117_wood', 8, 24, 11, 1); g.rect('shop117_wood_hi', 7, 9, 14, 1);
+    // Leave the glass and its stock unobscured. Below it: an enamel cabinet with a
+    // recessed panel and a substantial lip, within the original counter footprint.
+    g.poly([[2,62],[29,62],[30,64],[30,76],[28,78],[4,78],[2,76]], 'shop117_paint_dk');
+    g.rect('shop117_paint', 4, 65, 24, 9); g.rect('shop117_paint_hi', 5, 65, 22, 1);
+    g.rect('shop117_metal_dk', 7, 68, 18, 4); g.rect('shop117_paint', 8, 69, 16, 3);
+    g.rect('shop117_wood_hi', 3, 62, 26, 2); g.rect('shop117_metal_dk', 4, 76, 24, 2);
+    c.clearRect(2, 0, 3, 1); c.clearRect(2, 1, 1, 1);
+    g.paint(c, 0, 0); A.reset();
+  }
+
   function paintBase(c) {
     A.reset();
     K.panelWall(c, T, W - 2 * T, TOP, light);
     K.floor(c, T, ty(1), W - 2 * T, H - 2 * T, light, { wear: wear });
+    materialStudy(c);
     K.wallTops(c, W, RH, TOP, T, DOOR[0]);
     // The rug and the mat.
     K.rug(c, 4 * T + 2, ty(4) + 4, 3 * T - 4, 2 * T - 10, 'bands');
@@ -251,6 +346,7 @@ G.ui.shopRoom = (function () {
     // The front face: tongue-and-groove, a kick plate, a sticker.
     A.area(c, x0, frontY, longW, 16, function (x, y) { var e = y - frontY; return e === 0 ? 'panel_lit' : (e > 12 ? (e === 15 ? 'outline' : 'chrome_dark') : ((x - x0) % 6 === 0 ? 'panel_deep' : tone(K.PANEL, 0.5 - e * 0.02))); });
     box(c, 'outline', x0, frontY, 1, 16); box(c, 'outline', x0 + longW - 1, frontY, 1, 16);
+    studyCounterCorner(c);
     A.slab(c, x0 + 40, frontY + 3, 10, 7, ['outline', 'teal', 'teal_hi', 'teal_lit']); box(c, 'ivory', x0 + 42, frontY + 5, 6, 1);
     // What stands on it: the till (its display stuck), a bell, an ashtray, a newspaper, a jar.
     var g = X.grid(longW + 4, frontY + 4);
@@ -291,8 +387,8 @@ G.ui.shopRoom = (function () {
       props = [
         { img: G.gfx.bake.cached('shop:counter56', function () { return G.gfx.bake.layer(3 * T, 2 * T + 18, paintCounter); }), x: tx(8), y: ty(2) - 14, foot: ty(4) },
         { img: G.gfx.bake.cached('shop:freezer56', function () { return G.gfx.bake.layer(32, 31, paintFreezer); }), x: tx(1), y: ty(6) - 2, foot: ty(7) - 1 },
-        { img: G.gfx.bake.cached('shop:lamp56', function () { return K.floorLamp(); }), x: tx(3) + 9, y: ty(5) - 56, foot: ty(5) - 2 },
-        { img: G.gfx.bake.cached('shop:palm56', function () { return K.plant('monstera', ['orange_dark', 'orange', 'orange_hi', 'orange_lit']); }), x: tx(10) + 2, y: ty(7) - 42, foot: ty(7) - 1 },
+        { img: G.gfx.bake.cached('shop:lamp117', studyLamp), x: tx(3) + 5, y: ty(5) - 56, foot: ty(5) - 2 },
+        { img: G.gfx.bake.cached('shop:palm117', studyPlant), x: tx(10) + 2, y: ty(7) - 42, foot: ty(7) - 1 },
         { img: G.gfx.bake.cached('shop:cooler64', function () { return K.cooler(); }), x: tx(10) + 2, y: ty(6) - 53, foot: ty(6) - 1 }
       ];
       // Phase 64: what moves on the props, drawn with them in their place in the order: the
@@ -462,5 +558,9 @@ G.ui.shopRoom = (function () {
     create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: R.prebake,
     bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
     // Phase 64 (dbg.roomLife): the live things in the room.
-    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', live: n, things: ['lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 117, study: ['wall/floor bay', 'linen lamp', 'enamel counter corner', 'faceted monstera'], live: n, things: ['lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
 })();
+
+if (G.core && G.core.debug) G.core.debug.addLine(function () {
+  return G.core.state.sceneName() === 'shop' ? 'shop style 117: procedural wall/floor, lamp, counter corner, plant study' : '';
+});

@@ -1,11 +1,13 @@
 # Tienda: redibujado procedural cozy y misterio rural
 
-**Fecha:** 2026-11-13. **Estado:** plan pendiente de ejecución.
+**Fecha:** 2026-11-13. **Estado:** fase 117 implementada; muestra presentada para revisión visual. Fases 118–123 pendientes.
 
 La petición es cambiar todo el lenguaje visual de la tienda usando el sistema de
 dibujo que ya tiene SoftStatic. Las ilustraciones generadas son referencias de
 formas y ambiente. El resultado debe ser una escena del juego dibujada por código,
-con movimiento e interacción reales. Esta planificación no autoriza ejecutar sus fases.
+con movimiento e interacción reales. El usuario autorizó comenzar la integración el
+2026-11-13: se ha ejecutado la fase 117. Las siguientes fases conservan su inicio
+por indicación del usuario.
 
 Las fases 115 y 116 se revierten: se retiran tanto la recoloración inicial como el
 renderer con imágenes, sus PNG, atlas, precargas y pruebas específicas. La base vuelve
@@ -62,6 +64,11 @@ usuario la indique. Si una captura no cumple el criterio visual, se corrige dent
 de esa fase antes de ampliarla al resto de la tienda.
 
 ### Fase 117 — Fijar el lenguaje visual en píxeles nativos
+
+**Implementada (2026-11-13).** Muestra procedural de pared/suelo, lámpara de lino,
+esquina del mostrador y monstera. Comparativas del renderer original y nuevo en
+el mismo estado, más referencias del lago a tres horas. Se ajustó el contraste
+del suelo al revisar la toma nocturna. Pendiente del comentario visual del usuario.
 
 **Archivos:** `js/gfx/sprites.js`, `js/ui/shop_room.js`; opciones acotadas en
 `js/ui/room_kit.js` si hacen falta.
@@ -193,4 +200,6 @@ buscado. La revisión se hace con capturas y una secuencia del juego funcionando
 - Medir el presupuesto en el mismo ejecutor, con sprites ya preparados. Mantener
   ausencia de arte regenerado durante `draw` y explicar cualquier coste adicional.
 
-**Siguiente trabajo previsto:** fase 117. Ninguna fase de redibujado se ha iniciado.
+**Siguiente trabajo previsto:** fase 118, después de revisar la muestra de la fase 117.
+La muestra es parcial: el resto de muebles, alfombra, personajes e iluminación
+conservan todavía su dibujo original.
