@@ -1,6 +1,6 @@
 # Tienda: redibujado procedural cozy y misterio rural
 
-**Fecha:** 2026-11-13. **Estado:** fases 117–119 implementadas; 120–123 en curso.
+**Fecha:** 2026-11-13. **Estado:** fases 117–120 implementadas; 121–123 en curso.
 
 La petición es cambiar todo el lenguaje visual de la tienda usando el sistema de
 dibujo que ya tiene SoftStatic. Las ilustraciones generadas son referencias de
@@ -126,6 +126,10 @@ desaparece o se anima sigue reflejando el estado de la tienda.
 
 ### Fase 120 — Pescador, Rusty y perro en el nuevo lenguaje
 
+**Implementada (2026-11-13):** Fresh native shop-only geometry for the fisher, Rusty and four dog breeds, with all facings, walking poses and shopkeeper gestures. Cosmetic coats, hats and breed silhouettes retained; original cabin painters unchanged.
+
+**Verificación:** Three-hour native captures without browser errors; all active figures prebaked on shop entry.
+
 **Archivos:** `js/ui/room.js`, `js/ui/shop_room.js`; `data/looks.js` solo si requiere
 un campo visual, sin alterar preferencias guardadas ni jugabilidad.
 
@@ -207,4 +211,4 @@ buscado. La revisión se hace con capturas y una secuencia del juego funcionando
 - Medir el presupuesto en el mismo ejecutor, con sprites ya preparados. Mantener
   ausencia de arte regenerado durante `draw` y explicar cualquier coste adicional.
 
-**Siguiente trabajo previsto:** fase 120. El usuario ha autorizado continuar con todas las fases.
+**Siguiente trabajo previsto:** fase 121. El usuario ha autorizado continuar con todas las fases.

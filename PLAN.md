@@ -508,7 +508,7 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 117 Procedural shop material/shape study | Done | `Phase 117: Procedural shop style study` | User authorized beginning 2026-11-13. Native-code sample of wall/floor bay, faceted linen lamp, enamel counter corner and broad-leaf monstera. Geometry and old palette shifts unchanged. Captures at 12:00, 19:12 and 23:30; sample presented for visual feedback. 8.3 #585 |
 | 118 Room architecture and woven floor | Done | `Phase 118: Room architecture and woven floor` | The wall/floor material study now covers the entire original room. Native timber beams, broad boards, recessed joins, cut-away wall tops, a thick woven terracotta/ochre rug and door mat replace the striped shell. Map, OX/OY/TOP and all 59 blocked tiles are unchanged; cabin painters are untouched. |
 | 119 Furniture and shop fittings | Done | `Phase 119: Furniture and shop fittings` | Repainted every shop fitting procedurally: shelves, rod rack, bait station, counter, freezer, radio, guitar, amplifier and window frames. Original anchors and collision geometry retained. |
-| 120 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
+| 120 Shop characters | Done | `Phase 120: Shop characters` | Fresh native shop-only geometry for the fisher, Rusty and four dog breeds, with all facings, walking poses and shopkeeper gestures. Cosmetic coats, hats and breed silhouettes retained; original cabin painters unchanged. |
 | 121 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
 | 122 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
 | 123 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
@@ -1272,6 +1272,8 @@ These are interpretations and additions made while building, where the spec abov
 
 587. **Furniture and shop fittings (119):** Repainted every shop fitting procedurally: shelves, rod rack, bait station, counter, freezer, radio, guitar, amplifier and window frames. Original anchors and collision geometry retained.
 
+588. **Shop characters (120):** Fresh native shop-only geometry for the fisher, Rusty and four dog breeds, with all facings, walking poses and shopkeeper gestures. Cosmetic coats, hats and breed silhouettes retained; original cabin painters unchanged.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1582,9 +1584,11 @@ Phase 118 checks: validate OK (0 warnings); controlled renderer captures at 12:0
 
 Phase 119 checks: Native captures at noon, dusk and night; validate OK, zero warnings.
 
+Phase 120 checks: Three-hour native captures without browser errors; all active figures prebaked on shop entry.
+
 ### 8.6 Next task
 
-The user authorized all remaining shop phases on 2026-11-13. Phase 119 is done. Continue with phase 120; no further phase-start confirmation is needed.
+The user authorized all remaining shop phases on 2026-11-13. Phase 120 is done. Continue with phase 121; no further phase-start confirmation is needed.
 
 Phase 114 (the Great Northern sign at the Pines) is done, on the user's request of 2026-11-12; its look waits for the user's check (8.4 #75). Phase 113 (the bladebait as quick as a worm, held or pumped; the dropshot pumped in too) is done, on the user's request of 2026-11-11. Phase 112 (fish detail and realism) is done on the user's follow-up of 2026-11-11; visual feedback is pending (8.4 #74). Phase 111 (fish illustration style) is done on the user's request of 2026-11-11; visual feedback is pending (8.4 #74). Phase 110 (every hook comes in at a held reel: the bladebaits, jigheads and dropshots were 20-43 s from the bed) is done, on the user's request of 2026-11-11. Phase 109 (the Heavy Bladebait that would not come in) is done, on the user's request of 2026-11-08. Phase 108 (the journal tip that stayed up; finer cabins, piers and lamps) is done, on the user's request of 2026-11-08. Nothing is planned next: waiting on the user (8.4 #73). Before that: PLAN_FISHING.md is done (Phases 101-107, the user's OK of 2026-11-08); one push and one PR for all of it. Nothing is planned next: waiting on the user. **To check with the user:** PLAN_FISHING.md's look and feel (8.4 #72), the slower mid-game since Phase 105 (8.4 #71: a sea at 282 min, in the band), and as before Fogbound's, the Pines' and Blackwater's looks (#68-#70), the pacing bands and early rewards, #45 and #46, #54 and #55, #34 and #53.
 

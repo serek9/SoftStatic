@@ -1,12 +1,12 @@
 # SoftStatic: Handoff
 
-## Latest work: procedural shop, phase 119 (2026-11-13)
+## Latest work: procedural shop, phase 120 (2026-11-13)
 
-Repainted every shop fitting procedurally: shelves, rod rack, bait station, counter, freezer, radio, guitar, amplifier and window frames. Original anchors and collision geometry retained.
+Fresh native shop-only geometry for the fisher, Rusty and four dog breeds, with all facings, walking poses and shopkeeper gestures. Cosmetic coats, hats and breed silhouettes retained; original cabin painters unchanged.
 
-Checks: Native captures at noon, dusk and night; validate OK, zero warnings.
+Checks: Three-hour native captures without browser errors; all active figures prebaked on shop entry.
 
-The user authorized all remaining shop phases on 2026-11-13. Phase 119 is done. Continue with phase 120; no further phase-start confirmation is needed.
+The user authorized all remaining shop phases on 2026-11-13. Phase 120 is done. Continue with phase 121; no further phase-start confirmation is needed.
 
 ## State in one paragraph
 

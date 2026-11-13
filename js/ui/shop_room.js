@@ -571,20 +571,81 @@ G.ui.shopRoom = (function () {
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
       if (id < 100) { ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y); if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y, t, env); }
-      else if (id === 100) R.drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 16, oy + ty(3) - 2);
-      else if (id === 101) R.drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
-      else R.drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
+      else if (id === 100) drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 16, oy + ty(3) - 2);
+      else if (id === 101) drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
+      else drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
     }
     if (env) drawLight(ctx, env, t, rusty, ox, oy);
   }
 
-  function sprite(kind, dir, fr, lk) { return R.sprite(kind, dir, fr, lk); }
+  // Shop figures have their own native geometry; cabin figures and their cache are untouched.
+  var figures = {};
+  function shopLook(kind, lk) {
+    var list = kind === 'dog' ? G.data.looks.dogs : G.data.looks.fishers;
+    return typeof lk === 'object' && lk ? lk : G.data.lookOf(list, lk || (G.state.save.look && G.state.save.look[kind]));
+  }
+  function sprite(kind, dir, fr, lk) {
+    var L = shopLook(kind, lk), key = kind + L.id + dir + fr;
+    if (figures[key]) return figures[key];
+    if (dir === 'left') return (figures[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, L), 'x'));
+    var side = dir === 'right', back = dir === 'up', dog = kind === 'dog', s = dog ? L.size : 1;
+    var raw = X.grid(dog ? Math.ceil((side ? 40 : 32) * s) + 1 : 32, dog ? Math.ceil(32 * s) + 1 : 48);
+    var g = dog ? X.scaled(raw, s) : raw, stride = fr === 1 ? 2 : fr === 2 ? -2 : 0;
+    if (dog) {
+      var C = L.coat, E = L.ear, M = L.muzzle, sit = fr === 3;
+      if (side) {
+        g.poly([[7,20],[10,15],[25,15],[29,19],[27,25],[10,25]], C[1]);
+        g.rect(C[2],11,16,13,3); g.rect(C[0],10,24,16,2);
+        g.line(C[1],9,19,4,sit ? 25 : 14); g.line(C[2],5,15,3,L.tail === 'curl' ? 11 : 16);
+        for (var leg=0;leg<2;leg++) { var xx=leg ? 25 : 11, step=leg ? -stride : stride; g.rect(L.paleLegs ? M[1] : C[0],xx+step,24,3,sit ? 5 : 6); g.rect(M[2],xx+step,29,4,1); }
+        g.poly([[23,15],[24,8],[30,7],[34,11],[34,15],[37,16],[36,20],[29,21]],C[1]);
+        g.rect(M[1],31,16,6,3); g.rect(E[1],24,10,4,L.ears === 'prick' ? 4 : 10); g.set('shop117_edge',32,12); g.rect('shop117_edge',36,16,2,2);
+        if(L.ears==='prick')g.poly([[24,10],[24,4],[28,9]],E[0]);
+      } else {
+        g.poly([[10,17],[22,17],[24,25],[21,29],[11,29],[8,25]],C[1]); g.rect(L.chest,13,21,6,6);
+        g.rect(M[1],10+stride,27,4,3); g.rect(M[1],18-stride,27,4,3);
+        g.poly([[10,9],[14,7],[20,7],[23,10],[22,20],[18,23],[12,21],[9,17]],back ? C[0] : C[1]);
+        g.rect(E[1],8,10,4,L.ears==='prick'?4:10);g.rect(E[0],21,10,4,L.ears==='prick'?4:10);
+        if(L.ears==='prick'){g.poly([[9,11],[10,4],[14,9]],E[0]);g.poly([[19,9],[23,4],[24,12]],E[0]);}
+        if(!back){g.rect(M[1],12,16,9,4);g.set('shop117_edge',12,13);g.set('shop117_edge',20,13);g.rect('shop117_edge',15,16,3,2);if(L.face)g.rect(M[2],16,9,2,7);}
+      }
+      if(L.curly)for(var ci=0;ci<6;ci++)g.rect(C[2],10+(ci*7)%15,18+(ci*3)%7,2,2);
+    } else {
+      var rusty=kind==='rusty', CO=rusty?['shop117_clay_dk','shop117_clay','shop117_clay_hi']:L.coat;
+      var SK=rusty?['skin_shadow','flesh','skin_hi','bone']:L.skin, HK=rusty?['shop117_paint_dk','shop117_paint','shop117_paint_hi']:L.hatKeys;
+      var tr=rusty?'denim_dark':L.trousers;
+      g.rect(tr,11,35,5,9-Math.max(0,stride));g.rect(tr,18,35,5,9-Math.max(0,-stride));
+      g.rect('shop117_edge',10,43-Math.max(0,stride),7,3);g.rect('shop117_edge',18,43-Math.max(0,-stride),7,3);
+      g.poly([[10,23],[22,23],[24,26],[23,36],[10,36],[8,27]],CO[1]);g.rect(CO[2],11,24,3,9);g.rect(CO[0],21,25,3,11);
+      g.rect(CO[1],7,26+stride,4,10);g.rect(CO[0],24,26-stride,3,10);g.rect(SK[1],7,35+stride,3,3);g.rect(SK[0],24,35-stride,3,3);
+      if(!back){g.rect(CO[0],16,25,1,11);g.rect(CO[0],11,30,4,3);g.rect(CO[2],11,30,4,1);g.set('shop117_metal_hi',17,28);}
+      else {g.rect(CO[0],11,26,11,1);g.rect(CO[2],11,24,10,1);}
+      if(L.check && !rusty)for(var ch=0;ch<3;ch++)g.rect(L.check,11,27+ch*3,10,1);
+      g.rect(SK[0],14,21,5,3);
+      g.poly([[11,10],[20,10],[23,13],[23,20],[20,23],[13,23],[10,20],[9,14]],back?(rusty?'shop117_cloth_dk':L.hair):SK[1]);
+      if(!back){g.rect(SK[2],11,13,3,7);g.rect(SK[0],21,14,2,6);g.rect(SK[1],side?23:9,16,2,4);if(fr!==1||!rusty){g.set('shop117_edge',side?20:13,16);if(!side)g.set('shop117_edge',20,16);}g.rect(SK[0],side?22:16,18,2,2);g.rect('shop117_clay_dk',side?19:15,21,4,1);
+        if(rusty||L.beard){var beard=rusty?'shop117_paper':L.beard[1];g.poly([[11,19],[14,21],[20,21],[23,18],[21,24],[15,25],[11,22]],beard);}
+        if(rusty){g.rect('shop117_metal_dk',11,15,5,3);g.rect('shop117_metal_dk',18,15,5,3);g.rect('shop117_metal_hi',12,16,3,1);g.set('shop117_metal_hi',19,16);g.set('shop117_metal_dk',16,16);}
+      }
+      var hat=rusty?'cap':L.hat;
+      g.poly([[10,10],[12,7],[20,7],[23,10],[23,13],[10,13]],HK[1]);g.rect(HK[2],12,8,6,2);g.rect(HK[0],10,12,14,2);
+      if(hat==='cap')g.rect(HK[0],side?19:10,13,side?9:15,2);
+      if(hat==='bucket'){g.rect(HK[1],8,13,18,2);g.rect(HK[0],9,15,16,1);}
+      if(hat==='knit')g.rect(HK[2],11,12,12,2);
+      if(hat==='lamp'){g.rect('shop117_edge',15,10,5,4);g.rect('shop117_lamp',16,11,3,2);}
+      if(rusty&&fr===2){g.rect(CO[0],20,24,6,4);g.rect('shop117_paper',21,22,4,4);}
+      if(rusty&&fr===3){g.rect('shop117_paper',10,29,16,6);g.rect('shop117_cloth_dk',12,31,5,1);g.rect('shop117_cloth_dk',19,31,5,1);}
+    }
+    raw.outline('shop117_edge'); return (figures[key]=raw.canvas());
+  }
+  function prebake(kind, lk) { var dirs=['down','up','right','left'];for(var d=0;d<4;d++)for(var f=0;f<4;f++)sprite(kind,dirs[d],f,lk); }
+  function drawFigure(ctx,kind,dir,fr,x,y) {var a=R.anchor(kind,dir);R.shadow(ctx,x,y,kind==='dog'?16:18);ctx.drawImage(sprite(kind,dir,fr),Math.round(x-a[0]),Math.round(y-a[1]));}
 
   return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, TOP: TOP, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,
-    create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: R.prebake,
+    create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: prebake,
     bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
     // Phase 64 (dbg.roomLife): the live things in the room.
-    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 117, study: ['wall/floor bay', 'linen lamp', 'enamel counter corner', 'faceted monstera'], live: n, things: ['lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 120, study: ['wall/floor bay', 'linen lamp', 'enamel counter corner', 'faceted monstera'], live: n, things: ['lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {
