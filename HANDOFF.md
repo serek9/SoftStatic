@@ -1,12 +1,6 @@
 # SoftStatic: Handoff
 
-## Latest work: procedural shop, phase 123 (2026-11-13)
-
-Completed full procedural shop redraw and reusable browser integration checks. Native and 2x captures at noon, dusk and night, mobile capture and walking/Rusty conversation video recorded. All 11 interaction targets reachable, 59 blockers and original geometry retained, real 12-coin/two-bobber purchase and reentry verified; 144 character frames nonempty. Original 1519 palette colours/shifts and shared cabin painter unchanged.
-
-Checks: validate OK (zero warnings); replay 12345 identical hash 2848910695, 18 catches/21 casts; saves PASS. Browser: zero errors/art requests, zero warmed canvas allocations, stable save and restored context; draw 0.76 ms/frame on this executor, room bake 244 ms in recorded run.
-
-The user authorized all remaining shop phases on 2026-11-13. Phase 123 is done. Phases 117–123 are complete. Final visual review is pending.
+How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-30, after Phase 50 (fitting it in, the last of the tackle, company and living-lake Phases 41–50 of [PLAN_TACKLE.md](PLAN_TACKLE.md)), on the branch `claude/clever-brown-4b34ko`.
 
 ## State in one paragraph
 

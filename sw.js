@@ -5,13 +5,16 @@
 // changed, the whole set is written to the cache together and the page is told, so the next load
 // runs the new version and its HUD says Updated. Not registered on localhost or 127.0.0.1 unless
 // the address has ?sw, so a PC served by http.server works exactly as before.
-var CACHE = 'softstatic-v2';
+var CACHE = 'softstatic-v1';
 var FILES = [
   './',
   'index.html',
   'manifest.webmanifest',
   'icon-192.png',
   'icon-512.png',
+  'assets/shop/room.png',
+  'assets/shop/characters.png',
+  'assets/shop/dog-walk.png',
   'js/core/debug.js',
   'js/core/rng.js',
   'js/core/state.js',
@@ -83,6 +86,7 @@ var FILES = [
   'js/ui/journal.js',
   'js/ui/room.js',
   'js/ui/room_kit.js',
+  'js/ui/shop_art.js',
   'js/ui/shop_room.js',
   'js/ui/shop.js',
   'js/ui/map.js',
