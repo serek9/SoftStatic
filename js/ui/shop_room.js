@@ -473,7 +473,9 @@ G.ui.shopRoom = (function () {
     K.lavaLamp(ctx, ox + tx(6) + 22, oy + ty(1) - 30, t, true, env.night);             // Phase 64: on top of the gear shelf
     if (tvRect) K.glare(ctx, ox + tvRect[0], oy + tvRect[1], tvRect[2], tvRect[3]);
     // The floor lamp's shade, lit at night.
-    K.glow(ctx, ox + LAMP[0], oy + LAMP[1] - 22, 18, 'lamp_glow', 0.04 + 0.08 * env.night);
+    // The floor lamp's shade glows and throws a warm pool on the boards at every hour (Phase 116).
+    K.glow(ctx, ox + LAMP[0], oy + LAMP[1] - 22, 26, 'lamp_glow', 0.07 + 0.08 * env.night);
+    K.glow(ctx, ox + LAMP[0], oy + LAMP[1] + 6, 40, 'signal_amber', 0.035 + 0.04 * env.night);
     // The tank's bubbles; steam from Rusty's cup; smoke from the ashtray.
     ctx.fillStyle = P.water_foam;
     for (i = 0; i < 4; i++) { var u = (t * 0.5 + i / 4) % 1; ctx.fillRect(ox + tx(1) + 26 - (i % 2), oy + ty(5) + 11 - Math.floor(u * 15), 1, 1); }
@@ -543,7 +545,7 @@ G.ui.shopRoom = (function () {
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
       if (id < 100) { ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y); if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y, t, env); }
-      else if (id === 100) R.drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 16, oy + ty(3) - 2);
+      else if (id === 100) R.drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 16, oy + ty(3) - 9);   // Phase 116: raised, his bust over the counter
       else if (id === 101) R.drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
       else R.drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
     }

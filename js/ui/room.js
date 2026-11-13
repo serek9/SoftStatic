@@ -510,6 +510,54 @@ G.ui.room = (function () {
     g.outline('outline');
   }
 
+  // ---- Phase 116: the people as minis -------------------------------------------------------
+  // The fisher and Rusty are drawn for a 32×48 box; a mini view paints them into 24×34 shape by
+  // shape (as X.scaled does), the head at 0.78 and the body below the neck at 0.58, so they
+  // stand a tile tall with a big head, as the user's reference has them. Callbacks get the
+  // painter's own coordinates.
+  var MH = 0.78, MB = 0.58, MY = 17, MC = 12, MW = 24, MHT = 34;
+  function msc(y) { return y < MY ? MH : MB; }
+  function mY(y) { return 1 + (y < MY ? y * MH : MY * MH + (y - MY) * MB); }
+  function mX(x, y) { return MC + (x - 16) * msc(y); }
+  function iY(y) { y -= 1; return y < MY * MH ? y / MH : MY + (y - MY * MH) / MB; }
+  function iX(x, sy) { return 16 + (x - MC) / msc(sy); }
+  function Mini(g) { this.g = g; this.w = MW; this.h = MHT; }
+  var MQ = Mini.prototype;
+  MQ.at = function (x, y) { return this.g.at(Math.round(mX(x, y)), Math.round(mY(y))); };
+  MQ.set = function (key, x, y) { this.g.set(key, mX(x, y), mY(y)); return this; };
+  MQ.clear = function (x, y) { this.g.clear(mX(x, y), mY(y)); return this; };
+  MQ.rect = function (key, x, y, w, h) {
+    var cy = y + h / 2, x0 = Math.round(mX(x, cy)), y0 = Math.round(mY(y));
+    this.g.rect(key, x0, y0, Math.max(1, Math.round(mX(x + w, cy)) - x0), Math.max(1, Math.round(mY(y + h)) - y0)); return this;
+  };
+  MQ.fill = function (x0, y0, w, h, fn) {
+    var g = this.g, b = Math.floor(mY(y0)), b1 = Math.ceil(mY(y0 + h));
+    for (var y = b; y < b1; y++) {
+      var sy = Math.floor(iY(y + 0.5)); if (sy < y0 || sy >= y0 + h) continue;
+      var a = Math.floor(mX(x0, sy)), a1 = Math.ceil(mX(x0 + w, sy));
+      for (var x = a; x < a1; x++) {
+        var sx = Math.floor(iX(x + 0.5, sy)); if (sx < x0 || sx >= x0 + w) continue;
+        var k = fn(sx, sy, g.at(x, y)); if (k) g.set(k, x, y);
+      }
+    }
+    return this;
+  };
+  MQ.over = function (x0, y0, w, h, fn) { return this.fill(x0, y0, w, h, function (x, y, cur) { return cur ? fn(x, y, cur) : ''; }); };
+  MQ.ell = function (cx, cy, rx, ry, keys, o) { var s = msc(cy); this.g.ell(mX(cx, cy), mY(cy), Math.max(0.6, rx * s), Math.max(0.6, ry * s), keys, o); return this; };
+  MQ.cap = function (x0, y0, x1, y1, r, keys, bias) { this.g.cap(mX(x0, y0), mY(y0), mX(x1, y1), mY(y1), Math.max(0.55, r * msc((y0 + y1) / 2)), keys, bias); return this; };
+  MQ.line = function (key, x0, y0, x1, y1) { this.g.line(key, mX(x0, y0), mY(y0), mX(x1, y1), mY(y1)); return this; };
+  MQ.poly = function (pts, fill) {
+    var sp = [], i;
+    for (i = 0; i < pts.length; i++) sp.push([mX(pts[i][0], pts[i][1]), mY(pts[i][1])]);
+    this.g.poly(sp, typeof fill === 'string' ? fill : function (x, y) { var sy = Math.floor(iY(y + 0.5)); return fill(Math.floor(iX(x + 0.5, sy)), sy); }); return this;
+  };
+  MQ.slab = function (x, y, w, h, keys) {
+    var cy = y + h / 2, x0 = Math.round(mX(x, cy)), y0 = Math.round(mY(y));
+    this.g.slab(x0, y0, Math.max(2, Math.round(mX(x + w, cy)) - x0), Math.max(2, Math.round(mY(y + h)) - y0), keys); return this;
+  };
+  MQ.outline = function (key, diag) { this.g.outline(key, diag); return this; };
+  MQ.canvas = function () { return this.g.canvas(); };
+
   // ---- The sprites, baked once per look, facing and frame -------------------------------------
   // kind 'fisher' | 'dog' | 'rusty'; dir 'down' | 'up' | 'left' | 'right'; fr as above; lk the
   // look's id or record (save.look's without it). Returns a canvas; ANCHOR gives its feet.
@@ -529,10 +577,10 @@ G.ui.room = (function () {
     // box; a scaled grid paints them at the breed's size (data/looks.js size: a golden
     // retriever's back comes to a third of his height, as a real one's comes to a man's hip).
     if (kind === 'dog') { var s = dogScale(L); g = X.grid(Math.ceil(w * s) + 1, Math.ceil(h * s) + 1); paintDog(X.scaled(g, s), d, fr, L); }
-    else { g = X.grid(w, h); if (kind === 'rusty') paintRusty(g, d, fr); else paintFisher(g, d, fr, L); }
+    else { g = X.grid(MW, MHT); var m = new Mini(g); if (kind === 'rusty') paintRusty(m, d, fr); else paintFisher(m, d, fr, L); }
     return (art[key] = g.canvas());
   }
-  function dogScale(L) { return L && L.size ? L.size : 0.7; }
+  function dogScale(L) { return (L && L.size ? L.size : 0.7) * 0.72; }                 // Phase 116: a mini beside the mini fisher
   // Where a sprite's feet are within it: [x, y]. lk: the dog's look (its size).
   var anc = [0, 0];
   function anchor(kind, dir, lk) {
@@ -541,7 +589,7 @@ G.ui.room = (function () {
       anc[0] = Math.round((dir === 'left' || dir === 'right' ? 20 : 16) * s); anc[1] = Math.round(30 * s);
       return anc;
     }
-    anc[0] = 16; anc[1] = 46;
+    anc[0] = MC; anc[1] = Math.round(mY(46));
     return anc;
   }
   // Paints a look's fisher or dog in every facing and frame. Returns the ms it took.
@@ -561,7 +609,7 @@ G.ui.room = (function () {
   // Draws a walking figure with its feet at (x, y), its shadow under it.
   function drawFigure(ctx, kind, dir, fr, x, y, lk) {
     var img = sprite(kind, dir, fr, lk), a = anchor(kind, dir, lk), ds = kind === 'dog' ? dogScale(look('dog', lk)) : 1;
-    shadow(ctx, x, y, kind === 'dog' ? Math.round((dir === 'left' || dir === 'right' ? 26 : 18) * ds) : 20);
+    shadow(ctx, x, y, kind === 'dog' ? Math.round((dir === 'left' || dir === 'right' ? 26 : 18) * ds) : 15);
     ctx.drawImage(img, Math.round(x - a[0]), Math.round(y - a[1]));
   }
 
