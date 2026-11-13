@@ -44,7 +44,6 @@ node tools/balance.js --feed                     # each species against the ways
 node tools/lures.js                              # every hook dropped, slacked and worked in the real game (Phase 104; needs the server)
 node tools/angler.js 4                           # the angler bot fishes all 27 hooks in the real game, ~25 min (Phase 106; needs the server)
 node tools/reel.js                               # every hook reeled in from the bed within 15 s, in the real game (Phase 110; needs the server)
-node tools/shop.js                               # miniature shop art, purchases, looks, failed-asset fallback and offline reload (Phase 116; needs the server)
 node tools/reel.js pines "" pump                 # the same, reeled in pulses, within 20 s (Phase 113)
 ```
 

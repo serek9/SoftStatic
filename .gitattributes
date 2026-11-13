@@ -7,7 +7,7 @@
 *.json text eol=lf
 *.css  text eol=lf
 
-# Binary artwork, icons and other assets
+# Binary assets (none yet: all art and audio are procedural)
 *.png binary
 *.jpg binary
 *.gif binary
