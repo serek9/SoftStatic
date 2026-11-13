@@ -5,7 +5,7 @@
 // changed, the whole set is written to the cache together and the page is told, so the next load
 // runs the new version and its HUD says Updated. Not registered on localhost or 127.0.0.1 unless
 // the address has ?sw, so a PC served by http.server works exactly as before.
-var CACHE = 'softstatic-v2';
+var CACHE = 'softstatic-v1';
 var FILES = [
   './',
   'index.html',
