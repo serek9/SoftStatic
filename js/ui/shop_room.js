@@ -16,10 +16,12 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // Phase 115: the same room and footprints as a cozy dusk refuge: sage wall panels,
 // walnut boards, a teal counter, a woven rug and amber light, with violet lake shadows.
 // The existing quiet window figure and backwards clock keep their original triggers.
+// Phase 116: the user's approved mini illustration now supplies the room and character
+// art (shop_art.js); this painter remains an interactive fallback if an asset cannot load.
 G.ui = G.ui || {};
 G.ui.shopRoom = (function () {
   var A = G.gfx.paint, P = G.gfx.sprites.PALETTE, K = G.ui.roomKit, R = G.ui.room, X = G.gfx.pix, tone = X.tone;
-  var T = 32, COLS = 12, ROWS = 8, W = COLS * T, H = ROWS * T, OX = (640 - W) >> 1, OY = (360 - H) >> 1, TOP = 44, RH = H + TOP;
+  var T = 32, COLS = 12, ROWS = 8, W = COLS * T, H = ROWS * T, OX = (640 - W) >> 1, OY = 95, TOP = 90, RH = H + TOP;
   var STEP = R.STEP;
 
   // The map: w wall face (the north wall, seen), W a window in it, s side or south wall (its
@@ -45,17 +47,17 @@ G.ui.shopRoom = (function () {
     { id: 'counter2', c: 9, r: 3, w: 2, h: 1, block: true, talk: 'rusty' },
     { id: 'behind', c: 8, r: 1, w: 3, h: 1, block: true, talk: '' },         // Rusty's side of the counter
     { id: 'behind2', c: 9, r: 2, w: 2, h: 1, block: true, talk: '' },
-    { id: 'worms', c: 1, r: 3, w: 1, h: 1, block: true, talk: 'worms' },
-    { id: 'crickets', c: 1, r: 4, w: 1, h: 1, block: true, talk: 'crickets' },
-    { id: 'tank', c: 1, r: 5, w: 1, h: 1, block: true, talk: 'tank' },
+    { id: 'worms', c: 1, r: 2, w: 1, h: 1, block: true, talk: 'worms' },
+    { id: 'crickets', c: 1, r: 3, w: 1, h: 1, block: true, talk: 'crickets' },
+    { id: 'tank', c: 1, r: 4, w: 1, h: 1, block: true, talk: 'tank' },
     // Phase 56: the room's things in its corners and between the shelves.
     { id: 'fern', c: 5, r: 1, w: 1, h: 1, block: true, talk: '' },
     { id: 'guitar', c: 7, r: 1, w: 1, h: 1, block: true, talk: 'guitar' },
-    { id: 'freezer', c: 1, r: 6, w: 1, h: 1, block: true, talk: 'cat' },
+    { id: 'freezer', c: 1, r: 5, w: 1, h: 2, block: true, talk: 'cat' },
     { id: 'palm', c: 10, r: 6, w: 1, h: 1, block: true, talk: '' },
     { id: 'lamp', c: 3, r: 4, w: 1, h: 1, block: true, talk: '' },
     // Phase 64: a drinks cooler humming by the east wall; the freezer's cat.
-    { id: 'cooler', c: 10, r: 5, w: 1, h: 1, block: true, talk: 'cooler' }
+    { id: 'cooler', c: 10, r: 4, w: 1, h: 2, block: true, talk: 'cooler' }
   ];
   var DOOR = [6, 7], MAT = [6, 6], RUSTY = [9, 2], CLOCK = 7;
   var WK = R.walker(MAP, OBJECTS, MAT);
@@ -323,19 +325,19 @@ G.ui.shopRoom = (function () {
 
   // The bait station against the west wall: the worm cooler, the cricket cage, the tank.
   function baitStation(c) {
-    var x0 = tx(1), y = ty(3);
+    var x0 = tx(1), y = ty(2);
     // The cooler, lid ajar, cups of worms in dark earth.
     A.slab(c, x0 + 3, y + 6, 26, 20, ['outline', 'paper_dark', 'paper', 'bone', 'ivory']); box(c, 'crt_hi', x0 + 3, y + 18, 26, 3);
     A.slab(c, x0 + 2, y - 2, 28, 9, ['outline', 'paper_dark', 'bone', 'ivory', 'cream']);
     for (var i = 0; i < 3; i++) { A.blob(c, x0 + 8 + i * 8, y + 2, 3, 2, ['outline', 'wood_deep', 'wood_dark'], {}); A.line(c, 'flesh', x0 + 6 + i * 8, y + 2, x0 + 10 + i * 8, y + 1); }
     box(c, 'brick', x0 + 6, y + 10, 10, 4); box(c, 'ivory', x0 + 7, y + 11, 8, 1);
     // The cricket cage: a mesh box on a crate (its crickets are live).
-    y = ty(4);
+    y = ty(3);
     A.slab(c, x0 + 4, y + 16, 24, 12, WOODK);
     A.slab(c, x0 + 3, y - 2, 26, 19, ['outline', 'reed_dark', 'reed', 'reed_hi']);
     box(c, 'reed_dark', x0 + 5, y, 22, 15);
     // The minnow tank on its stand: water, gravel, a weed, the pump (bubbles are live).
-    y = ty(5);
+    y = ty(4);
     A.slab(c, x0 + 3, y + 18, 26, 10, ['outline', 'chrome_dark', 'chrome', 'chrome_hi']);
     box(c, 'outline', x0 + 3, y - 4, 26, 23); box(c, 'water_dark', x0 + 4, y - 3, 24, 21); box(c, 'water_mid', x0 + 4, y - 3, 24, 3);
     A.area(c, x0 + 4, y + 14, 24, 4, function (x, yy) { return (x + yy) % 3 ? 'stone' : 'stone_hi'; });
@@ -439,14 +441,14 @@ G.ui.shopRoom = (function () {
     }
     shown.rods = n;
     // Minnows in the tank, crickets in the cage now and then hopping.
-    var mx = ox + tx(1) + 5, my = oy + ty(5) - 1;
+    var mx = ox + tx(1) + 5, my = oy + ty(4) - 1;
     shown.minnows = stock.minnows;
     for (i = 0; i < stock.minnows; i++) {
       var ph = t * (0.35 + i * 0.07) + i * 1.7, u = (Math.sin(ph) + 1) / 2, dir = Math.cos(ph) > 0;
       ctx.fillStyle = P.water_foam; ctx.fillRect(mx + Math.round(u * 18), my + (i * 5) % 13, 3, 1);
       ctx.fillStyle = P.chrome_lit; ctx.fillRect(mx + Math.round(u * 18) + (dir ? 2 : 0), my + (i * 5) % 13, 1, 1);
     }
-    var cx = ox + tx(1) + 6, cy = oy + ty(4) + 1;
+    var cx = ox + tx(1) + 6, cy = oy + ty(3) + 1;
     shown.crickets = stock.crickets;
     for (i = 0; i < stock.crickets; i++) {
       var hop = (t * 0.6 + i * 0.37) % 1 < 0.06 ? 2 : 0;
@@ -577,6 +579,14 @@ G.ui.shopRoom = (function () {
   var order = [];
   function draw(ctx, st, t, hour, rusty, stock, env) {
     var ox = OX, oy = OY - TOP, i;
+    if (G.ui.shopArt && G.ui.shopArt.draw(ctx, st, t, rusty, stock, env)) {
+      shown.rods = 0;
+      if (stock) {
+        for (i = 1; i < G.data.gear.rods.length; i++) if (!G.data.gear.rods[i].ice && (!stock.rods || stock.rods.indexOf(i) < 0)) shown.rods++;
+        shown.minnows = stock.minnows; shown.crickets = stock.crickets;
+      }
+      return;
+    }
     ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
     ctx.drawImage(bake(), ox, oy);
     if (env) drawLive(ctx, env, t, rusty, ox, oy);
@@ -604,8 +614,8 @@ G.ui.shopRoom = (function () {
   function sprite(kind, dir, fr, lk) { return R.sprite(kind, dir, fr, lk); }
 
   return { T: T, COLS: COLS, ROWS: ROWS, OX: OX, OY: OY, TOP: TOP, STEP: STEP, MAP: MAP, OBJECTS: OBJECTS, DOOR: DOOR, MAT: MAT, RUSTY: RUSTY,
-    create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: R.prebake,
+    create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: function (kind, look) { R.prebake(kind, look); if (G.ui.shopArt) G.ui.shopArt.prebake(); },
     bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
     // Phase 64 (dbg.roomLife): the live things in the room.
-    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', style: 'cozy dusk', layout: '12x8, original footprints', live: n, things: ['warm amber bulbs', 'sage walls and teal counter', 'violet dusk shadows', 'lava lamp on the gear shelf', 'cat on the freezer', 'cooler', 'moths', 'reflections', 'glare'] }; } };
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', style: 'approved miniature concept', artwork: G.ui.shopArt ? G.ui.shopArt.info() : null, layout: '12x8, miniature furniture footprints', live: n, things: ['four-facing mini characters', 'dog trot', 'lake weather', 'game-hour clock', 'quiet strange events', 'steam and bubbles'] }; } };
 })();
