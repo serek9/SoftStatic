@@ -1,13 +1,12 @@
 # Tienda: redibujado procedural cozy y misterio rural
 
-**Fecha:** 2026-11-13. **Estado:** fases 117–122 implementadas; 123–123 en curso.
+**Fecha:** 2026-11-13. **Estado:** fases 117–123 implementadas; plan completado, revisión visual final pendiente.
 
 La petición es cambiar todo el lenguaje visual de la tienda usando el sistema de
 dibujo que ya tiene SoftStatic. Las ilustraciones generadas son referencias de
 formas y ambiente. El resultado debe ser una escena del juego dibujada por código,
-con movimiento e interacción reales. El usuario autorizó comenzar la integración el
-2026-11-13: se ha ejecutado la fase 117. Las siguientes fases conservan su inicio
-por indicación del usuario.
+con movimiento e interacción reales. El usuario autorizó completar todas las fases el
+2026-11-13.
 
 Las fases 115 y 116 se revierten: se retiran tanto la recoloración inicial como el
 renderer con imágenes, sus PNG, atlas, precargas y pruebas específicas. La base vuelve
@@ -189,6 +188,10 @@ Los efectos respetan la geometría y ningún fotograma modifica el guardado.
 
 ### Fase 123 — Integración, comparación final y entrega
 
+**Implementada (2026-11-13):** Completed full procedural shop redraw and reusable browser integration checks. Native and 2x captures at noon, dusk and night, mobile capture and walking/Rusty conversation video recorded. All 11 interaction targets reachable, 59 blockers and original geometry retained, real 12-coin/two-bobber purchase and reentry verified; 144 character frames nonempty. Original 1519 palette colours/shifts and shared cabin painter unchanged.
+
+**Verificación:** validate OK (zero warnings); replay 12345 identical hash 2848910695, 18 catches/21 casts; saves PASS. Browser: zero errors/art requests, zero warmed canvas allocations, stable save and restored context; draw 0.76 ms/frame on this executor, room bake 244 ms in recorded run.
+
 **Archivos:** los anteriores, herramientas de comprobación necesarias y documentación.
 
 1. Comparación A/B desde el mismo estado entre la tienda original y el nuevo
@@ -219,4 +222,4 @@ buscado. La revisión se hace con capturas y una secuencia del juego funcionando
 - Medir el presupuesto en el mismo ejecutor, con sprites ya preparados. Mantener
   ausencia de arte regenerado durante `draw` y explicar cualquier coste adicional.
 
-**Siguiente trabajo previsto:** fase 123. El usuario ha autorizado continuar con todas las fases.
+**Siguiente trabajo previsto:** revisión visual del conjunto terminado.

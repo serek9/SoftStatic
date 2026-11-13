@@ -83,7 +83,6 @@ G.ui.shopRoom = (function () {
 
   // ---- Painting ---------------------------------------------------------------------------
   var box = A.box, px = A.px;
-  var BRASS = ['rust', 'leaf_gold', 'brass_hi'], WOODK = K.WOOD;
   function img(c, im, x, y) { c.drawImage(im, Math.round(x), Math.round(y)); A.reset(); }
 
   // The procedural shop material family. All geometry is native and baked; shared
@@ -257,23 +256,6 @@ G.ui.shopRoom = (function () {
     g.rect('shop117_edge', 9, 29, 10, 1);
     g.outline('shop117_edge'); return g.canvas();
   }
-  function studyCounterCorner(c) {
-    var g = X.grid(32, 80);
-    g.poly([[4,0],[28,0],[30,2],[30,31],[28,33],[2,33],[2,3]], 'shop117_edge');
-    g.poly([[5,1],[27,1],[29,3],[29,30],[3,30],[3,4]], 'shop117_wood_mid');
-    g.poly([[5,1],[27,1],[28,3],[4,3]], 'shop117_wood_hi');
-    g.poly([[3,5],[5,3],[5,30],[3,32]], 'shop117_wood');
-    g.rect('shop117_wood', 8, 24, 11, 1); g.rect('shop117_wood_hi', 7, 9, 14, 1);
-    // Leave the glass and its stock unobscured. Below it: an enamel cabinet with a
-    // recessed panel and a substantial lip, within the original counter footprint.
-    g.poly([[2,62],[29,62],[30,64],[30,76],[28,78],[4,78],[2,76]], 'shop117_paint_dk');
-    g.rect('shop117_paint', 4, 65, 24, 9); g.rect('shop117_paint_hi', 5, 65, 22, 1);
-    g.rect('shop117_metal_dk', 7, 68, 18, 4); g.rect('shop117_paint', 8, 69, 16, 3);
-    g.rect('shop117_wood_hi', 3, 62, 26, 2); g.rect('shop117_metal_dk', 4, 76, 24, 2);
-    c.clearRect(2, 0, 3, 1); c.clearRect(2, 1, 1, 1);
-    g.paint(c, 0, 0); A.reset();
-  }
-
   function paintBase(c) {
     A.reset();
     materialStudy(c);
@@ -584,8 +566,6 @@ G.ui.shopRoom = (function () {
       ctx.fillRect(Math.round(ox + L[0] + Math.cos(a) * r), Math.round(oy + L[1] - (i < 2 ? 22 : 8) + Math.sin(a * 1.7) * r * 0.6), 1 + (Math.floor(t * 12 + i) & 1), 1);
     }
   }
-  var bp = [];
-  function bulbPts(ox, oy) { if (bp.length !== cable.length) { bp.length = 0; for (var i = 0; i < cable.length; i++) bp.push([0, 0]); } for (i = 0; i < cable.length; i++) { bp[i][0] = ox + cable[i][0]; bp[i][1] = oy + cable[i][1]; } return bp; }
 
   // Draws the room, the glass, Rusty behind his counter, the props, the dog and the fisher in
   // order of their feet. rusty: {face, fr} (Phase 37); stock: what the shelves hold (38); env:
@@ -684,9 +664,9 @@ G.ui.shopRoom = (function () {
     create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: prebake,
     bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
     // Phase 64 (dbg.roomLife): the live things in the room.
-    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 122, study: ['native timber room', 'enamel furniture', 'compact characters', 'warm matte lighting'], live: n, things: ['slow wax lamp', 'sleeping cat', 'bottled drinks', 'moths', 'lake windows', 'stock-aware bait'] }; } };
+    life: function () { var n = 0; for (var i = 0; i < (props || []).length; i++) if (props[i].live) n++; return { room: 'shop', stylePhase: 123, study: ['native timber room', 'enamel furniture', 'compact characters', 'warm matte lighting'], live: n, things: ['slow wax lamp', 'sleeping cat', 'bottled drinks', 'moths', 'lake windows', 'stock-aware bait'] }; } };
 })();
 
 if (G.core && G.core.debug) G.core.debug.addLine(function () {
-  return G.core.state.sceneName() === 'shop' ? 'shop style 117: procedural wall/floor, lamp, counter corner, plant study' : '';
+  return G.core.state.sceneName() === 'shop' ? 'shop style 123: native room, furniture, characters, light and quiet life' : '';
 });

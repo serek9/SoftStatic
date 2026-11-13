@@ -511,7 +511,7 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 120 Shop characters | Done | `Phase 120: Shop characters` | Fresh native shop-only geometry for the fisher, Rusty and four dog breeds, with all facings, walking poses and shopkeeper gestures. Cosmetic coats, hats and breed silhouettes retained; original cabin painters unchanged. |
 | 121 Warm interior light | Done | `Phase 121: Warm interior light` | Baked warm floor pools under furniture, cool translucent night shadow with local light falloff, muted warm string bulbs and matte timber. Original lake windows still follow actual game hour, rain and fog. |
 | 122 Ambient life and subtle unease | Done | `Phase 122: Ambient life and subtle unease` | Native sleeping cat with breathing and ear frames, slow wax lamp, subdued bottled drinks and CRT fishing programme. Existing stock-aware bait, clock anomaly, distant figure and Rusty events retained with original depth ordering. |
-| 123 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
+| 123 Integration and visual delivery | Done | `Phase 123: Integration and visual delivery` | Completed full procedural shop redraw and reusable browser integration checks. Native and 2x captures at noon, dusk and night, mobile capture and walking/Rusty conversation video recorded. All 11 interaction targets reachable, 59 blockers and original geometry retained, real 12-coin/two-bobber purchase and reentry verified; 144 character frames nonempty. Original 1519 palette colours/shifts and shared cabin painter unchanged. |
 
 ### 8.2 Architecture as built
 
@@ -1278,6 +1278,8 @@ These are interpretations and additions made while building, where the spec abov
 
 590. **Ambient life and subtle unease (122):** Native sleeping cat with breathing and ear frames, slow wax lamp, subdued bottled drinks and CRT fishing programme. Existing stock-aware bait, clock anomaly, distant figure and Rusty events retained with original depth ordering.
 
+591. **Integration and visual delivery (123):** Completed full procedural shop redraw and reusable browser integration checks. Native and 2x captures at noon, dusk and night, mobile capture and walking/Rusty conversation video recorded. All 11 interaction targets reachable, 59 blockers and original geometry retained, real 12-coin/two-bobber purchase and reentry verified; 144 character frames nonempty. Original 1519 palette colours/shifts and shared cabin painter unchanged.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1594,9 +1596,11 @@ Phase 121 checks: No browser errors in noon, dusk and night captures. Floor ligh
 
 Phase 122 checks: Three time-of-day captures without browser errors; animation frames baked with room.
 
+Phase 123 checks: validate OK (zero warnings); replay 12345 identical hash 2848910695, 18 catches/21 casts; saves PASS. Browser: zero errors/art requests, zero warmed canvas allocations, stable save and restored context; draw 0.76 ms/frame on this executor, room bake 244 ms in recorded run.
+
 ### 8.6 Next task
 
-The user authorized all remaining shop phases on 2026-11-13. Phase 122 is done. Continue with phase 123; no further phase-start confirmation is needed.
+The user authorized all remaining shop phases on 2026-11-13. Phase 123 is done. Phases 117–123 are complete. Final visual review is pending.
 
 Phase 114 (the Great Northern sign at the Pines) is done, on the user's request of 2026-11-12; its look waits for the user's check (8.4 #75). Phase 113 (the bladebait as quick as a worm, held or pumped; the dropshot pumped in too) is done, on the user's request of 2026-11-11. Phase 112 (fish detail and realism) is done on the user's follow-up of 2026-11-11; visual feedback is pending (8.4 #74). Phase 111 (fish illustration style) is done on the user's request of 2026-11-11; visual feedback is pending (8.4 #74). Phase 110 (every hook comes in at a held reel: the bladebaits, jigheads and dropshots were 20-43 s from the bed) is done, on the user's request of 2026-11-11. Phase 109 (the Heavy Bladebait that would not come in) is done, on the user's request of 2026-11-08. Phase 108 (the journal tip that stayed up; finer cabins, piers and lamps) is done, on the user's request of 2026-11-08. Nothing is planned next: waiting on the user (8.4 #73). Before that: PLAN_FISHING.md is done (Phases 101-107, the user's OK of 2026-11-08); one push and one PR for all of it. Nothing is planned next: waiting on the user. **To check with the user:** PLAN_FISHING.md's look and feel (8.4 #72), the slower mid-game since Phase 105 (8.4 #71: a sea at 282 min, in the band), and as before Fogbound's, the Pines' and Blackwater's looks (#68-#70), the pacing bands and early rewards, #45 and #46, #54 and #55, #34 and #53.
 
