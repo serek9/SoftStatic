@@ -418,66 +418,6 @@ G.ui.shopRoom = (function () {
     g.rect(POT[2], cx - 11, py, 22, 3); g.rect(POT[3], cx - 9, py, 8, 1); g.rect(POT[0], cx - 10, py + 3, 20, 1);
   }
 
-  // Rusty behind his counter (Phase 118): a big chibi bust, as the reference has him: a faded
-  // olive cap with a fish patch, white tufts, a round face with shut, smiling eyes, rosy cheeks
-  // and a red nose, a big white beard, the red flannel and the overall straps. dir 'down' (to
-  // us), 'left' (his eyes to the left), 'up' (his back, at the wall); fr 0 still, 1 a blink,
-  // 2 a sip from his mug, 3 reading the paper. 48×44; the chin at y 34.
-  var bust = {};
-  var FLAN = ['blood', 'crimson', 'rug_hi', 'pink_hi'], BEARD = ['stone', 'stone_hi', 'paper', 'bone', 'ivory'], SKIN = ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi', 'skin_lit'];
-  var CAP = ['olive_dark', 'olive', 'olive_hi', 'olive_lit'];
-  function rustyBust(dir, fr) {
-    var key = dir + fr;
-    if (bust[key]) return bust[key];
-    var g = X.grid(48, 44), cx = 24, i;
-    // The shoulders: the flannel and its plaid, the straps.
-    g.ell(cx, 42, 20, 10, FLAN, { bias: 0.15 });
-    g.over(0, 30, 48, 14, function (x, y, k) { return FLAN.indexOf(k) < 0 ? '' : ((x % 6 === 1 || y % 5 === 2) ? 'blood' : ''); });
-    if (dir !== 'up') { g.rect('denim', 13, 35, 4, 9); g.rect('denim', 31, 35, 4, 9); g.rect('denim_hi', 13, 35, 1, 9); g.rect('denim_hi', 31, 35, 1, 9); g.rect('brass_hi', 14, 39, 2, 2); g.rect('brass_hi', 32, 39, 2, 2); }
-    if (dir === 'up') {
-      // His back at the wall: white hair under the cap's mesh back, his ears.
-      g.ell(cx, 22, 12, 11, ['stone', 'stone_hi', 'hair_lit', 'bone'], { bias: 0.1 });
-      g.ell(11, 22, 2.5, 3.5, SKIN, {}); g.ell(37, 22, 2.5, 3.5, SKIN, {});
-      g.ell(cx, 13, 14, 9, CAP, { bias: 0.15 });
-      g.over(10, 5, 28, 14, function (x, y, k) { return CAP.indexOf(k) >= 0 && (x + y) % 2 ? 'olive_dark' : ''; });
-      g.rect('outline', 19, 19, 10, 1); g.rect('chrome', 21, 19, 6, 1);
-    } else {
-      var lk = dir === 'left' ? -1 : 0, down = fr === 3;
-      g.ell(10, 22, 3, 4, SKIN, { bias: -0.2 }); g.ell(38, 22, 3, 4, SKIN, { bias: -0.3 });             // the ears
-      g.ell(cx, 21, 13, 12, SKIN, { bias: 0.15 });                                                     // the face
-      g.ell(11, 18, 3.5, 5, ['stone_hi', 'hair_lit', 'bone', 'ivory'], { bias: 0.2 }); g.ell(37, 18, 3.5, 5, ['stone_hi', 'hair_lit', 'bone', 'ivory'], {}); // white tufts
-      g.ell(cx, 31, 15, 10, BEARD, { bias: 0.2 });                                                     // the beard
-      g.over(8, 24, 32, 18, function (x, y, k) { return BEARD.indexOf(k) >= 0 && (x * 3 + y * 5) % 11 === 0 ? 'stone_hi' : ''; });
-      g.ell(cx - 4, 26, 5, 2.4, BEARD, { bias: 0.3 }); g.ell(cx + 4, 26, 5, 2.4, BEARD, { bias: 0.1 });   // the moustache
-      if (!down && fr !== 2) { g.rect('blood', cx - 2, 29, 5, 1); g.rect('pink', cx - 1, 30, 3, 1); }    // the smile under it
-      g.ell(cx, 23, 2.6, 2.2, ['flesh_dark', 'rug_hi', 'pink_hi', 'pink_lit'], { bias: 0.3 });           // the nose
-      g.rect('pink_hi', 14, 24, 3, 2); g.rect('pink_hi', 31, 24, 3, 2);                                // the cheeks
-      for (var e = 0; e < 2; e++) {                                                                    // the eyes: shut and smiling, or looking down
-        var ex = (e ? 29 : 18) + lk, ey = 20 + (down ? 1 : 0);
-        if (down || fr === 1) g.rect('outline', ex - 1, ey + 1, 3, 1);
-        else { g.set('outline', ex - 2, ey + 1); g.rect('outline', ex - 1, ey, 3, 1); g.set('outline', ex + 2, ey + 1); }
-        g.rect('bone', ex - 2, ey - 3, 5, 1);                                                          // the brows, white
-      }
-      // The cap: the crown, its pale front panel, the fish patch, the brim toward us.
-      g.ell(cx, 11, 15, 9, CAP, { bias: 0.15 });
-      g.ell(cx, 9, 8, 6, ['paper_dark', 'paper', 'bone', 'cream'], { bias: 0.2 });
-      g.ell(cx, 9, 4, 1.6, ['teal_dark', 'teal', 'teal_hi', 'teal_lit'], {}); g.set('teal_lit', cx + 4, 8); g.set('outline', cx - 2, 9);
-      g.ell(cx, 15, 16, 3.2, ['olive_dark', 'olive_dark', 'olive', 'olive_hi'], { bias: 0.2 });
-      g.rect('outline', cx - 13, 17, 26, 1);
-      if (fr === 2) {                                                                                  // his mug at his mouth, his hand round it
-        g.slab(cx - 3, 24, 11, 11, ['outline', 'paper_dark', 'paper', 'bone', 'cream']); g.rect('cedar_dark', cx - 2, 25, 9, 1); g.rect('outline', cx + 8, 27, 2, 5);
-        g.ell(cx + 10, 33, 3, 2.6, SKIN, { bias: 0.2 });
-      }
-      if (fr === 3) {                                                                                  // the paper held up
-        g.slab(6, 30, 36, 14, ['paper_dark', 'paper_dark', 'paper', 'bone', 'cream']);
-        for (i = 33; i < 43; i += 2) { g.rect('stone_hi', 9, i, 13, 1); g.rect('stone_hi', 25, i, 14, 1); }
-        g.rect('stone', 9, 31, 30, 1); g.ell(7, 36, 2.5, 2.4, SKIN, {}); g.ell(41, 36, 2.5, 2.4, SKIN, {});
-      }
-    }
-    g.outline('outline');
-    return (bust[key] = g.canvas());
-  }
-
   // ---- Baking ------------------------------------------------------------------------------
   var base = null, front = null, props = null, bakeMs = 0;
   function bake() {
@@ -689,7 +629,7 @@ G.ui.shopRoom = (function () {
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
       if (id < 100) { ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y); if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y, t, env); }
-      else if (id === 100) ctx.drawImage(rustyBust(rusty.face === 'up' ? 'up' : (rusty.face === 'left' ? 'left' : 'down'), rusty.fr), ox + 278, oy + FY + 6 - 39);   // his bust over the counter
+      else if (id === 100) ctx.drawImage(R.sprite('rusty', rusty.face, rusty.fr), ox + 291, oy + FY + 17 - 41);   // Phase 119: as the boat paints him, his head and shoulders over the counter
       else if (id === 101) R.drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
       else R.drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
     }

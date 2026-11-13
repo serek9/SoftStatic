@@ -259,5 +259,8 @@ G.scene.dog = (function () {
   // Phase 47: the woof's playback rate for the breed on the boat.
   function barkPitch(lk) { return breed(lk).bark; }
 
-  return { POSES: POSES, FRAMES: FRAMES, prebake: prebake, barkPitch: barkPitch, breed: breed, T: T, CUE: CUE, PET: PET, VOICE: VOICE, request: request, voice: voice, create: create, setPose: setPose, pet: pet, want: want, cues: cues, step: step, draw: draw };
+  // Phase 119: a pose's painting (24×20 view px, the paws at y 19), for the walk-in rooms' dog sitting.
+  function art(pose, f, flip, lk) { return img(pose, f || 0, !!flip, breed(lk)); }
+
+  return { POSES: POSES, FRAMES: FRAMES, prebake: prebake, art: art, barkPitch: barkPitch, breed: breed, T: T, CUE: CUE, PET: PET, VOICE: VOICE, request: request, voice: voice, create: create, setPose: setPose, pet: pet, want: want, cues: cues, step: step, draw: draw };
 })();
