@@ -96,6 +96,9 @@ G.gfx.sprites = (function () {
     sun_dark: '#32100a', sun: '#702614', sun_hi: '#ac521c', sun_lit: '#d89a40',
     vinyl: '#121016', vinyl_hi: '#3a3642', neon_pink: '#d0507e', neon_pink_hi: '#f0a0b8',
     ivory: '#efe6cc', denim_lit: '#6880a4', outline: '#120e0c',
+    // Phase 115 (the shop as a warm lakeside refuge, the user's reference 2026-11-13): cedar
+    // boards, orange-brown and honey where the lamps reach. Interior keys only.
+    cedar_deep: '#2c160c', cedar_dark: '#4c2612', cedar: '#6c3618', cedar_mid: '#8a4820', cedar_hi: '#a65e2a', cedar_lit: '#c27a38', cedar_glow: '#d89a50',
     // Phase 70 (real fish, PLAN_SPECIES.md 3.5): each species' body ramp, back (dark) to belly
     // (pale), six keys; shared fin ramps (ray, root, membrane, edge); eyes. Fish keys only:
     // shift() never picks them, so no earlier sprite changes colour.
@@ -210,7 +213,7 @@ G.gfx.sprites = (function () {
   ('panel_deep panel panel_mid panel_hi panel_lit mustard_dark mustard mustard_hi mustard_lit orange_dark orange orange_hi orange_lit ' +
    'olive_dark olive olive_hi olive_lit pink_dark pink pink_hi pink_lit lav_dark lav lav_hi lav_lit crt_dark crt crt_hi crt_glow ' +
    'chrome_dark chrome chrome_hi chrome_lit brick_dark brick brick_hi leaf_deep leaf_dark leaf leaf_hi leaf_lit sun_dark sun sun_hi sun_lit ' +
-   'vinyl vinyl_hi neon_pink neon_pink_hi ivory denim_lit outline').split(' ').forEach(function (k) { INTERIOR[k] = true; });
+   'vinyl vinyl_hi neon_pink neon_pink_hi ivory denim_lit outline cedar_deep cedar_dark cedar cedar_mid cedar_hi cedar_lit cedar_glow').split(' ').forEach(function (k) { INTERIOR[k] = true; });
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.
   var CEILING_KEY = 'dusk_high';
