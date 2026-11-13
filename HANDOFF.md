@@ -1,12 +1,12 @@
 # SoftStatic: Handoff
 
-## Latest work: procedural shop, phase 118 (2026-11-13)
+## Latest work: procedural shop, phase 119 (2026-11-13)
 
-The wall/floor material study now covers the entire original room. Native timber beams, broad boards, recessed joins, cut-away wall tops, a thick woven terracotta/ochre rug and door mat replace the striped shell. Map, OX/OY/TOP and all 59 blocked tiles are unchanged; cabin painters are untouched.
+Repainted every shop fitting procedurally: shelves, rod rack, bait station, counter, freezer, radio, guitar, amplifier and window frames. Original anchors and collision geometry retained.
 
-Checks: validate OK (0 warnings); controlled renderer captures at 12:00, 19:12 and 23:30 inspected; no page errors.
+Checks: Native captures at noon, dusk and night; validate OK, zero warnings.
 
-The user authorized all remaining shop phases on 2026-11-13. Phase 118 is done. Continue with phase 119; no further phase-start confirmation is needed.
+The user authorized all remaining shop phases on 2026-11-13. Phase 119 is done. Continue with phase 120; no further phase-start confirmation is needed.
 
 ## State in one paragraph
 

@@ -1,6 +1,6 @@
 # Tienda: redibujado procedural cozy y misterio rural
 
-**Fecha:** 2026-11-13. **Estado:** fases 117–118 implementadas; 119–123 en curso.
+**Fecha:** 2026-11-13. **Estado:** fases 117–119 implementadas; 120–123 en curso.
 
 La petición es cambiar todo el lenguaje visual de la tienda usando el sistema de
 dibujo que ya tiene SoftStatic. Las ilustraciones generadas son referencias de
@@ -105,6 +105,10 @@ refugio antes de añadir efectos. Se conserva exactamente el mapa de colisiones.
 
 ### Fase 119 — Redibujar todos los muebles y objetos
 
+**Implementada (2026-11-13):** Repainted every shop fitting procedurally: shelves, rod rack, bait station, counter, freezer, radio, guitar, amplifier and window frames. Original anchors and collision geometry retained.
+
+**Verificación:** Native captures at noon, dusk and night; validate OK, zero warnings.
+
 **Archivos:** `js/ui/shop_room.js`, `js/ui/room_kit.js`, paleta local cuando proceda.
 
 1. Muebles principales: mostrador en L, estanterías, expositor de cañas, vitrinas,
@@ -203,4 +207,4 @@ buscado. La revisión se hace con capturas y una secuencia del juego funcionando
 - Medir el presupuesto en el mismo ejecutor, con sprites ya preparados. Mantener
   ausencia de arte regenerado durante `draw` y explicar cualquier coste adicional.
 
-**Siguiente trabajo previsto:** fase 119. El usuario ha autorizado continuar con todas las fases.
+**Siguiente trabajo previsto:** fase 120. El usuario ha autorizado continuar con todas las fases.
