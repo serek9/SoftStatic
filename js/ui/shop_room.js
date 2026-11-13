@@ -98,7 +98,7 @@ G.ui.shopRoom = (function () {
       if (y < 18) return y === 16 ? 'cedar_deep' : 'cedar_dark';                               // the beam's shadow
       var b = ((x - SW) / 11) | 0, bx = (x - SW) % 11;
       if (bx === 0) return 'cedar_deep';
-      var v = 0.3 + (hash(b, 3) - 0.5) * 0.16 + light(x, y) * 0.4 + (bx === 1 ? 0.1 : 0) - (bx === 10 ? 0.08 : 0);
+      var v = 0.2 + (hash(b, 3) - 0.5) * 0.14 + light(x, y) * 0.38 + (bx === 1 ? 0.2 : (bx === 2 ? 0.08 : 0)) - (bx >= 9 ? 0.1 : 0);
       if (((y * 3 + b * 17) % 41) < 2 && bx > 1) v -= 0.12;                                     // grain
       if (hash(b, 7) < 0.15 && Math.abs(y - 30 - hash(b, 8) * 90) < 2 && bx > 3 && bx < 8) v -= 0.25; // a knot
       return tone(WARM, v);
@@ -107,11 +107,11 @@ G.ui.shopRoom = (function () {
     A.area(c, SW, FY, W - 2 * SW, RH - T - FY, function (x, y) {
       var fy = y - FY, row = (fy / 12) | 0, ly = fy % 12, off = (hash(row, 7) * 300) | 0, len = 60 + ((hash(row, 11) * 4) | 0) * 16;
       var sx = x - SW + off, seg = (sx / len) | 0, lx = sx % len;
-      if (ly === 11) return 'cedar_deep';
-      if (lx === 0) return 'cedar_dark';
+      if (ly === 11) return 'outline';
+      if (lx === 0) return 'cedar_deep';
       if ((lx === 3 || lx === len - 3) && (ly === 2 || ly === 8)) return 'cedar_dark';
-      var v = 0.36 + (hash(row * 31 + seg, 3) - 0.5) * 0.18 + light(x, y) * 0.5 - 0.12;
-      if (ly === 0) v += 0.1; if (ly === 10) v -= 0.1; if (lx === 1) v -= 0.08;
+      var v = 0.34 + (hash(row * 31 + seg, 3) - 0.5) * 0.2 + light(x, y) * 0.55 - 0.12;
+      if (ly === 0) v += 0.2; else if (ly === 1) v += 0.08; if (ly >= 9) v -= 0.14; if (lx < 3) v -= 0.12;
       if (ly === 4 + ((hash(row, seg) * 4) | 0) && ((lx + seg * 7) % 23) < 13) v -= 0.1;      // grain
       return tone(WARM, v);
     });
@@ -245,8 +245,7 @@ G.ui.shopRoom = (function () {
     A.slab(c, 318, 76, 22, 12, ramp('teal')); box(c, 'ivory', 322, 80, 10, 2);
     for (i = 0; i < 3; i++) { A.slab(c, 341 + i * 4, 76, 3, 12, ramp(['brick', 'olive', 'brick_hi'][i])); box(c, 'chrome', 341 + i * 4, 74, 3, 2); }
     // Rusty's back shelf: the radio (its dial is live) and a stack of tins; a cabinet under it.
-    A.slab(c, 250, 114, 102, 5, LITK); box(c, 'cedar_deep', 252, 119, 98, FY - 119);
-    for (i = 1; i < 5; i++) box(c, 'outline', 252 + i * 20, 121, 1, FY - 123);
+    A.slab(c, 250, 114, 102, 5, LITK); A.area(c, 252, 119, 98, FY - 119, function (x, y) { return (x - 252) % 10 === 0 ? 'cedar_dark' : (y < 122 ? 'cedar_dark' : 'cedar'); });
     radio(c, RADIO[0], RADIO[1]);
     tin(c, 312, 103, 'brick_hi'); tin(c, 321, 103, 'olive_hi'); tin(c, 316, 95, 'mustard_hi');
   }
@@ -284,24 +283,24 @@ G.ui.shopRoom = (function () {
   function westStack(c) {
     var x = STACK, i, y;
     // The cooler: a white lid with a red pattern, cups of worms showing under it.
-    y = ty(2) + 2;
+    y = ty(2) - 2;
     A.slab(c, x, y + 10, 44, 20, ['outline', 'paper_dark', 'paper', 'bone', 'ivory']); box(c, 'teal_hi', x + 1, y + 23, 42, 2);
     A.slab(c, x - 1, y, 46, 11, ['outline', 'paper_dark', 'bone', 'ivory', 'cream']);
     for (i = 0; i < 4; i++) { var dx = x + 6 + i * 10; A.area(c, dx - 3, y + 2, 7, 7, function (xx, yy) { return Math.abs(xx - dx) + Math.abs(yy - y - 5) < 3 ? (Math.abs(xx - dx) + Math.abs(yy - y - 5) < 2 ? 'crimson' : 'rug_hi') : ''; }); }
     box(c, 'brick', x + 6, y + 15, 14, 5); box(c, 'ivory', x + 7, y + 17, 12, 1);
     // The cricket crate: a wooden frame round a mesh front.
-    y = ty(3) + 2;
+    y = ty(3) - 2;
     A.slab(c, x + 1, y, 42, 28, WOODK); box(c, 'outline', x + 5, y + 4, 34, 18); box(c, 'reed_dark', x + 6, y + 5, 32, 16);
     A.slab(c, x + 1, y + 23, 42, 5, LITK);
     // The minnow tank on its stand: glass, water lit from the hood, gravel, weeds.
-    y = ty(4) + 2;
+    y = ty(4) - 4;
     A.slab(c, x, y + 26, 44, 6, ['outline', 'chrome_dark', 'chrome', 'chrome_hi']);
     box(c, 'outline', x, y, 44, 27); A.slab(c, x, y - 3, 44, 4, ['outline', 'vinyl', 'vinyl_hi', 'chrome_dark']);
-    A.area(c, x + 1, y + 1, 42, 25, function (xx, yy) { var e = yy - y; return e < 3 ? 'crt_hi' : (e > 20 ? ((xx + yy) % 3 ? 'stone' : 'stone_hi') : (e < 10 ? 'teal_hi' : 'teal')); });
+    A.area(c, x + 1, y + 1, 42, 25, function (xx, yy) { var e = yy - y; return e < 3 ? 'crt_glow' : (e > 20 ? ((xx + yy) % 3 ? 'stone_hi' : 'paper_dark') : (e < 11 ? 'crt_hi' : 'teal_lit')); });
     for (i = 0; i < 4; i++) { A.line(c, 'leaf_hi', x + 6 + i * 10, y + 22, x + 4 + i * 10, y + 10 + (i % 2) * 4); A.line(c, 'leaf', x + 8 + i * 10, y + 22, x + 10 + i * 10, y + 13); }
     box(c, 'crt_glow', x + 2, y + 2, 10, 1); box(c, 'chrome_lit', x + 1, y + 3, 1, 8);
     // The freezer: a long white chest, a red label, the cat's place on its lid.
-    y = ty(5) + 12;
+    y = ty(5) + 18;
     A.slab(c, x, y + 10, 44, 34, ['outline', 'paper_dark', 'paper', 'bone', 'ivory']);
     A.slab(c, x - 1, y, 46, 12, ['outline', 'paper_dark', 'bone', 'ivory', 'cream']);
     box(c, 'chrome_hi', x + 17, y + 11, 10, 2); box(c, 'outline', x + 17, y + 13, 10, 1);
@@ -315,25 +314,34 @@ G.ui.shopRoom = (function () {
     wallThings(c);
     builtIns(c);
     westStack(c);
-    rug(c, 128, ty(3) + 6, 100, 66);
+    rug(c, 130, ty(3) + 4, 96, 68);
+    // The frame's rounded bottom corners, as the reference's room has them (the beam's log ends
+    // stand at the top ones).
+    for (var q = 0; q < 2; q++) {
+      var qx = q ? W - 20 : 0, qy = RH - 20;
+      A.area(c, qx, qy, 20, 20, function (x, y) { var d = Math.hypot(q ? x - (W - 20) : 19 - x, y - qy); return d > 19.5 ? 'black' : (d > 18 ? 'outline' : ''); });
+    }
     A.reset();
   }
-  // The rug: concentric bands of rust, orange, mustard and olive round a tan heart, tassels all round.
+  // The rug (Phase 118): a knotted rag rug, each knot a 2×2 bump, in bands of orange, red,
+  // mustard, olive and orange round a tan heart; fat tassels on its short sides.
   function rug(c, x, y, w, h) {
-    var B = ['rug_hi', 'orange', 'mustard', 'mustard_hi', 'olive', 'olive_hi', 'orange_hi', 'orange', 'mustard_hi', 'orange_hi'];
-    A.area(c, x - 4, y - 3, w + 8, h + 6, function (xx, yy) {
+    var B = ['orange_hi', 'rug_hi', 'orange', 'mustard_hi', 'olive', 'olive_hi', 'orange_hi', 'mustard', 'cedar_glow', 'cedar_lit'];
+    A.area(c, x - 6, y, w + 12, h, function (xx, yy) {
       var ix = xx - x, iy = yy - y;
-      if (ix < 0 || ix >= w || iy < 0 || iy >= h) {                                            // the tassels
-        if ((ix < 0 || ix >= w) && iy >= 0 && iy < h) return iy % 3 === 0 ? '' : (ix < -2 || ix > w + 1 ? 'mustard_hi' : 'cream');
-        if ((iy < 0 || iy >= h) && ix >= 0 && ix < w) return ix % 3 === 0 ? '' : 'cream';
-        return '';
+      if (ix < 0 || ix >= w) {                                                                   // the tassels, in bunches
+        var d = ix < 0 ? -ix : ix - w + 1, q = iy % 5;
+        if (q === 4 || d > 6 - (q === 0 || q === 3 ? 1 : 0)) return '';
+        return d === 6 || (d === 5 && (q === 0 || q === 3)) ? 'mustard' : (q === 1 ? 'mustard_lit' : 'mustard_hi');
       }
-      var e = Math.min(ix, w - 1 - ix, iy * 1.25, (h - 1 - iy) * 1.25), band = Math.min(B.length - 1, Math.floor(e / 3.3));
-      var k = B[band];
-      if (((ix + iy * 2) % 4) === 0) k = sh(k, -1);                                            // the knots
-      return k;
+      var e = Math.min(ix, w - 1 - ix, iy, h - 1 - iy), band = Math.min(B.length - 1, Math.floor(e / 4));
+      var k = B[band], kx = ix % 4, ky = iy % 4;
+      if (band === B.length - 1 && ((Math.abs(ix - w / 2) < 9 && Math.abs(iy - h / 2) < 3) || ((ix + iy) % 6 === 0))) k = 'mustard';   // the heart's motif
+      if (ix === 0 || iy === 0 || ix === w - 1 || iy === h - 1) return 'orange_dark';
+      if ((kx === 0 || kx === 3) && (ky === 0 || ky === 3)) return sh(k, -1);                    // round knots: dark corners, a lit crown
+      return kx === 1 && ky === 1 ? sh(k, 1) : k;
     });
-    box(c, 'cedar_deep', x, y + h + 3, w, 1);
+    box(c, 'cedar_deep', x, y + h, w, 2);
   }
 
   // Props drawn in order of their feet with the people.
@@ -365,8 +373,8 @@ G.ui.shopRoom = (function () {
   function paintLamp(g) {
     g.rect('brass_hi', 16, 28, 2, 50); g.rect('leaf_gold', 17, 28, 1, 50);
     g.ell(17, 78, 8, 2.6, ['outline', 'rust', 'leaf_gold', 'brass_hi'], { bias: 0.2 });
-    g.poly([[8, 2], [26, 2], [32, 28], [2, 28]], function (x, y) { return x % 4 === 0 ? 'paper' : (x < 17 ? 'ivory' : 'cream'); });
-    g.rect('lamp_glow', 3, 28, 28, 2); g.rect('mustard_lit', 8, 1, 18, 1);
+    g.poly([[8, 2], [26, 2], [32, 28], [2, 28]], function (x, y) { var d = Math.abs(x - 17); return x % 4 === 0 ? (y > 18 ? 'orange_lit' : 'mustard_lit') : (y > 22 ? 'orange_lit' : (d < 5 ? 'cream' : (d < 10 ? 'lamp_glow' : 'mustard_lit'))); });
+    g.rect('signal_amber', 3, 28, 28, 2); g.rect('mustard_hi', 8, 1, 18, 1);
   }
   // The drinks fridge (42×66): a red cabinet, a sign, a glass door (the inside is live).
   function paintFridge(g) {
@@ -391,17 +399,83 @@ G.ui.shopRoom = (function () {
   }
   // The monstera (60×64): big split leaves over a terracotta pot.
   function paintPalm(g) {
-    var L = ['leaf_deep', 'leaf_dark', 'leaf', 'leaf_hi', 'leaf_lit'], POT = ['brick_dark', 'brick', 'brick_hi', 'orange_hi'], cx = 30, py = 48, i;
-    var LV = [[-2.7, 20, 9], [-2.2, 22, 10], [-1.7, 24, 10], [-1.2, 23, 10], [-0.7, 21, 9], [-0.3, 17, 8], [-2.95, 15, 8], [-1.45, 14, 8]];
+    var L = ['leaf_dark', 'leaf', 'leaf_hi', 'leaf_lit', 'olive_lit'], POT = ['orange_dark', 'orange', 'orange_hi', 'orange_lit'], cx = 30, py = 48, i, k;
+    // Each leaf: [angle, reach, size]; a broad heart, its midrib, the splits running in from its rim.
+    var LV = [[-2.75, 19, 9], [-2.25, 22, 10], [-1.75, 21, 10], [-1.3, 22, 10], [-0.85, 22, 10], [-0.4, 18, 9], [-1.55, 10, 8], [-2.0, 11, 7], [-1.05, 11, 7]];
     for (i = 0; i < LV.length; i++) {
-      var a = LV[i][0], r = LV[i][1], lx = cx + Math.cos(a) * r, ly = py - 10 + Math.sin(a) * r * 0.8;
-      g.line('leaf_dark', cx, py - 2, lx, ly + 3);
-      g.ell(lx, ly, LV[i][2], LV[i][2] * 0.7, L, { bias: 0.15 - (i % 3) * 0.12 });
-      g.line('leaf_deep', lx - LV[i][2] * 0.6, ly + 1, lx - 1, ly); g.line('leaf_deep', lx + 1, ly + 2, lx + LV[i][2] * 0.6, ly + 1); // the splits
-      g.line('leaf_lit', lx - 3, ly - 2, lx + 2, ly - 3);
+      var a = LV[i][0], r = LV[i][1], z = LV[i][2], lx = cx + Math.cos(a) * r, ly = py - 12 + Math.sin(a) * r * 0.85, ca = Math.cos(a), sa = Math.sin(a);
+      g.line('leaf_dark', cx, py - 2, lx - ca * z * 0.6, ly - sa * z * 0.5 + 2);
+      g.ell(lx, ly, z, z * 0.72, L, { bias: 0.2 - (i % 3) * 0.12 });
+      g.line('leaf_dark', lx - ca * z * 0.8, ly - sa * z * 0.6, lx + ca * z * 0.8, ly + sa * z * 0.6);       // the midrib
+      for (k = -1; k <= 1; k += 2) {                                                                    // the splits
+        var px0 = lx - sa * z * 0.72 * k, py0 = ly + ca * z * 0.5 * k;
+        g.line('outline', px0, py0, px0 + (lx - px0) * 0.45, py0 + (ly - py0) * 0.45);
+        g.line('outline', px0 + ca * 3, py0 + sa * 2, px0 + ca * 3 + (lx - px0) * 0.4, py0 + sa * 2 + (ly - py0) * 0.4);
+      }
+      g.line('olive_lit', lx - 3, ly - z * 0.45, lx + 2, ly - z * 0.55);
     }
-    g.poly([[cx - 10, py], [cx + 10, py], [cx + 8, 63], [cx - 8, 63]], function (x) { return tone(POT, 0.8 - (x - cx + 10) / 20 * 0.6); });
-    g.rect(POT[2], cx - 11, py, 22, 3); g.rect(POT[0], cx - 10, py + 3, 20, 1);
+    g.poly([[cx - 10, py], [cx + 10, py], [cx + 8, 63], [cx - 8, 63]], function (x) { return tone(POT, 0.85 - (x - cx + 10) / 20 * 0.6); });
+    g.rect(POT[2], cx - 11, py, 22, 3); g.rect(POT[3], cx - 9, py, 8, 1); g.rect(POT[0], cx - 10, py + 3, 20, 1);
+  }
+
+  // Rusty behind his counter (Phase 118): a big chibi bust, as the reference has him: a faded
+  // olive cap with a fish patch, white tufts, a round face with shut, smiling eyes, rosy cheeks
+  // and a red nose, a big white beard, the red flannel and the overall straps. dir 'down' (to
+  // us), 'left' (his eyes to the left), 'up' (his back, at the wall); fr 0 still, 1 a blink,
+  // 2 a sip from his mug, 3 reading the paper. 48×44; the chin at y 34.
+  var bust = {};
+  var FLAN = ['blood', 'crimson', 'rug_hi', 'pink_hi'], BEARD = ['stone', 'stone_hi', 'paper', 'bone', 'ivory'], SKIN = ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi', 'skin_lit'];
+  var CAP = ['olive_dark', 'olive', 'olive_hi', 'olive_lit'];
+  function rustyBust(dir, fr) {
+    var key = dir + fr;
+    if (bust[key]) return bust[key];
+    var g = X.grid(48, 44), cx = 24, i;
+    // The shoulders: the flannel and its plaid, the straps.
+    g.ell(cx, 42, 20, 10, FLAN, { bias: 0.15 });
+    g.over(0, 30, 48, 14, function (x, y, k) { return FLAN.indexOf(k) < 0 ? '' : ((x % 6 === 1 || y % 5 === 2) ? 'blood' : ''); });
+    if (dir !== 'up') { g.rect('denim', 13, 35, 4, 9); g.rect('denim', 31, 35, 4, 9); g.rect('denim_hi', 13, 35, 1, 9); g.rect('denim_hi', 31, 35, 1, 9); g.rect('brass_hi', 14, 39, 2, 2); g.rect('brass_hi', 32, 39, 2, 2); }
+    if (dir === 'up') {
+      // His back at the wall: white hair under the cap's mesh back, his ears.
+      g.ell(cx, 22, 12, 11, ['stone', 'stone_hi', 'hair_lit', 'bone'], { bias: 0.1 });
+      g.ell(11, 22, 2.5, 3.5, SKIN, {}); g.ell(37, 22, 2.5, 3.5, SKIN, {});
+      g.ell(cx, 13, 14, 9, CAP, { bias: 0.15 });
+      g.over(10, 5, 28, 14, function (x, y, k) { return CAP.indexOf(k) >= 0 && (x + y) % 2 ? 'olive_dark' : ''; });
+      g.rect('outline', 19, 19, 10, 1); g.rect('chrome', 21, 19, 6, 1);
+    } else {
+      var lk = dir === 'left' ? -1 : 0, down = fr === 3;
+      g.ell(10, 22, 3, 4, SKIN, { bias: -0.2 }); g.ell(38, 22, 3, 4, SKIN, { bias: -0.3 });             // the ears
+      g.ell(cx, 21, 13, 12, SKIN, { bias: 0.15 });                                                     // the face
+      g.ell(11, 18, 3.5, 5, ['stone_hi', 'hair_lit', 'bone', 'ivory'], { bias: 0.2 }); g.ell(37, 18, 3.5, 5, ['stone_hi', 'hair_lit', 'bone', 'ivory'], {}); // white tufts
+      g.ell(cx, 31, 15, 10, BEARD, { bias: 0.2 });                                                     // the beard
+      g.over(8, 24, 32, 18, function (x, y, k) { return BEARD.indexOf(k) >= 0 && (x * 3 + y * 5) % 11 === 0 ? 'stone_hi' : ''; });
+      g.ell(cx - 4, 26, 5, 2.4, BEARD, { bias: 0.3 }); g.ell(cx + 4, 26, 5, 2.4, BEARD, { bias: 0.1 });   // the moustache
+      if (!down && fr !== 2) { g.rect('blood', cx - 2, 29, 5, 1); g.rect('pink', cx - 1, 30, 3, 1); }    // the smile under it
+      g.ell(cx, 23, 2.6, 2.2, ['flesh_dark', 'rug_hi', 'pink_hi', 'pink_lit'], { bias: 0.3 });           // the nose
+      g.rect('pink_hi', 14, 24, 3, 2); g.rect('pink_hi', 31, 24, 3, 2);                                // the cheeks
+      for (var e = 0; e < 2; e++) {                                                                    // the eyes: shut and smiling, or looking down
+        var ex = (e ? 29 : 18) + lk, ey = 20 + (down ? 1 : 0);
+        if (down || fr === 1) g.rect('outline', ex - 1, ey + 1, 3, 1);
+        else { g.set('outline', ex - 2, ey + 1); g.rect('outline', ex - 1, ey, 3, 1); g.set('outline', ex + 2, ey + 1); }
+        g.rect('bone', ex - 2, ey - 3, 5, 1);                                                          // the brows, white
+      }
+      // The cap: the crown, its pale front panel, the fish patch, the brim toward us.
+      g.ell(cx, 11, 15, 9, CAP, { bias: 0.15 });
+      g.ell(cx, 9, 8, 6, ['paper_dark', 'paper', 'bone', 'cream'], { bias: 0.2 });
+      g.ell(cx, 9, 4, 1.6, ['teal_dark', 'teal', 'teal_hi', 'teal_lit'], {}); g.set('teal_lit', cx + 4, 8); g.set('outline', cx - 2, 9);
+      g.ell(cx, 15, 16, 3.2, ['olive_dark', 'olive_dark', 'olive', 'olive_hi'], { bias: 0.2 });
+      g.rect('outline', cx - 13, 17, 26, 1);
+      if (fr === 2) {                                                                                  // his mug at his mouth, his hand round it
+        g.slab(cx - 3, 24, 11, 11, ['outline', 'paper_dark', 'paper', 'bone', 'cream']); g.rect('cedar_dark', cx - 2, 25, 9, 1); g.rect('outline', cx + 8, 27, 2, 5);
+        g.ell(cx + 10, 33, 3, 2.6, SKIN, { bias: 0.2 });
+      }
+      if (fr === 3) {                                                                                  // the paper held up
+        g.slab(6, 30, 36, 14, ['paper_dark', 'paper_dark', 'paper', 'bone', 'cream']);
+        for (i = 33; i < 43; i += 2) { g.rect('stone_hi', 9, i, 13, 1); g.rect('stone_hi', 25, i, 14, 1); }
+        g.rect('stone', 9, 31, 30, 1); g.ell(7, 36, 2.5, 2.4, SKIN, {}); g.ell(41, 36, 2.5, 2.4, SKIN, {});
+      }
+    }
+    g.outline('outline');
+    return (bust[key] = g.canvas());
   }
 
   // ---- Baking ------------------------------------------------------------------------------
@@ -451,14 +525,14 @@ G.ui.shopRoom = (function () {
     }
     shown.rods = n;
     // Minnows in the tank, crickets in the crate now and then hopping.
-    var mx = ox + STACK + 4, my = oy + ty(4) + 7;
+    var mx = ox + STACK + 4, my = oy + ty(4) + 1;
     shown.minnows = stock.minnows;
     for (i = 0; i < stock.minnows; i++) {
       var ph = t * (0.35 + i * 0.07) + i * 1.7, u = (Math.sin(ph) + 1) / 2, dir = Math.cos(ph) > 0;
       ctx.fillStyle = P.water_foam; ctx.fillRect(mx + Math.round(u * 32), my + (i * 5) % 14, 3, 1);
       ctx.fillStyle = P.chrome_lit; ctx.fillRect(mx + Math.round(u * 32) + (dir ? 2 : 0), my + (i * 5) % 14, 1, 1);
     }
-    var cx = ox + STACK + 7, cy = oy + ty(3) + 7;
+    var cx = ox + STACK + 7, cy = oy + ty(3) + 3;
     shown.crickets = stock.crickets;
     for (i = 0; i < stock.crickets; i++) {
       var hop = (t * 0.6 + i * 0.37) % 1 < 0.06 ? 2 : 0;
@@ -467,13 +541,28 @@ G.ui.shopRoom = (function () {
     ctx.fillStyle = P.reed_hi;                                                          // the crate's mesh over them
     for (i = 0; i < 9; i++) ctx.fillRect(cx - 1 + i * 4, cy - 1, 1, 16);
     for (i = 0; i < 5; i++) ctx.fillRect(cx - 1, cy - 1 + i * 4, 33, 1);
-    K.cat(ctx, ox + STACK + 2, oy + ty(5) + 14, t, 2);
+    K.cat(ctx, ox + STACK + 2, oy + ty(5) + 20, t, 2);
   }
 
   // ---- Light, life and the strange (Phase 39) -------------------------------------------
   // env: {hour, night, grey, rain, fog, flash, strange, st}: the windows show the lake at the
   // hour; at night the room keeps its lamps' warmth, darker toward the corners.
   var mask = null;
+  // Phase 118: the dark in fine steps (2 px cells, eleven levels), so no ring shows round a pool.
+  function softMask(w, h, pools, clear) {
+    return G.gfx.bake.layer(w, h, function (c) {
+      c.fillStyle = P.cedar_deep;                                                             // a warm dark, never a cold one
+      for (var y = 0; y < h; y += 2) for (var x = 0; x < w; x += 2) {
+        if (clear(x, y)) continue;
+        var best = 9;
+        for (var i = 0; i < pools.length; i++) { var p = pools[i], dx = (x - p.x) / (p.sx || 1.2), dy = y - p.y; best = Math.min(best, Math.sqrt(dx * dx + dy * dy) / p.r); }
+        var a = Math.round(Math.max(0, Math.min(1, (best - 0.3) / 0.9)) * 10) / 10 * 0.55;
+        if (!a) continue;
+        c.globalAlpha = a; c.fillRect(x, y, 2, 2);
+      }
+      c.globalAlpha = 1;
+    });
+  }
   function clearAt(x, y) {
     for (var i = 0; i < WINS.length; i++) { var g = WINS[i]; if (x >= g[0] && x < g[0] + g[2] && y >= g[1] && y < g[1] + g[3]) return true; }
     return false;
@@ -510,9 +599,9 @@ G.ui.shopRoom = (function () {
   function drawLight(ctx, env, t, rusty, ox, oy) {
     var i, n = env.night;
     // The dark in the corners, deeper at night; the lamps' pools stay warm.
-    if (!mask) mask = K.nightMask(W, RH, [{ x: LAMP[0], y: LAMP[1] + 30, r: 140, sx: 1.4 }, { x: DESK[0], y: DESK[1], r: 80 }, { x: W >> 1, y: 40, r: 70, sx: 3.6 },
+    if (!mask) mask = softMask(W, RH, [{ x: LAMP[0], y: LAMP[1] + 30, r: 140, sx: 1.4 }, { x: DESK[0], y: DESK[1], r: 80 }, { x: W >> 1, y: 40, r: 70, sx: 3.6 },
       { x: 335, y: ty(5), r: 50 }, { x: 40, y: ty(4) + 16, r: 40 }, { x: W >> 1, y: ty(5), r: 90, sx: 1.6 }], clearAt);
-    ctx.globalAlpha = 0.18 + 0.22 * n; ctx.drawImage(mask, ox, oy);
+    ctx.globalAlpha = 0.3 + 0.25 * n; ctx.drawImage(mask, ox, oy);
     ctx.globalAlpha = 0.04 + 0.06 * n; ctx.fillStyle = P.flame; ctx.fillRect(ox + SW, oy, W - 2 * SW, RH - T);
     ctx.globalAlpha = 1;
     if (env.grey > 0.02) { ctx.globalAlpha = 0.06 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + SW, oy + 16, W - 2 * SW, RH - 48); ctx.globalAlpha = 1; }
@@ -533,7 +622,7 @@ G.ui.shopRoom = (function () {
     K.glow(ctx, ox + STACK + 22, oy + ty(4) + 14, 24, 'crt_glow', 0.03 + 0.04 * n);       // the tank
     // The tank's bubbles; steam from Rusty's mug; smoke from the ashtray.
     ctx.fillStyle = P.water_foam;
-    for (i = 0; i < 5; i++) { var u = (t * 0.5 + i / 5) % 1; ctx.fillRect(ox + STACK + 38 - (i % 2), oy + ty(4) + 24 - Math.floor(u * 21), 1, 1); }
+    for (i = 0; i < 5; i++) { var u = (t * 0.5 + i / 5) % 1; ctx.fillRect(ox + STACK + 38 - (i % 2), oy + ty(4) + 18 - Math.floor(u * 19), 1, 1); }
     var cupX = ox + 312, cupY = oy + FY + 23;
     if (!rusty || rusty.fr !== 2) {
       ctx.fillStyle = P.outline; ctx.fillRect(cupX - 1, cupY - 1, 9, 9); ctx.fillStyle = P.cream; ctx.fillRect(cupX, cupY, 7, 7); ctx.fillStyle = P.paper_dark; ctx.fillRect(cupX + 5, cupY + 1, 2, 6);
@@ -600,7 +689,7 @@ G.ui.shopRoom = (function () {
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
       if (id < 100) { ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y); if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y, t, env); }
-      else if (id === 100) R.drawFigure(ctx, 'rusty', rusty.face, rusty.fr, ox + tx(RUSTY[0]) + 10, oy + FY + 22);   // his feet behind the counter, his bust over it
+      else if (id === 100) ctx.drawImage(rustyBust(rusty.face === 'up' ? 'up' : (rusty.face === 'left' ? 'left' : 'down'), rusty.fr), ox + 278, oy + FY + 6 - 39);   // his bust over the counter
       else if (id === 101) R.drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
       else R.drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
     }

@@ -98,7 +98,7 @@ G.gfx.sprites = (function () {
     ivory: '#efe6cc', denim_lit: '#6880a4', outline: '#120e0c',
     // Phase 115 (the shop as a warm lakeside refuge, the user's reference 2026-11-13): cedar
     // boards, orange-brown and honey where the lamps reach. Interior keys only.
-    cedar_deep: '#2c160c', cedar_dark: '#4c2612', cedar: '#6c3618', cedar_mid: '#8a4820', cedar_hi: '#a65e2a', cedar_lit: '#c27a38', cedar_glow: '#d89a50',
+    cedar_deep: '#2e120a', cedar_dark: '#4e1e10', cedar: '#6e2c14', cedar_mid: '#8e3a18', cedar_hi: '#a84a1e', cedar_lit: '#c4642a', cedar_glow: '#dc8a40',
     // Phase 70 (real fish, PLAN_SPECIES.md 3.5): each species' body ramp, back (dark) to belly
     // (pale), six keys; shared fin ramps (ray, root, membrane, edge); eyes. Fish keys only:
     // shift() never picks them, so no earlier sprite changes colour.

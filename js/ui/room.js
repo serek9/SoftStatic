@@ -515,14 +515,16 @@ G.ui.room = (function () {
   // X.scaled does), the head (above y 17) and the body each at their own scale. Callbacks get
   // the painter's own coordinates.
   // Phase 117: chibi, as the reference has them: the head at 1.45 (Rusty's 1.95), the body at 0.82.
-  var MH = 1.45, MB = 0.82, MY = 17, MC = 24, MW = 48, MHT = 52;
-  var MINI = { fisher: [1.45, 0.82], rusty: [1.95, 0.82] };
-  function useMini(kind) { var m = MINI[kind] || MINI.fisher; MH = m[0]; MB = m[1]; MC = Math.ceil(16 * Math.max(MH, MB)) + 1; MW = MC * 2; MHT = Math.ceil(mY(48)) + 1; }
+  // Phase 118: the body wider than it is tall (BX), a stout little figure as in the reference.
+  var MH = 1.5, MB = 0.78, MBX = 1.15, MY = 17, MC = 24, MW = 48, MHT = 52;
+  var MINI = { fisher: [1.7, 0.86, 1.35], rusty: [1.95, 0.82, 1] };
+  function useMini(kind) { var m = MINI[kind] || MINI.fisher; MH = m[0]; MB = m[1]; MBX = m[2]; MC = Math.ceil(16 * Math.max(MH, MBX)) + 1; MW = MC * 2; MHT = Math.ceil(mY(48)) + 1; }
   function msc(y) { return y < MY ? MH : MB; }
+  function mscx(y) { return y < MY ? MH : MBX; }
   function mY(y) { return 1 + (y < MY ? y * MH : MY * MH + (y - MY) * MB); }
-  function mX(x, y) { return MC + (x - 16) * msc(y); }
+  function mX(x, y) { return MC + (x - 16) * mscx(y); }
   function iY(y) { y -= 1; return y < MY * MH ? y / MH : MY + (y - MY * MH) / MB; }
-  function iX(x, sy) { return 16 + (x - MC) / msc(sy); }
+  function iX(x, sy) { return 16 + (x - MC) / mscx(sy); }
   function Mini(g) { this.g = g; this.w = MW; this.h = MHT; }
   var MQ = Mini.prototype;
   MQ.at = function (x, y) { return this.g.at(Math.round(mX(x, y)), Math.round(mY(y))); };
@@ -545,8 +547,8 @@ G.ui.room = (function () {
     return this;
   };
   MQ.over = function (x0, y0, w, h, fn) { return this.fill(x0, y0, w, h, function (x, y, cur) { return cur ? fn(x, y, cur) : ''; }); };
-  MQ.ell = function (cx, cy, rx, ry, keys, o) { var s = msc(cy); this.g.ell(mX(cx, cy), mY(cy), Math.max(0.6, rx * s), Math.max(0.6, ry * s), keys, o); return this; };
-  MQ.cap = function (x0, y0, x1, y1, r, keys, bias) { this.g.cap(mX(x0, y0), mY(y0), mX(x1, y1), mY(y1), Math.max(0.55, r * msc((y0 + y1) / 2)), keys, bias); return this; };
+  MQ.ell = function (cx, cy, rx, ry, keys, o) { this.g.ell(mX(cx, cy), mY(cy), Math.max(0.6, rx * mscx(cy)), Math.max(0.6, ry * msc(cy)), keys, o); return this; };
+  MQ.cap = function (x0, y0, x1, y1, r, keys, bias) { this.g.cap(mX(x0, y0), mY(y0), mX(x1, y1), mY(y1), Math.max(0.55, r * (msc((y0 + y1) / 2) + mscx((y0 + y1) / 2)) / 2), keys, bias); return this; };
   MQ.line = function (key, x0, y0, x1, y1) { this.g.line(key, mX(x0, y0), mY(y0), mX(x1, y1), mY(y1)); return this; };
   MQ.poly = function (pts, fill) {
     var sp = [], i;
@@ -582,7 +584,7 @@ G.ui.room = (function () {
     else { useMini(kind); g = X.grid(MW, MHT); var m = new Mini(g); if (kind === 'rusty') paintRusty(m, d, fr); else paintFisher(m, d, fr, L); }
     return (art[key] = g.canvas());
   }
-  function dogScale(L) { return (L && L.size ? L.size : 0.7) * 1.12; }                 // Phase 117: beside the chibi fisher
+  function dogScale(L) { return (L && L.size ? L.size : 0.7) * 1.45; }                 // Phase 118: a big puppy beside the chibi fisher
   // Where a sprite's feet are within it: [x, y]. lk: the dog's look (its size).
   var anc = [0, 0];
   function anchor(kind, dir, lk) {
@@ -611,7 +613,7 @@ G.ui.room = (function () {
   // Draws a walking figure with its feet at (x, y), its shadow under it.
   function drawFigure(ctx, kind, dir, fr, x, y, lk) {
     var img = sprite(kind, dir, fr, lk), a = anchor(kind, dir, lk), ds = kind === 'dog' ? dogScale(look('dog', lk)) : 1;
-    shadow(ctx, x, y, kind === 'dog' ? Math.round((dir === 'left' || dir === 'right' ? 26 : 18) * ds) : 22);
+    shadow(ctx, x, y, kind === 'dog' ? Math.round((dir === 'left' || dir === 'right' ? 26 : 18) * ds) : 26);
     ctx.drawImage(img, Math.round(x - a[0]), Math.round(y - a[1]));
   }
 
