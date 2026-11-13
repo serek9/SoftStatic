@@ -105,6 +105,7 @@ G.gfx.sprites = (function () {
     shop117_cloth_dk: '#665c48', shop117_cloth: '#a28d69', shop117_cloth_hi: '#d4b98c',
     shop117_paper: '#d7c7a6', shop117_metal_dk: '#314345', shop117_metal: '#617575', shop117_metal_hi: '#99aaa0',
     shop117_clay_dk: '#553e39', shop117_clay: '#895e49', shop117_clay_hi: '#b68c63', shop117_lamp: '#e7c790',
+    shop117_rug_dk: '#543b40', shop117_rug: '#935e4f', shop117_rug_hi: '#ba8a62', shop117_ochre: '#b79a65',
     // Phase 70 (real fish, PLAN_SPECIES.md 3.5): each species' body ramp, back (dark) to belly
     // (pale), six keys; shared fin ramps (ray, root, membrane, edge); eyes. Fish keys only:
     // shift() never picks them, so no earlier sprite changes colour.

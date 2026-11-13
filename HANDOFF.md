@@ -1,23 +1,12 @@
 # SoftStatic: Handoff
 
-## Latest work: procedural shop, phase 117 (2026-11-13)
+## Latest work: procedural shop, phase 118 (2026-11-13)
 
-The user rejected imported art and requested the current procedural renderer. The
-rollback of phases 115/116 and the seven-phase plan are in PLAN_SHOP_LOOK.md.
-The user then authorized beginning the plan; phase 117 now implements only a native
-material/shape study: wall/floor bay, linen floor lamp, enamel counter corner and
-faceted monstera. Other furniture, actors and lighting remain original controls.
-All drawing uses paint/pix/bake; there are no imported shop images. Layout, camera,
-59 blocked tiles, purchases and appearances remain unchanged.
+The wall/floor material study now covers the entire original room. Native timber beams, broad boards, recessed joins, cut-away wall tops, a thick woven terracotta/ochre rug and door mat replace the striped shell. Map, OX/OY/TOP and all 59 blocked tiles are unchanged; cabin painters are untouched.
 
-Checks: validate (zero warnings), replay 12345 (2848910695, identical), saves PASS;
-browser checks cover unchanged layout/palette shifts, a purchase, warmed draw cache,
-state restoration and no art requests. Three-hour before/after shop captures, lake
-references and an enlarged comparison were presented to the user. Next: phase 118
-once the sample has been reviewed. Do not treat this partial sample as a finished
-whole-shop restyle. PLAN.md §8 is authoritative.
+Checks: validate OK (0 warnings); controlled renderer captures at 12:00, 19:12 and 23:30 inspected; no page errors.
 
-How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-30, after Phase 50 (fitting it in, the last of the tackle, company and living-lake Phases 41–50 of [PLAN_TACKLE.md](PLAN_TACKLE.md)), on the branch `claude/clever-brown-4b34ko`.
+The user authorized all remaining shop phases on 2026-11-13. Phase 118 is done. Continue with phase 119; no further phase-start confirmation is needed.
 
 ## State in one paragraph
 

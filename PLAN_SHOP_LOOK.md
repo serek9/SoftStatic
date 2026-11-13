@@ -1,6 +1,6 @@
 # Tienda: redibujado procedural cozy y misterio rural
 
-**Fecha:** 2026-11-13. **Estado:** fase 117 implementada; muestra presentada para revisión visual. Fases 118–123 pendientes.
+**Fecha:** 2026-11-13. **Estado:** fases 117–118 implementadas; 119–123 en curso.
 
 La petición es cambiar todo el lenguaje visual de la tienda usando el sistema de
 dibujo que ya tiene SoftStatic. Las ilustraciones generadas son referencias de
@@ -59,8 +59,7 @@ descubren al observar: reloj, reflejos, tarro sin etiqueta y figura lejana ya ex
 ## 3. Fases de implementación
 
 Se ejecutan en orden. Cada fase termina con captura real del juego, comprobaciones,
-actualización de PLAN.md §8/HANDOFF.md y un commit. La siguiente empieza cuando el
-usuario la indique. Si una captura no cumple el criterio visual, se corrige dentro
+actualización de PLAN.md §8/HANDOFF.md y un commit. El usuario ha autorizado ejecutar todas las fases restantes en esta iteración. Si una captura no cumple el criterio visual, se corrige dentro
 de esa fase antes de ampliarla al resto de la tienda.
 
 ### Fase 117 — Fijar el lenguaje visual en píxeles nativos
@@ -86,6 +85,10 @@ volumen distintos; la paleta encaja con el lago. Se presenta esa prueba nativa
 antes de extender el estilo a todos los objetos.
 
 ### Fase 118 — Arquitectura, suelo, paredes y alfombra
+
+**Implementada (2026-11-13):** The wall/floor material study now covers the entire original room. Native timber beams, broad boards, recessed joins, cut-away wall tops, a thick woven terracotta/ochre rug and door mat replace the striped shell. Map, OX/OY/TOP and all 59 blocked tiles are unchanged; cabin painters are untouched.
+
+**Verificación:** validate OK (0 warnings); controlled renderer captures at 12:00, 19:12 and 23:30 inspected; no page errors.
 
 **Archivos:** `js/ui/shop_room.js`, opciones locales en `js/ui/room_kit.js`.
 
@@ -200,6 +203,4 @@ buscado. La revisión se hace con capturas y una secuencia del juego funcionando
 - Medir el presupuesto en el mismo ejecutor, con sprites ya preparados. Mantener
   ausencia de arte regenerado durante `draw` y explicar cualquier coste adicional.
 
-**Siguiente trabajo previsto:** fase 118, después de revisar la muestra de la fase 117.
-La muestra es parcial: el resto de muebles, alfombra, personajes e iluminación
-conservan todavía su dibujo original.
+**Siguiente trabajo previsto:** fase 119. El usuario ha autorizado continuar con todas las fases.

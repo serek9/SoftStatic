@@ -86,15 +86,14 @@ G.ui.shopRoom = (function () {
   var BRASS = ['rust', 'leaf_gold', 'brass_hi'], WOODK = K.WOOD;
   function img(c, im, x, y) { c.drawImage(im, Math.round(x), Math.round(y)); A.reset(); }
 
-  // Phase 117 is a native-size material/shape study, not the full room redesign yet.
-  // Only a wall/floor bay, the floor lamp, the counter corner and the monstera change.
-  // The complete walk map and the shared room-kit/cabin artwork remain untouched.
+  // The procedural shop material family. All geometry is native and baked; shared
+  // room-kit/cabin painters and the complete walk map remain untouched.
   var STUDY_WOOD = ['shop117_edge', 'shop117_wood_dk', 'shop117_wood', 'shop117_wood_mid', 'shop117_wood_hi', 'shop117_wood_lit'];
   var STUDY_METAL = ['shop117_edge', 'shop117_metal_dk', 'shop117_metal', 'shop117_metal_hi'];
   function materialStudy(c) {
     // Broad boards with a top plane and a recessed join; a few chosen strokes replace
     // the old continuous grain/nail pattern. Lighting is sampled once per board.
-    var x0 = tx(2), y0 = ty(3), w = 6 * T, h = 3 * T;
+    var x0 = T, y0 = ty(1), w = W - 2 * T, h = H - 2 * T;
     A.area(c, x0, y0, w, h, function (x, y) {
       var row = Math.floor((y - y0) / 14), v = (y - y0) % 14;
       var offset = (row % 3) * 23, segment = Math.floor((x - x0 + offset) / 68), u = (x - x0 + offset) % 68;
@@ -106,7 +105,7 @@ G.ui.shopRoom = (function () {
       return tone(STUDY_WOOD, 0.28 + lit * 0.25 + (K.hash(row, segment + 61) - 0.5) * 0.1);
     });
     // A wall bay with wide structural boards, a bevelled beam and three quiet planes.
-    var wx = tx(3) - 2, ww = 4 * T + 4;
+    var wx = T, ww = W - 2 * T;
     A.area(c, wx, 7, ww, TOP + 32 - 7, function (x, y) {
       var u = (x - wx) % 16;
       if (u === 0 || y === TOP + 30) return 'shop117_edge';
@@ -122,6 +121,46 @@ G.ui.shopRoom = (function () {
     box(c, 'shop117_edge', wx, TOP + 1, ww, 5);
     box(c, 'shop117_wood_hi', wx + 1, TOP + 1, ww - 2, 2);
     box(c, 'shop117_wood', wx + 1, TOP + 3, ww - 2, 2);
+  }
+  function roomEdges(c) {
+    for (var side = 0; side < 2; side++) {
+      var x0 = side ? W - T : 0;
+      A.area(c, x0, 0, T, RH, function (x, y) {
+        var edge = side ? x - x0 : T - 1 - x;
+        if ((x === 0 || x === W - 1) && (y < 3 || y > RH - 4)) return '';
+        if (edge === 0) return 'shop117_edge';
+        if (edge === 1) return 'shop117_wood_mid';
+        if (edge < 4) return 'shop117_wood_dk';
+        return y % 14 === 13 ? 'shop117_edge' : 'wood_deep';
+      });
+    }
+    var y0 = ty(7);
+    A.area(c, T, y0, W - T * 2, T, function (x, y) {
+      if (x >= tx(DOOR[0]) && x < tx(DOOR[0] + 1)) return y < y0 + 3 ? 'shop117_wood_dk' : 'night_deep';
+      var u = (x - T) % 16;
+      if (y === y0) return 'shop117_wood_hi';
+      if (y < y0 + 3) return 'shop117_wood';
+      if (u < 2 || y > RH - 3) return 'shop117_edge';
+      return u === 2 ? 'shop117_wood' : 'shop117_wood_dk';
+    });
+    box(c, 'shop117_metal_dk', tx(DOOR[0]) + 3, y0 + 12, T - 6, 2);
+  }
+  function wovenRug(c) {
+    var x0 = 4 * T + 2, y0 = ty(4) + 4, w = 3 * T - 4, h = 2 * T - 10;
+    box(c, 'shop117_edge', x0, y0 + 2, w + 1, h + 1);
+    A.area(c, x0, y0, w, h, function (x, y) {
+      var u = x - x0, v = y - y0, e = Math.min(u, w - 1 - u, v, h - 1 - v);
+      if (e < 2) return 'shop117_rug_dk';
+      if (e < 4) return 'shop117_ochre';
+      if (e < 7) return 'shop117_rug';
+      if (e < 8) return 'shop117_rug_hi';
+      var diamond = Math.abs(u - w / 2) * 0.55 + Math.abs(v - h / 2);
+      if (diamond < 6) return 'shop117_ochre';
+      if (diamond < 8) return 'shop117_rug_dk';
+      if (diamond > 18 && diamond < 20) return 'shop117_rug_hi';
+      return 'shop117_rug';
+    });
+    for (var y = 2; y < h; y += 3) { box(c, 'shop117_cloth', x0 - 3, y0 + y, 3, 1); box(c, 'shop117_cloth', x0 + w, y0 + y, 3, 1); }
   }
   function studyLamp() {
     var g = X.grid(22, 54);
@@ -182,13 +221,11 @@ G.ui.shopRoom = (function () {
 
   function paintBase(c) {
     A.reset();
-    K.panelWall(c, T, W - 2 * T, TOP, light);
-    K.floor(c, T, ty(1), W - 2 * T, H - 2 * T, light, { wear: wear });
     materialStudy(c);
-    K.wallTops(c, W, RH, TOP, T, DOOR[0]);
+    roomEdges(c);
     // The rug and the mat.
-    K.rug(c, 4 * T + 2, ty(4) + 4, 3 * T - 4, 2 * T - 10, 'bands');
-    A.area(c, tx(6) + 3, ty(6) + 6, T - 6, T - 9, function (x, y) { return (y - ty(6)) % 3 === 0 ? 'reed' : ((x + y) % 4 ? 'rust' : 'rust_dark'); });
+    wovenRug(c);
+    A.area(c, tx(6) + 3, ty(6) + 6, T - 6, T - 9, function (x, y) { return (y - ty(6)) % 4 === 0 ? 'shop117_cloth_dk' : 'shop117_paint_dk'; });
     box(c, 'outline', tx(6) + 3, ty(6) + T - 3, T - 6, 1);
     // Cobwebs in the top corners; a loose board.
     for (var w = 0; w < 2; w++) { var cx = w ? W - T - 1 : T, dir = w ? -1 : 1; for (var k = 0; k < 4; k++) A.line(c, 'fog_mid', cx, 7, cx + dir * (22 - k * 5), 7 + k * 5); for (k = 1; k < 3; k++) A.line(c, 'fog_dark', cx + dir * k * 7, 7, cx, 7 + k * 7); }

@@ -506,7 +506,12 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 115 Cozy dusk bait shop | Reverted | User request, 2026-11-13 | Initial colour pass withdrawn; return to the original procedural shop before planning a complete redraw |
 | 116 Approved miniature shop in game | Reverted | User request, 2026-11-13 | Remove imported images/atlases, image-backed renderer, preloads and changed room geometry; restore procedural-only drawing |
 | 117 Procedural shop material/shape study | Done | `Phase 117: Procedural shop style study` | User authorized beginning 2026-11-13. Native-code sample of wall/floor bay, faceted linen lamp, enamel counter corner and broad-leaf monstera. Geometry and old palette shifts unchanged. Captures at 12:00, 19:12 and 23:30; sample presented for visual feedback. 8.3 #585 |
-| 118–123 Procedural shop look | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Room, furniture/props, characters, lighting, ambient mystery and final integration. Next: phase 118 after the material/shape study |
+| 118 Room architecture and woven floor | Done | `Phase 118: Room architecture and woven floor` | The wall/floor material study now covers the entire original room. Native timber beams, broad boards, recessed joins, cut-away wall tops, a thick woven terracotta/ochre rug and door mat replace the striped shell. Map, OX/OY/TOP and all 59 blocked tiles are unchanged; cabin painters are untouched. |
+| 119 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
+| 120 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
+| 121 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
+| 122 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
+| 123 Procedural shop | Planned | [PLAN_SHOP_LOOK.md](PLAN_SHOP_LOOK.md) | Pending |
 
 ### 8.2 Architecture as built
 
@@ -1263,6 +1268,8 @@ These are interpretations and additions made while building, where the spec abov
 
 585. **Procedural shop style study (117):** `shop_room.js` paints a deliberately partial wall/floor bay, a new 22x54 linen floor lamp on the original foot anchor, the counter's bevelled corner/recessed enamel panel, and a 28x40 monstera with four faceted leaf masses and a tapered clay pot. Palette keys `shop117_` are matte ash timber, green painted metal, linen, foliage, clay and cool shadows; `shift` excludes them. No image loading or global recolour. Everything is drawn through `paint`/`pix` and baked; cabin helpers, 12x8 map, TOP/OX/OY, 59 blockers, NPC and object interaction coordinates are unchanged. The remaining room is intentionally original as a visual control until phases 118–123. The floor contrast was reduced after comparing night with the lake. `dbg.roomLife()` and the debug overlay identify the study.
 
+586. **Room architecture and woven floor (118):** The wall/floor material study now covers the entire original room. Native timber beams, broad boards, recessed joins, cut-away wall tops, a thick woven terracotta/ochre rug and door mat replace the striped shell. Map, OX/OY/TOP and all 59 blocked tiles are unchanged; cabin painters are untouched.
+
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1569,9 +1576,13 @@ Shop rollback checks (2026-11-13): runtime source matches pre-shop-change commit
 
 Phase 117 checks: `--validate` OK (0 warnings); `--replay 12345` hash `2848910695 / 2848910695`, 18 catches, 21 casts, PASS; `--saves` PASS. Headless Chromium: identical room/map/object definitions, 59 blocked cells, same RRUUU path to Rusty, a 12-coin purchase adds two bobbers. All 1519 existing palette colours and +/- shift choices unchanged. Repeated warmed drawing creates zero canvases, leaves the save and canvas state unchanged, and takes about 0.8–1.0 ms per frame on this executor; no page errors or art requests. Controlled shop before/after captures at 12:00, 19:12 and 23:30, lake reference captures at the same hours, and an enlarged four-element comparison inspected.
 
+Phase 118 checks: validate OK (0 warnings); controlled renderer captures at 12:00, 19:12 and 23:30 inspected; no page errors.
+
 ### 8.6 Next task
 
-The user authorized starting the procedural shop plan on 2026-11-13. Phase 117 is implemented and its real-game sample/comparison has been presented. Next is phase 118 after visual review; phases 118–123 are not implemented. The shop rollback remains part of the same pending PR. Phase 114 (the Great Northern sign at the Pines) is done, on the user's request of 2026-11-12; its look waits for the user's check (8.4 #75). Phase 113 (the bladebait as quick as a worm, held or pumped; the dropshot pumped in too) is done, on the user's request of 2026-11-11. Phase 112 (fish detail and realism) is done on the user's follow-up of 2026-11-11; visual feedback is pending (8.4 #74). Phase 111 (fish illustration style) is done on the user's request of 2026-11-11; visual feedback is pending (8.4 #74). Phase 110 (every hook comes in at a held reel: the bladebaits, jigheads and dropshots were 20-43 s from the bed) is done, on the user's request of 2026-11-11. Phase 109 (the Heavy Bladebait that would not come in) is done, on the user's request of 2026-11-08. Phase 108 (the journal tip that stayed up; finer cabins, piers and lamps) is done, on the user's request of 2026-11-08. Nothing is planned next: waiting on the user (8.4 #73). Before that: PLAN_FISHING.md is done (Phases 101-107, the user's OK of 2026-11-08); one push and one PR for all of it. Nothing is planned next: waiting on the user. **To check with the user:** PLAN_FISHING.md's look and feel (8.4 #72), the slower mid-game since Phase 105 (8.4 #71: a sea at 282 min, in the band), and as before Fogbound's, the Pines' and Blackwater's looks (#68-#70), the pacing bands and early rewards, #45 and #46, #54 and #55, #34 and #53.
+The user authorized all remaining shop phases on 2026-11-13. Phase 118 is done. Continue with phase 119; no further phase-start confirmation is needed.
+
+Phase 114 (the Great Northern sign at the Pines) is done, on the user's request of 2026-11-12; its look waits for the user's check (8.4 #75). Phase 113 (the bladebait as quick as a worm, held or pumped; the dropshot pumped in too) is done, on the user's request of 2026-11-11. Phase 112 (fish detail and realism) is done on the user's follow-up of 2026-11-11; visual feedback is pending (8.4 #74). Phase 111 (fish illustration style) is done on the user's request of 2026-11-11; visual feedback is pending (8.4 #74). Phase 110 (every hook comes in at a held reel: the bladebaits, jigheads and dropshots were 20-43 s from the bed) is done, on the user's request of 2026-11-11. Phase 109 (the Heavy Bladebait that would not come in) is done, on the user's request of 2026-11-08. Phase 108 (the journal tip that stayed up; finer cabins, piers and lamps) is done, on the user's request of 2026-11-08. Nothing is planned next: waiting on the user (8.4 #73). Before that: PLAN_FISHING.md is done (Phases 101-107, the user's OK of 2026-11-08); one push and one PR for all of it. Nothing is planned next: waiting on the user. **To check with the user:** PLAN_FISHING.md's look and feel (8.4 #72), the slower mid-game since Phase 105 (8.4 #71: a sea at 282 min, in the band), and as before Fogbound's, the Pines' and Blackwater's looks (#68-#70), the pacing bands and early rewards, #45 and #46, #54 and #55, #34 and #53.
 
 ---
 
