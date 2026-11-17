@@ -81,6 +81,10 @@ G.ui.card = (function () {
 
   function isOpen() { return cur !== null; }
   // Called every step while the card shows.
+  // Phase 138 (PLAN_UX.md): this sitting's tape: fish landed, coins they brought in (the bonus
+  // too), the longest. Never saved: a reload starts a new tape.
+  var TAPE = { fish: 0, coins: 0, best: 0, ver: 0 };
+
   // Phase 135: the goal this catch counts toward, read once the catch is in the journal.
   var goal = { on: false, text: '', a: 0, b: 1 }, goalAt = -1;
   function tick(dt) {
@@ -119,7 +123,10 @@ G.ui.card = (function () {
   function commit(choice, save) {
     if (cur.pondK >= 0 && choice === 'sell') choice = 'release';                     // Phase 85: never sold
     if (cur.trash !== undefined) { G.sim.pond.bin(save.pond, cur.trash, G.data); cur = null; G.core.save.autosave('catch'); return; } // Phase 84: binned
+    var c0 = save.coins;
     G.sim.economy.recordCatch(save, cur, choice);                                  // Phase 94.2: with the first-catch bonus
+    TAPE.fish++; TAPE.coins += Math.max(0, save.coins - c0); TAPE.ver++;             // Phase 138: this sitting's tape
+    if (cur.len > TAPE.best) TAPE.best = cur.len;
     G.ui.badge.hide();
     if (cur.pondK >= 0) G.sim.pond.caughtBack(save.pond, cur.pondK, choice === 'keep', G.data); // Phase 85: back in the pond (shy a while), or out of it
     cur = null;
@@ -193,5 +200,6 @@ G.ui.card = (function () {
   }
 
   return { build: build, buildTrash: buildTrash, open: open, isOpen: isOpen, info: info, update: update, tick: tick, shownBy: shownBy, commit: commit, draw: draw, tap: tap,
+    tape: function () { return TAPE; }, // Phase 138
     rect: function () { lay(); return RECT; }, keys: function () { return { sell: SELL, keep: KEEP, release: FREE }; }, choice: function () { return cur && cur.trash !== undefined ? 'bin' : CHOICES[sel]; } };
 })();
