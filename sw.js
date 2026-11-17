@@ -80,6 +80,7 @@ var FILES = [
   'js/ui/setup.js',
   'js/ui/look.js',
   'js/ui/menu.js',
+  'js/ui/title.js',
   'js/ui/journal.js',
   'js/gfx/people_art.js',
   'js/gfx/shop_art.js',

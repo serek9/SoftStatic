@@ -36,7 +36,7 @@ G.ui.menu = (function () {
 
   // arg: passed to the overlay's open() (Phase 47: the pause list's row; the picker's caller).
   function open(name, arg) {
-    var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, look: G.ui.look, controls: G.ui.controls, milestones: G.ui.milestones }[name] || null; // milestones: Phase 94.1
+    var o = { pause: pause, journal: G.ui.journal, map: G.ui.map, look: G.ui.look, controls: G.ui.controls, milestones: G.ui.milestones, title: G.ui.title }[name] || null; // milestones: Phase 94.1; title: Phase 130
     if (!o) return false;
     cur = o; curName = name;
     if (G.ui.tips) G.ui.tips.opened(name); // the journal / chart tip is done when the page opens (the scene does not step under a menu)
