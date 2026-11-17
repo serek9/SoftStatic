@@ -147,28 +147,67 @@ G.ui.room = (function () {
     for (var i = 0; i < A.keys.length; i++) { var r = rampOf(kind, A.roles[i], L); out.push(r ? X.tone(r, A.levels[i]) : A.keys[i]); }
     return out;
   }
+  function lumKey(k) { var h = parseInt(P_[k].slice(1), 16); return 0.3 * (h >> 16) + 0.59 * ((h >> 8) & 255) + 0.11 * (h & 255); }
+  var P_ = S.PALETTE;
+  // Phase 125: a walk that reads as a walk. The fisher: from the front or behind, the stride
+  // lifts one leg two pixels and his body sinks a pixel; from the side, his legs part, the near
+  // one forward and the far one back, and his body sinks. The dog, who sits in every drawing:
+  // from the side it is a standing golden built in the drawing's own keys (its body, four legs
+  // stepping in pairs, its plume of a tail, the drawing's head and ears), trotting; from the
+  // front or behind it lifts its paws in turn and bobs.
+  function stamp(g, rows, keys, x0, y0, fn) {
+    for (var y = 0; y < rows.length; y++) for (var x = 0; x < rows[y].length; x++) {
+      var ch = rows[y][x]; if (ch === '.') continue;
+      var d = fn ? fn(x, y) : null;
+      if (d === false) continue;
+      g.set(keys[ART_CH.indexOf(ch)], x0 + x + (d ? d[0] : 0), y0 + y + (d ? d[1] : 0));
+    }
+  }
+  function dogTrot(keys, rows, fr) {
+    var order = keys.slice().sort(function (a, b) { return lumKey(a) - lumKey(b); }), OUT = order[0];
+    var C = order.slice(3), FAR = order.slice(2, 7), st = fr === 1 ? 1 : (fr === 2 ? -1 : 0), g = X.grid(44, 34);
+    g.cap(9, 17, 3, 9 - st, 2.4, C, 0.2); g.cap(3, 9 - st, 2, 6 - st, 1.6, C, 0.3);                // the plume of a tail
+    g.cap(13, 22, 13 - st * 3, 31, 1.7, FAR, 0); g.cap(27, 22, 27 + st * 3, 31, 1.7, FAR, 0);        // the far legs
+    g.ell(13 - st * 3, 31.8, 2, 1.1, FAR, {}); g.ell(27 + st * 3, 31.8, 2, 1.1, FAR, {});
+    g.ell(19, 20, 12, 6.2, C, { bias: 0.2 });                                                        // the body
+    g.ell(28, 19.5, 5, 6, C, { bias: 0.3 });                                                         // the chest
+    g.cap(10, 22, 10 + st * 3, 31, 2, C, 0.1); g.cap(30, 22, 30 - st * 3, 31, 2, C, 0.15);           // the near legs
+    g.ell(10.5 + st * 3, 31.8, 2.4, 1.3, C, { bias: 0.2 }); g.ell(30.5 - st * 3, 31.8, 2.4, 1.3, C, { bias: 0.2 });
+    g.cap(29, 17, 32, 11, 4, C, 0.25);                                                               // the neck
+    stamp(g, rows.slice(0, 17), keys, 4, -1 + (st ? 0 : 0), function (x) { return x < 14 ? false : null; });   // the drawing's head and ears
+    g.outline(OUT);
+    return g.canvas();
+  }
   function sprite(kind, dir, fr, lk) {
     var L = look(kind, lk), key = kind + (L ? L.id : '') + dir + fr;
     if (art[key]) return art[key];
-    var A = G.gfx.peopleArt[kind], rows = A[dir], keys = artKeys(kind, L), h = rows.length, w = rows[0].length, x, y, side = dir === 'left' || dir === 'right';
-    var g = X.grid(w, h + 1), legTop = Math.round(h * 0.86), bob = kind === 'dog' && (fr === 1 || fr === 2) ? 1 : 0;
-    for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
-      var ch = rows[y][x]; if (ch === '.') continue;
-      var dy = 1 - bob;
-      if (kind === 'fisher' && y >= legTop && (fr === 1 || fr === 2)) {                // a stride: one boot lifted
-        var near = side ? (x < w / 2) === (fr === 1) : (x < w / 2) === (fr === 1);
-        if (near) dy -= 1;
-      }
-      g.set(keys[ART_CH.indexOf(ch)], x, y + dy);
+    var A = G.gfx.peopleArt[kind], rows = A[dir], keys = artKeys(kind, L), h = rows.length, w = rows[0].length, side = dir === 'left' || dir === 'right';
+    var moving = fr === 1 || fr === 2, g;
+    if (kind === 'dog' && side && moving) {
+      if (dir === 'left') return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, lk), 'x'));
+      return (art[key] = dogTrot(keys, A.right, fr));
     }
+    g = X.grid(w + 4, h + 2);
+    var legTop = Math.round(h * (kind === 'dog' ? 0.84 : 0.8)), cx = w / 2, sgn = fr === 1 ? 1 : -1;
+    if (kind === 'fisher' && moving) {
+      // The legs first, then the body over them, sunk a pixel.
+      stamp(g, rows, keys, 2, 1, function (x, y) {
+        if (y < legTop) return false;
+        if (side) return [x < cx ? -2 : 2, 0];                                        // the legs part, one forward and one back
+        return [0, ((x < cx) === (fr === 1)) ? -2 : 0];
+      });
+      stamp(g, rows, keys, 2, 1, function (x, y) { return y >= legTop ? false : [0, 1]; });
+    } else if (kind === 'dog' && moving) {
+      stamp(g, rows, keys, 2, 0, function (x, y) { return y >= legTop && ((x < cx) === (fr === 1)) ? [0, -1] : [0, 0]; });
+    } else stamp(g, rows, keys, 2, 1, null);
     if (kind === 'rusty' && dir === 'down' && fr === 2) {                                // his mug at his mouth, his hand round it
-      var mx = (w >> 1) + 2, my = 25;
-      my = 17; g.rect('outline', mx - 1, my - 1, 9, 9); g.slab(mx, my, 7, 7, ['paper_dark', 'paper', 'bone', 'cream']); g.rect('cedar_dark', mx + 1, my + 1, 5, 1); g.rect('outline', mx + 7, my + 2, 2, 4);
+      var mx = (w >> 1) + 4, my = 18;
+      g.rect('outline', mx - 1, my - 1, 9, 9); g.slab(mx, my, 7, 7, ['paper_dark', 'paper', 'bone', 'cream']); g.rect('cedar_dark', mx + 1, my + 1, 5, 1); g.rect('outline', mx + 7, my + 2, 2, 4);
       g.ell(mx + 7, my + 7, 2.2, 2, ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi'], { bias: 0.2 });
     }
     if (kind === 'rusty' && dir === 'down' && fr === 3) {                                // the paper held up
-      g.rect('outline', 4, 30, w - 8, 12); g.slab(5, 31, w - 10, 10, ['paper_dark', 'paper_dark', 'paper', 'bone']);
-      for (y = 33; y < 40; y += 2) { g.rect('stone_hi', 7, y, (w >> 1) - 9, 1); g.rect('stone_hi', (w >> 1) + 1, y, (w >> 1) - 9, 1); }
+      g.rect('outline', 6, 31, w - 8, 12); g.slab(7, 32, w - 10, 10, ['paper_dark', 'paper_dark', 'paper', 'bone']);
+      for (var y = 34; y < 41; y += 2) { g.rect('stone_hi', 9, y, (w >> 1) - 9, 1); g.rect('stone_hi', (w >> 1) + 3, y, (w >> 1) - 9, 1); }
     }
     return (art[key] = g.canvas());
   }
@@ -176,7 +215,7 @@ G.ui.room = (function () {
   var anc = [0, 0];
   function anchor(kind, dir, lk) {
     var rows = G.gfx.peopleArt[kind][dir];
-    anc[0] = rows[0].length >> 1; anc[1] = rows.length - 1;                            // Phase 124: the feet at the drawing's foot
+    anc[0] = (rows[0].length >> 1) + 2; anc[1] = rows.length + (kind === 'dog' ? -1 : 0);    // the feet at the drawing's foot (a 2 px margin round it)
     return anc;
   }
   // Paints a look's fisher or dog in every facing and frame. Returns the ms it took.
@@ -196,6 +235,7 @@ G.ui.room = (function () {
   // Draws a walking figure with its feet at (x, y), its shadow under it.
   function drawFigure(ctx, kind, dir, fr, x, y, lk) {
     var img = sprite(kind, dir, fr, lk), a = anchor(kind, dir, lk), side = dir === 'left' || dir === 'right';
+    if (kind === 'dog' && side && (fr === 1 || fr === 2)) { a[0] = 22; a[1] = 32; }       // the trotting dog stands 44×34
     shadow(ctx, x, y, kind === 'dog' ? (side ? 32 : 26) : 24);
     ctx.drawImage(img, Math.round(x - a[0]), Math.round(y - a[1]));
   }
