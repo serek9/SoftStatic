@@ -2,7 +2,7 @@
 
 How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-30, after Phase 50 (fitting it in, the last of the tackle, company and living-lake Phases 41–50 of [PLAN_TACKLE.md](PLAN_TACKLE.md)), on the branch `claude/clever-brown-4b34ko`.
 
-## Latest session (2026-11-17): the rooms' look, Phases 115-126
+## Latest session (2026-11-17): the rooms' look, Phases 115-127
 
 **Read this first if you are continuing the bait shop, the cabin or the rooms' people.**
 
@@ -11,6 +11,7 @@ How to pick the project up on another computer. **PLAN.md §8 Project Status is 
 - **The people** (`js/ui/room.js` + `js/gfx/people_art.js`): the fisher, the golden and Rusty are the owner's sheet (`tools/art/ref/people_sheet.webp`) sampled to size with their own palettes (`sprites.js` `pf*`, `pd*`, `pr*`). The other three looks and three breeds are the sheet's body painted over in code with their own hats, beards, coats, ears, coats and tails (Phase 126). Walk: the fisher strides (Phase 125); the dog trots standing from every side and sits when it stops.
 - **The shop** (`js/ui/shop_room.js` + `js/gfx/shop_art.js`): the owner's picture (`tools/art/ref/shop.png`) sampled to 384×340 with 64 keys (`ps*`), the people painted out; the counter, floor lamp, fridge and monstera are cut out to stand in order with the walkers; live over it: Rusty, the night mask and glows, and `alive()` (windows by the hour, clock, lava lamp, tank, fridge, radio, cat, bulbs, a light dip every 41 s, steam, dust, the figure at the window). The map, objects and talk ids are unchanged since Phase 117.
 - **The cabin** (`js/ui/cabin.js`): still its own procedural room at full detail; boards recoloured to cedar once patched (Phase 123); the new people walk in it. The owner may want it remade like the shop: ask for a reference picture and use `tools/art/` the same way.
+- **Phase 127:** the other three looks and three breeds are now the owner's second sheet (`tools/art/ref/people_sheet2.webp`), each its own drawing with its own palette (`pk*`, `py*`, `ph*`, `pu*`, `pb*`, `pc*`); the Phase 126 painted-over hats and breeds are gone. Made with `tools/art/extract2.py`, `km2.py`, `export2.py`.
 - **Regenerating art:** `tools/art/README.md` (Python 3 + numpy + Pillow; not part of the game). Data and palette must be replaced together.
 - **Checks:** `node tools/balance.js --validate`, `--replay 12345` (hash 2848910695), `--saves`; in a browser `?debug`, `dbg.ui('shop')`, `dbg.shopWalk('RRRUU')` (stops at (9, 4) facing `rusty`), `dbg.roomLife()`. Screenshots of the room are the real test of a look change: compare against the reference side by side.
 - **Open points (PLAN.md §8.4 #76-#78):** the owner's verdict on the rooms; the shop no longer shows the rods for sale leaving the rack, nor the minnows and crickets left; Rusty's paper and mug are drawn over his front view only.
