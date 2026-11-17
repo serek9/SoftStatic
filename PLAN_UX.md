@@ -93,3 +93,25 @@ Done when: travel takes as long as before (`dbg.travel`), screenshots mid-travel
 UI only, counted from the catches the card shows; nothing saved.
 
 Done when: the counts match a scripted sitting, and the page opens on the goal.
+
+---
+
+# Round 3, Phases 139–140
+
+## 6. Audit (2026-11-17, after round 2; tackle, bite, fight, badge, the shop and Rusty, the cabin, controls, the picker; PC and phone, 0 page errors)
+
+**Better since round 2:** one place for passing messages; travel reads as a tape; the MENU shows the sitting and the next goal.
+
+**Problems, by weight:**
+1. **The menus look like a VCR but sound like generic UI.** Opening a panel and travelling are silent apart from the row clicks.
+2. **Some players will want the whole picture to read as tape** (the user's 90s VHS wish), but the game's look must stay as it is by default.
+3. **The SETTINGS page's key hints run past its edge** on a PC (three hints in a 176 px panel).
+4. (Looked at, left as is) The tackle panel is mostly empty on a fresh save, but sizing it to its content saves only two rows, because the hook's icon needs the room.
+
+## 7. The phases
+
+### Phase 139: Tape sounds
+A cassette deck's key as a panel opens (a low click, a small thunk, a breath of hiss), and the tape winding on during travel. Quiet, on the effects bus, at or under the existing UI clicks.
+
+### Phase 140: The Tape look
+SETTINGS → SCREEN → **Tape look**, off by default: faint scanlines, a soft vignette and one slow tracking line over the picture, baked once and drawn in one call, only ever darker. It also fixes the SETTINGS page's hints.

@@ -80,7 +80,7 @@ G.ui.menu = (function () {
   // chosen); SAVE TAPE holds export and import. Back (Esc) on a page returns to MENU.
   var PAGES = {
     menu: { title: 'MENU', rows: ['Resume', 'Journal', 'Chart', 'Milestones', 'Fisher & dog', 'Settings', 'Controls', 'Save tape'] },
-    settings: { title: 'SETTINGS', rows: ['#SOUND', 'Volume', 'Music', 'World', 'Effects', 'Sound', 'Dog barks', '#PLAY', 'Reel', 'Tips', 'Key hints', '#SCREEN', 'Text size', 'Reduce flashes', 'Reduce motion', 'Full screen', 'Vibration'] },
+    settings: { title: 'SETTINGS', rows: ['#SOUND', 'Volume', 'Music', 'World', 'Effects', 'Sound', 'Dog barks', '#PLAY', 'Reel', 'Tips', 'Key hints', '#SCREEN', 'Text size', 'Tape look', 'Reduce flashes', 'Reduce motion', 'Full screen', 'Vibration'] },
     save: { title: 'SAVE TAPE', rows: ['Export save', 'Import save'] }
   };
   var PAGE_OF = { Settings: 'settings', 'Save tape': 'save' };
@@ -227,6 +227,7 @@ G.ui.menu = (function () {
       var lr = axis('left', 'right');
       if (SLIDER[ITEMS[sel]] && lr) volume(lr, SLIDER[ITEMS[sel]]);
       if (ITEMS[sel] === 'Reduce flashes' && lr) flip('reduceFlashes');
+      if (ITEMS[sel] === 'Tape look' && lr) flip('tapeLook'); // Phase 140
       if (ITEMS[sel] === 'Reduce motion' && lr) flip('reduceMotion');
       if (ITEMS[sel] === 'Reel' && lr) reelMode();
       if (ITEMS[sel] === 'Sound' && lr) { st.mute = !st.mute; dirty = true; }
@@ -251,6 +252,7 @@ G.ui.menu = (function () {
         case 'Key hints': hints(); break; // Phase 129
         case 'Vibration': vibration(); break; // Phase 91.3
         case 'Reduce flashes': flip('reduceFlashes'); break; // Phase 92.2
+        case 'Tape look': flip('tapeLook'); break; // Phase 140
         case 'Reduce motion': flip('reduceMotion'); break;
         case 'Reel': reelMode(); break;
         case 'Controls': pause.close(); open('controls'); return true; // Phase 88.5
@@ -317,6 +319,7 @@ G.ui.menu = (function () {
         else if (ITEMS[i] === 'Text size') F.drawText(ctx, st.textSize === 'large' ? 'large' : 'normal', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Tips') F.drawText(ctx, st.tips === false ? 'off' : 'on', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Key hints') F.drawText(ctx, st.hints ? 'always' : 'first time', X + VAL_X, y, key);
+        else if (ITEMS[i] === 'Tape look') F.drawText(ctx, st.tapeLook ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Reduce flashes') F.drawText(ctx, st.reduceFlashes ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Reduce motion') F.drawText(ctx, st.reduceMotion ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Reel') F.drawText(ctx, st.reel === 'toggle' ? 'tap on/off' : 'hold', X + VAL_X, y, key);
@@ -332,7 +335,7 @@ G.ui.menu = (function () {
       }
       x = U.left(X);
       if (page !== 'menu') x += U.hint(ctx, 'ESC', 'back', x, Y + PRECT[3] - U.PAD - U.KEY_H);
-      x += U.hint(ctx, 'W/S', 'choose', x, Y + PRECT[3] - U.PAD - U.KEY_H);
+      if (page !== 'settings') x += U.hint(ctx, 'W/S', 'choose', x, Y + PRECT[3] - U.PAD - U.KEY_H); // three hints do not fit the panel
       if (page === 'settings') U.hint(ctx, 'A/D', 'change', x, Y + PRECT[3] - U.PAD - U.KEY_H);
       ctx.globalAlpha = 1;
     }

@@ -142,7 +142,7 @@ G.ui.panel = (function () {
   // runs down its body for ROLL s (kick() marks the moment; the overlays call it on open).
   // None under Reduce motion. Not a flash: the band is faint and moves.
   var ROLL = 0.18;
-  function kick() { L.kickT = L.now; }
+  function kick() { L.kickT = L.now; if (G.audio && G.audio.engine) G.audio.engine.play('deck'); } // Phase 139: with the deck's key
   function track(ctx, x, y, w, h) {
     var st = G.state && G.state.save && G.state.save.settings, u = (L.now - L.kickT) / ROLL;
     if (u < 0 || u >= 1 || (st && st.reduceMotion)) return;
@@ -153,6 +153,33 @@ G.ui.panel = (function () {
     ctx.fillRect(x, by + 1, w, 2);
     ctx.globalAlpha = a;
   }
+  // Phase 140 (PLAN_UX.md): the Tape look, a setting (off by default): the whole picture as a tape
+  // played back, faint scanlines and a soft vignette baked once into one layer, and one pale
+  // tracking line drifting slowly down. One drawImage a frame; drawn over the scene only (the
+  // panels have their own scanlines). Never brighter: ink over the picture, the line at 0.05.
+  var tapeCv = null;
+  function bakeTape() {
+    return G.gfx.bake.layer(640, 360, function (c) {
+      c.fillStyle = P.ink;
+      c.globalAlpha = 0.14; for (var y = 1; y < 360; y += 2) c.fillRect(0, y, 640, 1);
+      for (var k = 0; k < 14; k++) {                                                 // the vignette: nested frames, darker to the edge
+        c.globalAlpha = 0.035 * (14 - k) / 14 + 0.01;
+        var m = k * 3; c.fillRect(m, m, 640 - 2 * m, 3); c.fillRect(m, 360 - m - 3, 640 - 2 * m, 3); c.fillRect(m, m + 3, 3, 360 - 2 * m - 6); c.fillRect(640 - m - 3, m + 3, 3, 360 - 2 * m - 6);
+      }
+      c.globalAlpha = 1;
+    });
+  }
+  function screen(ctx) {
+    var st = G.state && G.state.save && G.state.save.settings;
+    if (!st || !st.tapeLook) return;
+    if (!tapeCv) tapeCv = bakeTape();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var sx = ctx.canvas.width / 640, sy = ctx.canvas.height / 360;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tapeCv, 0, 0, ctx.canvas.width, ctx.canvas.height);
+    if (!st.reduceMotion) { var ly = Math.floor((L.now * 14) % 420) - 30; ctx.globalAlpha = 0.05; ctx.fillStyle = P.fog_light; ctx.fillRect(0, ly * sy, ctx.canvas.width, 2 * sy); ctx.globalAlpha = 1; }
+  }
+
   // OSD capitals: the word in bold with its red and teal ghosts a pixel to each side.
   function osd(ctx, text, x, y, key) {
     var a = ctx.globalAlpha;
@@ -245,7 +272,7 @@ G.ui.panel = (function () {
 
   return {
     TAB: TAB, PAD: PAD, ROW: ROW, KEY_H: KEY_H, MARGIN: MARGIN, MAX_W: MAX_W, MAX_H: MAX_H,
-    place: place, frame: frame, osd: osd, play: play, scan: scan, blink: blink, kick: kick, asideX: asideX, top: top, left: left, key: key, keyW: keyW, hint: hint, hintW: hintW, row: row, inside: inside,
+    place: place, frame: frame, osd: osd, play: play, scan: scan, blink: blink, kick: kick, screen: screen, asideX: asideX, top: top, left: left, key: key, keyW: keyW, hint: hint, hintW: hintW, row: row, inside: inside,
     shown: shown, // 8.4 #36: the label a hint shows now ('' when it is left out)
     // Phase 90: the UI layer and the shared pieces of §7
     configure: configure, frameStart: frameStart, begin: begin, ux: ux, uy: uy, gx: gx, gy: gy, fromCss: fromCss, rowH: rowH, btnH: btnH,
