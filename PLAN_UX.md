@@ -146,3 +146,15 @@ A fresh save on an emulated iPhone, played with real touch events on the on-scre
 
 ### Phase 143: How to play first
 The home-screen note waits until the first fish is landed; the first screen on a phone now says **CAST: hold the button, let go to throw**.
+
+---
+
+# Round 6, Phase 144
+
+## 11. Audit (2026-11-17, after round 5): the mid-game
+Four fish caught (420 coins), then the player only watches the screen.
+
+**The finding:** first-time tips show one at a time, in order, and each stays until it is done. The journal tip ("J the journal: where and when each fish lives") stayed through all four catches and beyond, so the tips about Rusty's shop, the tackle panel and the chart never appeared. A player who doesn't open the journal never hears that coins buy gear or new waters.
+
+### Phase 144: Tips take turns
+A tip that is not one of the basics (cast, wait, reel in) steps aside after 25 s on screen, so the next can speak; the basics stay until done. Measured: journal → tackle at 26 s → shop at 52 s.

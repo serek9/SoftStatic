@@ -12,7 +12,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 G.ui = G.ui || {};
 G.ui.tips = (function () {
   var S = G.gfx.sprites, F = S.fine, P = S.PALETTE;
-  var FIGHTS = 3, WORK_S = 3, LATE_S = 9;
+  var FIGHTS = 3, WORK_S = 3, LATE_S = 9, SHOW_MAX = 25, seen = {}; // SHOW_MAX: Phase 144
   // The order they come in. when(run, save): whether it may show now; done(run, save, ev): whether
   // the player has just done it (ev: this step's events). pc / touch: [key cap, words].
   var TIPS = [
@@ -85,6 +85,13 @@ G.ui.tips = (function () {
     // the tip to show: the first not done whose moment it is
     cur = null;
     if (enabled()) for (i = 0; i < TIPS.length; i++) { var t = TIPS[i]; if (!done(t.id) && t.when(run, save)) { cur = t; break; } }
+    // Phase 144 (PLAN_UX.md): a tip that is not one of the basics steps aside after SHOW_MAX s on
+    // screen, done or not, so the next one can speak (a player who never opens the journal still
+    // hears about Rusty's and the chart). The basics stay until they are done.
+    if (cur && BASICS.indexOf(cur.id) < 0 && !menu && !G.ui.card.isOpen() && !G.ui.hud.note()) {
+      seen[cur.id] = (seen[cur.id] || 0) + dt;
+      if (seen[cur.id] > SHOW_MAX) { mark(cur.id); cur = null; }
+    }
     // 88.3 / 89.3: the bite and the fight said in words, for the first FIGHTS fish
     word = '';
     if (enabled() && landed() < FIGHTS) {

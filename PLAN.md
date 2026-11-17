@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-17, after 143 How to play first. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-17, after 144 Tips take turns. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -532,6 +532,7 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 141 The fight says what lands fish | Done | ✓ | In the first fights the word over the rod said EASE (let go) on every run, which throws the hook on a slack line; now it says REEL (keep it tight) and EASE only while the line is really tight. The Controls page says the same. |
 | 142 Stop it at a depth | Done | ✓ | A first-time tip once a fish is caught: tap SPACE (REEL on a phone) to stop the sinking lure at a depth, since depth decides which fish come. |
 | 143 How to play first | Done | ✓ | On a phone, the Add-to-Home-Screen note (91.2) waits until the first fish is landed, so the first line a new player sees is how to cast. |
+| 144 Tips take turns | Done | ✓ | A first-time tip other than the basics steps aside after 25 s on screen, so one left undone (the journal's) no longer hides the tips about the tackle, Rusty's and the chart. |
 ### 8.2 Architecture as built
 
 The files that exist so far. §3 is the target tree; this is what is in it now.
@@ -1256,6 +1257,7 @@ These are interpretations and additions made while building, where the spec abov
 615. **The fight's word (141):** `tips.js` shows EASE from tension 0.6 until it falls under 0.42 (`EASE_ON`, `EASE_OFF`, hysteresis), REEL otherwise, whatever the fish's mode: a scripted new player obeying it landed 2 of 2, while obeying the old run-based word lost 3 of 3 to thrown hooks. The phone's button still reads REEL (it is what the button does).
 616. **The depth tip (142):** `tips.js` 'depth' shows while sinking once a fish is caught (not on the ice) and is done when a press moves the lure from sinking to waiting that step (`last.fsm === 'sinking' && f === 'waiting' && pressed('action')`: the scene has already moved on when the tips step).
 617. **The home-screen note's moment (143):** `tips.homeStep` also waits for `caught(save) >= 1`; it took the cast tip's place on a fresh save's first screen. Checked by a scripted phone session with CDP touch events (title tap, CAST hold, HOOK tap, REEL hold, SELL tap): 2 of 2 landed, the cast tip first.
+618. **Tips take turns (144):** `tips.js` `SHOW_MAX` 25 s: the time a non-basic tip has been the one to show (no overlay, card or HUD note up) is counted in memory (`seen`); past it the tip is marked done in `save.tipsDone` and the next one speaks. The basics (`BASICS`) stay until done.
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1342,7 +1344,7 @@ Run these after any change. A different result means something changed. Recorded
 The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
 
 ### 8.6 Next task
-Phase 143 is done (UX round 5, PLAN_UX.md §10). Next: the round-6 audit.
+Phase 144 is done (UX round 6, PLAN_UX.md §11). Next: the round-7 audit.
 
 ---
 
