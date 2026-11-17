@@ -278,8 +278,6 @@ G.core.debug = (function () {
     },
     // Phase 52: passive mode and time away are gone, and dbg.passive, dbg.away and dbg.tape with them.
     passive: function () { return 'passive mode was removed in Phase 52'; },
-    // dbg.restore() pays for the next cabin stage; returns the level.
-    restore: function () { G.sim.economy.restoreCabin(G.state.save, G.data); G.core.save.autosave('purchase'); return G.state.save.cabinLevel; },
     // dbg.sprite(name) bakes a sprite and returns how many pixels differ from its definition (0 = exact).
     sprite: function (name) { return G.gfx.sprites.verify(name || 'test'); },
     // dbg.fx(kind, n, x, y) emits particles; they show wherever a scene draws fx (the gallery's fx page).

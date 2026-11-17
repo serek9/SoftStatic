@@ -25,7 +25,6 @@ G.data.milestones = [
   { id: 'pond_clean', name: 'The pond cleaned', test: 'pondClean', reward: 100, icon: 'pond' },
   { id: 'pond_full', name: 'The pond full', test: 'pondFull', reward: 150, icon: 'pond' },
   { id: 'pond_back', name: 'A stocked fish caught', test: 'pondCaught', arg: 1, reward: 50, icon: 'pond' },
-  { id: 'cabin_done', name: 'The cabin restored', test: 'cabin', reward: 250, icon: 'cabin' },
   { id: 'every_rod', name: 'Every rod on the rack', test: 'rods', reward: 250, icon: 'rod' }
 ];
 // One a water (not the Back Pond, which holds only what is stocked): every species placed there caught.

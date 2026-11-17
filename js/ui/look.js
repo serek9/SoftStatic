@@ -42,7 +42,7 @@ G.ui.look = (function () {
   }
 
   var lv = -1;
-  function lay() { if (lv === G.ui.panel.ver()) return; lv = G.ui.panel.ver(); G.ui.panel.place(W, H, from === 'cabin' ? 'bl' : 'right', R); }
+  function lay() { if (lv === G.ui.panel.ver()) return; lv = G.ui.panel.ver(); G.ui.panel.place(W, H, from === 'cabin' ? 'br' : 'right', R); }
   function open(src) {
     from = src || ''; row = 0; changed = false; t = 0;
     lv = -1; lay();

@@ -47,7 +47,6 @@ G.sim.milestones = (function () {
     pondClean: function (save, data, m, sess, out) { var p = save.pond, Pd = G.sim.pond; out[1] = Pd.parts(data); out[0] = p ? Math.min(out[1], Pd.done(p, data)) : 0; if (p && Pd.clean(p, data)) out[0] = out[1]; return out; },
     pondFull: function (save, data, m, sess, out) { out[0] = save.pond && save.pond.stock ? save.pond.stock.length : 0; out[1] = G.sim.pond.capOf(data); return out; },
     pondCaught: function (save, data, m, sess, out) { out[0] = save.pond ? save.pond.caught | 0 : 0; out[1] = m.arg; return out; },
-    cabin: function (save, data, m, sess, out) { out[0] = save.cabinLevel | 0; out[1] = data.gear.cabin.length - 1; return out; },
     rods: function (save, data, m, sess, out) { var r = save.gear.rods || []; out[0] = r.length; out[1] = data.gear.rods.length; return out; }
   };
 
