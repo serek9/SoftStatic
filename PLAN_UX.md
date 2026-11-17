@@ -58,4 +58,38 @@ UI only: no new rewards or rules.
 Done when: `--milestones` PASS (unchanged), and `dbg.milestones()` agrees with the card's line.
 
 ## 3. After the round
-Re-audit with the same screenshots, write round 2 here, and continue.
+Re-audit with the same screenshots, write the next round here, and continue.
+
+---
+
+# Round 2, Phases 136–138
+
+## 4. Audit (2026-11-17, after round 1; a scripted session: tackle, cast, bite, hook-set, runs, card, milestone, a lost fish, travel, the cabin, controls, milestones; PC and phone, 0 page errors)
+
+**Better since round 1:** every panel shares the VCR look; the MENU fits a phone; the shop has shelves; the card names a goal.
+
+**Problems, by weight:**
+1. **The HUD's messages talk over each other.** Why a fish got away is loose text at the top left (no plate, a different place from every other message), while the journal tip and the milestone line stack at the top centre. A lost fish, a tip and a milestone can all show at once.
+2. **Travelling is a plain black fade.** The rest of the game now reads as a tape; moving between waters is the natural place for the tape to fast-forward.
+3. **No sense of a sitting.** The MENU says what to chase but nothing says what this sitting has brought in, the small "one more cast" pull.
+4. **The milestones page doesn't point at the goal** the MENU and the card name; you scroll a list of 24 to find it.
+
+## 5. The phases
+
+### Phase 136: One voice for the HUD
+Every passing message is an OSD plate at the top centre, in one place and one style: why a fish got away, the tips, the milestone line. One shows at a time; a reason for a lost fish takes the tip's place while it shows, and the milestone line sits under it.
+
+Done when: `dbg` forces each message and only one plate shows at the top centre; screenshots on PC and phone.
+
+### Phase 137: Fast-forward between waters
+The travel fade plays as a VCR fast-forward: `▶▶ FF` in the corner, the tape counter running, a few rolling static lines, then the new water's name as a channel card (`CH 03  BLACKWATER CREEK`) as it fades in. Same length as today, nothing waits on it; a plain fade under Reduce motion.
+
+Done when: travel takes as long as before (`dbg.travel`), screenshots mid-travel, and Reduce motion gives the plain fade.
+
+### Phase 138: This tape
+- The MENU's foot shows this sitting's tape: fish landed, coins taken, the best fish (`TAPE  3 FISH  +87c  BEST 26 cm`).
+- The milestones page opens scrolled to the next goal and marks it with the play mark.
+
+UI only, counted from the catches the card shows; nothing saved.
+
+Done when: the counts match a scripted sitting, and the page opens on the goal.

@@ -78,8 +78,8 @@ G.ui.milestones = (function () {
     var m = G.sim.milestones.byId(G.data, cur);
     if (!m) return;
     if (lineFor !== cur) { lineFor = cur; lineStr = m.name + '  +' + m.reward + 'c'; lineW = F.measure(lineStr) + 13; }
-    var a = Math.min(1, curT * 2, (SHOW_S - curT) * 4), x = pic[0] + ((pic[2] - lineW) >> 1), y = Y + 52;
-    ctx.globalAlpha = 0.75 * a; ctx.fillStyle = P.night_ink; ctx.fillRect(x - 6, y - 4, lineW + 12, 16); ctx.globalAlpha = a;
+    var a = Math.min(1, curT * 2, (SHOW_S - curT) * 4), x = pic[0] + ((pic[2] - lineW) >> 1), y = Y + 58; // Phase 136: under the plate row
+    ctx.globalAlpha = 0.72 * a; ctx.fillStyle = P.night_ink; ctx.fillRect(x - 6, y - 3, lineW + 12, G.ui.panel.KEY_H + 6); ctx.globalAlpha = a;
     mark(ctx, m.icon, x, y - 1);
     F.drawText(ctx, lineStr, x + 13, y, 'signal_amber');
     ctx.globalAlpha = 1;
