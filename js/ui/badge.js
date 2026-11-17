@@ -68,10 +68,11 @@ G.ui.badge = (function () {
   function showing() { return b.on && !b.settled; }
 
   // Drawn by the card on its context over the card (cx, cy: the card's top left, cw its width).
-  function draw(ctx, cx, cy, cw) {
+  // tabX (Phase 133): where the card's top-right tab starts; the settled medallion sits just left of it.
+  function draw(ctx, cx, cy, cw, tabX) {
     if (!b.on) return;
     var st = G.state.save && G.state.save.settings, still = st && st.reduceMotion;
-    if (b.settled) { medal(ctx, b.cls, cx + cw - SMALL - 4, cy + 3, SMALL, b.trophy); return; } // in the card's corner
+    if (b.settled) { medal(ctx, b.cls, (tabX === undefined ? cx + cw : tabX) - SMALL - 3, cy + 1, SMALL, b.trophy); return; } // beside the card's tab
     var u = still ? 1 : Math.min(1, b.t / RISE), e = 1 - (1 - u) * (1 - u), x = cx + ((cw - BW) >> 1), y = cy + 14 + Math.round((1 - e) * 24);
     var U = G.ui.panel;
     ctx.globalAlpha = still ? 1 : Math.min(1, u * 1.5);

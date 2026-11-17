@@ -35,12 +35,14 @@ G.ui.dock = (function () {
     return !!(d && run && run.boat && Math.abs(run.boat.x - d.x) <= d.reach);
   }
 
+  var sayWas = null, sayLines = [];
   function layout() {
+    sayWas = null;
     var U = G.ui.panel, w = 0, i;
     for (i = 0; i < ROWS.length; i++) w = Math.max(w, F.measure(ROWS[i]));
     w = Math.max(w + 2 * U.PAD + 16, U.hintW('SPACE', 'go') + U.hintW('ESC', 'stay') + 2 * U.PAD + 8, 170);
     RH = U.rowH();
-    var h = U.TAB + U.PAD + ROWS.length * RH + 4 + U.ROW + (U.touch() ? U.PAD : U.KEY_H + U.PAD);
+    var h = U.TAB + U.PAD + ROWS.length * RH + 4 + 2 * U.ROW + (U.touch() ? U.PAD : U.KEY_H + U.PAD);
     U.place(w, h, 'top', R); R[1] += 34;
     R[2] = w; R[3] = h;
     lv = U.ver();
@@ -127,7 +129,8 @@ G.ui.dock = (function () {
     var rs = DEST[sel].indexOf('rest:') === 0 ? DEST[sel].slice(5) : '';
     if (rs) { var hh = G.ui.cabin.partStart(rs); waitSay = (rs === G.ui.cabin.partNow(G.state.save.clock) ? 'It is ' + rs + ' now. ' : '') + 'The clock to ' + (hh < 10 ? '0' : '') + hh + ':00.'; }
     var say = msg || (rs ? waitSay : '') || (DEST[sel] === 'clear' ? G.data.pond.streamCost + 'c. You have ' + G.state.save.coins + '.' : '') || (DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours, up the path. The stove is lit.') : SAYS[sel]);
-    F.drawText(ctx, say, U.left(x), U.top(y) + ROWS.length * RH + 4, 'fog_mid');
+    if (say !== sayWas) { sayWas = say; sayLines = F.wrap(say, R[2] - 2 * U.PAD); } // Phase 133: wrapped, not cut off (wrapped only when it changes)
+    for (i = 0; i < sayLines.length && i < 2; i++) F.drawText(ctx, sayLines[i], U.left(x), U.top(y) + ROWS.length * RH + 4 + i * U.ROW, 'fog_mid');
     if (!U.touch()) {
       var hx = U.left(x), hy = y + R[3] - U.PAD - U.KEY_H;
       hx += U.hint(ctx, 'SPACE', 'go', hx, hy);

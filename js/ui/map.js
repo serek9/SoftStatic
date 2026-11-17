@@ -368,6 +368,7 @@ G.ui.map = (function () {
       if (s.id === hereId()) ctx.drawImage(mark('boat'), s.x - 6, s.y - 18);
       var name = names[i], lx = labelX(i), ly = s.y + (s.ry || 8) + 6;
       if (on) { ctx.fillStyle = P.rust_dark; ctx.fillRect(lx - 4, ly - 2, nameW[i] + 8, 13); ctx.fillStyle = P.signal_amber; ctx.fillRect(lx - 4, ly - 2, 1, 13); }
+      else { ctx.globalAlpha = 0.8; ctx.fillStyle = P.night_ink; ctx.fillRect(lx - 3, ly - 2, nameW[i] + 6, 13); ctx.globalAlpha = 1; } // Phase 133: a plate, so a name over a lake's outline stays readable
       F.bold(ctx, name, lx, ly, on ? 'signal_amber' : (open ? 'bone' : 'fog_mid'));
     }
     // Phase 66: the brackets slide to the chosen stop.

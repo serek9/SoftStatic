@@ -10,7 +10,7 @@ G.ui.card = (function () {
   var S = G.gfx.sprites, F = S.fine, U = G.ui.panel;
   // Phase 70: the portrait box grew from 80×40 to 96×56 for the real fish (PLAN_SPECIES.md 3.5),
   // and the card with it, to the small panel's widest (G.ui.panel.MAX_W).
-  var W = 240, H = 98, PW = 96, PH = 56, KEY_Y = 81, HINT = 'A/D  SPACE';
+  var W = 240, H = 98, PW = 96, PH = 56, KEY_Y = 81, HINT = 'choose';
   var RECT = U.place(W, H, 'top', [0, 0, W, H]), SELL = [0, 0, 0, U.KEY_H], KEEP = [0, 0, 0, U.KEY_H], FREE = [0, 0, 0, U.KEY_H];
   var lv = -1, KH = U.KEY_H; // Phase 90: the layout's UI version; the keys' height (taller for a thumb)
   var CHOICES = ['sell', 'keep', 'release'];
@@ -138,8 +138,9 @@ G.ui.card = (function () {
     if (!(cur.pondK >= 0)) U.button(ctx, txt.sell, SELL[0], ky, SELL[2], KH, keyState(0, SELL));
     U.button(ctx, 'KEEP', KEEP[0], ky, KEEP[2], KH, keyState(1, KEEP));
     U.button(ctx, 'RELEASE', FREE[0], ky, FREE[2], KH, keyState(2, FREE));
-    if (keysOn && !U.touch() && !G.core.device.touch()) F.drawText(ctx, HINT, x + W - U.PAD - F.measure(HINT), ty + 1 + 2 * (U.ROW + 1), 'fog_mid'); // 90.4: no keys named on a phone; 90.5: over the keys, at the right
-    G.ui.badge.draw(ctx, x, y, W);                                                   // Phase 94.3: the size badge, over the card
+    if (keysOn && !U.touch() && !G.core.device.touch()) U.hint(ctx, 'SPACE', HINT, x + W - U.PAD - U.hintW('SPACE', HINT) + 8, ty + 2 * (U.ROW + 1)); // 90.4: no keys named on a phone; Phase 133: a key cap, not loose letters
+    var aside = cur.isNew ? 'NEW!' : (cur.isRecord ? 'RECORD' : (cur.trophy ? 'TROPHY' : ''));
+    G.ui.badge.draw(ctx, x, y, W, aside ? x + W - U.PAD - F.measureBold(aside) - 12 : x + W - U.PAD); // Phase 94.3: the size badge; Phase 133: settled beside the NEW tab, not on it
     G.core.view.begin(ctx0, false);
   }
 

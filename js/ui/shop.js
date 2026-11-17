@@ -236,6 +236,16 @@ G.ui.shop = (function () {
     for (var i = 0; i < entries.length; i++) { out.push(entries[i]); if (entries[i][0] === 2) out.push([FIVE_ROW, entries[i][1]]); }
     return out;
   }
+  // Phase 133 (PLAN_UX.md): Rusty's Buy as shelves by kind instead of one list of 64; A/D (or
+  // a tap on the list's foot) turns the shelf. The shelf last looked at is kept for the visit.
+  var TABS = [
+    { n: 'RODS', e: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 12], [0, 13]] },
+    { n: 'REEL & LINE', e: [[0, 6], [0, 7], [0, 8], [0, 9], [0, 10]] },
+    { n: 'LURES', e: SHELF_ITEMS.lures },
+    { n: 'BAIT', e: [[1, 0], [1, 1], [1, 2], [1, 3]] },
+    { n: 'GEAR', e: [[0, 11]] }
+  ], tab = 0;
+  function showTab(d) { tab = (tab + (d || 0) + TABS.length) % TABS.length; showItems(TABS[tab].e, 'rusty'); G.ui.panel.kick(); }
   var stock = { rod: 0, minnows: 7, crickets: 6 }, packs = { minnow: 0, cricket: 0 };
   // Phase 39: the hour and the light for the room (the lake's: Fogbound's drizzle and fog),
   // and the strange: at Fogbound's unease 0.4 or more, now and then and one at a time, the
@@ -500,7 +510,7 @@ G.ui.shop = (function () {
       var ud = M.axis('up', 'down');
       if (ud) choice = (choice + ud + CHOICES.length) % CHOICES.length;
       if (inp.pressed('action')) {
-        if (CHOICES[choice] === 'BUY') showItems(ALL, 'rusty');
+        if (CHOICES[choice] === 'BUY') showTab(0);
         else if (CHOICES[choice] === 'TALK') talk();
         else open = '';
       }
@@ -508,7 +518,7 @@ G.ui.shop = (function () {
       if (inp.pressed('back')) { if (from === 'rusty') open = 'choice'; else open = ''; return; }
       var d = M.axis('up', 'down'), pg = M.axis('left', 'right');
       if (d) { sel = (sel + d + list.length) % list.length; row = list[sel][0]; col = list[sel][1]; describe(); say(''); }
-      if (pg) pageBy(pg);                                                             // Phase 69: A/D or the arrows turn a page
+      if (pg) { if (from === 'rusty') showTab(pg); else pageBy(pg); }                 // Phase 69: A/D turn a page; Phase 133: at Rusty's, the shelf
       if (inp.pressed('action')) act();
     }
   }
@@ -570,7 +580,7 @@ G.ui.shop = (function () {
         }
       }
       if (list.length > rows && gx >= LIST.x && gx < LIST.x + LIST.w && gy >= LIST.y + LIST.h - 16 && gy < LIST.y + LIST.h) { // Phase 69: the foot of the list pages it (left half up, right half down)
-        pageBy(gx < LIST.x + (LIST.w >> 1) ? -1 : 1); return 'none';
+        if (from === 'rusty') showTab(gx < LIST.x + (LIST.w >> 1) ? -1 : 1); else pageBy(gx < LIST.x + (LIST.w >> 1) ? -1 : 1); return 'none';
       }
       var hx = U.left(ITEM.x), hy = ITEM.y + ITEM.h - U.PAD - U.KEY_H;
       if (gy >= hy - 2 && gy < hy + U.KEY_H + 2) {
@@ -622,7 +632,7 @@ G.ui.shop = (function () {
       // chosen item (its name and price, what it does, its state or the last word, the keys).
       var U = G.ui.panel, x = LIST.x, y = LIST.y;
       if (save.coins !== lastCoins) { lastCoins = save.coins; txt.coins = '' + save.coins; }
-      U.frame(ctx, x, y, LIST.w, LIST.h, TITLES[from] || 'BUY', '  ' + txt.coins, 'bone');      // room for the coin
+      U.frame(ctx, x, y, LIST.w, LIST.h, from === 'rusty' ? TABS[tab].n : (TITLES[from] || 'BUY'), '  ' + txt.coins, 'bone'); // room for the coin
       ctx.drawImage(coin, U.asideX(x, LIST.w, '  ' + txt.coins), y + 4);
       var rows = LIST.rows, top = Math.max(0, Math.min(sel - rows + 2, list.length - rows)); // Phase 43: the list scrolls
       if (top < 0) top = 0;
@@ -641,7 +651,14 @@ G.ui.shop = (function () {
       }
       if (top > 0) F.drawText(ctx, '^', x + (LIST.w >> 1) - 8, y + LIST.h - 12, 'fog_mid');           // more above, more below
       if (top + rows < list.length) F.drawText(ctx, 'v', x + (LIST.w >> 1) + 4, y + LIST.h - 14, 'fog_mid');
-      if (list.length > rows) { // Phase 69: where in the list, and the keys that page it
+      if (from === 'rusty') { // Phase 133: the shelves as marks, the one shown lit, and the keys that turn them
+        var mx = x + U.PAD + 2, my = y + LIST.h - 11;
+        F.drawText(ctx, '<', mx, my - 2, 'fog_mid'); mx += 8;
+        for (var tb = 0; tb < TABS.length; tb++) { ctx.fillStyle = P[tb === tab ? 'signal_amber' : 'fog_dark']; ctx.fillRect(mx + tb * 8, my, 5, 5); }
+        F.drawText(ctx, '>', mx + TABS.length * 8 + 1, my - 2, 'fog_mid');
+        if (!G.core.device.touch()) F.drawText(ctx, 'A/D shelf', mx + TABS.length * 8 + 12, my - 2, 'fog_mid');
+      }
+      if (list.length > rows && from !== 'rusty') { // Phase 69: where in the list, and the keys that page it
         if (txt.posSel !== sel || txt.posLen !== list.length) { txt.posSel = sel; txt.posLen = list.length; txt.pos = (sel + 1) + '/' + list.length; }
         F.drawText(ctx, txt.pos, x + LIST.w - U.PAD - F.measure(txt.pos), y + LIST.h - 13, 'fog_mid');
         F.drawText(ctx, 'A/D page', x + U.PAD + 2, y + LIST.h - 13, 'fog_mid');
