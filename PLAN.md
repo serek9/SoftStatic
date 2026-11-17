@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-17, after 131 The VCR menu skin. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-17, after 132 A menu you can read at a glance. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -520,6 +520,7 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 129 Key hints the first time | Done | ✓ | `settings.hints` (false by default; old saves get it from the defaults) and a **Key hints** row in the pause list, `first time` or `always`. |
 | 130 The title on tape | Done | ✓ | `js/ui/title.js` (new), an overlay (`G.ui.menu.open('title')`, so the world waits under it) opened at boot over the lake's first frame, skipped with `?seed` (the test bots), `?gallery` or `?notitle`… |
 | 131 The VCR menu skin | Done | ✓ | `panel.js`: every panel's title is OSD capitals with a play mark and a red/teal chroma split; faint scanlines in the body; a blinking ▶ cursor on the pause and pier lists; panels roll in under a tracking band (PLAN_UX.md). |
+| 132 A menu you can read at a glance | Done | ✓ | The pause list is a VCR MENU in three pages: MENU (Resume, Journal, Chart, Milestones, Fisher & dog, Settings, Controls, Save tape), SETTINGS (under SOUND, PLAY and SCREEN headings) and SAVE TAPE (export, import); a PLAY status line; Esc steps back a page. |
 ### 8.2 Architecture as built
 
 The files that exist so far. §3 is the target tree; this is what is in it now.
@@ -1226,6 +1227,8 @@ These are interpretations and additions made while building, where the spec abov
 597. **The cabin as drawn (128):** `G.gfx.cabinArt` {keys (64 `pv*`), cuts [{id, x, y, w, h, foot, spans}], rows (528 chars × 352)}; a cut's spans give per row the first and one-past-last pixel that is not floor or rug (the floor and…
 598. **The VCR skin (131):** `panel.frame` draws the title through `osd()` (bold, with `neon_red` and `neon_teal` ghosts a pixel to each side at 0.55 of the alpha) after a 4×7 `play()` mark; the title tab is 6 px wider for it. `scan()` darkens every other body row with `ink` at 0.22. `row(…, cursor)` adds a blinking 3×5 mark (steady under Reduce motion) where the text starts 6 px inside the bar.
 599. **The roll-in (131):** `panel.kick()` (called by `menu.open`, the pier, the card and the setup panel) starts a 0.18 s tracking band that runs down the body in `fog_light` at ≤0.35 alpha; none under Reduce motion. Presentation only.
+600. **Menu pages (132):** `menu.js` `PAGES` {menu, settings, save}; '#' rows are headings (never chosen: `stepSel` skips them, taps ignore them). `pause.open(at)` opens the page that holds `at`, so the picker, controls and milestones still return to their row. Back on a sub-page returns to MENU at the row that led there; P or Back on MENU closes. Journal opens the journal; Chart opens the chart when `mapAllowed()`, else says 'Reel in first.'. The export reminder (91.2) opens SAVE TAPE.
+601. **The status line (132):** with no message, the foot reads `▶ PLAY  HH:MM  WATER`, rebuilt only when the minute or the water changes (no allocation per frame).
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1312,7 +1315,7 @@ Run these after any change. A different result means something changed. Recorded
 The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
 
 ### 8.6 Next task
-Phase 131 is done. Next: Phase 132, a menu you can read at a glance (PLAN_UX.md).
+Phase 132 is done. Next: Phase 133, fixes and a shop that finds things (PLAN_UX.md).
 
 ---
 
