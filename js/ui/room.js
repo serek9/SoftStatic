@@ -250,12 +250,6 @@ G.ui.room = (function () {
     else { g.ell(2.8, 5, 1.4, B.ears === 'heavy' ? 3 : 2.4, EAR, { bias: 0.1 }); g.ell(11.2, 5, 1.4, B.ears === 'heavy' ? 3 : 2.4, EAR, { bias: 0.1 }); }
     g.outline('outline');
   }
-  // A grid's painting shown at 2×, each art pixel a 2×2 block, as the cat is.
-  function doubled(w, h, paint) {
-    var g = X.grid(w, h); paint(g);
-    var small = g.canvas();
-    return G.gfx.bake.layer(w * PX, h * PX, function (c) { c.imageSmoothingEnabled = false; c.drawImage(small, 0, 0, w * PX, h * PX); });
-  }
   var RUSTY_L = { id: 'rusty', coat: ['blood', 'crimson', 'rug_hi'], check: 'blood', hat: 'cap', hatKeys: ['olive_dark', 'olive', 'olive_hi'],
     hair: 'hair_lit', beard: ['stone_hi', 'paper', 'bone'], skin: ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi'], trousers: 'denim' };
 
@@ -268,13 +262,30 @@ G.ui.room = (function () {
     var list = kind === 'dog' ? G.data.looks.dogs : G.data.looks.fishers;
     return typeof lk === 'object' && lk ? lk : G.data.lookOf(list, lk || (G.state.save && G.state.save.look ? G.state.save.look[kind] : ''));
   }
-  function sprite(kind, dir, fr, lk) {
+  // Phase 121: the art itself (1×), for a room composed at half size and shown at 2× (the
+  // shop); sprite() is the same art at 2× for a room drawn at full size (the cabin).
+  var small = {};
+  function smallSprite(kind, dir, fr, lk) {
     var L = look(kind, lk), flip = dir === 'left', d = dir === 'left' || dir === 'right' ? 'side' : dir;
     var key = kind + (L ? L.id : '') + d + fr + (flip ? '<' : '');
+    if (small[key]) return small[key];
+    if (flip) return (small[key] = G.gfx.bake.flipped(smallSprite(kind, 'right', fr, L), 'x'));
+    var g = kind === 'dog' ? X.grid(d === 'side' ? 22 : 14, 15) : X.grid(16, 26);
+    if (kind === 'dog') puppy(g, d, fr, L); else trainer(g, d, fr, kind === 'rusty' ? RUSTY_L : L, kind === 'rusty');
+    return (small[key] = g.canvas());
+  }
+  function sprite(kind, dir, fr, lk) {
+    var L = look(kind, lk), key = kind + (L ? L.id : '') + dir + fr;
     if (art[key]) return art[key];
-    if (flip) return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, L), 'x'));
-    if (kind === 'dog') return (art[key] = doubled(d === 'side' ? 22 : 14, 15, function (g) { puppy(g, d, fr, L); }));
-    return (art[key] = doubled(16, 26, function (g) { trainer(g, d, fr, kind === 'rusty' ? RUSTY_L : L, kind === 'rusty'); }));
+    var sm = smallSprite(kind, dir, fr, lk);
+    return (art[key] = G.gfx.bake.layer(sm.width * PX, sm.height * PX, function (c) { c.imageSmoothingEnabled = false; c.drawImage(sm, 0, 0, sm.width * PX, sm.height * PX); }));
+  }
+  // Draws the 1× art with its feet at (x, y) and a small shadow under it.
+  function drawSmall(ctx, kind, dir, fr, x, y, lk) {
+    var im = smallSprite(kind, dir, fr, lk), side = dir === 'left' || dir === 'right', ax = kind === 'dog' ? (side ? 11 : 7) : 8, ay = kind === 'dog' ? 14 : 25;
+    var w = kind === 'dog' ? (side ? 16 : 10) : 11, P = S.PALETTE;
+    ctx.globalAlpha = 0.3; ctx.fillStyle = P.outline; ctx.fillRect(Math.round(x - w / 2), Math.round(y - 1), w, 2); ctx.fillRect(Math.round(x - w / 2 + 2), Math.round(y - 2), w - 4, 4); ctx.globalAlpha = 1;
+    ctx.drawImage(im, Math.round(x - ax), Math.round(y - ay));
   }
   // Where a sprite's feet are within it: [x, y]. lk: the dog's look (its size).
   var anc = [0, 0];
@@ -320,5 +331,5 @@ G.ui.room = (function () {
   }
 
   return { walker: walker, heldDir: heldDir, sprite: sprite, anchor: anchor, prebake: prebake, shadow: shadow, drawFigure: drawFigure,
-    walkers: walkers, frames: frames, STEP: STEP, TURN: TURN, DIRS: DIRS };
+    walkers: walkers, frames: frames, small: smallSprite, drawSmall: drawSmall, STEP: STEP, TURN: TURN, DIRS: DIRS };
 })();
