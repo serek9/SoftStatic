@@ -122,6 +122,24 @@ G.gfx.sprites = (function () {
     pr14: '#d27242', pr15: '#241e27', pr16: '#b35f39', pr17: '#ec8a50', pr18: '#deb48b', pr19: '#c49a75',
     pr20: '#c54124', pr21: '#322c39', pr22: '#4e4725', pr23: '#a7321f', pr24: '#564c53', pr25: '#26130e',
     pr26: '#40170f', pr27: '#c47c25',
+    // Phase 127 (the other looks and breeds from the user's second sheet, js/gfx/people_art.js
+    // looks): the knit hat (pk), the rain hat (py), the headlamp (ph), the husky (pu), the St.
+    // Bernard (pb) and the curly dog (pc). Interior keys only.
+    pk0: '#583129', pk1: '#fad7b4', pk2: '#ac846a', pk3: '#9d5f33', pk4: '#465c58', pk5: '#966f58', pk6: '#d2996a', pk7: '#381b0c',
+    pk8: '#627c75', pk9: '#2e2119', pk10: '#693c25', pk11: '#2b150a', pk12: '#3b4c49', pk13: '#546c66', pk14: '#333b36', pk15: '#ebab7c',
+    pk16: '#815a3f', pk17: '#bf8353', pk18: '#7c4928', pk19: '#a9693b', pk20: '#582e16', pk21: '#8f552e', pk22: '#452418', pk23: '#f8be94',
+    py0: '#f7b141', py1: '#453a4a', py2: '#39221b', py3: '#915632', py4: '#db993f', py5: '#643b25', py6: '#ae6641', py7: '#7d492a',
+    py8: '#361a08', py9: '#b67428', py10: '#db9030', py11: '#432008', py12: '#c88430', py13: '#582e0d', py14: '#f8c161', py15: '#fbbb4f',
+    py16: '#4d2d20', py17: '#f1a83a', py18: '#d6865b', py19: '#e89d34', py20: '#794510', py21: '#2a1307', py22: '#a0631f', py23: '#c2754a',
+    ph0: '#2c140d', ph1: '#e8966f', ph2: '#5b4646', ph3: '#c15d3f', ph4: '#7e6562', ph5: '#8f382a', ph6: '#fdefd4', ph7: '#3e180d',
+    ph8: '#633928', ph9: '#794933', ph10: '#6a5352', ph11: '#772f23', ph12: '#a24130', ph13: '#4b3a40', ph14: '#3f2e31', ph15: '#b24d36',
+    ph16: '#c17d5c', ph17: '#f9bb92', ph18: '#564c5f', ph19: '#52291b', ph20: '#351e18', ph21: '#fce5bf', ph22: '#f5ad83', ph23: '#915738',
+    pu0: '#e0b394', pu1: '#452a20', pu2: '#7e655e', pu3: '#f7d4b5', pu4: '#59423c', pu5: '#321a12', pu6: '#caa184', pu7: '#725b56',
+    pu8: '#e57f64', pu9: '#68504b', pu10: '#b18b73', pu11: '#edc4a5', pu12: '#fcdec1', pu13: '#9b7562', pb0: '#fcdcbd', pb1: '#76452c',
+    pb2: '#402113', pb3: '#b65f2f', pb4: '#894f31', pb5: '#e7b690', pb6: '#33190c', pb7: '#9a6c4f', pb8: '#f5caa7', pb9: '#c56b35',
+    pb10: '#bd8a67', pb11: '#643b28', pb12: '#552e1d', pb13: '#a5542a', pb14: '#eb856b', pb15: '#d6a27c', pc0: '#371c10', pc1: '#fce1c6',
+    pc2: '#925c3e', pc3: '#814e33', pc4: '#d7a988', pc5: '#a57153', pc6: '#b88869', pc7: '#5f3521', pc8: '#e3b896', pc9: '#4a2819',
+    pc10: '#ebc2a0', pc11: '#fadabb', pc12: '#f1caa9', pc13: '#ce9778', pc14: '#f6d2b2', pc15: '#71412a',
     // Phase 70 (real fish, PLAN_SPECIES.md 3.5): each species' body ramp, back (dark) to belly
     // (pale), six keys; shared fin ramps (ray, root, membrane, edge); eyes. Fish keys only:
     // shift() never picks them, so no earlier sprite changes colour.
@@ -236,7 +254,7 @@ G.gfx.sprites = (function () {
   ('panel_deep panel panel_mid panel_hi panel_lit mustard_dark mustard mustard_hi mustard_lit orange_dark orange orange_hi orange_lit ' +
    'olive_dark olive olive_hi olive_lit pink_dark pink pink_hi pink_lit lav_dark lav lav_hi lav_lit crt_dark crt crt_hi crt_glow ' +
    'chrome_dark chrome chrome_hi chrome_lit brick_dark brick brick_hi leaf_deep leaf_dark leaf leaf_hi leaf_lit sun_dark sun sun_hi sun_lit ' +
-   'vinyl vinyl_hi neon_pink neon_pink_hi ivory denim_lit outline cedar_deep cedar_dark cedar cedar_mid cedar_hi cedar_lit cedar_glow ps0 ps1 ps2 ps3 ps4 ps5 ps6 ps7 ps8 ps9 ps10 ps11 ps12 ps13 ps14 ps15 ps16 ps17 ps18 ps19 ps20 ps21 ps22 ps23 ps24 ps25 ps26 ps27 ps28 ps29 ps30 ps31 ps32 ps33 ps34 ps35 ps36 ps37 ps38 ps39 ps40 ps41 ps42 ps43 ps44 ps45 ps46 ps47 ps48 ps49 ps50 ps51 ps52 ps53 ps54 ps55 ps56 ps57 ps58 ps59 ps60 ps61 ps62 ps63 pf0 pf1 pf2 pf3 pf4 pf5 pf6 pf7 pf8 pf9 pf10 pf11 pf12 pf13 pf14 pf15 pf16 pf17 pf18 pf19 pf20 pf21 pf22 pf23 pf24 pf25 pd0 pd1 pd2 pd3 pd4 pd5 pd6 pd7 pd8 pd9 pd10 pd11 pd12 pd13 pr0 pr1 pr2 pr3 pr4 pr5 pr6 pr7 pr8 pr9 pr10 pr11 pr12 pr13 pr14 pr15 pr16 pr17 pr18 pr19 pr20 pr21 pr22 pr23 pr24 pr25 pr26 pr27').split(' ').forEach(function (k) { INTERIOR[k] = true; });
+   'vinyl vinyl_hi neon_pink neon_pink_hi ivory denim_lit outline cedar_deep cedar_dark cedar cedar_mid cedar_hi cedar_lit cedar_glow ps0 ps1 ps2 ps3 ps4 ps5 ps6 ps7 ps8 ps9 ps10 ps11 ps12 ps13 ps14 ps15 ps16 ps17 ps18 ps19 ps20 ps21 ps22 ps23 ps24 ps25 ps26 ps27 ps28 ps29 ps30 ps31 ps32 ps33 ps34 ps35 ps36 ps37 ps38 ps39 ps40 ps41 ps42 ps43 ps44 ps45 ps46 ps47 ps48 ps49 ps50 ps51 ps52 ps53 ps54 ps55 ps56 ps57 ps58 ps59 ps60 ps61 ps62 ps63 pf0 pf1 pf2 pf3 pf4 pf5 pf6 pf7 pf8 pf9 pf10 pf11 pf12 pf13 pf14 pf15 pf16 pf17 pf18 pf19 pf20 pf21 pf22 pf23 pf24 pf25 pd0 pd1 pd2 pd3 pd4 pd5 pd6 pd7 pd8 pd9 pd10 pd11 pd12 pd13 pr0 pr1 pr2 pr3 pr4 pr5 pr6 pr7 pr8 pr9 pr10 pr11 pr12 pr13 pr14 pr15 pr16 pr17 pr18 pr19 pr20 pr21 pr22 pr23 pr24 pr25 pr26 pr27 pk0 pk1 pk2 pk3 pk4 pk5 pk6 pk7 pk8 pk9 pk10 pk11 pk12 pk13 pk14 pk15 pk16 pk17 pk18 pk19 pk20 pk21 pk22 pk23 py0 py1 py2 py3 py4 py5 py6 py7 py8 py9 py10 py11 py12 py13 py14 py15 py16 py17 py18 py19 py20 py21 py22 py23 ph0 ph1 ph2 ph3 ph4 ph5 ph6 ph7 ph8 ph9 ph10 ph11 ph12 ph13 ph14 ph15 ph16 ph17 ph18 ph19 ph20 ph21 ph22 ph23 pu0 pu1 pu2 pu3 pu4 pu5 pu6 pu7 pu8 pu9 pu10 pu11 pu12 pu13 pb0 pb1 pb2 pb3 pb4 pb5 pb6 pb7 pb8 pb9 pb10 pb11 pb12 pb13 pb14 pb15 pc0 pc1 pc2 pc3 pc4 pc5 pc6 pc7 pc8 pc9 pc10 pc11 pc12 pc13 pc14 pc15').split(' ').forEach(function (k) { INTERIOR[k] = true; });
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.
   var CEILING_KEY = 'dusk_high';

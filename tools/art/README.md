@@ -24,5 +24,11 @@ python3 room3.py        # shop_art.js (rows, keys, bulbs) and room_pal.txt (the 
 Then copy the `.js` into `js/gfx/` and the palette lines into `js/gfx/sprites.js` (replacing the
 `pf*`/`pd*`/`pr*` or `ps*` block, and keeping the keys in the INTERIOR list), and run
 `node tools/balance.js --validate`. A new k-means run gives new keys, so the palette must be
-replaced with the data, never one without the other. The other looks and breeds are painted
-over these drawings in code (`js/ui/room.js`, Phase 126), not traced.
+replaced with the data, never one without the other. The other looks and breeds (Phase 127) are the user's second sheet (`ref/people_sheet2.webp`:
+the knit hat, the rain hat, the headlamp, the husky, the St. Bernard, the curly dog):
+
+```bash
+python3 extract2.py     # cells found from the sheet's alpha, sampled (fishers 52/266, dogs 38/206)
+python3 km2.py          # a palette each (24, 24, 24, 14, 16, 16 keys); out2/q.png is a preview
+python3 export2.py      # out2/people_art2.js (goes in people_art.js under looks) and out2/pal2.txt
+```

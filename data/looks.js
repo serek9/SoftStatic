@@ -32,7 +32,7 @@ G.data.looks = {
       ears: 'prick', tail: 'curl', face: 'mask', paleLegs: true, curly: false, bulk: 1, size: 0.68, bark: 1.15 },
     { id: 'saint', name: 'St. Bernard', coat: ['rust_dark', 'rust', 'rust_hi'], ear: ['ink', 'rust_dark', 'rust'], chest: 'bone', muzzle: ['paper_dark', 'paper', 'bone'],
       ears: 'heavy', tail: 'low', face: 'blaze', paleLegs: true, curly: false, bulk: 1.12, size: 0.8, bark: 0.78 },
-    { id: 'poodle', name: 'Poodle', coat: ['paper_dark', 'paper', 'cream'], ear: ['reed_hi', 'paper_dark', 'paper'], chest: 'cream', muzzle: ['paper_dark', 'paper', 'cream'],
+    { id: 'poodle', name: 'Poodle', coat: ['wood_dark', 'wood', 'wood_hi'], ear: ['ink', 'wood_dark', 'wood'], chest: 'cream', muzzle: ['paper_dark', 'paper', 'cream'],
       ears: 'pom', tail: 'pom', face: '', paleLegs: false, curly: true, bulk: 0.92, size: 0.66, bark: 1.3 }
   ],
   HATS: ['cap', 'knit', 'bucket', 'lamp'],
