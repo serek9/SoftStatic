@@ -7,7 +7,7 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // native for itself.
 G.ui = G.ui || {};
 G.ui.card = (function () {
-  var S = G.gfx.sprites, F = S.fine, U = G.ui.panel;
+  var S = G.gfx.sprites, F = S.fine, U = G.ui.panel, P = S.PALETTE;
   // Phase 70: the portrait box grew from 80×40 to 96×56 for the real fish (PLAN_SPECIES.md 3.5),
   // and the card with it, to the small panel's widest (G.ui.panel.MAX_W).
   var W = 240, H = 98, PW = 96, PH = 56, KEY_Y = 81, HINT = 'choose';
@@ -44,7 +44,7 @@ G.ui.card = (function () {
   // Phase 129: the keys are named on the first FIRST_CARDS cards, then only with the Key hints setting.
   var FIRST_CARDS = 3, keysOn = true;
   function open(info) {
-    cur = info; sel = 0; t = 0; at = 0; G.ui.panel.kick(); // Phase 131
+    cur = info; sel = 0; t = 0; at = 0; G.ui.panel.kick(); goalAt = -1; goal.on = false; // Phase 131; Phase 135
     var s = G.state.save, n = 0; for (var k in s.journal) n += s.journal[k].caught || 0;
     keysOn = !!s.settings.hints || n < FIRST_CARDS;
     if (info.trash === undefined) {
@@ -81,7 +81,22 @@ G.ui.card = (function () {
 
   function isOpen() { return cur !== null; }
   // Called every step while the card shows.
-  function tick(dt) { at += dt; G.ui.badge.step(dt); }
+  // Phase 135: the goal this catch counts toward, read once the catch is in the journal.
+  var goal = { on: false, text: '', a: 0, b: 1 }, goalAt = -1;
+  function tick(dt) {
+    at += dt; G.ui.badge.step(dt);
+    if (cur && cur.trash === undefined && goalAt < 0 && at > 0.15) {
+      goalAt = at;
+      var n = G.ui.milestones.next(G.state.run && G.state.run.loc);
+      goal.on = !!n.id; goal.a = n.a; goal.b = n.b;
+      if (goal.on && goal.a < goal.b) { // the catch is written when it is sold, kept or let go: count it now
+        var m = null, L = G.data.milestones, jj = G.state.save.journal[cur.id], fresh = !jj || !jj.caught, sp = G.data.fish[cur.spIdx];
+        for (var q = 0; q < L.length; q++) if (L[q].id === n.id) m = L[q];
+        if (m && (m.test === 'caught' || (fresh && m.test === 'species') || (fresh && m.test === 'water' && sp.locations.indexOf(m.arg) >= 0))) goal.a++;
+      }
+      if (goal.on) { var tail = ' ' + goal.a + '/' + goal.b, room = W - (U.PAD + PW + 8) - 21 - U.PAD, lab = n.label; while (lab.length > 4 && F.measure(lab + tail) > room) lab = lab.slice(0, -1); goal.text = (lab !== n.label ? lab.replace(/\s+$/, '') + '.' : lab) + tail; }
+    }
+  }
   // 0 when it opens, 1 once it has slid into place (0.25 s, easing out).
   function shownBy() { var u = Math.min(1, at / 0.25); return 1 - (1 - u) * (1 - u) * (1 - u); }
   function info() { return cur; }
@@ -139,6 +154,12 @@ G.ui.card = (function () {
     U.button(ctx, 'KEEP', KEEP[0], ky, KEEP[2], KH, keyState(1, KEEP));
     U.button(ctx, 'RELEASE', FREE[0], ky, FREE[2], KH, keyState(2, FREE));
     if (keysOn && !U.touch() && !G.core.device.touch()) U.hint(ctx, 'SPACE', HINT, x + W - U.PAD - U.hintW('SPACE', HINT) + 8, ty + 2 * (U.ROW + 1)); // 90.4: no keys named on a phone; Phase 133: a key cap, not loose letters
+    if (goal.on) { // Phase 135: the next goal, a bar and its count
+      var gy = ty + 1 + 3 * (U.ROW + 1), bw = 16, fillW = Math.round(bw * goal.a / Math.max(1, goal.b));
+      ctx.fillStyle = P.fog_dark; ctx.fillRect(rx, gy + 2, bw, 3);
+      ctx.fillStyle = P.neon_teal; ctx.fillRect(rx, gy + 2, fillW, 3);
+      F.drawText(ctx, goal.text, rx + bw + 5, gy, 'fog_mid');
+    }
     var aside = cur.isNew ? 'NEW!' : (cur.isRecord ? 'RECORD' : (cur.trophy ? 'TROPHY' : ''));
     G.ui.badge.draw(ctx, x, y, W, aside ? x + W - U.PAD - F.measureBold(aside) - 12 : x + W - U.PAD); // Phase 94.3: the size badge; Phase 133: settled beside the NEW tab, not on it
     G.core.view.begin(ctx0, false);

@@ -84,7 +84,7 @@ G.ui.menu = (function () {
     save: { title: 'SAVE TAPE', rows: ['Export save', 'Import save'] }
   };
   var PAGE_OF = { Settings: 'settings', 'Save tape': 'save' };
-  var page = 'menu', solo = false;
+  var page = 'menu', solo = false, nextTxt = '';
   var SLIDER = { Volume: 'volume', Music: 'music', World: 'world', Effects: 'effects' };
   var ITEMS = [];
   function head(r) { return r && r.charAt(0) === '#'; }
@@ -196,12 +196,15 @@ G.ui.menu = (function () {
     var s = G.state.save, f = s.flags || {}, n = 0;
     if (G.core.device.persisted() === true || G.core.save.tour()) return false;
     for (var k in s.journal) n += s.journal[k].caught || 0;
+    if (n > 0 && !f.exportAt && !f.remindAt && s.flags) { s.flags.remindAt = Date.now(); return false; } // Phase 135: the week starts at the first fish, not in 1970
     return n > 0 && Date.now() - Math.max(f.exportAt || 0, f.remindAt || 0) > WEEK;
   }
 
   var pause = {
     open: function (at) {
       solo = at === '@settings'; if (solo) at = 'Volume'; // Phase 134: SETTINGS alone, from the tape: Back closes it
+      var nx = G.ui.milestones.next(G.state.run && G.state.run.loc); nextTxt = '';
+      if (nx.id) { var lab = nx.label, tail = '  ' + nx.a + '/' + nx.b, room = PW - 2 * G.ui.panel.PAD - 12; while (lab.length > 4 && S.fine.measure('NEXT  ' + lab + tail) > room) lab = lab.slice(0, -1); nextTxt = 'NEXT  ' + (lab !== nx.label ? lab.replace(/\s+$/, '') + '.' : lab) + tail; } // Phase 135
       page = pageOf(at); layoutPause(); sel = Math.max(0, ITEMS.indexOf(at)); TOP = 0; say(''); dirty = false; openT = G.ui.panel.now();
       if (!at && remindDue()) { G.state.save.flags.remindAt = Date.now(); dirty = true; page = 'save'; layoutPause(); sel = ITEMS.indexOf('Export save'); reminded++; say('This browser may clear the save. Export a copy to keep it.', 'signal_amber'); }
       scrollTo();
@@ -316,6 +319,7 @@ G.ui.menu = (function () {
       if (!msgLines.length) { // Phase 132: the VCR's status line
         U.play(ctx, U.left(X) + 2, Y + MSG_Y + 2, 'neon_teal');
         F.drawText(ctx, status(), U.left(X) + 9, Y + MSG_Y + 2, 'fog_mid');
+        if (page === 'menu' && nextTxt) F.drawText(ctx, nextTxt, U.left(X) + 9, Y + MSG_Y + 2 + U.ROW, 'neon_teal'); // Phase 135: the goal to chase
       }
       x = U.left(X);
       if (page !== 'menu') x += U.hint(ctx, 'ESC', 'back', x, Y + PRECT[3] - U.PAD - U.KEY_H);
