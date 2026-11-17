@@ -289,7 +289,7 @@ G.ui.cabin = (function () {
     if (lv >= 3) list.push({ img: K.console90s(), x: tx(7) + 8, y: ty(3) + 4, foot: ty(3) + 14 });
     else add('cables', 22, 16, function (c) { crate(c, 1, 2, 20, 13); A.line(c, 'outline', 4, 2, 9, 0); A.line(c, 'outline', 9, 0, 15, 3); }, tx(7) + 5, ty(3) + 2, ty(3) + 16);
     // The box fan (stage 2) turning, or a crate; the fridge (dead and rusted while derelict).
-    if (lv >= 2) list.push({ img: K.boxFan(), x: tx(5) + 5, y: ty(2) - 27, foot: ty(2) - 1, live: function (ctx, x, y) { K.fanBlades(ctx, x + 11, y + 11, t, fanOn); } });
+    if (lv >= 2) list.push({ img: K.boxFan(), x: tx(5) + 5, y: ty(2) - 27, foot: ty(2) - 1, live: function (ctx, x, y) { fanSmall(ctx, x + 6, y + 6, fanOn); } });
     else add('crate5', 26, 22, function (c) { crate(c, 1, 1, 24, 20); }, tx(5) + 3, ty(2) - 23, ty(2) - 1);
     list.push({ img: G.gfx.bake.cached('cabin64:fridge' + (lv < 1 ? 'old' : ''), function () { return K.fridge(lv < 1); }), x: tx(9) + 3, y: ty(2) - 40, foot: ty(2) - 1 });
     // The side table by the chair: the lava lamp on it (stage 3), a candle in a jar (1-2), or a crate.
@@ -302,10 +302,10 @@ G.ui.cabin = (function () {
       g2.outline('outline'); g2.paint(c, 0, 0);
     }, tx(6) + 5, ty(5) - 27, ty(5) - 1);
     var side = list[list.length - 1];
-    if (lv >= 3) side.live = function (ctx, x, y) { K.lavaLamp(ctx, x + 8, y + 7, t, lavaOn, env.night); };
+    if (lv >= 3) side.live = function (ctx, x, y) { lavaSmall(ctx, x + 4, y + 3, lavaOn); };
     else if (lv >= 1) side.live = function (ctx, x, y) {
-      ctx.fillStyle = P.outline; ctx.fillRect(x + 6, y - 1, 6, 7); ctx.fillStyle = P.teal_dark; ctx.fillRect(x + 7, y, 4, 5); ctx.fillStyle = P.cream; ctx.fillRect(x + 8, y + 1, 2, 3);
-      var fl = (Math.floor(t * 9) * 7) % 3; ctx.fillStyle = P.lamp_glow; ctx.fillRect(x + 8 + (fl === 2 ? 1 : 0), y - 2 - (fl ? 1 : 0), 1, 2); ctx.fillStyle = P.flame; ctx.fillRect(x + 8, y - 1, 1, 1);
+      ctx.fillStyle = P.outline; ctx.fillRect(x + 3, y, 4, 4); ctx.fillStyle = P.teal_dark; ctx.fillRect(x + 4, y + 1, 2, 2); ctx.fillStyle = P.cream; ctx.fillRect(x + 4, y + 1, 1, 2);
+      var fl = (Math.floor(t * 9) * 7) % 3; ctx.fillStyle = P.lamp_glow; ctx.fillRect(x + 4 + (fl === 2 ? 1 : 0), y - 1 - (fl ? 1 : 0), 1, 1); ctx.fillStyle = P.flame; ctx.fillRect(x + 4, y, 1, 1);
     };
     // The armchair from behind (stage 2), facing the CRT; before it an upturned bucket as a seat.
     if (lv >= 2) add('chair', 32, 34, function (c) {
@@ -363,8 +363,93 @@ G.ui.cabin = (function () {
     A.reset();
   }
 
+  // ---- Phase 122: the cabin at the shop's pixel ---------------------------------------------------
+  // The user asked for the cabin in the style of the shop (Phase 121): the room shown at 2×, one
+  // pixel for the walls, the furniture, the lights and the people. The stages are still painted
+  // at full size (above, unchanged), then each layer and prop is halved once when the room is
+  // baked: every 2×2 block takes its commonest colour, a tie going to the darker, so seams,
+  // chinking and outlines hold; a prop's edge pixels then take the outline, so every object is
+  // drawn round in dark. The live things (the glass, the fire, the trophies, the record, the
+  // screens, the fan, the lamps, the drip, the dark, the bulbs, the people) are drawn at half
+  // size into the room's own canvas, which is shown at 2×.
+  var HW = W >> 1, HH = RH >> 1, HT = 16, HTOP = TOP >> 1;
+  // Once patched, the cabin's boards turn to the shop's warm cedar (the derelict stays cold).
+  var WARMMAP = { wood_deep: 'cedar_deep', wood_dark: 'cedar_dark', wood: 'cedar', wood_mid: 'cedar_mid', wood_hi: 'cedar_hi', wood_lit: 'cedar_lit',
+    panel_deep: 'cedar_deep', panel: 'cedar', panel_mid: 'cedar_mid', panel_hi: 'cedar_hi', panel_lit: 'cedar_lit' }, warmRGB = null;
+  function rgbOf(k) { return parseInt(P[k].slice(1), 16); }
+  function halve(src, edge, warm) {
+    var tag = (edge ? 'e' : '') + (warm ? 'w' : '');
+    if (src._half && src._half[tag]) return src._half[tag];
+    if (warm && !warmRGB) { warmRGB = {}; for (var wk in WARMMAP) warmRGB[rgbOf(wk)] = rgbOf(WARMMAP[wk]); }
+    var w = src.width, h = src.height, w2 = Math.ceil(w / 2), h2 = Math.ceil(h / 2);
+    var d = src.getContext('2d').getImageData(0, 0, w, h).data, out = G.gfx.bake.canvas(w2, h2), oc = out.getContext('2d'), od = oc.createImageData(w2, h2), o = od.data;
+    var cand = [0, 0, 0, 0], cnt = [0, 0, 0, 0], OUT = P.outline, orr = parseInt(OUT.slice(1, 3), 16), og = parseInt(OUT.slice(3, 5), 16), ob = parseInt(OUT.slice(5, 7), 16);
+    for (var y = 0; y < h2; y++) for (var x = 0; x < w2; x++) {
+      var n = 0, k, q;
+      for (k = 0; k < 4; k++) {
+        var sx = x * 2 + (k & 1), sy = y * 2 + (k >> 1);
+        if (sx >= w || sy >= h) continue;
+        var i = (sy * w + sx) * 4;
+        if (d[i + 3] < 128) continue;
+        var c = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+        if (warm && warmRGB[c] !== undefined) c = warmRGB[c];
+        for (q = 0; q < n; q++) if (cand[q] === c) { cnt[q]++; break; }
+        if (q === n) { cand[n] = c; cnt[n] = 1; n++; }
+      }
+      var oi = (y * w2 + x) * 4, opaque = 0;
+      for (q = 0; q < n; q++) opaque += cnt[q];
+      if (opaque < 2) { o[oi + 3] = 0; continue; }
+      var best = 0;
+      for (q = 1; q < n; q++) {
+        var lq = ((cand[q] >> 16) & 255) + ((cand[q] >> 8) & 255) + (cand[q] & 255), lb = ((cand[best] >> 16) & 255) + ((cand[best] >> 8) & 255) + (cand[best] & 255);
+        if (cnt[q] > cnt[best] || (cnt[q] === cnt[best] && lq < lb)) best = q;
+      }
+      o[oi] = (cand[best] >> 16) & 255; o[oi + 1] = (cand[best] >> 8) & 255; o[oi + 2] = cand[best] & 255; o[oi + 3] = 255;
+    }
+    if (edge) {                                                                                     // the outline round each object
+      var a = new Uint8Array(w2 * h2), j;
+      for (j = 0; j < w2 * h2; j++) a[j] = o[j * 4 + 3] ? 1 : 0;
+      for (y = 0; y < h2; y++) for (x = 0; x < w2; x++) {
+        j = y * w2 + x; if (!a[j]) continue;
+        if (x === 0 || y === 0 || x === w2 - 1 || y === h2 - 1 || !a[j - 1] || !a[j + 1] || !a[j - w2] || !a[j + w2]) { o[j * 4] = orr; o[j * 4 + 1] = og; o[j * 4 + 2] = ob; }
+      }
+    }
+    oc.putImageData(od, 0, 0);
+    src._half = src._half || {}; src._half[tag] = out;
+    return out;
+  }
+  function h(v) { return v / 2; }
+  // Small live things at the half size.
+  function fireSmall(ctx, x, y) {
+    var tq = Math.floor(t * 10) / 10, k;
+    ctx.fillStyle = P.rust_dark; ctx.fillRect(x, y + 3, 7, 1);
+    for (k = 0; k < 3; k++) {
+      var hh = 2 + Math.round(Math.sin(tq * 5.3 + k * 1.9) + 0.6), cx = x + 1 + k * 2;
+      ctx.fillStyle = P.flame; ctx.fillRect(cx, y + 3 - hh, 1, hh); ctx.fillStyle = P.signal_amber; ctx.fillRect(cx, y + 2, 1, 1); ctx.fillStyle = P.lamp_glow; ctx.fillRect(cx, y + 3, 1, 1);
+    }
+  }
+  function recordSmall(ctx, x, y, on) {
+    ctx.fillStyle = P.vinyl; ctx.fillRect(x, y, 9, 4);
+    var a = on ? t * 3.5 : 0; ctx.fillStyle = P.vinyl_hi; ctx.fillRect(x + 4 + Math.round(Math.cos(a) * 3), y + 2 + Math.round(Math.sin(a)), 1, 1);
+    ctx.fillStyle = P.orange_hi; ctx.fillRect(x + 4, y + 1, 1, 2); ctx.fillStyle = P.chrome_lit; ctx.fillRect(x + 7, y, 1, 2);
+  }
+  function fanSmall(ctx, cx, cy, on) {
+    var a = on ? t * 14 : 0.4;
+    for (var i = 0; i < 3; i++) { var b = a + i * 2.094; ctx.fillStyle = P.paper_dark; ctx.fillRect(Math.round(cx + Math.cos(b) * 2), Math.round(cy + Math.sin(b) * 2), 1, 1); ctx.fillStyle = P.hair_lit; ctx.fillRect(Math.round(cx + Math.cos(b) * 3), Math.round(cy + Math.sin(b) * 3), 1, 1); }
+    ctx.fillStyle = P.chrome_hi; ctx.fillRect(cx, cy, 1, 1); ctx.fillStyle = P.chrome_dark; ctx.fillRect(cx - 3, cy - 2, 7, 1); ctx.fillRect(cx - 3, cy + 2, 7, 1);
+  }
+  function lavaSmall(ctx, x, y, on) {
+    ctx.fillStyle = P.outline; ctx.fillRect(x - 2, y - 9, 5, 10);
+    ctx.fillStyle = P.chrome; ctx.fillRect(x - 1, y - 9, 3, 1); ctx.fillRect(x - 1, y - 1, 3, 1);
+    ctx.fillStyle = P[on ? 'lav_dark' : 'umber_dark']; ctx.fillRect(x - 1, y - 8, 3, 7);
+    ctx.fillStyle = P[on ? 'orange_hi' : 'orange_dark']; ctx.fillRect(x - 1, y - 3, 3, 1);
+    var u = on ? 0.5 - 0.5 * Math.cos((t / 19 % 1) * 2 * Math.PI) : 0; ctx.fillRect(x, Math.round(y - 3 - u * 4), 1, 1);
+    if (on && env.night > 0.15) K.glow(ctx, x, y - 5, 6, 'neon_pink', 0.05 * env.night);
+  }
+
   // ---- State ----------------------------------------------------------------------------------
   var level = -1, t = 0, base = null, front = null, props = null, mask = null, screenR = null;
+  var hbase = null, hfront = null, hprops = [], hcable = [], view = null, vctx = null;      // Phase 122: the half-size room
   var mounted = [];   // {spIdx, img, flipImg, name, len}, decided in enter()
   var turned = [];    // per mounted trophy: faces the door; decided in enter() only
   var order = [];
@@ -392,13 +477,25 @@ G.ui.cabin = (function () {
     front = G.gfx.bake.cached('cabin56f:' + lv, function () { return G.gfx.bake.layer(W, RH, function (c) { paintFront(c, lv); }); });
     props = makeProps(lv); screenR = null;
     for (var i = 0; i < props.length; i++) if (props[i].screen) screenR = props[i].screen;
+    // Phase 122: halved, with the props' positions in half px (the full-size layers stay cached).
+    hbase = G.gfx.bake.cached('cabin122:' + lv, function () { return halve(base, false, lv >= 1); });
+    hfront = G.gfx.bake.cached('cabin122f:' + lv, function () { return halve(front, false, lv >= 1); });
+    hprops.length = 0;
+    for (i = 0; i < props.length; i++) {
+      var p0 = props[i], sr = p0.screen;
+      hprops.push({ img: halve(p0.img, true, lv >= 1), x: Math.round(p0.x / 2), y: Math.round(p0.y / 2), foot: p0.foot / 2, live: p0.live, screen: sr ? [Math.round(sr[0] / 2), Math.round(sr[1] / 2), Math.round(sr[2] / 2), Math.round(sr[3] / 2)] : null });
+    }
+    hcable.length = 0;
+    for (i = 0; i < cable.length; i += 2) hcable.push([cable[i][0] >> 1, cable[i][1] >> 1]);
+    if (!view) { view = G.gfx.bake.canvas(HW, HH); vctx = view.getContext('2d'); vctx.imageSmoothingEnabled = false; }
     var pools = [];
     if (lv >= 2) pools.push({ x: STOVE[0], y: STOVE[1] + 30, r: 120 });
     if (lv >= 3) pools.push({ x: LAMPP[0], y: LAMPP[1], r: 110 });
     if (lv === 1) pools.push({ x: tx(2) + 20, y: ty(1) + 10, r: 70 });
     if (lv >= 3 && screenR) pools.push({ x: screenR[0] + 8, y: screenR[1] + 30, r: 40 });
     if (!pools.length) pools.push({ x: GL[0] + GL[2] / 2, y: ty(2), r: 60, sx: 1 });
-    mask = K.nightMask(W, RH, pools, function (x, y) { return x >= GL[0] && x < GL[0] + GL[2] && y >= GL[1] && y < GL[1] + GL[3]; });
+    for (i = 0; i < pools.length; i++) { pools[i].x /= 2; pools[i].y /= 2; pools[i].r /= 2; }
+    mask = K.nightMask(HW, HH, pools, function (x, y) { return x >= GL[0] / 2 && x < (GL[0] + GL[2]) / 2 && y >= GL[1] / 2 && y < (GL[1] + GL[3]) / 2; });
     if (!coin) coin = G.gfx.bake.layer(8, 8, function (c) { A.reset(); A.blob(c, 4, 4, 3.6, 3.6, BRASS, { bias: 0.1, rim: 0 }); box(c, 'rust', 3, 3, 2, 2); px(c, 'brass_hi', 2, 2); });
   }
 
@@ -429,7 +526,7 @@ G.ui.cabin = (function () {
     mounted.length = 0; turned.length = 0;
     for (i = 0; i < ord.length && i < cap; i++) {
       var k = kept[ord[i]], sp = speciesIndex(k.id);
-      mounted.push({ trophy: k.w >= G.sim.pond.trophyKg(G.data.fish[sp]), spIdx: sp, img: G.gfx.fishgen.portrait(sp, PLQ_W - 6, PLQ_H - 8, false), flipImg: G.gfx.fishgen.portraitFlipped(sp, PLQ_W - 6, PLQ_H - 8), name: G.data.fish[sp].name, len: Math.round(k.len) + ' cm' });
+      mounted.push({ trophy: k.w >= G.sim.pond.trophyKg(G.data.fish[sp]), spIdx: sp, img: G.gfx.fishgen.portrait(sp, (PLQ_W - 6) >> 1, (PLQ_H - 8) >> 1, false), flipImg: G.gfx.fishgen.portraitFlipped(sp, (PLQ_W - 6) >> 1, (PLQ_H - 8) >> 1), name: G.data.fish[sp].name, len: Math.round(k.len) + ' cm' });
       turned.push(false);
     }
     stored = ord.length - mounted.length;
@@ -599,58 +696,70 @@ G.ui.cabin = (function () {
     if (a > 0) { G.core.view.begin(ctx, true); G.ui.menu.dim(ctx, a); }            // Phase 93.1: the rest's fade
   }
   function drawRoom(ctx) {
-    var save = G.state.save, ox = OX, oy = OY - TOP, i;
+    var save = G.state.save, i, c = vctx;
     ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
-    ctx.drawImage(base, ox, oy);
-    K.glass(ctx, ox + GL[0], oy + GL[1], GL[2], GL[3], env, t, 0);
-    ctx.drawImage(front, ox, oy);
-    if (level >= 2) drawFire(ctx, ox + tx(10) + 9, oy + ty(1) + 3);
+    // Phase 122: the room at half size in its own canvas, then that at 2×.
+    c.clearRect(0, 0, HW, HH);
+    c.drawImage(hbase, 0, 0);
+    K.glass(c, GL[0] >> 1, GL[1] >> 1, GL[2] >> 1, GL[3] >> 1, env, t, 0);
+    c.drawImage(hfront, 0, 0);
+    if (level >= 2) fireSmall(c, (tx(10) + 9) >> 1, (ty(1) + 3) >> 1);
     // The trophies on their plaques; turned ones face the door.
     for (i = 0; i < mounted.length; i++) {
-      var m = mounted[i], im = turned[i] ? m.flipImg : m.img, cx = ox + plaqueX(i) + (PLQ_W >> 1), cy = oy + plaqueY(i) + 7;
-      ctx.drawImage(im, cx - (im.width >> 1), cy - (im.height >> 1));
+      var m = mounted[i], im = turned[i] ? m.flipImg : m.img, cx = (plaqueX(i) + (PLQ_W >> 1)) >> 1, cy = (plaqueY(i) + 7) >> 1;
+      c.drawImage(im, cx - (im.width >> 1), cy - (im.height >> 1));
       if (m.trophy) {                                                              // Phase 85: the trophy's brass tag under its plaque
-        var tgx = ox + plaqueX(i) + PLQ_W - 9, tgy = oy + plaqueY(i) + PLQ_H + 1;
-        ctx.fillStyle = P.outline; ctx.fillRect(tgx + 3, tgy - 1, 1, 2); ctx.fillRect(tgx - 1, tgy + 1, 9, 5);
-        ctx.fillStyle = P.brass_hi; ctx.fillRect(tgx, tgy + 2, 7, 3); ctx.fillStyle = P.rust; ctx.fillRect(tgx + 1, tgy + 3, 5, 1);
+        var tgx = (plaqueX(i) + PLQ_W - 9) >> 1, tgy = (plaqueY(i) + PLQ_H + 1) >> 1;
+        c.fillStyle = P.outline; c.fillRect(tgx - 1, tgy, 5, 3); c.fillStyle = P.brass_hi; c.fillRect(tgx, tgy + 1, 3, 1);
       }
     }
-    // The record turning, the CRT's screen.
-    if (level >= 3) K.record(ctx, ox + tx(3) + 4, oy + ty(1) - 3, t, recordT >= 0);
-    reflections(ctx, ox, oy);
+    if (level >= 3) recordSmall(c, (tx(3) + 4) >> 1, (ty(1) - 3) >> 1, recordT >= 0);
+    reflections(c, 0, 0);
     // Everything that stands, in order of its feet.
-    var f = R.walkers(walk, T, ox, oy + TOP), fr = R.frames(walk);
+    var f = R.walkers(walk, HT, 0, HTOP), fr = R.frames(walk);
     order.length = 0;
-    for (i = 0; i < props.length; i++) order.push(props[i].foot, i);
-    order.push(f[3] - oy, 101, f[1] - oy + 0.5, 102);
+    for (i = 0; i < hprops.length; i++) order.push(hprops[i].foot, i);
+    order.push(f[3] + 1, 101, f[1] + 1.5, 102);
     for (var pass = 0; pass < order.length / 2; pass++) {
       var bi = -1, by = 1e9;
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
       if (id < 100) {
-        ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y);
-        if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y);
-        if (props[id].screen) {
-          var s = props[id].screen;
-          if (tvMode === 2) pondCam(ctx, ox + s[0], oy + s[1], s[2], s[3]);               // Phase 85: Pond Cam
-          else if (tvOn) K.console90sScreen(ctx, ox + s[0], oy + s[1], s[2], s[3], t - tvT);    // Phase 64: the console's boot, then its game
-          else { ctx.fillStyle = P.crt_dark; ctx.fillRect(ox + s[0], oy + s[1], s[2], s[3]); }
-          K.glare(ctx, ox + s[0], oy + s[1], s[2], s[3]);
+        var pr = hprops[id];
+        c.drawImage(pr.img, pr.x, pr.y);
+        if (pr.live) pr.live(c, pr.x, pr.y);
+        if (pr.screen) {
+          var s = pr.screen;
+          if (tvMode === 2) pondCam(c, s[0], s[1], s[2], s[3]);                     // Phase 85: Pond Cam
+          else if (tvOn) K.console90sScreen(c, s[0], s[1], s[2], s[3], t - tvT);       // Phase 64: the console's boot, then its game
+          else { c.fillStyle = P.crt_dark; c.fillRect(s[0], s[1], s[2], s[3]); }
+          K.glare(c, s[0], s[1], s[2], s[3]);
         }
       }
-      else if (id === 101) R.drawFigure(ctx, 'dog', walk.dog.face, fr[1], f[2], f[3]);
-      else R.drawFigure(ctx, 'fisher', walk.face, fr[0], f[0], f[1]);
+      else if (id === 101) R.drawSmall(c, 'dog', walk.dog.face, fr[1], f[2], f[3] + 1);
+      else R.drawSmall(c, 'fisher', walk.face, fr[0], f[0], f[1] + 1);
     }
     // A drip into the bucket while the roof leaks.
-    if (level < 2) { var dp = (t * 0.55) % 1; ctx.fillStyle = P.water_foam; if (dp < 0.85) ctx.fillRect(ox + tx(10) + 16, oy + 8 + Math.floor(dp * dp * (ty(7) - 30)), 1, 2); else { ctx.fillRect(ox + tx(10) + 13, oy + ty(7) - 20, 1, 1); ctx.fillRect(ox + tx(10) + 19, oy + ty(7) - 20, 1, 1); } }
+    if (level < 2) { var dp = (t * 0.55) % 1; c.fillStyle = P.water_foam; if (dp < 0.85) c.fillRect((tx(10) + 16) >> 1, 4 + Math.floor(dp * dp * h(ty(7) - 30)), 1, 1); else { c.fillRect((tx(10) + 13) >> 1, (ty(7) - 20) >> 1, 1, 1); c.fillRect((tx(10) + 19) >> 1, (ty(7) - 20) >> 1, 1, 1); } }
     // The dark, the lamps, the lights.
-    if (env.night > 0.02) { ctx.globalAlpha = Math.min(1, env.night * (level < 1 ? 1.15 : 1)); ctx.drawImage(mask, ox, oy); ctx.globalAlpha = 1; }
-    else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + T, oy + TOP + 2, W - 2 * T, RH - TOP - 2); ctx.globalAlpha = 1; }
-    if (level >= 2 && env.night > 0.2) K.glow(ctx, ox + STOVE[0], oy + STOVE[1] + 4, 16, 'flame', (0.05 + 0.015 * Math.sin(Math.floor(t * 10) * 1.3)) * env.night);
-    if (level >= 1 && env.night > 0.2) K.glow(ctx, ox + tx(2) + 20, oy + ty(1) - 6, 12, 'lamp_glow', 0.06 * env.night);
-    if (level >= 1) { ctx.fillStyle = P[env.night > 0.3 ? 'lamp_glow' : 'rust_hi']; ctx.fillRect(ox + tx(2) + 18, oy + ty(1) - 8, 5, 4); }  // the lantern's flame
-    if (level >= 3 && env.night > 0.3) K.glow(ctx, ox + LAMPP[0], oy + LAMPP[1] - 24, 15, 'lamp_glow', 0.06 * env.night);
-    if (cable.length) { for (i = 0; i < cable.length; i++) { bp[i] = bp[i] || [0, 0]; bp[i][0] = ox + cable[i][0]; bp[i][1] = oy + cable[i][1]; } bp.length = cable.length; K.bulbs(ctx, bp, t, env.night); }
+    if (env.night > 0.02) { c.globalAlpha = Math.min(1, env.night * (level < 1 ? 1.15 : (level >= 2 ? 0.75 : 1))); c.drawImage(mask, 0, 0); c.globalAlpha = 1; }
+    if (level >= 2) { c.globalAlpha = 0.04 + 0.05 * env.night; c.fillStyle = P.flame; c.fillRect(HT, 0, HW - 2 * HT, HH - HT); c.globalAlpha = 1; }   // the stove's warmth over the room
+    else if (env.grey > 0.02) { c.globalAlpha = 0.07 * env.grey; c.fillStyle = P.fog_mid; c.fillRect(HT, HTOP + 1, HW - 2 * HT, HH - HTOP - 1); c.globalAlpha = 1; }
+    if (level >= 2 && env.night > 0.2) K.glow(c, h(STOVE[0]), h(STOVE[1]) + 2, 8, 'flame', (0.05 + 0.015 * Math.sin(Math.floor(t * 10) * 1.3)) * env.night);
+    if (level >= 1 && env.night > 0.2) K.glow(c, h(tx(2) + 20), h(ty(1) - 6), 6, 'lamp_glow', 0.06 * env.night);
+    if (level >= 1) { c.fillStyle = P[env.night > 0.3 ? 'lamp_glow' : 'rust_hi']; c.fillRect((tx(2) + 18) >> 1, (ty(1) - 8) >> 1, 3, 2); }  // the lantern's flame
+    if (level >= 3 && env.night > 0.3) K.glow(c, h(LAMPP[0]), h(LAMPP[1] - 24), 8, 'lamp_glow', 0.06 * env.night);
+    if (hcable.length) {
+      var WB = ['lamp_glow', 'mustard_lit', 'signal_amber', 'orange_lit'];
+      for (i = 0; i < hcable.length; i++) {
+        var b = hcable[i], k = WB[i % 4], o = 0.75 + 0.25 * Math.sin(t * 0.6 + i * 1.7);
+        if (env.night > 0.2) { c.fillStyle = P[k]; c.globalAlpha = 0.18 * env.night * o; c.fillRect(b[0] - 1, b[1] - 1, 3, 4); c.globalAlpha = 1; }
+        c.fillStyle = P[k]; c.fillRect(b[0], b[1], 1, 1);
+      }
+    }
+    var sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(view, OX, OY - TOP, W, RH);
+    ctx.imageSmoothingEnabled = sm;
     if (env.flash > 0) { ctx.globalAlpha = 0.1 * env.flash; ctx.fillStyle = P.fog_light; ctx.fillRect(0, 0, 640, 360); ctx.globalAlpha = 1; }
     // The words: the cabin's stage, coins and next repair along the bottom; or a message.
     var U = G.ui.panel, ctx0 = ctx;
@@ -718,17 +827,15 @@ G.ui.cabin = (function () {
   // Phase 64: the varnished boards give back what is lit (the bench's lantern, the floor lamp,
   // the lava lamp, the TV on the rug), and the window's glass gives back the lamps at night.
   function reflections(ctx, ox, oy) {
-    var n = env.night, lv = level;
-    if (lv >= 1) K.reflect(ctx, ox + tx(2) + 20, oy + ty(2) + 2, 8, 22, 'lamp_glow', 0.16 * n, 0);
-    if (lv >= 3) K.reflect(ctx, ox + LAMPP[0], oy + ty(5) - 1, 10, 26, 'lamp_glow', 0.2 * n, 0);
-    if (lv >= 3 && lavaOn) K.reflect(ctx, ox + tx(6) + 13, oy + ty(5), 6, 14, 'neon_pink', 0.08 + 0.12 * n, 0);
-    if (lv >= 3 && tvOn) K.reflect(ctx, ox + tx(7) + 15, oy + ty(3) + 15, 12, 18, 'crt_glow', 0.05 + 0.1 * n, 0);
-    if (lv >= 2) K.reflect(ctx, ox + STOVE[0], oy + ty(1) + 24, 10, 8, 'flame', 0.18 * n, 0);
-    K.glassLamps(ctx, ox + GL[0], oy + GL[1], GL[2], GL[3], lv >= 2 ? n : 0);
-    // Moths at the floor lamp's shade.
-    if (lv >= 3 && n > 0.4) { ctx.fillStyle = P.paper; for (var i = 0; i < 2; i++) { var a = t * (2.3 + i * 0.8) + i * 3; ctx.fillRect(Math.round(ox + LAMPP[0] + Math.cos(a) * (7 + i * 3)), Math.round(oy + LAMPP[1] - 24 + Math.sin(a * 1.6) * 4), 1 + (Math.floor(t * 12 + i) & 1), 1); } }
+    var n = env.night, lv = level;                                                  // Phase 122: in the half-size room
+    if (lv >= 1) K.reflect(ctx, (tx(2) + 20) >> 1, (ty(2) + 2) >> 1, 4, 11, 'lamp_glow', 0.16 * n, 0);
+    if (lv >= 3) K.reflect(ctx, LAMPP[0] >> 1, (ty(5) - 1) >> 1, 5, 13, 'lamp_glow', 0.2 * n, 0);
+    if (lv >= 3 && lavaOn) K.reflect(ctx, (tx(6) + 13) >> 1, ty(5) >> 1, 3, 7, 'neon_pink', 0.08 + 0.12 * n, 0);
+    if (lv >= 3 && tvOn) K.reflect(ctx, (tx(7) + 15) >> 1, (ty(3) + 15) >> 1, 6, 9, 'crt_glow', 0.05 + 0.1 * n, 0);
+    if (lv >= 2) K.reflect(ctx, STOVE[0] >> 1, (ty(1) + 24) >> 1, 5, 4, 'flame', 0.18 * n, 0);
+    K.glassLamps(ctx, GL[0] >> 1, GL[1] >> 1, GL[2] >> 1, GL[3] >> 1, lv >= 2 ? n : 0);
+    if (lv >= 3 && n > 0.4) { ctx.fillStyle = P.paper; for (var i = 0; i < 2; i++) { var a = t * (2.3 + i * 0.8) + i * 3; ctx.fillRect(Math.round((LAMPP[0] >> 1) + Math.cos(a) * (4 + i * 2)), Math.round(((LAMPP[1] - 24) >> 1) + Math.sin(a * 1.6) * 2), 1, 1); } }
   }
-  var bp = [];
   // Phase 93: the parts of the day as 7×7 marks: dawn a half sun on a line, day a sun, dusk a
   // low sun, night a crescent moon (palette keys; the journal's pages use them too).
   var PART_ICON = {
