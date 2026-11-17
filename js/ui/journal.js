@@ -146,6 +146,19 @@ G.ui.journal = (function () {
     });
   }
 
+  // Phase 135 (PLAN_UX.md): a species that lives at the water the boat is on and bites at this
+  // part of the day (or at any hour). Loops only, no allocation.
+  function hereNow(sp) {
+    var r = G.state.run, here = r && r.loc, part = G.ui.cabin.partNow(G.state.save.clock || 0);
+    for (var i = 0; i < sp.homes.length; i++) {
+      var h = sp.homes[i];
+      if (h.loc !== here) continue;
+      if (!h.hours.length) return true;
+      for (var k = 0; k < h.hours.length; k++) if (h.hours[k] === part) return true;
+    }
+    return false;
+  }
+
   // Phase 93.2: its best parts of the day: the hours of its home at the water the boat is on,
   // or else its first home's (none for a fish that bites at any hour).
   function bestParts(sp, out) {
@@ -347,6 +360,7 @@ G.ui.journal = (function () {
     ctx.globalAlpha = 1;
     if (got && !j.read) { ctx.fillStyle = P.neon_red; ctx.fillRect(x + CW - 7, y + CH - 7, 4, 4); }
     if (j && j.lateNew) F.bold(ctx, '*', x + 3, y + 3, 'teal_lit'); // a page that gained a line
+    if (!got && hereNow(sp)) F.drawText(ctx, 'now', x + CW - F.measure('now') - 3, y + 3, 'teal_lit'); // Phase 135: not caught yet, and it bites here at this hour
     if (got && j.sizes && j.sizes.length) {                                          // Phase 94.3: the highest size caught, as a medallion
       var hi = -1; for (var q = 0; q < j.sizes.length; q++) for (var c = 0; c < G.data.SIZE_CLASSES.length; c++) if (G.data.SIZE_CLASSES[c].id === j.sizes[q] && c > hi) hi = c;
       if (hi >= 0) G.ui.badge.medal(ctx, G.data.SIZE_CLASSES[hi].id, x + 2, y + CH - 17, 15, j.bestW >= G.sim.pond.trophyKg(sp));

@@ -21,7 +21,7 @@ G.ui.panel = (function () {
   var TAB = 13, PAD = 6, ROW = 12, KEY_H = 11, MARGIN = 8, MAX_W = 240, MAX_H = 140;
   var CAPS_CSS = 9, ROW_CSS = 28, BTN_CSS = 44;   // touch: the capitals' least CSS px, a tappable row's, a button's
   var L = { on: false, touch: false, large: false, cv: null, ctx: null, css: 1, k: 1, VW: 640, VH: 360, PX: 0, PY: 0, PW: 640, PH: 360,
-    gameCss: 1, gameLeft: 0, gameTop: 0, insL: 0, insR: 0, ver: 0, shown: false, mx: -1, my: -1, now: 0 };
+    gameCss: 1, gameLeft: 0, gameTop: 0, insL: 0, insR: 0, ver: 0, shown: false, mx: -1, my: -1, now: 0, kickT: -9 };
 
   // Called by G.core.device.fit with the page's measures: o = {touch, large, compact, dpr, vw,
   // vh, left, top, cssW, cssH, gameCss}. Rebuilds the layer when anything changed (ver bumps).
@@ -117,8 +117,12 @@ G.ui.panel = (function () {
   // The frame: the body, the tab with title in it at the top left (none when title is ''),
   // and aside, a short word (a count, a price, NEW!) in asideKey on a second tab at the top
   // right (none when ''). Neither tab takes room from the body.
+  // Phase 131 (PLAN_UX.md): a VCR's on-screen display. The title is bold capitals with a play
+  // mark and a one-pixel red/teal chroma split behind it; the body carries faint scanlines. All
+  // from palette keys, drawn under whatever alpha the caller set (its fade).
+  var PLAY_W = 6;                                                                  // the play mark and its gap
   function frame(ctx, x, y, w, h, title, aside, asideKey) {
-    var tw = title ? F.measureBold(title) + 12 : 0, tx = x + PAD;
+    var tw = title ? F.measureBold(title) + 12 + PLAY_W : 0, tx = x + PAD;
     var aw = aside ? F.measureBold(aside) + 12 : 0, ax = x + w - PAD - aw;
     if (title) round(ctx, tx, y, tw, TAB + 3, 'paper', 'night_ink');
     if (aside) round(ctx, ax, y, aw, TAB + 3, 'paper', 'night_ink');
@@ -126,8 +130,49 @@ G.ui.panel = (function () {
     ctx.fillStyle = P.night_ink;                                                   // the tabs open into the body
     if (title) ctx.fillRect(tx + 1, y + TAB, tw - 2, 3);
     if (aside) ctx.fillRect(ax + 1, y + TAB, aw - 2, 3);
-    if (title) F.bold(ctx, title, tx + 6, y + 3, 'bone');
-    if (aside) F.bold(ctx, aside, ax + 6, y + 3, asideKey || 'fog_light');
+    scan(ctx, x + 2, y + TAB + 2, w - 4, h - TAB - 4);
+    track(ctx, x + 2, y + TAB + 2, w - 4, h - TAB - 4);
+    if (title) {
+      play(ctx, tx + 6, y + 4, 'signal_amber');
+      osd(ctx, title, tx + 6 + PLAY_W, y + 3, 'bone');
+    }
+    if (aside) osd(ctx, aside, ax + 6, y + 3, asideKey || 'fog_light');
+  }
+  // Phase 131: a panel that has just opened rolls in under a tracking band, a pale streak that
+  // runs down its body for ROLL s (kick() marks the moment; the overlays call it on open).
+  // None under Reduce motion. Not a flash: the band is faint and moves.
+  var ROLL = 0.18;
+  function kick() { L.kickT = L.now; }
+  function track(ctx, x, y, w, h) {
+    var st = G.state && G.state.save && G.state.save.settings, u = (L.now - L.kickT) / ROLL;
+    if (u < 0 || u >= 1 || (st && st.reduceMotion)) return;
+    var a = ctx.globalAlpha, by = y + Math.floor(u * (h - 3)), j = ((L.now * 997) | 0) % 5 - 2;
+    ctx.globalAlpha = a * 0.35 * (1 - u); ctx.fillStyle = P.fog_light;
+    ctx.fillRect(x + Math.max(0, j), by, w - Math.abs(j), 1);
+    ctx.globalAlpha = a * 0.2 * (1 - u);
+    ctx.fillRect(x, by + 1, w, 2);
+    ctx.globalAlpha = a;
+  }
+  // OSD capitals: the word in bold with its red and teal ghosts a pixel to each side.
+  function osd(ctx, text, x, y, key) {
+    var a = ctx.globalAlpha;
+    ctx.globalAlpha = a * 0.55;
+    F.bold(ctx, text, x - 1, y, 'neon_red');
+    F.bold(ctx, text, x + 1, y, 'neon_teal');
+    ctx.globalAlpha = a;
+    F.bold(ctx, text, x, y, key);
+  }
+  // A VCR's play mark: a 4 × 7 right-pointing triangle.
+  function play(ctx, x, y, key) {
+    ctx.fillStyle = P[key];
+    for (var i = 0; i < 4; i++) ctx.fillRect(x + i, y + i, 1, 7 - 2 * i);
+  }
+  // Faint scanlines over a body: every other row a touch darker.
+  function scan(ctx, x, y, w, h) {
+    var a = ctx.globalAlpha;
+    ctx.globalAlpha = a * 0.22; ctx.fillStyle = P.ink;
+    for (var r = 1; r < h; r += 2) ctx.fillRect(x, y + r, w, 1);
+    ctx.globalAlpha = a;
   }
   // Where an aside's text starts (for an icon drawn before it).
   function asideX(x, w, aside) { return x + w - PAD - F.measureBold(aside) - 6; }
@@ -182,18 +227,25 @@ G.ui.panel = (function () {
 
   // The bar under a chosen row of a list (y is the text's top); h: the row's height (ROW).
   // 90.5: the selection is never colour alone: a lit edge bar (2 px) on its left.
-  function row(ctx, x, y, w, h) {
+  // Phase 131: cursor true adds a VCR menu's blinking play mark in the gap before the text
+  // (lists whose text starts 6 px or more inside the bar); steady under Reduce motion.
+  function row(ctx, x, y, w, h, cursor) {
     var rh = h || ROW, top = y - 2 - ((rh - ROW) >> 1);
     ctx.fillStyle = P.rust_dark; ctx.fillRect(x, top, w, rh - 1);
     ctx.fillStyle = P.signal_amber; ctx.fillRect(x, top, 2, rh - 1);
+    if (cursor && blink()) {
+      ctx.fillStyle = P.signal_amber;
+      for (var i = 0; i < 3; i++) ctx.fillRect(x + 3 + i, y + i, 1, 5 - 2 * i);
+    }
   }
+  function blink() { var st = G.state && G.state.save && G.state.save.settings; return (st && st.reduceMotion) || (L.now * 1.6) % 1 < 0.65; }
 
   // True when the point (gx, gy) is inside the rectangle r = [x, y, w, h].
   function inside(r, gx, gy) { return !!r && gx >= r[0] && gx < r[0] + r[2] && gy >= r[1] && gy < r[1] + r[3]; }
 
   return {
     TAB: TAB, PAD: PAD, ROW: ROW, KEY_H: KEY_H, MARGIN: MARGIN, MAX_W: MAX_W, MAX_H: MAX_H,
-    place: place, frame: frame, asideX: asideX, top: top, left: left, key: key, keyW: keyW, hint: hint, hintW: hintW, row: row, inside: inside,
+    place: place, frame: frame, osd: osd, play: play, scan: scan, blink: blink, kick: kick, asideX: asideX, top: top, left: left, key: key, keyW: keyW, hint: hint, hintW: hintW, row: row, inside: inside,
     shown: shown, // 8.4 #36: the label a hint shows now ('' when it is left out)
     // Phase 90: the UI layer and the shared pieces of §7
     configure: configure, frameStart: frameStart, begin: begin, ux: ux, uy: uy, gx: gx, gy: gy, fromCss: fromCss, rowH: rowH, btnH: btnH,

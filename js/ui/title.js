@@ -133,16 +133,44 @@ G.ui.title = (function () {
   }
   function bakeLines() { return G.gfx.bake.layer(640, 360, function (c) { c.fillStyle = P.ink; for (var y = 1; y < 360; y += 2) c.fillRect(0, y, 640, 1); }); }
 
+  // Phase 134 (PLAN_UX.md): the tape's own menu under the letters, a VCR's: PLAY (CONTINUE once
+  // a fish has been caught), SETTINGS, CONTROLS. W/S move; any other key, the action or a tap off
+  // the rows does the chosen row, PLAY by default, so one key still plays as before. SETTINGS
+  // and CONTROLS open their pages over the tape and come back to it (back = true).
+  var ROWS = ['PLAY', 'SETTINGS', 'CONTROLS'], sel = 0, back = false, ROW_Y = 252, ROW_H = 16, ROW_W = 120;
+  var hush = false;                                 // Phase 134: keys from the page just closed are ignored until released
   var woke0 = false;                                // the page's first touch only wakes it (input.js 90.4): on the title it plays too
-  function open() { t = 0; out = -1; woke0 = G.core.input.woke(); }
+  function first() { var j = G.state.save && G.state.save.journal, k; for (k in j) if (j[k].caught) return false; return true; }
+  function open(arg) {
+    if (arg === 'back') { t = IN_S + 0.5; out = -1; woke0 = true; hush = true; return; } // back from a page: the tape already settled; wait for the keys to lift
+    t = 0; out = -1; woke0 = G.core.input.woke(); sel = 0; ROWS[0] = first() ? 'PLAY' : 'CONTINUE';
+  }
   function close() { if (out < 0) { out = 0; if (G.audio && G.audio.engine) G.audio.engine.play('uiOk'); } }
+  function choose(i) {
+    if (i === 0) { close(); return true; }
+    back = true; G.audio.engine.play('uiOk');
+    G.ui.menu.open(i === 1 ? 'pause' : 'controls', i === 1 ? '@settings' : 'title');
+    return false;
+  }
   function update(dt) {
     var inp = G.core.input;
     t += dt;
     if (out >= 0) { out += dt; return out < OUT_S; }
-    if (t > GUARD && ((!woke0 && inp.woke()) || inp.any() || inp.pressed('action') || inp.pressed('back') || inp.pressed('pause'))) { close(); inp.releaseAll(); }
+    if (t <= GUARD) return true;
+    if (hush) { if (inp.any()) return true; hush = false; }
+    if (!woke0 && inp.woke()) { close(); inp.releaseAll(); return true; }
+    var d = (inp.pressed('down') ? 1 : 0) - (inp.pressed('up') ? 1 : 0);
+    if (d) { sel = (sel + d + ROWS.length) % ROWS.length; G.audio.engine.play('uiMove'); inp.releaseAll(); return true; }
+    if (inp.pressed('up') || inp.pressed('down') || inp.held('up') || inp.held('down')) return true;
+    if (inp.any() || inp.pressed('action') || inp.pressed('back') || inp.pressed('pause')) {
+      var go = inp.pressed('back') || inp.pressed('pause') ? 0 : sel;
+      inp.releaseAll();
+      return choose(go) || out >= 0;
+    }
     return true;
   }
+  // Called by the menu when an overlay the title opened has closed: back to the tape.
+  function returned() { if (!back) return false; back = false; return true; }
 
   // ---- Drawing -------------------------------------------------------------------------------
   function ease(u) { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); }
@@ -194,9 +222,16 @@ G.ui.title = (function () {
     var sec = Math.floor(t), cnt = 'SP  0:' + (sec < 600 ? '0' : '') + Math.floor(sec / 60) + ':' + (sec % 60 < 10 ? '0' : '') + (sec % 60);
     osd(ctx, cnt, 612 - F.measure(cnt), 24, 'fog_light');
     if (Math.floor(t * 1.25) & 1) osd(ctx, '12:00', 612 - F.measure('12:00'), 322, 'fog_light');
-    if (t > IN_S && out < 0 && (Math.floor((t - IN_S) * 1.1) & 1) === 0) {
-      var go = G.core.device.touch() ? 'TAP  TO  PLAY' : 'PRESS  SPACE';
-      osd(ctx, go, 320 - (F.measure(go) >> 1), 268, 'signal_amber');
+    if (t > IN_S && out < 0) { // Phase 134: the tape's menu, the chosen row with a blinking play mark
+      for (i = 0; i < ROWS.length; i++) {
+        var on = i === sel, rw = F.measureBold(ROWS[i]), rx = 320 - (rw >> 1), ry = ROW_Y + i * ROW_H;
+        F.bold(ctx, ROWS[i], rx + 1, ry + 1, 'ink'); F.bold(ctx, ROWS[i], rx, ry, on ? 'signal_amber' : 'fog_mid');
+        if (on && G.ui.panel.blink()) { ctx.fillStyle = P.signal_amber; for (var k = 0; k < 4; k++) ctx.fillRect(rx - 10 + k, ry + 1 + k, 1, 7 - 2 * k); }
+      }
+      if ((Math.floor((t - IN_S) * 1.1) & 1) === 0) {
+        var hintS = G.core.device.touch() ? 'TAP  TO  CHOOSE' : 'W/S  CHOOSE    SPACE  GO';
+        osd(ctx, hintS, 320 - (F.measure(hintS) >> 1), ROW_Y + 3 * ROW_H + 10, 'fog_mid');
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -205,7 +240,15 @@ G.ui.title = (function () {
 
   return {
     native: true, open: open, update: update, draw: draw,
-    tap: function () { if (t > GUARD) close(); return 'none'; },
+    // A tap on a row does it; anywhere else plays (Phase 134). gx, gy in game px (the title draws in them).
+    tap: function (gx, gy) {
+      if (t <= GUARD || out >= 0) return 'none';
+      woke0 = true;                                                                   // a tap on a row is that row, even the page's first
+      var k = Math.floor((gy - ROW_Y + 4) / ROW_H);
+      if (t > IN_S && k >= 0 && k < ROWS.length && Math.abs(gx - 320) < (ROW_W >> 1)) { sel = k; choose(k); } else close();
+      return 'none';
+    },
+    returned: returned,
     // dbg: where it is.
     state: function () { return { t: +t.toFixed(2), out: +out.toFixed(2), word: word ? [word.w, word.h] : null }; }
   };

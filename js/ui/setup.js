@@ -79,7 +79,7 @@ G.ui.setup = (function () {
   function open() {
     var save = G.state.save;
     build(save); layout(); cursorTo(save);
-    col = 0; msg = ''; on = true; openT = G.ui.panel.now();
+    col = 0; msg = ''; on = true; openT = G.ui.panel.now(); G.ui.panel.kick();
     took.rod = false; took.hook = false; took.rod0 = E().rodInHand(save, G.data); took.hook0 = save.gear.bait; took.line0 = save.gear.lineType;
   }
 

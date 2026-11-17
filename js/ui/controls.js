@@ -48,10 +48,14 @@ G.ui.controls = (function () {
     U.place(w, h, 'top', R); R[2] = w; R[3] = h;
   }
 
-  function open() { lv = -1; lay(); top = 0; openT = G.ui.panel.now(); }
+  var from = '';
+  function open(arg) { from = arg || ''; lv = -1; lay(); top = 0; openT = G.ui.panel.now(); }
   function update() {
     var inp = G.core.input;
-    if (inp.pressed('back') || inp.pressed('pause') || inp.pressed('action')) { G.ui.menu.open('pause', 'Controls'); return true; }
+    if (inp.pressed('back') || inp.pressed('pause') || inp.pressed('action')) {
+      if (from === 'title') { inp.releaseAll(); return false; }                  // Phase 134: back to the tape
+      G.ui.menu.open('pause', 'Controls'); return true;
+    }
     var d = (inp.pressed('down') ? 1 : 0) - (inp.pressed('up') ? 1 : 0);
     if (d) top = Math.max(0, Math.min(ROWS.length - show, top + d));
     return true;

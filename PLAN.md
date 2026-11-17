@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-17, after Phase 130 and a cleanup of the docs. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-17, after 135 Something to chase. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -519,6 +519,11 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 128 The cabin as the user drew it | Done | ✓ | `tools/art/ref/cabin.webp` sampled by `tools/art/cabin.py` and `cabin2.py` to 528×352 (nearly the whole view; the old room was 384 wide) with 64 keys (`pv*`, interior), and 16 cuts (shelf, monstera… |
 | 129 Key hints the first time | Done | ✓ | `settings.hints` (false by default; old saves get it from the defaults) and a **Key hints** row in the pause list, `first time` or `always`. |
 | 130 The title on tape | Done | ✓ | `js/ui/title.js` (new), an overlay (`G.ui.menu.open('title')`, so the world waits under it) opened at boot over the lake's first frame, skipped with `?seed` (the test bots), `?gallery` or `?notitle`… |
+| 131 The VCR menu skin | Done | ✓ | `panel.js`: every panel's title is OSD capitals with a play mark and a red/teal chroma split; faint scanlines in the body; a blinking ▶ cursor on the pause and pier lists; panels roll in under a tracking band (PLAN_UX.md). |
+| 132 A menu you can read at a glance | Done | ✓ | The pause list is a VCR MENU in three pages: MENU (Resume, Journal, Chart, Milestones, Fisher & dog, Settings, Controls, Save tape), SETTINGS (under SOUND, PLAY and SCREEN headings) and SAVE TAPE (export, import); a PLAY status line; Esc steps back a page. |
+| 133 Fixes and a shop that finds things | Done | ✓ | The card's settled size medallion sits beside its NEW tab and its PC hint is a key cap; the pier panel wraps its line; chart names sit on plates; Rusty's Buy opens in five shelves (RODS, REEL & LINE, LURES, BAIT, GEAR) turned with A/D or the list's foot. |
+| 134 The tape's menu | Done | ✓ | The title shows a VCR menu under the letters: PLAY (CONTINUE once a fish is caught), SETTINGS, CONTROLS. One key or a tap off the rows still plays at once; the two pages open over the tape and return to it. |
+| 135 Something to chase | Done | ✓ | The catch card's foot shows the goal it counts toward (the water's fish, or the nearest milestone) with a bar, counting this fish; the MENU names the next goal; journal tiles of fish not caught that bite here at this hour say *now*. A fresh save's first pause no longer jumps to the export reminder. |
 ### 8.2 Architecture as built
 
 The files that exist so far. §3 is the target tree; this is what is in it now.
@@ -1223,6 +1228,17 @@ These are interpretations and additions made while building, where the spec abov
 595. **Looks, breeds, the living shop (126):** `room.js` margins TOPM 6, SIDEM 4 (`anchor` = drawing's foot + margins; the trotting dog (22, 34) side, (18, 36) front/back).
 596. **The second sheet (127):** `G.gfx.peopleArt.looks[id]` for `knit_hat`, `rain_hat`, `headlamp`, `husky`, `saint`, `poodle`: `keys` (their own palettes `pk*`, `py*`, `ph*`, `pu*`, `pb*`, `pc*`: 24, 24, 24, 14, 16, 16 keys…
 597. **The cabin as drawn (128):** `G.gfx.cabinArt` {keys (64 `pv*`), cuts [{id, x, y, w, h, foot, spans}], rows (528 chars × 352)}; a cut's spans give per row the first and one-past-last pixel that is not floor or rug (the floor and…
+598. **The VCR skin (131):** `panel.frame` draws the title through `osd()` (bold, with `neon_red` and `neon_teal` ghosts a pixel to each side at 0.55 of the alpha) after a 4×7 `play()` mark; the title tab is 6 px wider for it. `scan()` darkens every other body row with `ink` at 0.22. `row(…, cursor)` adds a blinking 3×5 mark (steady under Reduce motion) where the text starts 6 px inside the bar.
+599. **The roll-in (131):** `panel.kick()` (called by `menu.open`, the pier, the card and the setup panel) starts a 0.18 s tracking band that runs down the body in `fog_light` at ≤0.35 alpha; none under Reduce motion. Presentation only.
+600. **Menu pages (132):** `menu.js` `PAGES` {menu, settings, save}; '#' rows are headings (never chosen: `stepSel` skips them, taps ignore them). `pause.open(at)` opens the page that holds `at`, so the picker, controls and milestones still return to their row. Back on a sub-page returns to MENU at the row that led there; P or Back on MENU closes. Journal opens the journal; Chart opens the chart when `mapAllowed()`, else says 'Reel in first.'. The export reminder (91.2) opens SAVE TAPE.
+601. **The status line (132):** with no message, the foot reads `▶ PLAY  HH:MM  WATER`, rebuilt only when the minute or the water changes (no allocation per frame).
+602. **Rusty's shelves (133):** `shop.js` `TABS` lists every one of the 41 items once (rods 0–5 and the ice rods; the reel, the line and the three line types; the 23 lures with their Buy 5 rows; the four baits; the Snow Machine). `showTab(d)` turns the shelf; the tab is kept for the visit. A/D and the foot's halves turn the shelf at Rusty's and still page a facing shelf's list. The position counter is left out for shelves.
+603. **Small fixes (133):** `badge.draw(ctx, x, y, w, tabX)` sets the settled medallion just left of the card's top-right tab. The card's PC hint is `hint('SPACE', 'choose')`. The pier panel keeps two wrapped lines for its word, rewrapped only when the word changes. Chart names get a `night_ink` plate at 0.8.
+604. **The tape's menu (134):** `title.js` ROWS; W/S move, any other key does the chosen row (Back or P play). SETTINGS opens the pause panel with '@settings' (`solo`: Back closes it instead of going to MENU); CONTROLS opens with 'title' and closes itself. `menu.update` reopens the title (`open('title', 'back')`, already settled) when an overlay the title opened closes; `hush` ignores keys until released. An overlay that opens another from its `update` is kept (`cur === was`).
+605. **The first touch on the tape (134):** `input.js` lets the page's first touch through when the title is open, so a tap on SETTINGS works first time; elsewhere it still only wakes the page (90.4). The title's `tap` plays on any tap off its rows.
+606. **The next goal (135):** `milestones.next(loc)` picks the water's milestone when its fish are not all caught, else the unfinished milestone nearest done by share (the sitting's pats, the hole and the pond's left out); worked out on a call (the card's first 0.15 s, the pause's open), never per frame. The card counts the catch on display (it is written to the journal only on Sell, Keep or Release): +1 for 'caught', and for 'species' or the water's when it is the species' first.
+607. **Here now (135):** `journal.hereNow(sp)`: a home at the boat's water whose hours hold the present part of the day (or any hour); drawn as *now* in `teal_lit` on a tile not caught yet.
+608. **The export reminder's week (135, fixes 91.2):** with neither `exportAt` nor `remindAt` set, the first check sets `remindAt` to now and does not remind, so a fresh save's first pause opens on MENU.
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1309,7 +1325,7 @@ Run these after any change. A different result means something changed. Recorded
 The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
 
 ### 8.6 Next task
-Phases 1–130 are done. Phases 108–130 (fish art, the lodge sign, the rooms and people from the user's pictures, key hints, the title on tape) wait for the user's look (8.4 #72–#80). Next: a UX/UI audit of the whole game and its phases, on the user's request of 2026-11-17.
+Phase 135 is done, and with it UX round 1 (PLAN_UX.md, Phases 131–135). Next: the round-2 audit (PLAN_UX.md §3).
 
 ---
 

@@ -137,7 +137,30 @@ G.ui.milestones = (function () {
     return gy < R[1] + (R[3] >> 1) ? 'up' : 'down';
   }
 
+  // Phase 135 (PLAN_UX.md): the goal to chase next, for the card's foot and the MENU's status:
+  // the water you are on if its fish are not all caught, otherwise the unfinished milestone
+  // nearest done (by share; the sitting's pats and the hole left out). Worked out on a call,
+  // never per frame: NEXT {id, label, a, b, reward}, label short enough for the card.
+  var NEXT = { id: '', label: '', a: 0, b: 0, reward: 0 }, SKIP = { pats: 1, hole: 1, pondClean: 1, pondFull: 1, pondCaught: 1 };
+  function next(loc) {
+    var save = G.state.save, L = G.data.milestones, M = G.sim.milestones, best = null, bs = -1, i;
+    NEXT.id = '';
+    for (i = 0; i < L.length; i++) {
+      var m = L[i];
+      if (M.done(save, m.id) || SKIP[m.test]) continue;
+      var p = M.progress(save, m, G.data, sess, PR);
+      if (p[1] <= 0) continue;
+      var sc = m.test === 'water' && m.arg === loc ? 2 : p[0] / p[1];
+      if (sc > bs) { bs = sc; best = m; NEXT.a = Math.min(p[0], p[1]); NEXT.b = p[1]; }
+    }
+    if (!best) return NEXT;
+    NEXT.id = best.id; NEXT.reward = best.reward;
+    NEXT.label = best.test === 'water' ? G.data.locations[best.arg].name : best.name;
+    return NEXT;
+  }
+
   return {
+    next: next,
     native: true, open: open, update: update, draw: draw, tap: tap, step: step, drawLine: drawLine, checkNow: checkNow, mark: mark, MARKS: MARKS,
     rect: function () { lay(); return R; },
     // dbg.milestones(): each with done or its progress; this sitting's counts; the queue
