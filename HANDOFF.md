@@ -2,7 +2,7 @@
 
 How to pick the project up on another computer. **PLAN.md §8 Project Status is the authoritative status** (phases, architecture, decisions, known issues, baselines, next task) and is updated every phase. The status sections below are a snapshot from 2026-10-30, after Phase 50 (fitting it in, the last of the tackle, company and living-lake Phases 41–50 of [PLAN_TACKLE.md](PLAN_TACKLE.md)), on the branch `claude/clever-brown-4b34ko`.
 
-## Latest session (2026-11-17): the rooms' look, Phases 115-127
+## Latest session (2026-11-17): the rooms' look, Phases 115-128
 
 **Read this first if you are continuing the bait shop, the cabin or the rooms' people.**
 
@@ -10,12 +10,12 @@ How to pick the project up on another computer. **PLAN.md §8 Project Status is 
 - **What the owner wants:** a cozy, warm, liminal look (dusk, lamps, small strange things), the people as chibi sprites as on their own character sheet, the shop practically identical to their reference picture, and things that feel alive. They reject fat 2× pixels (Phases 121-122 were undone in 123) and recolours passed off as other characters (Phase 126).
 - **The people** (`js/ui/room.js` + `js/gfx/people_art.js`): the fisher, the golden and Rusty are the owner's sheet (`tools/art/ref/people_sheet.webp`) sampled to size with their own palettes (`sprites.js` `pf*`, `pd*`, `pr*`). The other three looks and three breeds are the sheet's body painted over in code with their own hats, beards, coats, ears, coats and tails (Phase 126). Walk: the fisher strides (Phase 125); the dog trots standing from every side and sits when it stops.
 - **The shop** (`js/ui/shop_room.js` + `js/gfx/shop_art.js`): the owner's picture (`tools/art/ref/shop.png`) sampled to 384×340 with 64 keys (`ps*`), the people painted out; the counter, floor lamp, fridge and monstera are cut out to stand in order with the walkers; live over it: Rusty, the night mask and glows, and `alive()` (windows by the hour, clock, lava lamp, tank, fridge, radio, cat, bulbs, a light dip every 41 s, steam, dust, the figure at the window). The map, objects and talk ids are unchanged since Phase 117.
-- **The cabin** (`js/ui/cabin.js`): still its own procedural room at full detail; boards recoloured to cedar once patched (Phase 123); the new people walk in it. The owner may want it remade like the shop: ask for a reference picture and use `tools/art/` the same way.
+- **The cabin** (`js/ui/cabin.js` + `js/gfx/cabin_art.js`, Phase 128): the owner's picture (`tools/art/ref/cabin.webp`) sampled to 528×352 with 64 keys (`pv*`), nearly the whole view; 16 pieces of furniture cut out (per-row spans) to stand in order with the walkers. No stages or repairs any more (the owner: "the cabin is always like this"): `data/gear.js` `cabin`, `restoreCabin`, `dbg.restore` and the `cabin_done` milestone are gone. The green door with the red panes is the back door to the Back Pond (walk up from (10, 1)); four plaques hold the four heaviest kept fish; the computer opens the fisher-and-dog picker. Live: windows by the hour, the stove's fire, the lamps, the TV's three channels, the record, steam. `dbg.ui('cabin')` from the boat between casts, `dbg.cabinWalk('RRRUUUUUUUU')` (out the green door to the pond).
 - **Phase 127:** the other three looks and three breeds are now the owner's second sheet (`tools/art/ref/people_sheet2.webp`), each its own drawing with its own palette (`pk*`, `py*`, `ph*`, `pu*`, `pb*`, `pc*`); the Phase 126 painted-over hats and breeds are gone. Made with `tools/art/extract2.py`, `km2.py`, `export2.py`.
 - **Regenerating art:** `tools/art/README.md` (Python 3 + numpy + Pillow; not part of the game). Data and palette must be replaced together.
 - **Checks:** `node tools/balance.js --validate`, `--replay 12345` (hash 2848910695), `--saves`; in a browser `?debug`, `dbg.ui('shop')`, `dbg.shopWalk('RRRUU')` (stops at (9, 4) facing `rusty`), `dbg.roomLife()`. Screenshots of the room are the real test of a look change: compare against the reference side by side.
 - **Open points (PLAN.md §8.4 #76-#78):** the owner's verdict on the rooms; the shop no longer shows the rods for sale leaving the rack, nor the minnows and crickets left; Rusty's paper and mug are drawn over his front view only.
-- **Ideas the owner may ask for next:** the cabin from a reference picture; more life in the shop (the cat's breathing, Rusty's own idle moves, the monstera's leaves in a draught); the walking dog's legs with more frames.
+- **Ideas the owner may ask for next:** more life in the shop (the cat's breathing, Rusty's own idle moves, the monstera's leaves in a draught); the walking dog's legs with more frames.
 
 ## State in one paragraph
 

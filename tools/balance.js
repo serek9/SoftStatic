@@ -949,7 +949,6 @@ function milestonesCheck() {
     pond_clean: [s => { s.pond.got = (1 << G.sim.pond.parts(d)) - 1; s.pond.stream = true; s.pond.clear = 1; }, s => { s.pond.got = 1; }],
     pond_full: [s => { for (let i = 0; i < G.sim.pond.capOf(d); i++) s.pond.stock.push({ id: 'yellow_perch' }); }, s => { s.pond.stock.push({ id: 'yellow_perch' }); }],
     pond_back: [s => { s.pond.caught = 1; }, s => {}],
-    cabin_done: [s => { s.cabinLevel = d.gear.cabin.length - 1; }, s => { s.cabinLevel = d.gear.cabin.length - 2; }],
     every_rod: [s => { s.gear.rods = d.gear.rods.map((r, i) => i); }, s => { s.gear.rods = d.gear.rods.slice(1).map((r, i) => i); }]
   };
   for (const id in d.locations) if (!d.locations[id].pond) {

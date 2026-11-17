@@ -126,7 +126,7 @@ G.ui.dock = (function () {
     }
     var rs = DEST[sel].indexOf('rest:') === 0 ? DEST[sel].slice(5) : '';
     if (rs) { var hh = G.ui.cabin.partStart(rs); waitSay = (rs === G.ui.cabin.partNow(G.state.save.clock) ? 'It is ' + rs + ' now. ' : '') + 'The clock to ' + (hh < 10 ? '0' : '') + hh + ':00.'; }
-    var say = msg || (rs ? waitSay : '') || (DEST[sel] === 'clear' ? G.data.pond.streamCost + 'c. You have ' + G.state.save.coins + '.' : '') || (DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours. ' + G.data.gear.cabin[G.state.save.cabinLevel].name + '.') : SAYS[sel]);
+    var say = msg || (rs ? waitSay : '') || (DEST[sel] === 'clear' ? G.data.pond.streamCost + 'c. You have ' + G.state.save.coins + '.' : '') || (DEST[sel] === 'cabin' ? (M === POND ? 'Up the steps to the back door.' : 'Yours, up the path. The stove is lit.') : SAYS[sel]);
     F.drawText(ctx, say, U.left(x), U.top(y) + ROWS.length * RH + 4, 'fog_mid');
     if (!U.touch()) {
       var hx = U.left(x), hy = y + R[3] - U.PAD - U.KEY_H;

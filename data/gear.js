@@ -138,17 +138,9 @@ G.data.gear = {
   // sizeMin went 0.7 -> 0.85 with it, keeping the mean sizeFactor at 1.1.
   economy: { sizeMin: 0.85, sizeMax: 1.5, sizeCurve: 1.6 },
 
-  // Cabin restoration (V9), one stage after another; cabinLevel is the index reached.
-  // plaques: how many kept fish can be mounted at that stage.
   // Phase 94.2: the first fish of a species pays its base price on top of its sale, at least min
   // coins, whether it is sold, kept or released (so letting it go never costs the bonus).
-  firstCatch: { min: 10 },
-  cabin: [
-    { name: 'Derelict', cost: 0, plaques: 2 },
-    { name: 'Patched Roof', cost: 150, plaques: 4 },
-    { name: 'Stove Lit', cost: 400, plaques: 6 },
-    { name: 'Rug and Lamp', cost: 900, plaques: 8 },
-    { name: 'Restored', cost: 2000, plaques: 10 }
-  ]
+  // Phase 128: the cabin's restoration stages (V9) are gone: the cabin is always as the user drew it.
+  firstCatch: { min: 10 }
   // Phase 52: passive mode (and passive.incomeMult, D5) is gone: no income without fishing.
 };

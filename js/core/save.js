@@ -152,7 +152,7 @@ G.core.save = (function () {
       baits: {},             // bait or lure id -> count left
       journal: {},           // species id -> {caught, bestLen, bestW, hints, seen, phantom}
       kept: [],              // {id, len, w}
-      cabinLevel: 0,         // restoration stage (data/gear.js cabin)
+      cabinLevel: 0,         // the old restoration stage; read by nothing since Phase 128 (the cabin has no stages)
       unlocks: { fog: true },
       loc: 'fog',            // the location the game resumes at
       unease: {},            // location id -> 0..1

@@ -1,4 +1,4 @@
-# tools/art: the user's pictures into palette-keyed data (Phases 124-126)
+# tools/art: the user's pictures into palette-keyed data (Phases 124-128)
 
 The rooms' people (`js/gfx/people_art.js`) and the bait shop (`js/gfx/shop_art.js`) are the
 user's own pictures (`ref/people_sheet.webp`, `ref/shop.png`), sampled to the game's size and
@@ -32,3 +32,14 @@ python3 extract2.py     # cells found from the sheet's alpha, sampled (fishers 5
 python3 km2.py          # a palette each (24, 24, 24, 14, 16, 16 keys); out2/q.png is a preview
 python3 export2.py      # out2/people_art2.js (goes in people_art.js under looks) and out2/pal2.txt
 ```
+
+The cabin (Phase 128; 528×352, 64 keys, `ref/cabin.webp`):
+
+```bash
+python3 cabin.py        # the picture sampled to the room (median per cell) and its 64 keys (out3/cabin.pkl, out3/cabin_q2.png)
+python3 cabin2.py       # the 16 cuts' spans; out3/cabin_art.js (goes to js/gfx/) and out3/cabin_pal.txt (the pv* keys)
+```
+
+A cut is a rectangle and a foot in `cabin2.py`'s CUTS; its spans skip the floor and rug keys, so move a
+rectangle there (out3/cuts.png shows the cuts lit over the darkened room) and keep the objects' tiles in
+`js/ui/cabin.js` OBJECTS to match.

@@ -93,7 +93,7 @@ G.scene.scenery = G.scene.scenery || {};
     var n = G.scene.sailing.light(G.state.save.clock || 0).night, wy = loc.waterY - oy, t = run.boat ? run.boat.t : 0;
     for (i = 0; i < loc.landmarks.length; i++) {
       m = loc.landmarks[i];
-      if (m.kind === 'backwall' && n > 0.08 && (G.state.save.cabinLevel || 0) >= 1) {
+      if (m.kind === 'backwall' && n > 0.08) {
         var top = wy - (14 + WALL_H) / HI;
         for (var w = 0; w < WIN.length; w++) {
           var sx = m.x + WIN[w][0] / HI - ox, sy = top + 10 / HI, ww = WIN[w][1] / HI, wh = WIN[w][2] / HI;

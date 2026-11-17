@@ -83,6 +83,7 @@ var FILES = [
   'js/ui/journal.js',
   'js/gfx/people_art.js',
   'js/gfx/shop_art.js',
+  'js/gfx/cabin_art.js',
   'js/ui/room.js',
   'js/ui/room_kit.js',
   'js/ui/shop_room.js',

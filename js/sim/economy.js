@@ -1,7 +1,7 @@
 var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 
 // Economy (V8): prices, gear effects, purchases, bait use, catches into the save,
-// location unlock checks and cabin restoration. Reels and lines are linear upgrades
+// location unlock checks (the cabin restoration went in Phase 128). Reels and lines are linear upgrades
 // (save.gear.reel = 2: the Brass Reel, owned and in use). Phase 43: rods are a rack:
 // save.gear.rods lists the indices owned and save.gear.rod is the one in use; buy('rod') buys
 // the next rod up the ladder (rods without ladder: false), buyRod any rod. The hook carries
@@ -304,16 +304,6 @@ G.sim.economy = (function () {
     return OK;
   }
 
-  // The next cabin restoration stage (V9): OK, MAXED or POOR.
-  function restoreCabin(save, data) {
-    var next = data.gear.cabin[save.cabinLevel + 1];
-    if (!next) return MAXED;
-    if (save.coins < next.cost) return POOR;
-    save.coins -= next.cost;
-    save.cabinLevel++;
-    return OK;
-  }
-
   return {
     TIERED: TIERED, OK: OK, MAXED: MAXED, POOR: POOR, LOCKED: LOCKED, UNKNOWN: UNKNOWN,
     partOf: partOf, anyCaught: anyCaught, firstBonus: firstBonus, sizeFactor: sizeFactor, sizeQ: sizeQ, qRange: qRange, hookQ: hookQ, size: size, price: price, baitById: baitById, isLure: isLure, baitInUse: baitInUse, effects: effects,
@@ -321,6 +311,6 @@ G.sim.economy = (function () {
     iceAll: iceAll, buySnow: buySnow, onIce: onIce, iceHook: iceHook, rodInHand: rodInHand,
     lineTypeById: lineTypeById, ownsLineType: ownsLineType, buyLineType: buyLineType, useLineType: useLineType,
     nextItem: nextItem, buy: buy, buyBait: buyBait, useBait: useBait, recordCatch: recordCatch,
-    canUnlock: canUnlock, unlock: unlock, restoreCabin: restoreCabin
+    canUnlock: canUnlock, unlock: unlock
   };
 })();
