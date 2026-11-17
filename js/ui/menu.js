@@ -73,7 +73,7 @@ G.ui.menu = (function () {
   // to the chosen one, with marks for more above and below.
   // Phase 91.3: 'Vibration' in touch mode. The list is built from ALL, keeping the rows that apply.
   // Phase 92: Music, World and Effects under the master Volume; Reduce flashes, Reduce motion and Reel (hold or toggle).
-  var ALL = ['Resume', 'Volume', 'Music', 'World', 'Effects', 'Sound', 'Dog barks', 'Full screen', 'Vibration', 'Text size', 'Reduce flashes', 'Reduce motion', 'Reel', 'Tips', 'Milestones', 'Controls', 'Fisher & dog', 'Export save', 'Import save'];
+  var ALL = ['Resume', 'Volume', 'Music', 'World', 'Effects', 'Sound', 'Dog barks', 'Full screen', 'Vibration', 'Text size', 'Reduce flashes', 'Reduce motion', 'Reel', 'Tips', 'Key hints', 'Milestones', 'Controls', 'Fisher & dog', 'Export save', 'Import save'];
   var SLIDER = { Volume: 'volume', Music: 'music', World: 'world', Effects: 'effects' };
   var ITEMS = [];
   function buildItems() {
@@ -154,6 +154,8 @@ G.ui.menu = (function () {
   // Phase 90: Text size, normal or large; the fit lays the UI layer out again.
   function textSize() { var st = G.state.save.settings; st.textSize = st.textSize === 'large' ? 'normal' : 'large'; dirty = true; G.core.device.fit(); layoutPause(); scrollTo(); }
   function tips() { var st = G.state.save.settings; st.tips = st.tips === false; dirty = true; }
+  // Phase 129: the key hints and the cabin's heading, the first time only (off) or always (on).
+  function hints() { var st = G.state.save.settings; st.hints = !st.hints; dirty = true; }
   function vibration() { var st = G.state.save.settings; st.vibration = st.vibration === false; dirty = true; if (st.vibration) G.core.device.buzz('bite'); }
 
   // 91.2: once a week, while the browser has not promised to keep the save and there is a save
@@ -188,6 +190,7 @@ G.ui.menu = (function () {
       if (ITEMS[sel] === 'Full screen' && lr) fullscreen();
       if (ITEMS[sel] === 'Text size' && lr) textSize();
       if (ITEMS[sel] === 'Tips' && lr) tips();
+      if (ITEMS[sel] === 'Key hints' && lr) hints();
       if (ITEMS[sel] === 'Vibration' && lr) vibration();
       if (!inp.pressed('action')) return true;
       G.audio.engine.play('uiOk');
@@ -198,6 +201,7 @@ G.ui.menu = (function () {
         case 'Full screen': fullscreen(); break; // Phase 59.3
         case 'Text size': textSize(); break; // Phase 90
         case 'Tips': tips(); break; // Phase 88
+        case 'Key hints': hints(); break; // Phase 129
         case 'Vibration': vibration(); break; // Phase 91.3
         case 'Reduce flashes': flip('reduceFlashes'); break; // Phase 92.2
         case 'Reduce motion': flip('reduceMotion'); break;
@@ -259,6 +263,7 @@ G.ui.menu = (function () {
         else if (ITEMS[i] === 'Full screen') F.drawText(ctx, G.core.device.isFullscreen() ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Text size') F.drawText(ctx, st.textSize === 'large' ? 'large' : 'normal', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Tips') F.drawText(ctx, st.tips === false ? 'off' : 'on', X + VAL_X, y, key);
+        else if (ITEMS[i] === 'Key hints') F.drawText(ctx, st.hints ? 'always' : 'first time', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Reduce flashes') F.drawText(ctx, st.reduceFlashes ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Reduce motion') F.drawText(ctx, st.reduceMotion ? 'on' : 'off', X + VAL_X, y, key);
         else if (ITEMS[i] === 'Reel') F.drawText(ctx, st.reel === 'toggle' ? 'tap on/off' : 'hold', X + VAL_X, y, key);
