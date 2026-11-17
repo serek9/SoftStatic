@@ -81,6 +81,8 @@ var FILES = [
   'js/ui/look.js',
   'js/ui/menu.js',
   'js/ui/journal.js',
+  'js/gfx/people_art.js',
+  'js/gfx/shop_art.js',
   'js/ui/room.js',
   'js/ui/room_kit.js',
   'js/ui/shop_room.js',
