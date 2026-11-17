@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-17, after 140 The Tape look. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-17, after 142 Stop it at a depth. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -529,6 +529,8 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 138 This tape | Done | ✓ | The MENU's foot shows this sitting's tape (TAPE  2 FISH  +76c  25 cm) above the next goal; the milestones page opens on the goal to chase, its row lit. |
 | 139 Tape sounds | Done | ✓ | A panel opening plays a cassette deck's key (a low click, a thunk, a breath of hiss); travel plays the tape winding on. Quiet, on the effects bus. |
 | 140 The Tape look | Done | ✓ | SETTINGS → SCREEN → Tape look (off by default): the picture with faint scanlines, a soft vignette and one slow tracking line, as a tape played back. The SETTINGS page's hints no longer run past its edge. |
+| 141 The fight says what lands fish | Done | ✓ | In the first fights the word over the rod said EASE (let go) on every run, which throws the hook on a slack line; now it says REEL (keep it tight) and EASE only while the line is really tight. The Controls page says the same. |
+| 142 Stop it at a depth | Done | ✓ | A first-time tip once a fish is caught: tap SPACE (REEL on a phone) to stop the sinking lure at a depth, since depth decides which fish come. |
 ### 8.2 Architecture as built
 
 The files that exist so far. §3 is the target tree; this is what is in it now.
@@ -1250,6 +1252,8 @@ These are interpretations and additions made while building, where the spec abov
 612. **The goal row (138):** `milestones.open` scrolls so the goal from `next(loc)` is the third row shown and lights it with `panel.row` (no cursor: the icon sits where it would).
 613. **Tape sounds (139):** `engine` `deck` (click at 0.55 rate and 0.02 gain, a 130→70 Hz sine thunk at 0.016, a 3.2→2.4 kHz band of hiss at 0.005) is played by `panel.kick()`; `ff` (a 1.4→3.6 kHz band of hiss over 0.7 s at 0.007, a 55→75 Hz triangle at 0.006) by the chart's `go`. Both at or under the UI clicks' levels.
 614. **The Tape look (140):** `save.settings.tapeLook` (false by default; read with defaults, no version bump). `panel.screen(ctx)` draws after the scene and before the overlays: one baked 640×360 layer (`ink` scanlines at 0.14, a 14-step vignette of nested 3 px frames up to 0.045) and, unless Reduce motion, a 2 px `fog_light` line at 0.05 drifting down at 14 px/s. It only darkens, so the sky stays under `dusk_high`. Measured: 16.47 → 16.52 ms a frame (vsync-bound) on PC and phone.
+615. **The fight's word (141):** `tips.js` shows EASE from tension 0.6 until it falls under 0.42 (`EASE_ON`, `EASE_OFF`, hysteresis), REEL otherwise, whatever the fish's mode: a scripted new player obeying it landed 2 of 2, while obeying the old run-based word lost 3 of 3 to thrown hooks. The phone's button still reads REEL (it is what the button does).
+616. **The depth tip (142):** `tips.js` 'depth' shows while sinking once a fish is caught (not on the ice) and is done when a press moves the lure from sinking to waiting that step (`last.fsm === 'sinking' && f === 'waiting' && pressed('action')`: the scene has already moved on when the tips step).
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1336,7 +1340,7 @@ Run these after any change. A different result means something changed. Recorded
 The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
 
 ### 8.6 Next task
-Phase 140 is done, and with it UX round 3 (PLAN_UX.md, Phases 139–140). Next: the round-4 audit.
+Phases 141–142 are done (UX round 4, PLAN_UX.md §8–9). Next: the round-5 audit.
 
 ---
 
