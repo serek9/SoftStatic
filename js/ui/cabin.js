@@ -126,6 +126,10 @@ G.ui.cabin = (function () {
   var turned = [];    // per mounted trophy: faces the door; decided in enter() only
   var order = [];
   var from = 'front', stored = 0, walk = null, faced = '', held = [], txt = { title: 'THE CABIN', next: '', stored: '', coins: '' }, lastCoins = -1;
+  // Phase 129: the heading (the cabin, the coins, the keys) shows on the first visit, then only
+  // with the pause list's Key hints at 'always'; a message box still opens at Space.
+  var firstVisit = true, R_NONE = [];
+  function headOn() { return firstVisit || !!G.state.save.settings.hints; }
   var open = '', lines = [], tvMode = 0, tvT = 0, recordT = -1, chordN = 0, sayN = {};
   var env = { hour: 0, night: 0, grey: 0, rain: 0, fog: 0, flash: 0 };
   var BOX = { x: 24, y: 296, w: 592, h: 56 }, HEAD = { x: 120, y: 316, w: 400, h: 40 };
@@ -158,6 +162,7 @@ G.ui.cabin = (function () {
     bake();
     t = 0; open = ''; faced = ''; held.length = 0; tvMode = 0; recordT = -1;
     from = G.state.run.loc === 'pond' ? 'back' : 'front';                         // Phase 83: which door he came in by
+    firstVisit = !(save.tipsDone && save.tipsDone.cabin);                          // Phase 129
     walk = from === 'back' ? WK.create({ c: BACK[0], r: BACK[1], face: 'down', dc: BACK[0] - 1, dr: BACK[1] }) : WK.create();
     R.prebake('fisher'); R.prebake('dog');                                          // so no step bakes a frame
     var ord = [];
@@ -185,7 +190,8 @@ G.ui.cabin = (function () {
   // the front door to Fogbound's pier. The water is loaded here, behind the scene change, and
   // the pier's panel waits until the boat leaves and comes back (as after the map's trips).
   function leave(door) {
-    var run = G.state.run, sc = G.scene.sailing, L = G.data.locations;
+    var run = G.state.run, sc = G.scene.sailing, L = G.data.locations, sv = G.state.save;
+    (sv.tipsDone || (sv.tipsDone = {})).cabin = true;                              // Phase 129: the heading's first visit is over
     if (door === 'back') {
       if (run.loc !== 'pond') { sc.load('pond'); sc.tp(L.pond.dock.x - 30); }
       G.ui.dock.disarm(); G.core.save.autosave('travel');
@@ -447,9 +453,10 @@ G.ui.cabin = (function () {
         return;
       }
       for (i = 0; i < lines.length && i < 2; i++) F.drawText(ctx, lines[i], BOX.x + 14, BOX.y + 10 + i * (F.LINE_H + 6), 'bone');
-      U.hint(ctx, 'SPACE', 'ok', BOX.x + 14, BOX.y + BOX.h - U.PAD - U.KEY_H);
+      if (headOn()) U.hint(ctx, 'SPACE', 'ok', BOX.x + 14, BOX.y + BOX.h - U.PAD - U.KEY_H);
       return;
     }
+    if (!headOn()) return;
     if (save.coins !== lastCoins) { lastCoins = save.coins; txt.coins = '  ' + save.coins; }
     U.frame(ctx, HEAD.x, HEAD.y - U.TAB, HEAD.w, HEAD.h, txt.title, txt.coins, 'bone');
     ctx.drawImage(coin, U.asideX(HEAD.x, HEAD.w, txt.coins), HEAD.y - U.TAB + 4);
@@ -511,7 +518,7 @@ G.ui.cabin = (function () {
     // Phase 58: a panel is open over the room (the touch pad hides), and the touch action
     // button's word for what he faces.
     busy: function () { return open !== ''; },
-    rects: function () { uiLay(); return open ? R_BOX : R_HEAD; }, // 8.4 #38: what the ESC key keeps off
+    rects: function () { uiLay(); return open ? R_BOX : (headOn() ? R_HEAD : R_NONE); }, // 8.4 #38: what the ESC key keeps off
     // Phase 59.2: a touch with the box open. A message: a tap on the box is Space (ok).
     tap: function (gx0, gy0) {
       uiLay();

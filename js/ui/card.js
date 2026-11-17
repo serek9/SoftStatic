@@ -41,8 +41,12 @@ G.ui.card = (function () {
     return { trash: i, kind: k.id, name: k.name, lines: F.wrap(k.card, W - 2 * U.PAD - PW + 8 - 8 - 8) };
   }
 
+  // Phase 129: the keys are named on the first FIRST_CARDS cards, then only with the Key hints setting.
+  var FIRST_CARDS = 3, keysOn = true;
   function open(info) {
     cur = info; sel = 0; t = 0; at = 0;
+    var s = G.state.save, n = 0; for (var k in s.journal) n += s.journal[k].caught || 0;
+    keysOn = !!s.settings.hints || n < FIRST_CARDS;
     if (info.trash === undefined) {
       txt.size = info.len.toFixed(1) + ' cm  ' + (info.w < 0.1 ? Math.round(info.w * 1000) + ' g' : info.w.toFixed(2) + ' kg'); // Phase 44: small fish in grams
       txt.sell = 'SELL ' + info.price + 'c';
@@ -134,7 +138,7 @@ G.ui.card = (function () {
     if (!(cur.pondK >= 0)) U.button(ctx, txt.sell, SELL[0], ky, SELL[2], KH, keyState(0, SELL));
     U.button(ctx, 'KEEP', KEEP[0], ky, KEEP[2], KH, keyState(1, KEEP));
     U.button(ctx, 'RELEASE', FREE[0], ky, FREE[2], KH, keyState(2, FREE));
-    if (!U.touch() && !G.core.device.touch()) F.drawText(ctx, HINT, x + W - U.PAD - F.measure(HINT), ty + 1 + 2 * (U.ROW + 1), 'fog_mid'); // 90.4: no keys named on a phone; 90.5: over the keys, at the right
+    if (keysOn && !U.touch() && !G.core.device.touch()) F.drawText(ctx, HINT, x + W - U.PAD - F.measure(HINT), ty + 1 + 2 * (U.ROW + 1), 'fog_mid'); // 90.4: no keys named on a phone; 90.5: over the keys, at the right
     G.ui.badge.draw(ctx, x, y, W);                                                   // Phase 94.3: the size badge, over the card
     G.core.view.begin(ctx0, false);
   }
@@ -150,7 +154,7 @@ G.ui.card = (function () {
     var rx = x + U.PAD + PW + 8;
     for (var i = 0; i < cur.lines.length && i < 4; i++) F.drawText(ctx, cur.lines[i], rx, ty + 1 + i * (U.ROW + 1), i ? 'fog_light' : 'bone');
     U.button(ctx, 'BIN', SELL[0], y + KEY_Y, SELL[2], KH, G.core.input.held('action') && t >= 0.4 ? 2 : 1);
-    if (!U.touch() && !G.core.device.touch()) F.drawText(ctx, 'SPACE', SELL[0] + SELL[2] + 8, y + KEY_Y + 2, 'fog_mid');
+    if (keysOn && !U.touch() && !G.core.device.touch()) F.drawText(ctx, 'SPACE', SELL[0] + SELL[2] + 8, y + KEY_Y + 2, 'fog_mid');
   }
 
   // Touch and the mouse (Phase 46): a tap on SELL, KEEP or RELEASE chooses it, and the caller presses
