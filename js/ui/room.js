@@ -3,9 +3,8 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // What the walk-in rooms share (Phase 56): the bait shop (js/ui/shop_room.js) and the cabin
 // (js/ui/cabin_room.js) are both small rooms seen from above at a three-quarter angle, walked
 // tile by tile. This file has the walk (lifted from the shop's, Phase 36, unchanged in its
-// rules), and the fisher, the dog and Rusty who walk them, painted as the boat paints them
-// (Phase 119: js/scene/fisher.js, js/scene/dog.js), in the rooms' three-quarter view. Every
-// colour a palette key.
+// rules), and the fisher, the dog and Rusty who walk them, as overworld sprites at 2× (Phase
+// 120). Every colour a palette key.
 // Visual and input only: no randomness, nothing saved.
 G.ui = G.ui || {};
 G.ui.room = (function () {
@@ -115,165 +114,150 @@ G.ui.room = (function () {
   function dk(k) { return S.shift(k, -1); }
   function lt(k) { return S.shift(k, 1); }
 
-  // ---- Phase 119: the fisher and the dog as on the boat ---------------------------------------
-  // The user asked for the people of the rooms to look as they do in the boat, in the room's
-  // three-quarter view: the boat's own way of painting (js/scene/fisher.js, js/scene/dog.js):
-  // soft round shapes shaded by their ramps with 'ink' at the rim, no drawn outline, an eye a
-  // single ink pixel, the same keys from the look. The fisher stands 26×44 (his feet at y 42):
-  // the boat's head (4.8×5), its round body (7.5×8), its arms as limbs, and the legs and boots
-  // the boat hides. The dog 30×24 from the side, 22×24 from the front and behind, sitting as
-  // it sits in the bow (the boat's own painting).
-  var BA = G.gfx.paint, BOOTB = ['ink', 'wood_deep', 'wood_dark', 'wood'];
-  function bootR(L) {
-    var c = L.coat, k = L.trousers || 'stone_dark';
-    return { COAT: ['ink', c[0], c[1], c[2]], FAR: ['ink', 'ink', c[0], c[1]], SKIN: L.skin, H: L.hatKeys, HAIR: [dk(L.hair), L.hair, lt(L.hair)],
-      TR: ['ink', dk(k), k, lt(k)], TF: ['ink', 'ink', dk(k), k] };
-  }
-  function bChecks(c, L, cx, cy, rx, ry) {
-    for (var y = Math.floor(cy - ry); y <= cy + ry; y++) for (var x = Math.floor(cx - rx); x <= cx + rx; x++) {
-      var h = y % 4 === 1, v = x % 4 === 1, nx = (x - cx) / rx, ny = (y - cy) / ry;
-      if ((h || v) && nx * nx + ny * ny < 0.7) BA.px(c, h && v ? L.check : L.coat[0], x, y);
-    }
-  }
-  function bHat(c, L, R, dir) {
-    var H = R.H, side = dir === 'side', back = dir === 'up';
+  // ---- Phase 120: the people as overworld sprites -------------------------------------------
+  // The user asked for the rooms' people a little bigger, at the cat's own pixel size, all of a
+  // piece, the way a Pokémon game draws its people: small sprites with a dark outline, a big
+  // head, a compact body, painted on a grid and shown at 2× (each art pixel 2×2), as the
+  // shop's cat is. The fisher and Rusty are 16×26 (32×52 on screen), the dog 22×15 from the
+  // side and 14×15 from the front and behind (44×30 and 28×30), so the dog stands longer than
+  // the cat curled up and the fisher a head and more over the dog. The look's own keys: the
+  // coat, the hat and its shape, the hair, a beard, the skin, the trousers; the breed's coat,
+  // ears, tail, muzzle, mask or blaze.
+  var PX = 2, BOOTK = ['outline', 'wood_deep', 'wood_dark', 'wood'];
+  function hatTop(g, L, dir) {
+    var H = [dk(L.hatKeys[0]), L.hatKeys[0], L.hatKeys[1], L.hatKeys[2]], side = dir === 'side', back = dir === 'up';
     if (L.hat === 'cap') {
-      BA.blob(c, 13, 6.5, side ? 5 : 5.4, 3.6, H, { bias: 0.1 }); BA.box(c, H[0], side ? 9 : 8, 8, side ? 9 : 11, 1);
-      if (side) { BA.box(c, H[1], 15, 8, 5, 2); BA.box(c, H[0], 15, 9, 5, 1); }                       // the brim, forward
-      else if (!back) { BA.box(c, H[1], 8, 9, 11, 2); BA.box(c, H[0], 8, 10, 11, 1); }                   // the brim, toward us
-      else { BA.box(c, 'ink', 11, 9, 5, 1); }                                                            // the strap
+      g.ell(8, 5.5, 6.2, 4.6, H, { bias: 0.15 });
+      if (side) { g.rect(H[1], 9, 8, 6, 2); g.rect(H[2], 9, 8, 5, 1); }                       // the brim, forward
+      else if (!back) { g.rect(H[0], 2, 8, 12, 2); g.rect(H[2], 3, 8, 10, 1); g.rect('bone', 6, 4, 4, 2); } // the brim toward us, a patch
+      else g.rect(H[0], 6, 8, 4, 1);                                                           // the strap
     } else if (L.hat === 'knit' || L.hat === 'lamp') {
-      var K = L.hat === 'lamp' ? ['ink', 'stone_dark', 'stone'] : H;
-      BA.blob(c, 13, 6.5, side ? 5.2 : 5.6, 4.2, K, { bias: 0.1 }); BA.box(c, K[0], side ? 9 : 8, 8, side ? 9 : 11, 2);
-      for (var x = 9; x < 18; x += 2) BA.px(c, K[1], x, 8);
-      if (L.hat === 'knit') BA.blob(c, side ? 11.5 : 13, 2.2, 1.8, 1.5, H, { bias: 0.2 });                // the bobble
-      else if (side) { BA.box(c, 'ink', 16, 6, 3, 3); BA.px(c, 'lamp_glow', 18, 7); }
-      else if (!back) { BA.box(c, 'ink', 11, 6, 5, 3); BA.px(c, 'lamp_glow', 13, 7); BA.px(c, 'cream', 12, 7); }
-    } else {                                                                                            // the bucket: a soft crown, the brim all round
-      BA.blob(c, 13, 6, 4.6, 3.4, H, { bias: 0.1 }); BA.blob(c, 13, 9, side ? 7.5 : 8, 1.8, H, { bias: back ? -0.1 : 0.05 }); BA.box(c, H[0], 9, 8, 9, 1);
+      var K = L.hat === 'lamp' ? ['ink', 'stone_dark', 'stone', 'stone_hi'] : H;
+      g.ell(8, 5.5, 6.2, 5, K, { bias: 0.15 }); g.rect(K[1], 2, 8, 12, 2);
+      for (var x = 3; x < 14; x += 2) g.set(K[3], x, 8);
+      if (L.hat === 'knit') g.ell(side ? 6 : 8, 0.8, 1.8, 1.4, H, { bias: 0.3 });
+      else if (side) { g.rect('ink', 12, 5, 3, 3); g.set('lamp_glow', 14, 6); }
+      else if (!back) { g.rect('ink', 6, 5, 4, 3); g.set('lamp_glow', 7, 6); g.set('cream', 8, 6); }
+    } else {                                                                                    // the bucket
+      g.ell(8, 4.8, 5, 4, H, { bias: 0.15 }); g.ell(8, 8, 7.6, 1.8, H, { bias: back ? -0.1 : 0.1 }); g.rect(H[0], 3, 7, 10, 1);
     }
   }
-  function boatFisher(c, dir, fr, L) {
-    var R = bootR(L), k = L.skin, st = fr === 1 ? 1 : (fr === 2 ? -1 : 0), s;
+  function trainer(g, dir, fr, L, rusty) {
+    var c = L.coat, CO = [dk(c[0]), c[0], c[1], c[2]], k = L.skin, tr = L.trousers || 'stone_dark', TR = [dk(tr), tr, lt(tr)];
+    var HAIR = [dk(L.hair), L.hair, lt(L.hair)], st = fr === 1 ? 1 : (fr === 2 ? -1 : 0), s;
+    if (rusty) st = 0;
     if (dir === 'side') {
-      // Legs scissoring, the far one darker; boots toe forward.
-      for (s = 1; s >= 0; s--) {
-        var d = (s ? -st : st) * 3, keys = s ? R.TF : R.TR;
-        BA.limb(c, 13, 29, 13 + d * 0.5, 34, 2.7, keys, 0.05); BA.limb(c, 13 + d * 0.5, 34, 13 + d, 38, 2.4, keys, 0);
-        var bx = Math.round(13 + d);
-        BA.box(c, BOOTB[s ? 0 : 1], bx - 2, 38, 5, 3); BA.box(c, BOOTB[s ? 1 : 2], bx - 2, 38, 5, 1); BA.box(c, 'ink', bx - 2, 41, 7, 1);
+      for (s = 1; s >= 0; s--) {                                                                // the legs scissor, the far one darker
+        var d = (s ? -st : st) * 2, x0 = 6 + d;
+        g.rect(s ? TR[0] : TR[1], x0, 20, 3, 4); g.rect(BOOTK[s ? 1 : 2], x0, 23, 4, 2); g.rect(BOOTK[3], x0 + 1, 23, 2, 1);
       }
-      BA.limb(c, 13, 19, 13 - st * 3, 27, 2.2, R.FAR, 0); BA.blob(c, 13 - st * 3, 28.5, 1.6, 1.5, [k[0], k[0], k[1], k[2]], {});   // the far arm
-      BA.blob(c, 13, 24, 6, 8, R.COAT, { bias: 0.05 });
-      if (L.check) bChecks(c, L, 13, 24, 6, 8);
-      BA.box(c, L.coat[0], 16, 18, 1, 12);                                                                // the zip at the front
-      BA.limb(c, 13, 19, 13 + st * 3, 27, 2.4, R.COAT, 0.1); BA.blob(c, 13 + st * 3, 28.5, 1.7, 1.6, k, { bias: 0.1 }); // the near arm
-      BA.box(c, L.coat[2], 11, 16, 5, 1); BA.box(c, L.coat[0], 12, 17, 4, 1);                            // the collar
-      BA.blob(c, 13.5, 12, 4.6, 5, k, { bias: 0.1 });
-      BA.blob(c, 9.8, 11.5, 1.8, 3.2, R.HAIR, { bias: 0.1 });                                             // hair at the back
-      BA.px(c, k[0], 11, 12); BA.px(c, 'ink', 16, 11); BA.px(c, k[3], 16, 12); BA.px(c, k[1], 18, 13); BA.box(c, k[1], 15, 15, 2, 1);
-      if (L.beard) BA.blob(c, 15, 15, 3, 2.2, L.beard, { bias: 0.1 });
-      bHat(c, L, R, 'side');
+      g.cap(8, 15, 8 - st * 2, 19, 1.3, [CO[0], CO[0], CO[1]], 0); g.set(k[1], 8 - st * 2, 20);   // the far arm
+      g.slab(4, 13, 8, 9, CO);                                                                  // the coat
+      if (L.check) g.over(4, 13, 8, 9, function (x, y, kk) { return (x % 3 === 0 || y % 3 === 0) && CO.indexOf(kk) >= 0 ? L.check : ''; });
+      g.rect(CO[0], 10, 14, 1, 7);
+      g.cap(8, 15, 8 + st * 2, 19, 1.4, CO, 0.2); g.ell(8 + st * 2, 20, 1.2, 1.1, k, { bias: 0.2 }); // the near arm, the hand
+      g.ell(8.5, 8.5, 5.5, 5.5, k, { bias: 0.2 });                                              // the head
+      g.ell(4.5, 9, 2, 3.5, HAIR, { bias: 0.1 });                                               // hair at the back
+      g.rect(k[0], 6, 10, 1, 2);                                                                // the ear
+      g.rect('outline', 11, 10, 1, 2); g.set(k[3], 13, 11); g.set(k[3], 10, 12);                 // the eye, the nose, a cheek
+      if (L.beard) g.ell(11, 12, 2.6, 1.8, [dk(L.beard[0])].concat(L.beard), { bias: 0.2 });
+      hatTop(g, L, 'side');
+      g.outline('outline');
       return;
     }
-    var back = dir === 'up', lift = fr === 1 ? [2, 0] : (fr === 2 ? [0, 2] : [0, 0]);
-    for (s = 0; s < 2; s++) {
-      var lx = s ? 15.5 : 10.5, ly = 38 - lift[s];
-      BA.limb(c, lx, 29, lx, ly, 2.6, s ? R.TF : R.TR, s ? -0.1 : 0.05);
-      BA.box(c, BOOTB[1], lx - 2.5, ly, 5, 3); BA.box(c, BOOTB[2], lx - 2.5, ly, 5, 1); BA.box(c, 'ink', lx - 2.5, ly + 3, 5, 1);
+    var back = dir === 'up', lift = fr === 1 ? [1, 0] : (fr === 2 ? [0, 1] : [0, 0]);
+    if (rusty) lift = [0, 0];
+    for (s = 0; s < 2; s++) {                                                                   // the legs and boots
+      var lx = s ? 8 : 4, ly = 20 - lift[s];
+      g.rect(s ? TR[0] : TR[1], lx, ly, 4, 4); g.rect(s ? TR[1] : TR[2], lx, ly, 1, 3);
+      g.rect(BOOTK[2], lx, ly + 3, 4, 2); g.rect(BOOTK[3], lx + 1, ly + 3, 2, 1);
     }
-    BA.blob(c, 13, 24, 7.5, 8, R.COAT, { bias: 0.05 });
-    if (L.check) bChecks(c, L, 13, 24, 7.5, 8);
-    if (!back) { BA.box(c, L.coat[0], 13, 18, 1, 13); BA.box(c, L.coat[2], 10, 16, 7, 1); BA.box(c, L.coat[0], 11, 17, 5, 1); BA.px(c, 'chrome_hi', 13, 20); }
-    else { BA.box(c, L.coat[0], 13, 20, 1, 11); BA.box(c, L.coat[2], 9, 18, 9, 1); }
-    // The arms at his sides, swinging against the legs; the hands.
-    BA.limb(c, 6.5, 19, 5.5, 27 + st, 2.4, R.COAT, 0.1); BA.limb(c, 19.5, 19, 20.5, 27 - st, 2.4, R.FAR, 0);
-    BA.blob(c, 5.5, 28.5 + st, 1.7, 1.6, k, { bias: 0.1 }); BA.blob(c, 20.5, 28.5 - st, 1.7, 1.6, k, { bias: -0.1 });
+    g.slab(3, 13, 10, 9, CO);                                                                   // the coat
+    if (L.check) g.over(3, 13, 10, 9, function (x, y, kk) { return (x % 3 === 0 || y % 3 === 0) && CO.indexOf(kk) >= 0 ? L.check : ''; });
+    if (!back) { g.rect(CO[0], 8, 14, 1, 8); g.rect(CO[3], 5, 13, 6, 1); g.set(k[1], 7, 13); g.set(k[1], 8, 13); }
+    else { g.rect(CO[0], 8, 15, 1, 7); g.rect(CO[3], 4, 13, 8, 1); }
+    if (rusty && !back) { g.rect('denim', 5, 14, 1, 8); g.rect('denim', 10, 14, 1, 8); g.set('brass_hi', 5, 16); g.set('brass_hi', 10, 16); }
+    g.rect(CO[2], 1, 14 + st, 2, 6); g.rect(CO[1], 13, 14 - st, 2, 6);                          // the arms, swinging
+    g.rect(k[2], 1, 20 + st, 2, 1); g.rect(k[1], 13, 20 - st, 2, 1);                            // the hands
     if (back) {
-      BA.box(c, k[1], 11, 15, 5, 2);                                                                     // the nape
-      BA.blob(c, 13, 11.5, 4.8, 4.8, R.HAIR, { bias: 0.05 });
-      BA.px(c, k[1], 8, 12); BA.px(c, k[1], 18, 12);                                                     // the ears
+      g.ell(8, 8.5, 5.6, 5.5, HAIR, { bias: 0.15 }); g.rect(k[1], 6, 13, 4, 1);                 // the back of the head, the nape
+      g.set(k[1], 2, 9); g.set(k[1], 13, 9);
     } else {
-      BA.blob(c, 13, 12, 4.8, 5, k, { bias: 0.1 });
-      BA.px(c, k[0], 8, 12); BA.px(c, k[0], 18, 12);
-      BA.box(c, L.hair, 8, 9, 2, 3); BA.box(c, L.hair, 17, 9, 2, 3);
-      BA.px(c, 'ink', 11, 12); BA.px(c, 'ink', 15, 12);
-      BA.px(c, k[1], 13, 13); BA.box(c, k[1], 12, 15, 3, 1);
-      if (L.beard) BA.blob(c, 13, 15.2, 4, 2.4, L.beard, { bias: 0.1 });
+      g.ell(8, 9, 5.6, 5.2, k, { bias: 0.2 });                                                  // the face
+      g.rect(L.hair, 2, 7, 2, 4); g.rect(L.hair, 12, 7, 2, 4);
+      if (rusty && fr === 1 || rusty && fr === 3) { g.rect(k[0], 5, 11, 2, 1); g.rect(k[0], 9, 11, 2, 1); }
+      else { g.rect('outline', 5, 10, 1, 2); g.rect('outline', 10, 10, 1, 2); g.set('ivory', 5, 10); g.set('ivory', 10, 10); }
+      g.set(k[3], 4, 12); g.set(k[3], 11, 12);                                                  // the cheeks
+      if (L.beard) { var BD = [dk(L.beard[0])].concat(L.beard); g.ell(8, 12.8, 4.4, 2, BD, { bias: 0.25 }); g.rect(BD[1], 6, 12, 4, 1); }
+      else g.rect(k[0], 7, 13, 2, 1);
     }
-    bHat(c, L, R, back ? 'up' : 'down');
+    hatTop(g, L, back ? 'up' : 'down');
+    if (rusty && !back && fr === 2) { g.slab(9, 10, 5, 5, ['outline', 'paper_dark', 'paper', 'cream']); g.rect(k[2], 12, 14, 2, 2); }   // his mug at his mouth
+    if (rusty && !back && fr === 3) { g.slab(2, 14, 12, 7, ['paper_dark', 'paper_dark', 'paper', 'bone']); for (var y = 16; y < 20; y += 2) { g.rect('stone_hi', 3, y, 4, 1); g.rect('stone_hi', 9, y, 4, 1); } }
+    g.outline('outline');
   }
-  function boatDog(c, dir, fr, B) {
-    var D = B.coat, EAR = B.ear, MZ = B.muzzle, b = B.bulk, LEG = B.paleLegs ? MZ : D, FAR = [D[0], D[0], D[1]], st = fr === 1 ? 1 : (fr === 2 ? -1 : 0), sit = fr === 3;
+  function puppy(g, dir, fr, B) {
+    var D = [dk(B.coat[0]), B.coat[0], B.coat[1], B.coat[2]], EAR = B.ear, MZ = B.muzzle, LEG = B.paleLegs ? MZ : B.coat, FAR = [D[0], D[0], D[1]];
+    var st = fr === 1 ? 1 : (fr === 2 ? -1 : 0), sit = fr === 3;
     if (dir === 'side') {
-      // Standing or trotting: the tail, the far legs, the body and chest, the near legs, the head.
-      var t = B.tail;
-      if (t === 'curl') { BA.limb(c, 6, 10, 5, 5, 1.4, D, 0.1); BA.limb(c, 5, 5, 8, 4, 1.3, D, 0.2); }
-      else if (t === 'low') BA.limb(c, 6, 11, 3, 16, 1.7, D, 0);
-      else if (t === 'pom') { BA.limb(c, 6, 10, 4, 7, 0.9, D, 0.1); BA.blob(c, 3.5, 6.5, 1.9, 1.8, D, { bias: 0.15 }); }
-      else BA.limb(c, 6, 10, 2, 7 - st, 1.4, D, 0.1);
-      BA.limb(c, 9, 13, 9 - st * 2, 21, 1.4, FAR, 0); BA.limb(c, 19, 13, 19 + st * 2, 21, 1.4, FAR, 0);
-      BA.blob(c, 13, 12, 7.5 * b, 4.2 * b, D, { bias: 0.05 });
-      BA.blob(c, 19, 12.5, 3.6 * b, 4 * b, D, { bias: 0.15 }); BA.box(c, B.chest, 20, 12, 2, 3);
-      BA.limb(c, 10, 14, 10 + st * 2, 21, 1.5, LEG, 0.1); BA.limb(c, 18, 14, 18 - st * 2, 21, 1.5, LEG, 0.1);
-      BA.box(c, LEG[1], 9 + st * 2, 21, 3, 1); BA.box(c, LEG[1], 17 - st * 2, 21, 3, 1);
-      BA.limb(c, 19, 10, 21, 6.5, 2.4 * b, D, 0.15);                                                     // the neck
-      var hx = 22, hy = 5;
-      BA.blob(c, hx, hy, 4, 3.6, D, { bias: 0.1 });
-      BA.blob(c, hx + 3.6, hy + 1.4, 2.6, 1.7, MZ, { bias: 0.25 });
-      if (B.face === 'mask') BA.box(c, B.chest, hx, hy, 3, 1);
-      if (B.face === 'blaze') BA.box(c, B.chest, hx + 2, hy - 3, 1, 3);
-      BA.px(c, 'ink', hx + 6, hy + 1); BA.px(c, 'ink', hx + 1, hy - 1);
-      if (B.ears === 'prick') BA.limb(c, hx - 1, hy - 2, hx - 0.5, hy - 6, 1.4, EAR, 0.1);
-      else if (B.ears === 'heavy') BA.limb(c, hx - 2, hy - 2, hx - 3.2, hy + 2.8, 1.9, EAR, 0);
-      else if (B.ears === 'pom') { BA.blob(c, hx - 2.6, hy + 1.4, 1.9, 3.1, EAR, { bias: 0.15 }); BA.blob(c, hx - 0.5, hy - 3.2, 2.6, 1.8, D, { bias: 0.2 }); }
-      else BA.limb(c, hx - 2, hy - 2, hx - 3, hy + 2, 1.4, EAR, 0);
-      if (st) BA.px(c, 'pink_hi', hx + 4, hy + 3);
+      var t = B.tail;                                                                           // the tail
+      if (t === 'curl') g.ell(3.5, 4, 2, 1.8, D, { bias: 0.3 });
+      else if (t === 'pom') { g.line(D[1], 4, 7, 2, 4); g.ell(2, 3.5, 1.6, 1.5, D, { bias: 0.3 }); }
+      else if (t === 'low') g.cap(4, 7, 2, 11, 1, D, 0.1);
+      else g.cap(4, 7, 1, sit ? 11 : 4 - st, 1.2, D, 0.2);
+      if (sit) {
+        g.ell(7, 10, 4.5, 3.8, D, { bias: 0.15 });                                              // the haunch
+        g.ell(12, 8.5, 3.6, 4.2, D, { bias: 0.2 }); g.rect(B.chest, 13, 8, 2, 4);               // the chest
+        g.rect(LEG[1], 12, 11, 2, 3); g.rect(LEG[2], 12, 11, 1, 3); g.rect(LEG[1], 5, 13, 4, 1); // the forelegs, the folded hind paw
+        var hx = 14, hy = 4.5;
+      } else {
+        g.rect(FAR[1], 6 - st, 10, 2, 4); g.rect(FAR[1], 14 + st, 10, 2, 4);                    // the far legs
+        g.ell(9.5, 8.5, 7, 3.6, D, { bias: 0.15 });                                             // the body
+        g.ell(14.5, 8.5, 3, 3.4, D, { bias: 0.25 }); g.rect(B.chest, 15, 8, 2, 3);
+        g.rect(LEG[1], 5 + st, 11, 2, 3); g.rect(LEG[1], 13 - st, 11, 2, 3); g.rect(LEG[2], 5 + st, 11, 1, 2); g.rect(LEG[2], 13 - st, 11, 1, 2);
+        hx = 17; hy = 5;
+      }
+      g.ell(hx, hy, 3.8, 3.4, D, { bias: 0.2 });                                                // the head
+      g.ell(hx + 3, hy + 1.3, 2.2, 1.5, MZ, { bias: 0.3 }); g.set('outline', hx + 5, hy + 0.5); // the muzzle, the nose
+      g.set('outline', hx + 1, hy - 1); if (st && !sit) g.set('pink_hi', hx + 3, hy + 3);
+      if (B.face === 'mask') g.rect(B.chest, hx, hy, 2, 1);
+      if (B.face === 'blaze') g.rect(B.chest, hx + 1, hy - 3, 1, 3);
+      if (B.ears === 'prick') g.poly([[hx - 2, hy - 2], [hx - 1, hy - 6], [hx + 0.5, hy - 2]], EAR[1]);
+      else if (B.ears === 'pom') { g.ell(hx - 2, hy + 1, 1.6, 2.6, EAR, { bias: 0.2 }); g.ell(hx - 0.5, hy - 3, 2.2, 1.5, D, { bias: 0.3 }); }
+      else g.ell(hx - 1.8, hy + 1, 1.4, B.ears === 'heavy' ? 3 : 2.4, EAR, { bias: 0.1 });
+      if (B.curly) g.over(0, 0, 22, 15, function (x, y, kk) { return D.indexOf(kk) >= 0 && (x + y * 2) % 4 === 0 ? D[1] : ''; });
+      g.outline('outline');
       return;
     }
-    var back = dir === 'up';
-    // From the front or behind: the body beyond, the legs, the chest (or the haunches), the head.
-    BA.blob(c, 11, sit ? 15 : 13, 5.5 * b, sit ? 5.5 : 5, back ? D : [D[0], D[0], D[1]], { bias: 0.05 });
-    if (sit) { BA.blob(c, 6, 19, 3, 2.6, D, { bias: 0.1 }); BA.blob(c, 16, 19, 3, 2.6, D, { bias: -0.1 }); }
-    BA.limb(c, 8.5, 14, 8.5, 21 - (st > 0 ? 1 : 0), 1.5, LEG, 0.1); BA.limb(c, 13.5, 14, 13.5, 21 - (st < 0 ? 1 : 0), 1.5, LEG, -0.1);
-    BA.box(c, LEG[1], 7, 21 - (st > 0 ? 1 : 0), 3, 1); BA.box(c, LEG[1], 12, 21 - (st < 0 ? 1 : 0), 3, 1);
+    var back = dir === 'up', cx = 7;
+    if (sit) { g.ell(3.5, 12, 2.4, 2.2, D, { bias: 0.1 }); g.ell(10.5, 12, 2.4, 2.2, D, { bias: 0.1 }); }
+    g.ell(cx, 10, 4.2, 3.6, back ? D : FAR.concat([D[2]]), { bias: 0.1 });                      // the body
+    g.rect(LEG[1], 4, 11 - (st > 0 ? 1 : 0), 2, 3); g.rect(LEG[1], 8, 11 - (st < 0 ? 1 : 0), 2, 3);
     if (back) {
-      BA.blob(c, 11, 14, 5 * b, 5, D, { bias: 0.1 });                                                    // the haunches
-      if (B.tail === 'curl') BA.blob(c, 11, 9, 2.4, 2, D, { bias: 0.3 }); else BA.limb(c, 11, 15, 11 + st, 20, 1.3, D, 0.1);
-      BA.blob(c, 11, 6, 4, 3.6, D, { bias: 0.1 });
+      if (B.tail === 'curl') g.ell(cx, 7.5, 1.8, 1.5, D, { bias: 0.3 }); else g.cap(cx, 10, cx + st, 13.5, 1, D, 0.2);
+      g.ell(cx, 4.5, 4, 3.6, D, { bias: 0.2 });
     } else {
-      BA.blob(c, 11, 12, 3.8 * b, 4.2 * b, D, { bias: 0.15 }); BA.box(c, B.chest, 10, 11, 3, 4);
-      BA.blob(c, 11, 6, 4.2, 3.8, D, { bias: 0.1 });
-      BA.blob(c, 11, 8, 2.4, 1.6, MZ, { bias: 0.25 }); BA.box(c, 'ink', 10, 7, 3, 1);
-      if (B.face === 'mask') { BA.px(c, B.chest, 9, 5); BA.px(c, B.chest, 13, 5); }
-      if (B.face === 'blaze') BA.box(c, B.chest, 11, 2, 1, 4);
-      BA.px(c, 'ink', 9, 5); BA.px(c, 'ink', 13, 5);
-      if (st) BA.px(c, 'pink_hi', 11, 9);
+      g.ell(cx, 9, 3, 3.2, D, { bias: 0.25 }); g.rect(B.chest, 6, 8, 3, 4);                    // the chest
+      g.ell(cx, 4.5, 4.4, 3.8, D, { bias: 0.2 });                                               // the head
+      g.ell(cx, 6.5, 2, 1.4, MZ, { bias: 0.3 }); g.rect('outline', 6, 5, 2, 1);                 // the muzzle, the nose
+      g.set('outline', 5, 3); g.set('outline', 9, 3);
+      if (B.face === 'mask') { g.set(B.chest, 5, 2); g.set(B.chest, 9, 2); }
+      if (B.face === 'blaze') g.rect(B.chest, 7, 0, 1, 3);
+      if (st) g.set('pink_hi', 7, 8);
     }
-    if (B.ears === 'prick') { BA.limb(c, 8, 4, 7.5, 0.5, 1.3, EAR, 0.1); BA.limb(c, 14, 4, 14.5, 0.5, 1.3, EAR, 0.1); }
-    else if (B.ears === 'heavy') { BA.blob(c, 6.6, 7, 1.7, 3, EAR, { bias: 0.1 }); BA.blob(c, 15.4, 7, 1.7, 3, EAR, { bias: 0.1 }); }
-    else if (B.ears === 'pom') { BA.blob(c, 6.6, 7.5, 1.8, 3, EAR, { bias: 0.15 }); BA.blob(c, 15.4, 7.5, 1.8, 3, EAR, { bias: 0.15 }); BA.blob(c, 11, 2.5, 2.6, 1.8, D, { bias: 0.2 }); }
-    else { BA.limb(c, 7.5, 4, 6.8, 8.5, 1.4, EAR, 0); BA.limb(c, 14.5, 4, 15.2, 8.5, 1.4, EAR, 0); }
+    if (B.ears === 'prick') { g.poly([[3, 3], [3.5, -1], [5.5, 2]], EAR[1]); g.poly([[8.5, 2], [10.5, -1], [11, 3]], EAR[1]); }
+    else if (B.ears === 'pom') { g.ell(2.6, 5, 1.6, 2.4, EAR, { bias: 0.2 }); g.ell(11.4, 5, 1.6, 2.4, EAR, { bias: 0.2 }); g.ell(cx, 1, 2, 1.3, D, { bias: 0.3 }); }
+    else { g.ell(2.8, 5, 1.4, B.ears === 'heavy' ? 3 : 2.4, EAR, { bias: 0.1 }); g.ell(11.2, 5, 1.4, B.ears === 'heavy' ? 3 : 2.4, EAR, { bias: 0.1 }); }
+    g.outline('outline');
   }
-
-  // Rusty as the boat would paint him: the red flannel (its check in blood), an olive cap, grey
-  // tufts and a white beard. fr 0 still, 1 a blink, 2 a sip from his mug, 3 reading the paper.
+  // A grid's painting shown at 2×, each art pixel a 2×2 block, as the cat is.
+  function doubled(w, h, paint) {
+    var g = X.grid(w, h); paint(g);
+    var small = g.canvas();
+    return G.gfx.bake.layer(w * PX, h * PX, function (c) { c.imageSmoothingEnabled = false; c.drawImage(small, 0, 0, w * PX, h * PX); });
+  }
   var RUSTY_L = { id: 'rusty', coat: ['blood', 'crimson', 'rug_hi'], check: 'blood', hat: 'cap', hatKeys: ['olive_dark', 'olive', 'olive_hi'],
     hair: 'hair_lit', beard: ['stone_hi', 'paper', 'bone'], skin: ['flesh_dark', 'skin_shadow', 'flesh', 'skin_hi'], trousers: 'denim' };
-  function boatRusty(c, dir, fr) {
-    boatFisher(c, dir, 0, RUSTY_L);
-    var k = RUSTY_L.skin;
-    if (dir !== 'down') return;
-    BA.box(c, 'denim', 9, 17, 2, 10); BA.box(c, 'denim', 16, 17, 2, 10); BA.px(c, 'brass_hi', 9, 21); BA.px(c, 'brass_hi', 16, 21);   // the overall straps
-    if (fr === 1) { BA.px(c, k[1], 11, 12); BA.px(c, k[1], 15, 12); }                                // a blink
-    if (fr === 2) { BA.box(c, 'ink', 14, 13, 6, 6); BA.box(c, 'cream', 15, 14, 4, 4); BA.box(c, 'paper_dark', 18, 14, 1, 4); BA.blob(c, 19, 19, 1.7, 1.6, k, {}); }  // the mug at his mouth
-    if (fr === 3) {                                                                                    // the paper held up, his eyes down on it
-      BA.px(c, k[1], 11, 12); BA.px(c, k[1], 15, 12);
-      BA.box(c, 'paper_dark', 4, 18, 18, 11); BA.box(c, 'paper', 5, 18, 16, 10); BA.box(c, 'stone', 6, 19, 14, 1);
-      for (var y = 21; y < 28; y += 2) { BA.box(c, 'stone_hi', 6, y, 6, 1); BA.box(c, 'stone_hi', 14, y, 6, 1); }
-      BA.blob(c, 4, 23, 1.7, 1.6, k, {}); BA.blob(c, 22, 23, 1.7, 1.6, k, {});
-    }
-  }
 
   // ---- The sprites, baked once per look, facing and frame -------------------------------------
   // kind 'fisher' | 'dog' | 'rusty'; dir 'down' | 'up' | 'left' | 'right'; fr as above; lk the
@@ -289,17 +273,14 @@ G.ui.room = (function () {
     var key = kind + (L ? L.id : '') + d + fr + (flip ? '<' : '');
     if (art[key]) return art[key];
     if (flip) return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, L), 'x'));
-    if (kind === 'dog') {
-      if (d === 'side' && fr === 3) return (art[key] = G.scene.dog.art('idle', 0, false, L));            // sitting, as in the bow
-      return (art[key] = G.gfx.bake.layer(d === 'side' ? 30 : 22, 24, function (c) { BA.reset(); boatDog(c, d, fr, L); BA.reset(); }));
-    }
-    return (art[key] = G.gfx.bake.layer(26, 44, function (c) { BA.reset(); if (kind === 'rusty') boatRusty(c, d, fr); else boatFisher(c, d, fr, L); BA.reset(); }));
+    if (kind === 'dog') return (art[key] = doubled(d === 'side' ? 22 : 14, 15, function (g) { puppy(g, d, fr, L); }));
+    return (art[key] = doubled(16, 26, function (g) { trainer(g, d, fr, kind === 'rusty' ? RUSTY_L : L, kind === 'rusty'); }));
   }
   // Where a sprite's feet are within it: [x, y]. lk: the dog's look (its size).
   var anc = [0, 0];
   function anchor(kind, dir, lk) {
-    if (kind === 'dog') { anc[0] = dir === 'left' || dir === 'right' ? 13 : 11; anc[1] = 22; return anc; }   // Phase 119: the boat's dog
-    anc[0] = 13; anc[1] = 41;                                                               // the fisher and Rusty
+    if (kind === 'dog') { anc[0] = dir === 'left' || dir === 'right' ? 22 : 14; anc[1] = 29; return anc; }   // Phase 120: at 2×
+    anc[0] = 16; anc[1] = 51;                                                               // the fisher and Rusty
     return anc;
   }
   // Paints a look's fisher or dog in every facing and frame. Returns the ms it took.
@@ -319,8 +300,7 @@ G.ui.room = (function () {
   // Draws a walking figure with its feet at (x, y), its shadow under it.
   function drawFigure(ctx, kind, dir, fr, x, y, lk) {
     var img = sprite(kind, dir, fr, lk), a = anchor(kind, dir, lk), side = dir === 'left' || dir === 'right';
-    if (kind === 'dog' && side && fr === 3) { a[0] = 12; a[1] = 19; }                     // the bow's sitting painting
-    shadow(ctx, x, y, kind === 'dog' ? (side ? 22 : 14) : (kind === 'fisher' ? 18 : 26));
+    shadow(ctx, x, y, kind === 'dog' ? (side ? 34 : 22) : 24);
     ctx.drawImage(img, Math.round(x - a[0]), Math.round(y - a[1]));
   }
 

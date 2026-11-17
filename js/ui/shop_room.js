@@ -629,7 +629,7 @@ G.ui.shopRoom = (function () {
       for (i = 0; i < order.length; i += 2) if (order[i] < by) { by = order[i]; bi = i; }
       var id = order[bi + 1]; order[bi] = 1e9 + 1;
       if (id < 100) { ctx.drawImage(props[id].img, ox + props[id].x, oy + props[id].y); if (props[id].live) props[id].live(ctx, ox + props[id].x, oy + props[id].y, t, env); }
-      else if (id === 100) ctx.drawImage(R.sprite('rusty', rusty.face, rusty.fr), ox + 291, oy + FY + 17 - 41);   // Phase 119: as the boat paints him, his head and shoulders over the counter
+      else if (id === 100) ctx.drawImage(R.sprite('rusty', rusty.face, rusty.fr), ox + 288, oy + FY - 30);   // Phase 120: his head and shoulders over the counter
       else if (id === 101) R.drawFigure(ctx, 'dog', st.dog.face, fr[1], f[2], f[3]);
       else R.drawFigure(ctx, 'fisher', st.face, fr[0], f[0], f[1]);
     }
