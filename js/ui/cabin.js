@@ -363,6 +363,27 @@ G.ui.cabin = (function () {
     A.reset();
   }
 
+  // ---- Phase 123: the warm cabin ---------------------------------------------------------------
+  // Once patched, the cabin's boards turn to the shop's warm cedar (the derelict stays cold): each
+  // baked layer and prop is recoloured once, wood_* and panel_* to cedar_*, at its full detail.
+  var WARMMAP = { wood_deep: 'cedar_deep', wood_dark: 'cedar_dark', wood: 'cedar', wood_mid: 'cedar_mid', wood_hi: 'cedar_hi', wood_lit: 'cedar_lit',
+    panel_deep: 'cedar_deep', panel: 'cedar', panel_mid: 'cedar_mid', panel_hi: 'cedar_hi', panel_lit: 'cedar_lit' }, warmRGB = null;
+  function rgbOf(k) { return parseInt(P[k].slice(1), 16); }
+  function warmed(src) {
+    if (src._warm) return src._warm;
+    if (!warmRGB) { warmRGB = {}; for (var k in WARMMAP) warmRGB[rgbOf(k)] = rgbOf(WARMMAP[k]); }
+    var w = src.width, h = src.height, out = G.gfx.bake.canvas(w, h), oc = out.getContext('2d');
+    oc.drawImage(src, 0, 0);
+    var im = oc.getImageData(0, 0, w, h), d = im.data;
+    for (var i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      var c = warmRGB[(d[i] << 16) | (d[i + 1] << 8) | d[i + 2]];
+      if (c !== undefined) { d[i] = (c >> 16) & 255; d[i + 1] = (c >> 8) & 255; d[i + 2] = c & 255; }
+    }
+    oc.putImageData(im, 0, 0);
+    return (src._warm = out);
+  }
+
   // ---- State ----------------------------------------------------------------------------------
   var level = -1, t = 0, base = null, front = null, props = null, mask = null, screenR = null;
   var mounted = [];   // {spIdx, img, flipImg, name, len}, decided in enter()
@@ -392,6 +413,12 @@ G.ui.cabin = (function () {
     front = G.gfx.bake.cached('cabin56f:' + lv, function () { return G.gfx.bake.layer(W, RH, function (c) { paintFront(c, lv); }); });
     props = makeProps(lv); screenR = null;
     for (var i = 0; i < props.length; i++) if (props[i].screen) screenR = props[i].screen;
+    if (lv >= 1) {                                                                  // Phase 123: the warm boards
+      var b0 = base, f0 = front;
+      base = G.gfx.bake.cached('cabin123:' + lv, function () { return warmed(b0); });
+      front = G.gfx.bake.cached('cabin123f:' + lv, function () { return warmed(f0); });
+      for (i = 0; i < props.length; i++) props[i].img = warmed(props[i].img);
+    }
     var pools = [];
     if (lv >= 2) pools.push({ x: STOVE[0], y: STOVE[1] + 30, r: 120 });
     if (lv >= 3) pools.push({ x: LAMPP[0], y: LAMPP[1], r: 110 });
@@ -644,7 +671,8 @@ G.ui.cabin = (function () {
     // A drip into the bucket while the roof leaks.
     if (level < 2) { var dp = (t * 0.55) % 1; ctx.fillStyle = P.water_foam; if (dp < 0.85) ctx.fillRect(ox + tx(10) + 16, oy + 8 + Math.floor(dp * dp * (ty(7) - 30)), 1, 2); else { ctx.fillRect(ox + tx(10) + 13, oy + ty(7) - 20, 1, 1); ctx.fillRect(ox + tx(10) + 19, oy + ty(7) - 20, 1, 1); } }
     // The dark, the lamps, the lights.
-    if (env.night > 0.02) { ctx.globalAlpha = Math.min(1, env.night * (level < 1 ? 1.15 : 1)); ctx.drawImage(mask, ox, oy); ctx.globalAlpha = 1; }
+    if (env.night > 0.02) { ctx.globalAlpha = Math.min(1, env.night * (level < 1 ? 1.15 : (level >= 2 ? 0.75 : 1))); ctx.drawImage(mask, ox, oy); ctx.globalAlpha = 1; }
+    if (level >= 2) { ctx.globalAlpha = 0.04 + 0.05 * env.night; ctx.fillStyle = P.flame; ctx.fillRect(ox + T, oy, W - 2 * T, RH - T); ctx.globalAlpha = 1; }   // Phase 123: the stove's warmth over the room
     else if (env.grey > 0.02) { ctx.globalAlpha = 0.07 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + T, oy + TOP + 2, W - 2 * T, RH - TOP - 2); ctx.globalAlpha = 1; }
     if (level >= 2 && env.night > 0.2) K.glow(ctx, ox + STOVE[0], oy + STOVE[1] + 4, 16, 'flame', (0.05 + 0.015 * Math.sin(Math.floor(t * 10) * 1.3)) * env.night);
     if (level >= 1 && env.night > 0.2) K.glow(ctx, ox + tx(2) + 20, oy + ty(1) - 6, 12, 'lamp_glow', 0.06 * env.night);

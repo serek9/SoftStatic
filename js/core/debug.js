@@ -726,7 +726,7 @@ G.core.debug = (function () {
         // each facing and frame, Rusty's frames (down, side, his back). Phase 56: the room with
         // its back wall (384×300) and the larger sprites (G.ui.room: 32×48, the dog 40×32 from the side).
         var SR = G.ui.shopRoom, DS = ['down', 'up', 'right', 'left'];
-        ctx.drawImage(SR.bake(), 4, 26);
+        ctx.drawImage(SR.bake(), 4, 18);
         F.drawText(ctx, 'room (baked)', 4, 18, 'fog_mid');
         F.drawText(ctx, 'fisher', 394, 18, 'fog_mid'); F.drawText(ctx, 'dog', 500, 18, 'fog_mid');
         for (var di = 0; di < 4; di++) for (var fr2 = 0; fr2 < 3; fr2++) {

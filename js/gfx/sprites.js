@@ -96,6 +96,32 @@ G.gfx.sprites = (function () {
     sun_dark: '#32100a', sun: '#702614', sun_hi: '#ac521c', sun_lit: '#d89a40',
     vinyl: '#121016', vinyl_hi: '#3a3642', neon_pink: '#d0507e', neon_pink_hi: '#f0a0b8',
     ivory: '#efe6cc', denim_lit: '#6880a4', outline: '#120e0c',
+    // Phase 115 (the shop as a warm lakeside refuge, the user's reference 2026-11-13): cedar
+    // boards, orange-brown and honey where the lamps reach. Interior keys only.
+    cedar_deep: '#2e120a', cedar_dark: '#4e1e10', cedar: '#6e2c14', cedar_mid: '#8e3a18', cedar_hi: '#a84a1e', cedar_lit: '#c4642a', cedar_glow: '#dc8a40',
+    // Phase 124 (the shop as the user's reference shows it, js/gfx/shop_art.js): its 64 keys. Interior keys only.
+    ps0: '#38320d', ps1: '#110807', ps2: '#cd4209', ps3: '#6a2b14', ps4: '#6f4070', ps5: '#f5c580', ps6: '#6f5745', ps7: '#542212',
+    ps8: '#544313', ps9: '#a76423', ps10: '#eb791f', ps11: '#8d3b18', ps12: '#23100c', ps13: '#f8c356', ps14: '#192336', ps15: '#dc6619',
+    ps16: '#8c5423', ps17: '#2d130e', ps18: '#983f18', ps19: '#594036', ps20: '#4a1e12', ps21: '#190c0a', ps22: '#a3a780', ps23: '#b5587e',
+    ps24: '#411a11', ps25: '#922709', ps26: '#956641', ps27: '#e9a569', ps28: '#fbe9a7', ps29: '#b54e1a', ps30: '#a19216', ps31: '#a2835b',
+    ps32: '#c4402c', ps33: '#817a14', ps34: '#363153', ps35: '#f7aa39', ps36: '#d38345', ps37: '#e49453', ps38: '#3a2c2b', ps39: '#384f4c',
+    ps40: '#823617', ps41: '#b87143', ps42: '#752009', ps43: '#5f2613', ps44: '#9b2a21', ps45: '#c67425', ps46: '#a54519', ps47: '#df6b79',
+    ps48: '#c7ac1e', ps49: '#c75a1a', ps50: '#6a846e', ps51: '#cd9f6a', ps52: '#f48e2a', ps53: '#b33309', ps54: '#656310', ps55: '#171c1f',
+    ps56: '#46655d', ps57: '#030201', ps58: '#71491a', ps59: '#553a64', ps60: '#8b4a79', ps61: '#1f3941', ps62: '#371710', ps63: '#763015',
+    // Phase 124 (the rooms' people from the user's character sheet, js/gfx/people_art.js): the
+    // fisher's (pf), the dog's (pd) and Rusty's (pr) own short palettes. Interior keys only.
+    pf0: '#1f1a21', pf1: '#cf7445', pf2: '#f9b376', pf3: '#7c7230', pf4: '#5b2817', pf5: '#3e3c22',
+    pf6: '#af5125', pf7: '#f4a169', pf8: '#8f3e1f', pf9: '#471f12', pf10: '#70301c', pf11: '#80371d',
+    pf12: '#9e4621', pf13: '#b76034', pf14: '#240e08', pf15: '#65612c', pf16: '#eb8d56', pf17: '#34150d',
+    pf18: '#2f2d1b', pf19: '#c78a60', pf20: '#180c09', pf21: '#2d2938', pf22: '#1c1311', pf23: '#423a45',
+    pf24: '#4a4a26', pf25: '#555528', pd0: '#fbbe62', pd1: '#401b09', pd2: '#ac6029', pd3: '#ed953c',
+    pd4: '#351507', pd5: '#733915', pd6: '#e18335', pd7: '#fbb04f', pd8: '#57250b', pd9: '#ca722f',
+    pd10: '#f7a648', pd11: '#2b1105', pd12: '#d0924f', pd13: '#8e4b20', pr0: '#9d7557', pr1: '#423a46',
+    pr2: '#f7b678', pr3: '#fce0b7', pr4: '#f4cb98', pr5: '#1a0e0d', pr6: '#766f2d', pr7: '#605c28',
+    pr8: '#8e4623', pr9: '#622716', pr10: '#f7a061', pr11: '#882a1b', pr12: '#8f7f2f', pr13: '#372d1a',
+    pr14: '#d27242', pr15: '#241e27', pr16: '#b35f39', pr17: '#ec8a50', pr18: '#deb48b', pr19: '#c49a75',
+    pr20: '#c54124', pr21: '#322c39', pr22: '#4e4725', pr23: '#a7321f', pr24: '#564c53', pr25: '#26130e',
+    pr26: '#40170f', pr27: '#c47c25',
     // Phase 70 (real fish, PLAN_SPECIES.md 3.5): each species' body ramp, back (dark) to belly
     // (pale), six keys; shared fin ramps (ray, root, membrane, edge); eyes. Fish keys only:
     // shift() never picks them, so no earlier sprite changes colour.
@@ -210,7 +236,7 @@ G.gfx.sprites = (function () {
   ('panel_deep panel panel_mid panel_hi panel_lit mustard_dark mustard mustard_hi mustard_lit orange_dark orange orange_hi orange_lit ' +
    'olive_dark olive olive_hi olive_lit pink_dark pink pink_hi pink_lit lav_dark lav lav_hi lav_lit crt_dark crt crt_hi crt_glow ' +
    'chrome_dark chrome chrome_hi chrome_lit brick_dark brick brick_hi leaf_deep leaf_dark leaf leaf_hi leaf_lit sun_dark sun sun_hi sun_lit ' +
-   'vinyl vinyl_hi neon_pink neon_pink_hi ivory denim_lit outline').split(' ').forEach(function (k) { INTERIOR[k] = true; });
+   'vinyl vinyl_hi neon_pink neon_pink_hi ivory denim_lit outline cedar_deep cedar_dark cedar cedar_mid cedar_hi cedar_lit cedar_glow ps0 ps1 ps2 ps3 ps4 ps5 ps6 ps7 ps8 ps9 ps10 ps11 ps12 ps13 ps14 ps15 ps16 ps17 ps18 ps19 ps20 ps21 ps22 ps23 ps24 ps25 ps26 ps27 ps28 ps29 ps30 ps31 ps32 ps33 ps34 ps35 ps36 ps37 ps38 ps39 ps40 ps41 ps42 ps43 ps44 ps45 ps46 ps47 ps48 ps49 ps50 ps51 ps52 ps53 ps54 ps55 ps56 ps57 ps58 ps59 ps60 ps61 ps62 ps63 pf0 pf1 pf2 pf3 pf4 pf5 pf6 pf7 pf8 pf9 pf10 pf11 pf12 pf13 pf14 pf15 pf16 pf17 pf18 pf19 pf20 pf21 pf22 pf23 pf24 pf25 pd0 pd1 pd2 pd3 pd4 pd5 pd6 pd7 pd8 pd9 pd10 pd11 pd12 pd13 pr0 pr1 pr2 pr3 pr4 pr5 pr6 pr7 pr8 pr9 pr10 pr11 pr12 pr13 pr14 pr15 pr16 pr17 pr18 pr19 pr20 pr21 pr22 pr23 pr24 pr25 pr26 pr27').split(' ').forEach(function (k) { INTERIOR[k] = true; });
 
   // The dusk ceiling: keys whose prefix marks them as sky or water may not be brighter than dusk_high.
   var CEILING_KEY = 'dusk_high';
