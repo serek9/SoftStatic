@@ -134,3 +134,15 @@ Done when: a scripted new player who follows the word lands the fish it hooks (2
 
 ### Phase 142: Stop it at a depth
 The same new-player run shows every cast sinking about 9 s to Fogbound's bed, and nothing ever says a tap stops it, though depth decides which fish come (the journal lists each fish's depths). A first-time tip, from the second cast after the first fish: **SPACE (REEL on a phone): tap to stop the lure at this depth**, done the first time a tap stops it.
+
+---
+
+# Round 5, Phase 143
+
+## 10. Audit (2026-11-17, after round 4): a new player on a phone
+A fresh save on an emulated iPhone, played with real touch events on the on-screen buttons (CDP), doing what the screen says: tap the tape to play, hold CAST, tap HOOK, hold REEL (easing only on EASE), tap SELL. It landed 2 of 2 in about 100 s with no page errors; the controls, card keys and words all worked by thumb.
+
+**The finding:** the very first line a phone shows is "Add to Home Screen to keep your save and play full screen.", which takes the place of the tip that teaches casting, through the first cast. The first thing a new player needs is how to play.
+
+### Phase 143: How to play first
+The home-screen note waits until the first fish is landed; the first screen on a phone now says **CAST: hold the button, let go to throw**.

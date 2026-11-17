@@ -109,6 +109,7 @@ G.ui.tips = (function () {
   function homeStep(dt, run) {
     if (homeT > 0) { homeT -= dt; return; }
     if (done('homescreen') || !G.core.device.wantsHomeScreen() || !G.core.input.woke() || run.fsm !== 'sailing') return;
+    if (caught(G.state.save) < 1) return;                                            // Phase 143: after the first fish, so the first thing a phone says is how to cast
     mark('homescreen'); homeT = HOME_S; homeShown++;
   }
 
