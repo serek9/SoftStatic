@@ -123,13 +123,15 @@ G.ui.shopRoom = (function () {
       { x: 341, y: 230, r: 50 }, { x: TANK[0], y: TANK[1], r: 44 }, { x: W >> 1, y: 240, r: 90, sx: 1.6 }]);
     ctx.globalAlpha = 0.12 + 0.5 * n; ctx.drawImage(mask, ox, oy); ctx.globalAlpha = 1;
     if (env.grey > 0.02) { ctx.globalAlpha = 0.06 * env.grey; ctx.fillStyle = P.fog_mid; ctx.fillRect(ox + 16, oy + 16, W - 32, RH - 48); ctx.globalAlpha = 1; }
-    var bulbs = G.gfx.shopArt.bulbs, WB = ['lamp_glow', 'mustard_lit', 'signal_amber'];
+    var bulbs = G.gfx.shopArt.bulbs, WB = ['lamp_glow', 'mustard_lit', 'signal_amber'], dp = dip(t);
     for (i = 0; i < bulbs.length; i++) {
-      var b = bulbs[i], o = 0.7 + 0.3 * Math.sin(t * 0.6 + i * 1.7);
-      ctx.fillStyle = P[WB[i % 3]]; ctx.globalAlpha = (0.05 + 0.14 * n) * o;
+      var b = bulbs[i], o = (0.65 + 0.35 * Math.sin(t * (0.5 + (i % 5) * 0.13) + i * 1.7)) * (1 - dp);
+      ctx.fillStyle = P[WB[i % 3]]; ctx.globalAlpha = (0.06 + 0.16 * n) * o;
       ctx.fillRect(ox + b[0] - 4, oy + b[1] - 3, 9, 7); ctx.fillRect(ox + b[0] - 2, oy + b[1] - 5, 5, 11);
+      ctx.globalAlpha = 0.5 * o; ctx.fillStyle = P.cream; ctx.fillRect(ox + b[0], oy + b[1], 1, 1);           // the filament
     }
     ctx.globalAlpha = 1;
+    if (dp > 0) { ctx.globalAlpha = 0.25 * dp; ctx.fillStyle = P.ink; ctx.fillRect(ox, oy, W, RH); ctx.globalAlpha = 1; }   // every light dips for a breath
     for (i = 0; i < HANG.length; i++) K.glow(ctx, ox + HANG[i][0], oy + HANG[i][1] + 10, 14, 'lamp_glow', 0.03 + 0.06 * n);
     K.glow(ctx, ox + LAMP[0], oy + LAMP[1], 26, 'lamp_glow', 0.04 + 0.08 * n);
     K.glow(ctx, ox + LAMP[0], oy + LAMP[1] + 62, 46, 'signal_amber', 0.02 + 0.05 * n);
@@ -147,6 +149,85 @@ G.ui.shopRoom = (function () {
       ctx.globalAlpha = 1;
     }
   }
+  // ---- Phase 126: the picture alive ---------------------------------------------------------
+  // Over the user's picture, from the scene's time only: the windows go with the hour (lighter by
+  // day, deep blue by night with stars, rain running down them, a lightning flash, a cabin's
+  // light across the lake at night), the clock keeps the game's hour (and runs back when the
+  // strange says so), the lava lamp's wax rises and falls, minnows turn in the tank under a
+  // shimmer and its bubbles, the drinks fridge's tube flickers now and then, the radio's dial
+  // breathes and a note drifts up from it, the cat lets out a z in its sleep, and now and then
+  // every light in the room dips for a breath, then comes back.
+  var GLASS = [[96, 33, 56, 52], [293, 33, 56, 52]], CLOCK = [233, 44], LAVAG = [201, 54, 11, 20], TANKW = [27, 224, 40, 24], FRIDGE = [329, 214, 28, 45], DIAL = [288, 101, 19, 7], CATZ = [44, 256];
+  var ACH = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/';
+  function artKey(x, y) { var a = G.gfx.shopArt; return a.keys[ACH.indexOf(a.rows[y][x])]; }
+  var faceKey = '';
+  function dip(t) { var u = t % 41; return u > 40.6 ? 1 - Math.abs(u - 40.8) * 5 : 0; }     // a breath of the lights going down, every 41 s
+  function alive(ctx, env, t, ox, oy) {
+    var i, n = env.night, hr = ((env.hour % 24) + 24) % 24, day = hr > 8 && hr < 17 ? Math.min(1, Math.min(hr - 8, 17 - hr)) : 0;
+    // The windows.
+    for (i = 0; i < GLASS.length; i++) {
+      var gl = GLASS[i], gx = ox + gl[0], gy = oy + gl[1];
+      if (day > 0) { ctx.globalAlpha = 0.22 * day; ctx.fillStyle = P.fog_light; ctx.fillRect(gx, gy, gl[2], 32); ctx.globalAlpha = 0.12 * day; ctx.fillRect(gx, gy + 32, gl[2], gl[3] - 32); }
+      if (n > 0.05) { ctx.globalAlpha = 0.5 * n; ctx.fillStyle = P.night_blue; ctx.fillRect(gx, gy, gl[2], gl[3]); ctx.globalAlpha = 1;
+        ctx.fillStyle = P.fog_light;
+        for (var k = 0; k < 6; k++) { var tw = Math.sin(t * (0.7 + k * 0.31) + k * 2 + i) > 0.3; if (tw) ctx.fillRect(gx + 4 + ((k * 17 + i * 9) % (gl[2] - 8)), gy + 3 + ((k * 7) % 18), 1, 1); }
+        if (i === 1 && n > 0.4) { ctx.fillStyle = P[Math.sin(t * 0.37) > -0.7 ? 'lamp_glow' : 'signal_amber']; ctx.fillRect(gx + 14, gy + 33, 1, 1); } // a cabin's light across the lake
+      }
+      if (env.rain > 0.05) {
+        ctx.fillStyle = P.fog_light; ctx.globalAlpha = 0.4;
+        var nr = Math.round(env.rain * 9);
+        for (k = 0; k < nr; k++) { var v = (t * (0.45 + (k % 4) * 0.1) + k * 0.37) % 1; ctx.fillRect(gx + 2 + ((k * 11 + i * 5) % (gl[2] - 4)), gy + Math.floor(v * (gl[3] - 4)), 1, 3); }
+      }
+      if (env.flash > 0) { ctx.globalAlpha = 0.55 * env.flash; ctx.fillStyle = P.fog_light; ctx.fillRect(gx, gy, gl[2], gl[3]); }
+      ctx.globalAlpha = 1;
+    }
+    // The clock's hands at the game's hour (39.3 runs them back).
+    if (!faceKey) faceKey = artKey(CLOCK[0] + 4, CLOCK[1] + 3);
+    var cx = ox + CLOCK[0], cy = oy + CLOCK[1], back = env.strange === 'clock' ? env.st * 4 * Math.PI : 0;
+    ctx.fillStyle = P[faceKey];
+    ctx.fillRect(cx - 6, cy - 4, 13, 9); ctx.fillRect(cx - 4, cy - 6, 9, 13);
+    var ha = (hr % 12) / 12 * 2 * Math.PI - back * 0.08, ma = (hr % 1) * 2 * Math.PI - back;
+    ctx.fillStyle = P.outline;
+    for (i = 1; i <= 6; i++) ctx.fillRect(Math.round(cx + Math.sin(ma) * i), Math.round(cy - Math.cos(ma) * i), 1, 1);
+    for (i = 1; i <= 4; i++) { ctx.fillRect(Math.round(cx + Math.sin(ha) * i), Math.round(cy - Math.cos(ha) * i), 1, 1); ctx.fillRect(Math.round(cx + Math.sin(ha) * i) + 1, Math.round(cy - Math.cos(ha) * i), 1, 1); }
+    ctx.fillStyle = P.neon_red; ctx.fillRect(cx, cy, 1, 1);
+    // The lava lamp's wax.
+    var lx = ox + LAVAG[0], ly = oy + LAVAG[1];
+    for (i = 0; i < 3; i++) {
+      var u = 0.5 - 0.5 * Math.cos(((t / (17 + i * 6) + i * 0.33) % 1) * 2 * Math.PI), bx = lx + 4 + Math.round(Math.sin(t * 0.3 + i * 2) * 1.5), by = ly + 15 - Math.round(u * 12);
+      ctx.fillStyle = P[i === 1 ? 'orange_lit' : 'signal_amber']; ctx.fillRect(bx, by, 3, 2); ctx.fillRect(bx + 1, by - 1, 1, 4);
+      ctx.fillStyle = P.lamp_glow; ctx.fillRect(bx + 1, by, 1, 1);
+    }
+    // The tank: a shimmer, minnows, bubbles.
+    var tx0 = ox + TANKW[0], ty0 = oy + TANKW[1];
+    ctx.fillStyle = P.crt_glow; ctx.globalAlpha = 0.35;
+    for (i = 0; i < 3; i++) ctx.fillRect(tx0 + Math.round(((t * 6 + i * 13) % TANKW[2])), ty0 + 1 + i, 4, 1);
+    ctx.globalAlpha = 1;
+    for (i = 0; i < 4; i++) {
+      var ph = t * (0.3 + i * 0.07) + i * 1.9, fx = tx0 + 3 + Math.round((Math.sin(ph) + 1) / 2 * (TANKW[2] - 9)), fy = ty0 + 5 + ((i * 5) % 11) + Math.round(Math.sin(t * 0.8 + i));
+      ctx.fillStyle = P[i % 2 ? 'chrome_lit' : 'orange_hi']; ctx.fillRect(fx, fy, 3, 1); ctx.fillStyle = P.outline; ctx.fillRect(Math.cos(ph) > 0 ? fx + 2 : fx, fy, 1, 1);
+    }
+    ctx.fillStyle = P.water_foam;
+    for (i = 0; i < 4; i++) { var bu = (t * 0.45 + i / 4) % 1; ctx.fillRect(tx0 + TANKW[2] - 6 + (i % 2), ty0 + TANKW[3] - 4 - Math.floor(bu * (TANKW[3] - 5)), 1, 1); }
+    // The fridge's tube, now and then faltering.
+    var fl = ((t * 0.5) % 23) < 0.25 && (Math.floor(t * 30) & 1);
+    if (fl) { ctx.globalAlpha = 0.45; ctx.fillStyle = P.crt_dark; ctx.fillRect(ox + FRIDGE[0], oy + FRIDGE[1], FRIDGE[2], FRIDGE[3]); ctx.globalAlpha = 1; }
+    else K.glow(ctx, ox + FRIDGE[0] + 14, oy + FRIDGE[1] + 22, 20, 'crt_glow', 0.03 + 0.04 * n);
+    // The radio: its dial breathing, a note drifting up.
+    ctx.globalAlpha = 0.18 + 0.12 * Math.sin(t * 2.1); ctx.fillStyle = P.lamp_glow; ctx.fillRect(ox + DIAL[0], oy + DIAL[1], DIAL[2], DIAL[3]); ctx.globalAlpha = 1;
+    for (i = 0; i < 2; i++) {
+      var nu = (t * 0.22 + i * 0.5) % 1;
+      if (nu > 0.75) continue;
+      var nx = ox + DIAL[0] + 6 + i * 6 + Math.round(Math.sin(nu * 9 + i) * 2), ny = oy + DIAL[1] - 4 - Math.floor(nu * 22);
+      ctx.globalAlpha = Math.min(1, (0.75 - nu) * 3) * 0.8; ctx.fillStyle = P.mustard_lit;
+      ctx.fillRect(nx, ny, 2, 2); ctx.fillRect(nx + 1, ny - 4, 1, 4); ctx.fillRect(nx + 2, ny - 4, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+    // The cat asleep: a z now and then.
+    var zu = (t * 0.18) % 1;
+    if (zu < 0.6) { ctx.globalAlpha = Math.min(1, (0.6 - zu) * 3) * 0.75; G.gfx.sprites.drawText(ctx, 'z', ox + CATZ[0] + Math.round(zu * 8), oy + CATZ[1] - 6 - Math.floor(zu * 14), 'bone'); ctx.globalAlpha = 1; }
+  }
+
   function drawStrange(ctx, env, ox, oy) {
     if (env.strange !== 'figure') return;                                                          // someone on the far shore (Phase 39)
     var a = Math.min(1, Math.min(env.st, 1 - env.st) * 4);
@@ -165,7 +246,7 @@ G.ui.shopRoom = (function () {
     ctx.fillStyle = P.black; ctx.fillRect(0, 0, 640, 360);
     ctx.drawImage(bake(), ox, oy);
     if (stock) count(stock);
-    if (env) drawStrange(ctx, env, ox, oy);
+    if (env) { alive(ctx, env, t, ox, oy); drawStrange(ctx, env, ox, oy); }
     var f = R.walkers(st, T, ox, oy + TOP), fr = R.frames(st);
     order.length = 0;
     for (i = 0; i < props.length; i++) order.push(props[i].foot, i);
@@ -189,5 +270,5 @@ G.ui.shopRoom = (function () {
     create: WK.create, step: WK.step, facing: WK.facing, isBlocked: WK.isBlocked, draw: draw, bake: bake, sprite: sprite, prebake: R.prebake,
     bakeMs: function () { return bakeMs; }, blocked: WK.blocked, shown: function () { return shown; },
     // Phase 64 (dbg.roomLife): the live things in the room.
-    life: function () { return { room: 'shop', live: 3, things: ['rusty', 'the lamps’ and lights’ glow', 'steam off his mug', 'dust in the lamplight', 'the far shore'] }; } };
+    life: function () { return { room: 'shop', live: 11, things: ['rusty', 'windows by the hour', 'clock', 'lava lamp', 'tank', 'fridge tube', 'radio', 'cat', 'bulbs', 'steam', 'dust', 'the far shore'] }; } };
 })();
