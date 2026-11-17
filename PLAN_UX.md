@@ -131,3 +131,6 @@ A fresh save played from the title with real keys and a 0.3 s reaction, doing ex
 The word over the rod says **REEL: keep it tight** by default and **EASE: line tight, ease off a moment** only while the tension is high (from 0.6 until it drops under 0.42, so it doesn't flicker). The Controls page says "hold to reel; ease off when the line glows". UI only: the fight is unchanged.
 
 Done when: a scripted new player who follows the word lands the fish it hooks (2 of 2 in 86 s; the old word lost 3 of 3).
+
+### Phase 142: Stop it at a depth
+The same new-player run shows every cast sinking about 9 s to Fogbound's bed, and nothing ever says a tap stops it, though depth decides which fish come (the journal lists each fish's depths). A first-time tip, from the second cast after the first fish: **SPACE (REEL on a phone): tap to stop the lure at this depth**, done the first time a tap stops it.

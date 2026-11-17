@@ -22,6 +22,9 @@ G.ui.tips = (function () {
       when: function (r) { return (r.fsm === 'waiting' || r.fsm === 'interest') && r.bite.slot < 0 && !isLure(r); }, done: function (r, s, ev) { return ev.bite; } },
     { id: 'reelin', pc: ['SPACE', 'hold to reel the line back in'], touch: ['REEL', 'hold to reel the line back in'],
       when: function (r) { return (r.fsm === 'waiting' || r.fsm === 'interest') && r.bite.slot < 0 && waitT > LATE_S; }, done: function (r, s, ev) { return ev.reeled; } },
+    // Phase 142 (PLAN_UX.md): depth decides which fish come, and the lure sinks to the bed unless stopped.
+    { id: 'depth', pc: ['SPACE', 'tap to stop the lure at this depth'], touch: ['REEL', 'tap to stop the lure at this depth'],
+      when: function (r, s) { return r.fsm === 'sinking' && caught(s) >= 1 && !onIce(); }, done: function (r, s, ev) { return ev.stopped; } },
     { id: 'journal', pc: ['J', 'the journal: where and when each fish lives'], touch: ['@journal', 'where and when each fish lives'],
       when: function (r, s) { return r.fsm === 'sailing' && caught(s) >= 1; }, done: function (r, s, ev) { return ev.journal; } },
     { id: 'tackle', pc: ['S', 'change the rod, the bait and the line'], touch: ['@setup', 'change the rod, the bait and the line'],
@@ -45,7 +48,7 @@ G.ui.tips = (function () {
 
   var cur = null, workT = 0, workCast = -1, saidCast = -1, waitT = 0;
   var last = { fsm: '', slot: -1, menu: '', setup: false, scene: '' };
-  var ev = { cast: false, bite: false, reeled: false, journal: false, setup: false, shop: false, map: false };
+  var ev = { stopped: false, cast: false, bite: false, reeled: false, journal: false, setup: false, shop: false, map: false };
   var word = '', wordKey = '';            // 88.3: HOOK, REEL or EASE in the first fights
   var EASE_ON = 0.6, EASE_OFF = 0.42, easing = false; // Phase 141: the tension that says EASE, and the one that says REEL again
 
@@ -68,6 +71,7 @@ G.ui.tips = (function () {
     for (var k in ev) ev[k] = false;
     var f = run.fsm;
     if (f === 'casting' && last.fsm !== 'casting') ev.cast = true;
+    if (last.fsm === 'sinking' && f === 'waiting' && G.core.input.pressed('action')) ev.stopped = true; // Phase 142: a tap stopped the sinking lure (the scene has moved on this step)
     if (run.bite.slot >= 0 && last.slot < 0) ev.bite = true;
     if (f === 'sailing' && (last.fsm === 'waiting' || last.fsm === 'interest' || last.fsm === 'sinking')) ev.reeled = true;
     if (menu === 'journal' && last.menu !== 'journal') ev.journal = true;
