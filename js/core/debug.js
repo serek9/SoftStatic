@@ -461,6 +461,8 @@ G.core.debug = (function () {
     // dbg.mapNav(): Phase 66, the map's arrows checked from every stop.
     mapNav: function () { return G.ui.map.nav(); },
     // dbg.roomLife(): Phase 64, the live things in the room you are in (the shop or the cabin).
+    // dbg.title(): Phase 130, the title again (over whatever scene is up); its state.
+    title: function () { G.ui.menu.open('title'); return G.ui.title.state(); },
     roomLife: function () { var n = G.core.state.sceneName(); return n === 'shop' ? G.ui.shopRoom.life() : (n === 'cabin' ? G.ui.cabin.life() : 'not in a room'); },
     // dbg.pond(): Phase 84, the Back Pond: the trash left by kind and in all, where each piece
     // still lies ([i, kind, x]), the meter [done, of], the stream, how far the water has cleared,

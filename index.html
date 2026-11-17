@@ -109,6 +109,7 @@
 <script src="js/ui/setup.js"></script>
 <script src="js/ui/look.js"></script>
 <script src="js/ui/menu.js"></script>
+<script src="js/ui/title.js"></script>
 <script src="js/ui/journal.js"></script>
 <script src="js/gfx/people_art.js"></script>
 <script src="js/gfx/shop_art.js"></script>
@@ -161,6 +162,7 @@
   G.core.state.register('cabin', G.ui.cabin);
   G.core.state.register('gallery', G.core.debug.gallery);
   G.core.state.change(q.has('gallery') ? 'gallery' : 'sailing');
+  if (!q.has('seed') && !q.has('gallery') && !q.has('notitle')) G.ui.menu.open('title'); // Phase 130: the title, over the lake's first frame
   G.core.device.fit(); // Phase 90: again, now the save's settings and the scene are known (the UI layer's size)
 
   // Phase 91.1: offline play through sw.js. Not on localhost or 127.0.0.1 unless ?sw (a PC on

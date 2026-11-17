@@ -116,8 +116,8 @@ G.ui.hud = (function () {
   }
 
   function draw(ctx0, run, waterY) {
-    if (G.ui.card.isOpen() || G.core.compact || still) return;
     var ov = G.ui.menu.current();
+    if (G.ui.card.isOpen() || G.core.compact || still || ov === 'title') return;      // Phase 130: nothing over the title
     if (G.ui.panel.on() && (ov === 'map' || ov === 'journal' || ov === 'controls')) return; // Phase 90: the layer is above the full-screen overlays
     var Pn = G.ui.panel, ctx = Pn.begin(ctx0), pic = Pn.pic(), X = pic[0] + 8, Y = pic[1] + 8, RX = pic[0] + pic[2] - 8; // Phase 90: on the UI layer, on the picture
     var save = G.state.save, s = clockText(save.clock || 0), cx = X + F.measure(s) + 9, a = alpha();
@@ -170,7 +170,7 @@ G.ui.hud = (function () {
   // last). Shown once a touch has been seen, or while the mouse is near them.
   function drawButtons(ctx) {
     var I = G.core.input;
-    if (G.core.compact || still || !I.showButtons()) return;
+    if (G.core.compact || still || !I.showButtons() || G.ui.menu.current() === 'title') return;
     if (G.core.device.touch()) { drawTouch(ctx); return; }
     var B = I.BUTTONS, P = S.PALETTE;
     V.begin(ctx, true);
