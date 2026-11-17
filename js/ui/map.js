@@ -333,6 +333,7 @@ G.ui.map = (function () {
     }
     if (v !== 'travel') return false;
     dest = s; phase = 'out'; t = 0;
+    G.audio.engine.play('ff'); // Phase 139: the tape winds on
     return true;
   }
 

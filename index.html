@@ -197,6 +197,7 @@
     draw: function (ctx) {
       G.ui.panel.frameStart(); // Phase 90: the UI layer starts clear each frame
       V.begin(ctx, G.core.state.native()); G.core.state.draw(ctx);
+      G.ui.panel.screen(ctx); // Phase 140: the Tape look, when it is on
       V.begin(ctx, G.ui.menu.native()); G.ui.menu.draw(ctx);
       V.begin(ctx, false); G.ui.hud.drawButtons(ctx);
       V.begin(ctx, true); G.core.device.drawNotice(ctx); // 57.3: portrait on a phone

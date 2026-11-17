@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-17, after 138 This tape. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-17, after 140 The Tape look. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -527,6 +527,8 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 136 One voice for the HUD | Done | ✓ | Passing messages (why a fish got away, a lure lost, the last pack) are OSD plates at the top centre where the tips speak, with a teal play mark; a tip steps aside while one shows; the milestone line sits under them on the same plate. |
 | 137 Fast-forward between waters | Done | ✓ | Travel's fade plays as a VCR fast-forward: rolling static lines, ▶▶ FF and a running tape counter, then the new water as a channel card (CH 02  BLACKWATER CREEK; the shop and cabin are AV). Same length; the plain fade under Reduce motion. |
 | 138 This tape | Done | ✓ | The MENU's foot shows this sitting's tape (TAPE  2 FISH  +76c  25 cm) above the next goal; the milestones page opens on the goal to chase, its row lit. |
+| 139 Tape sounds | Done | ✓ | A panel opening plays a cassette deck's key (a low click, a thunk, a breath of hiss); travel plays the tape winding on. Quiet, on the effects bus. |
+| 140 The Tape look | Done | ✓ | SETTINGS → SCREEN → Tape look (off by default): the picture with faint scanlines, a soft vignette and one slow tracking line, as a tape played back. The SETTINGS page's hints no longer run past its edge. |
 ### 8.2 Architecture as built
 
 The files that exist so far. §3 is the target tree; this is what is in it now.
@@ -1246,6 +1248,8 @@ These are interpretations and additions made while building, where the spec abov
 610. **The fast-forward (137):** `map.ff(ctx, a, arriving)` draws over `M.dim` in both halves of the travel fade (FADE 0.35 s each way, unchanged): seven 1–2 px `fog_mid` lines placed by `S.hash` of the UI clock at 24 Hz, two play marks and FF, an SP counter at 9× the UI clock; on the way in, the channel card at the picture's centre (a water's number is its place in `G.data.locations`; the shop and the cabin are AV), its text built once per destination. Nothing under Reduce motion.
 611. **The tape (138):** `card.tape()` {fish, coins, best, ver}, counted in `commit()`: each fish settled adds one, the coins it brought (sale and first-catch bonus; a milestone's pay is not counted) and its length if the longest. Never saved. The MENU's foot is three lines now (`fixed` takes 3 rows); TAPE shows once a fish is in, its text rebuilt when `ver` changes.
 612. **The goal row (138):** `milestones.open` scrolls so the goal from `next(loc)` is the third row shown and lights it with `panel.row` (no cursor: the icon sits where it would).
+613. **Tape sounds (139):** `engine` `deck` (click at 0.55 rate and 0.02 gain, a 130→70 Hz sine thunk at 0.016, a 3.2→2.4 kHz band of hiss at 0.005) is played by `panel.kick()`; `ff` (a 1.4→3.6 kHz band of hiss over 0.7 s at 0.007, a 55→75 Hz triangle at 0.006) by the chart's `go`. Both at or under the UI clicks' levels.
+614. **The Tape look (140):** `save.settings.tapeLook` (false by default; read with defaults, no version bump). `panel.screen(ctx)` draws after the scene and before the overlays: one baked 640×360 layer (`ink` scanlines at 0.14, a 14-step vignette of nested 3 px frames up to 0.045) and, unless Reduce motion, a 2 px `fog_light` line at 0.05 drifting down at 14 px/s. It only darkens, so the sky stays under `dusk_high`. Measured: 16.47 → 16.52 ms a frame (vsync-bound) on PC and phone.
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1332,7 +1336,7 @@ Run these after any change. A different result means something changed. Recorded
 The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
 
 ### 8.6 Next task
-Phase 138 is done, and with it UX round 2 (PLAN_UX.md, Phases 136–138). Next: the round-3 audit.
+Phase 140 is done, and with it UX round 3 (PLAN_UX.md, Phases 139–140). Next: the round-4 audit.
 
 ---
 

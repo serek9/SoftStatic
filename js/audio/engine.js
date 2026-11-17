@@ -540,6 +540,11 @@ G.audio.engine = (function () {
     // Phase 90.5: the UI's two soft sounds: a move between rows, and a choice.
     uiMove: function () { click(2.2, 0.012, 0); },
     uiOk: function () { click(1.4, 0.02, 0); tone('sine', 880, 880, 0.06, 0.008, 0, 0.01); },
+    // Phase 139 (PLAN_UX.md): a cassette deck's key going down as a panel opens: a low click, a
+    // small mechanical thunk and a breath of tape hiss. Quiet, on the effects bus.
+    deck: function () { click(0.55, 0.02, 0); tone('sine', 130, 70, 0.05, 0.016, 0, 0.005); hiss('bandpass', 3200, 2400, 1.2, 0.14, 0.005, 0, 0.02); },
+    // Phase 139: the tape fast-forwarding while he travels: a rising whirr under a capstan's hum.
+    ff: function () { hiss('bandpass', 1400, 3600, 2.5, 0.7, 0.007, 0); tone('triangle', 55, 75, 0.7, 0.006, 0, 0, null, 0.08); },
     hum: function (pan) { tone('sine', 98, 97, 1.4, 0.05, pan, 0, null, 0.2); tone('sine', 147, 146.2, 1.4, 0.03, pan, 0, null, 0.2); },
     owl: function (pan) {
       for (var i = 0; i < 2; i++) {
