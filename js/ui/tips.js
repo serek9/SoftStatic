@@ -47,6 +47,7 @@ G.ui.tips = (function () {
   var last = { fsm: '', slot: -1, menu: '', setup: false, scene: '' };
   var ev = { cast: false, bite: false, reeled: false, journal: false, setup: false, shop: false, map: false };
   var word = '', wordKey = '';            // 88.3: HOOK, REEL or EASE in the first fights
+  var EASE_ON = 0.6, EASE_OFF = 0.42, easing = false; // Phase 141: the tension that says EASE, and the one that says REEL again
 
   function onIce() { var r = G.state.run, L = r && r.loc ? G.data.locations[r.loc] : null; return !!(L && L.ice); }
   function isLure(r) { return !!(r.gearFx && r.gearFx.lure && r.cast.bait === r.gearFx.bait); }
@@ -84,7 +85,11 @@ G.ui.tips = (function () {
     word = '';
     if (enabled() && landed() < FIGHTS) {
       if (run.bite.slot >= 0 && (f === 'waiting' || f === 'interest' || f === 'sinking')) { word = 'HOOK'; wordKey = 'now: set the hook'; }
-      else if (f === 'fighting' || f === 'hooked') { var pull = run.fight && run.fight.mode === 'pull'; word = pull ? 'EASE' : 'REEL'; wordKey = pull ? 'it runs: let go' : 'it tires: hold to reel'; }
+      else if (f === 'fighting' || f === 'hooked') { // Phase 141: EASE only while the line is really tight (letting go on every run throws the hook)
+        var T = run.fight && run.fight.active ? run.fight.T : 0;
+        easing = easing ? T > EASE_OFF : T >= EASE_ON;
+        word = easing ? 'EASE' : 'REEL'; wordKey = easing ? 'line tight: ease off a moment' : 'keep it tight: hold to reel';
+      }
     }
     // 88.4: a lure left dead (or a slow one rushed) for WORK_S s, said once a cast
     var st = styleOf(run);

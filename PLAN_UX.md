@@ -115,3 +115,19 @@ A cassette deck's key as a panel opens (a low click, a small thunk, a breath of 
 
 ### Phase 140: The Tape look
 SETTINGS → SCREEN → **Tape look**, off by default: faint scanlines, a soft vignette and one slow tracking line over the picture, baked once and drawn in one call, only ever darker. It also fixes the SETTINGS page's hints.
+
+---
+
+# Round 4, Phase 141
+
+## 8. Audit (2026-11-17, after round 3): a new player's first minutes
+A fresh save played from the title with real keys and a 0.3 s reaction, doing exactly what the screen says.
+
+**The finding:** in the first fights the word over the rod said **EASE: it runs, let go** whenever the fish ran. A player who did that lost **all three** fish hooked ("It threw the hook on a slack line"), because a run is not a reason to let go: only a tight line is (the angler bot that lands fish reels through runs and eases only above tension 0.55). The game taught the move that loses fish.
+
+## 9. The phase
+
+### Phase 141: The fight says what lands fish
+The word over the rod says **REEL: keep it tight** by default and **EASE: line tight, ease off a moment** only while the tension is high (from 0.6 until it drops under 0.42, so it doesn't flicker). The Controls page says "hold to reel; ease off when the line glows". UI only: the fight is unchanged.
+
+Done when: a scripted new player who follows the word lands the fish it hooks (2 of 2 in 86 s; the old word lost 3 of 3).
