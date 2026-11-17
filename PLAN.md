@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-17, after 133 Fixes and a shop that finds things. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-17, after 134 The tape's menu. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -522,6 +522,7 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 131 The VCR menu skin | Done | ✓ | `panel.js`: every panel's title is OSD capitals with a play mark and a red/teal chroma split; faint scanlines in the body; a blinking ▶ cursor on the pause and pier lists; panels roll in under a tracking band (PLAN_UX.md). |
 | 132 A menu you can read at a glance | Done | ✓ | The pause list is a VCR MENU in three pages: MENU (Resume, Journal, Chart, Milestones, Fisher & dog, Settings, Controls, Save tape), SETTINGS (under SOUND, PLAY and SCREEN headings) and SAVE TAPE (export, import); a PLAY status line; Esc steps back a page. |
 | 133 Fixes and a shop that finds things | Done | ✓ | The card's settled size medallion sits beside its NEW tab and its PC hint is a key cap; the pier panel wraps its line; chart names sit on plates; Rusty's Buy opens in five shelves (RODS, REEL & LINE, LURES, BAIT, GEAR) turned with A/D or the list's foot. |
+| 134 The tape's menu | Done | ✓ | The title shows a VCR menu under the letters: PLAY (CONTINUE once a fish is caught), SETTINGS, CONTROLS. One key or a tap off the rows still plays at once; the two pages open over the tape and return to it. |
 ### 8.2 Architecture as built
 
 The files that exist so far. §3 is the target tree; this is what is in it now.
@@ -1232,6 +1233,8 @@ These are interpretations and additions made while building, where the spec abov
 601. **The status line (132):** with no message, the foot reads `▶ PLAY  HH:MM  WATER`, rebuilt only when the minute or the water changes (no allocation per frame).
 602. **Rusty's shelves (133):** `shop.js` `TABS` lists every one of the 41 items once (rods 0–5 and the ice rods; the reel, the line and the three line types; the 23 lures with their Buy 5 rows; the four baits; the Snow Machine). `showTab(d)` turns the shelf; the tab is kept for the visit. A/D and the foot's halves turn the shelf at Rusty's and still page a facing shelf's list. The position counter is left out for shelves.
 603. **Small fixes (133):** `badge.draw(ctx, x, y, w, tabX)` sets the settled medallion just left of the card's top-right tab. The card's PC hint is `hint('SPACE', 'choose')`. The pier panel keeps two wrapped lines for its word, rewrapped only when the word changes. Chart names get a `night_ink` plate at 0.8.
+604. **The tape's menu (134):** `title.js` ROWS; W/S move, any other key does the chosen row (Back or P play). SETTINGS opens the pause panel with '@settings' (`solo`: Back closes it instead of going to MENU); CONTROLS opens with 'title' and closes itself. `menu.update` reopens the title (`open('title', 'back')`, already settled) when an overlay the title opened closes; `hush` ignores keys until released. An overlay that opens another from its `update` is kept (`cur === was`).
+605. **The first touch on the tape (134):** `input.js` lets the page's first touch through when the title is open, so a tap on SETTINGS works first time; elsewhere it still only wakes the page (90.4). The title's `tap` plays on any tap off its rows.
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1318,7 +1321,7 @@ Run these after any change. A different result means something changed. Recorded
 The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
 
 ### 8.6 Next task
-Phase 133 is done. Next: Phase 134, the tape's menu on the title (PLAN_UX.md).
+Phase 134 is done. Next: Phase 135, something to chase (PLAN_UX.md).
 
 ---
 

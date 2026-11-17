@@ -297,7 +297,7 @@ G.core.input = (function () {
     document.addEventListener('touchstart', function (e) {
       e.preventDefault();
       touched = true;
-      if (!woke) { woke = true; wakeT = performance.now(); return; }
+      if (!woke) { woke = true; wakeT = performance.now(); if (!(G.ui && G.ui.menu && G.ui.menu.current() === 'title')) return; } // Phase 134: on the tape the first touch is its menu's too
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         gamePt(canvas, t.clientX, t.clientY, pt);

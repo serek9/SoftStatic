@@ -52,7 +52,8 @@ G.ui.menu = (function () {
   function update(dt) {
     var inp = G.core.input, scene = G.core.state.sceneName();
     if (cur) {
-      if (!cur.update(dt)) { cur = null; curName = ''; }
+      var was = cur;
+      if (!cur.update(dt) && cur === was) { cur = null; curName = ''; if (G.ui.title && G.ui.title.returned()) open('title', 'back'); } // Phase 134: a page opened from the tape returns to it
       return true;
     }
     if (scene === 'gallery') return false;
@@ -83,7 +84,7 @@ G.ui.menu = (function () {
     save: { title: 'SAVE TAPE', rows: ['Export save', 'Import save'] }
   };
   var PAGE_OF = { Settings: 'settings', 'Save tape': 'save' };
-  var page = 'menu';
+  var page = 'menu', solo = false;
   var SLIDER = { Volume: 'volume', Music: 'music', World: 'world', Effects: 'effects' };
   var ITEMS = [];
   function head(r) { return r && r.charAt(0) === '#'; }
@@ -200,6 +201,7 @@ G.ui.menu = (function () {
 
   var pause = {
     open: function (at) {
+      solo = at === '@settings'; if (solo) at = 'Volume'; // Phase 134: SETTINGS alone, from the tape: Back closes it
       page = pageOf(at); layoutPause(); sel = Math.max(0, ITEMS.indexOf(at)); TOP = 0; say(''); dirty = false; openT = G.ui.panel.now();
       if (!at && remindDue()) { G.state.save.flags.remindAt = Date.now(); dirty = true; page = 'save'; layoutPause(); sel = ITEMS.indexOf('Export save'); reminded++; say('This browser may clear the save. Export a copy to keep it.', 'signal_amber'); }
       scrollTo();
@@ -207,7 +209,7 @@ G.ui.menu = (function () {
     update: function () {
       var inp = G.core.input, st = G.state.save.settings, was = sel;
       if (lv !== G.ui.panel.ver()) { layoutPause(); scrollTo(); }
-      if (inp.pressed('back') && page !== 'menu') { var from = page === 'settings' ? 'Settings' : 'Save tape'; G.audio.engine.play('uiMove'); goPage('menu', from); return true; }
+      if (inp.pressed('back') && page !== 'menu' && !solo) { var from = page === 'settings' ? 'Settings' : 'Save tape'; G.audio.engine.play('uiMove'); goPage('menu', from); return true; }
       if (inp.pressed('pause') || inp.pressed('back')) { pause.close(); return false; }
       var dv = axis('up', 'down'); if (dv) stepSel(dv);
       if (sel !== was) { scrollTo(); G.audio.engine.play('uiMove'); }
