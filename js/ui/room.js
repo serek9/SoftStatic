@@ -262,30 +262,19 @@ G.ui.room = (function () {
     var list = kind === 'dog' ? G.data.looks.dogs : G.data.looks.fishers;
     return typeof lk === 'object' && lk ? lk : G.data.lookOf(list, lk || (G.state.save && G.state.save.look ? G.state.save.look[kind] : ''));
   }
-  // Phase 121: the art itself (1×), for a room composed at half size and shown at 2× (the
-  // shop); sprite() is the same art at 2× for a room drawn at full size (the cabin).
-  var small = {};
-  function smallSprite(kind, dir, fr, lk) {
+  // Phase 123: the user wants fine detail, not fat pixels, with the people's cozy proportions
+  // kept: the same designs are painted at twice their size through a scaled view (X.scaled), so
+  // the head, the coat, the hat and the dog's body are rasterised at the full resolution with a
+  // 1 px outline and their ramps' shading, while the eyes and small marks keep their single
+  // pixels. The fisher and Rusty 32×52, the dog 44×30 from the side and 28×30 front and back.
+  function sprite(kind, dir, fr, lk) {
     var L = look(kind, lk), flip = dir === 'left', d = dir === 'left' || dir === 'right' ? 'side' : dir;
     var key = kind + (L ? L.id : '') + d + fr + (flip ? '<' : '');
-    if (small[key]) return small[key];
-    if (flip) return (small[key] = G.gfx.bake.flipped(smallSprite(kind, 'right', fr, L), 'x'));
-    var g = kind === 'dog' ? X.grid(d === 'side' ? 22 : 14, 15) : X.grid(16, 26);
-    if (kind === 'dog') puppy(g, d, fr, L); else trainer(g, d, fr, kind === 'rusty' ? RUSTY_L : L, kind === 'rusty');
-    return (small[key] = g.canvas());
-  }
-  function sprite(kind, dir, fr, lk) {
-    var L = look(kind, lk), key = kind + (L ? L.id : '') + dir + fr;
     if (art[key]) return art[key];
-    var sm = smallSprite(kind, dir, fr, lk);
-    return (art[key] = G.gfx.bake.layer(sm.width * PX, sm.height * PX, function (c) { c.imageSmoothingEnabled = false; c.drawImage(sm, 0, 0, sm.width * PX, sm.height * PX); }));
-  }
-  // Draws the 1× art with its feet at (x, y) and a small shadow under it.
-  function drawSmall(ctx, kind, dir, fr, x, y, lk) {
-    var im = smallSprite(kind, dir, fr, lk), side = dir === 'left' || dir === 'right', ax = kind === 'dog' ? (side ? 11 : 7) : 8, ay = kind === 'dog' ? 14 : 25;
-    var w = kind === 'dog' ? (side ? 16 : 10) : 11, P = S.PALETTE;
-    ctx.globalAlpha = 0.3; ctx.fillStyle = P.outline; ctx.fillRect(Math.round(x - w / 2), Math.round(y - 1), w, 2); ctx.fillRect(Math.round(x - w / 2 + 2), Math.round(y - 2), w - 4, 4); ctx.globalAlpha = 1;
-    ctx.drawImage(im, Math.round(x - ax), Math.round(y - ay));
+    if (flip) return (art[key] = G.gfx.bake.flipped(sprite(kind, 'right', fr, L), 'x'));
+    var g = kind === 'dog' ? X.grid((d === 'side' ? 22 : 14) * PX, 15 * PX) : X.grid(16 * PX, 26 * PX), v = X.scaled(g, PX);
+    if (kind === 'dog') puppy(v, d, fr, L); else trainer(v, d, fr, kind === 'rusty' ? RUSTY_L : L, kind === 'rusty');
+    return (art[key] = g.canvas());
   }
   // Where a sprite's feet are within it: [x, y]. lk: the dog's look (its size).
   var anc = [0, 0];
@@ -331,5 +320,5 @@ G.ui.room = (function () {
   }
 
   return { walker: walker, heldDir: heldDir, sprite: sprite, anchor: anchor, prebake: prebake, shadow: shadow, drawFigure: drawFigure,
-    walkers: walkers, frames: frames, small: smallSprite, drawSmall: drawSmall, STEP: STEP, TURN: TURN, DIRS: DIRS };
+    walkers: walkers, frames: frames, STEP: STEP, TURN: TURN, DIRS: DIRS };
 })();

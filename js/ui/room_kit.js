@@ -617,9 +617,12 @@ G.ui.roomKit = (function () {
   // now and then the tail's tip twitching or an ear flicking. Three frames baked once; the
   // scene's time picks one. (x, y): its bottom left.
   var catArt = [];
-  function catFrame(f) {
-    if (catArt[f]) return catArt[f];
-    return (catArt[f] = prop(20, 13, function (g) {
+  function catFrame(f, s) {
+    s = s || 1;
+    var key = f + 'x' + s;
+    if (catArt[key]) return catArt[key];
+    var cg = X.grid(20 * s, 13 * s), cv = s > 1 ? X.scaled(cg, s) : cg;                         // Phase 123: at 2× painted at full detail, not doubled
+    return (catArt[key] = (function (g) {
       var C = ['orange_dark', 'orange', 'orange_hi', 'orange_lit'], up = f === 1 ? 1 : 0;
       g.ell(11, 8 - up * 0.5, 7.5, 4.6 + up * 0.5, C, { bias: 0.1 });                          // the curled body
       g.fill(5, 3, 13, 9, function (x, y, k) { return k && (x + (y >> 1)) % 4 === 0 && y < 10 ? 'orange_dark' : ''; }); // stripes
@@ -629,12 +632,13 @@ G.ui.roomKit = (function () {
       g.poly([[2.5, 5.5], [3.2, 2], [5, 4.6]], 'orange'); g.poly([[5.5, 4.6], [7, 2.2 - (f === 2 ? 1 : 0)], [7.8, 5.5]], 'orange_hi'); // the ears
       g.set('pink', 3, 4); g.line('orange_dark', 3, 8, 4, 8); g.line('orange_dark', 6, 8, 7, 8);  // shut eyes
       g.set('pink_hi', 5, 9); g.set('cream', 4, 10); g.set('cream', 6, 10);                    // the nose, the muzzle
-    }));
+      g.outline('outline'); return cg.canvas();
+    })(cv));
   }
   function cat(ctx, x, y, t, s) {
     var f = (t % 11) < 0.5 || (t % 17) > 16.6 ? 2 : (Math.sin(t * 1.6) > 0 ? 1 : 0);
     s = s || 1;                                                                                 // Phase 117: the shop's cat at 2×
-    ctx.drawImage(catFrame(f), x, y - 13 * s, 20 * s, 13 * s);
+    ctx.drawImage(catFrame(f, s), x, y - 13 * s);
   }
 
   return { hash: hash, FLOOR: FLOOR, PANEL: PANEL, WOOD: WOOD, LOG: LOG,
