@@ -78,8 +78,8 @@ G.ui.milestones = (function () {
     var m = G.sim.milestones.byId(G.data, cur);
     if (!m) return;
     if (lineFor !== cur) { lineFor = cur; lineStr = m.name + '  +' + m.reward + 'c'; lineW = F.measure(lineStr) + 13; }
-    var a = Math.min(1, curT * 2, (SHOW_S - curT) * 4), x = pic[0] + ((pic[2] - lineW) >> 1), y = Y + 52;
-    ctx.globalAlpha = 0.75 * a; ctx.fillStyle = P.night_ink; ctx.fillRect(x - 6, y - 4, lineW + 12, 16); ctx.globalAlpha = a;
+    var a = Math.min(1, curT * 2, (SHOW_S - curT) * 4), x = pic[0] + ((pic[2] - lineW) >> 1), y = Y + 58; // Phase 136: under the plate row
+    ctx.globalAlpha = 0.72 * a; ctx.fillStyle = P.night_ink; ctx.fillRect(x - 6, y - 3, lineW + 12, G.ui.panel.KEY_H + 6); ctx.globalAlpha = a;
     mark(ctx, m.icon, x, y - 1);
     F.drawText(ctx, lineStr, x + 13, y, 'signal_amber');
     ctx.globalAlpha = 1;
@@ -100,7 +100,14 @@ G.ui.milestones = (function () {
   }
   function count() { var n = 0, L = G.data.milestones; for (var i = 0; i < L.length; i++) if (G.sim.milestones.done(G.state.save, L[i].id)) n++; return n; }
   var head = '', headN = -1;
-  function open(arg) { from = arg || ''; lv = -1; lay(); top = 0; openT = G.ui.panel.now(); }
+  // Phase 138: the page opens on the goal to chase, its row lit.
+  var goalId = '';
+  function open(arg) {
+    from = arg || ''; lv = -1; lay(); top = 0; openT = G.ui.panel.now();
+    goalId = next(G.state.run && G.state.run.loc).id;
+    var L = G.data.milestones;
+    for (var i = 0; i < L.length; i++) if (L[i].id === goalId) top = Math.max(0, Math.min(L.length - show, i - 2));
+  }
   function back() { if (from === 'journal') G.ui.menu.open('journal'); else G.ui.menu.open('pause', 'Milestones'); }
   function update() {
     var inp = G.core.input, L = G.data.milestones;
@@ -118,8 +125,10 @@ G.ui.milestones = (function () {
     U.frame(ctx, x, y, R[2], R[3], 'MILESTONES', head, 'fog_light');
     for (i = 0; i < show && top + i < L.length; i++) {
       var m = L[top + i], ry = U.top(y) + i * rh + ((rh - U.ROW) >> 1), ok = G.sim.milestones.done(save, m.id), lx = U.left(x);
+      var goalRow = m.id === goalId;
+      if (goalRow) U.row(ctx, x + 3, ry, R[2] - 6, rh);
       mark(ctx, ok ? 'tick' : m.icon, lx, ry - 1);
-      F.drawText(ctx, m.name, lx + 14, ry, ok ? 'bone' : 'fog_light');
+      F.drawText(ctx, m.name, lx + 14, ry, ok ? 'bone' : (goalRow ? 'signal_amber' : 'fog_light'));
       var pr = G.sim.milestones.progress(save, m, G.data, sess, PR), ps = ok ? 'done' : Math.min(pr[0], pr[1]) + ' / ' + pr[1], rs = m.reward + 'c';
       F.drawText(ctx, ps, lx + COLN, ry, ok ? 'moss_lit' : 'fog_mid');
       F.drawText(ctx, rs, x + R[2] - U.PAD - F.measure(rs), ry, ok ? 'fog_mid' : 'signal_amber');

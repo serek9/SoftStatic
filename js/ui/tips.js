@@ -114,6 +114,7 @@ G.ui.tips = (function () {
   // Drawn by the HUD on its own context (the UI layer or the game canvas), at the picture's top centre.
   function draw(ctx, run, X, Y, pic) {
     if (!G.state.save || G.ui.setup.isOpen() || G.ui.dock.isOpen() || G.ui.menu.current() || G.ui.card.isOpen()) return;
+    if (G.ui.hud.note()) return;                                                     // Phase 136: a passing message has the place
     var touch = G.core.device.touch(), cx = pic[0] + (pic[2] >> 1), y = Y + 38;
     if (word) { line(ctx, word, wordKey, cx, y, true); return; }
     if (homeT > 0) { ctx.globalAlpha = Math.min(1, homeT); line(ctx, '', HOME_SAYS, cx, y, false); ctx.globalAlpha = 1; return; } // 91.2

@@ -353,8 +353,36 @@ G.ui.map = (function () {
     return true;
   }
 
+  // Phase 137 (PLAN_UX.md): travel as a VCR fast-forward over the fade: rolling static lines,
+  // FF and the tape counter in the corners, and on the way in the new water as a channel card.
+  // a: how dark the fade is (0..1). Nothing under Reduce motion (the plain fade). View pixels.
+  var chTxt = '', chFor = '';
+  function ff(ctx, a, arriving) {
+    var st = G.state.save && G.state.save.settings;
+    if ((st && st.reduceMotion) || a <= 0.05) return;
+    var U = G.ui.panel, now = U.now(), i, P2 = P;
+    ctx.globalAlpha = 0.3 * a; ctx.fillStyle = P2.fog_mid;
+    for (i = 0; i < 7; i++) { var ly = (S.hash(i, Math.floor(now * 24)) % 360); ctx.fillRect(0, ly, 640, 1 + (i & 1)); }
+    ctx.globalAlpha = a;
+    U.play(ctx, 28, 25, 'fog_light'); U.play(ctx, 33, 25, 'fog_light');
+    F.bold(ctx, 'FF', 42, 24, 'fog_light');
+    var sec = Math.floor(now * 9) % 3600, cnt = 'SP  0:' + (sec < 600 ? '0' : '') + Math.floor(sec / 60) + ':' + (sec % 60 < 10 ? '0' : '') + (sec % 60);
+    F.drawText(ctx, cnt, 612 - F.measure(cnt), 26, 'fog_light');
+    if (arriving && dest) {
+      var key = dest.kind + ':' + (dest.id || '');
+      if (chFor !== key) { // a water is a channel; the shop and the cabin are the deck's AV input
+        chFor = key; var n = 0, k = 0;
+        if (dest.kind === 'loc') for (var id in G.data.locations) { k++; if (id === dest.id) n = k; }
+        chTxt = (dest.kind === 'loc' ? 'CH ' + (n < 10 ? '0' : '') + n : 'AV') + '   ' + (stopName(dest) || '').toUpperCase();
+      }
+      var w = F.measureBold(chTxt);
+      F.bold(ctx, chTxt, 320 - (w >> 1) + 1, 172 + 1, 'ink'); F.bold(ctx, chTxt, 320 - (w >> 1), 172, 'signal_amber');
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function draw(ctx) {
-    if (phase === 'in') { M.dim(ctx, 1 - t / FADE); return; }
+    if (phase === 'in') { M.dim(ctx, 1 - t / FADE); ff(ctx, 1 - t / FADE, true); return; }
     var U = G.ui.panel;
     U.frame(ctx, FX, FY, FW, FH, 'THE WATERS', G.state.save.coins + 'c', 'signal_amber');
     ctx.drawImage(chart, CX, CY);
@@ -389,7 +417,7 @@ G.ui.map = (function () {
       U.hint(c, 'M', 'close', hx, hy);
     }
     G.core.view.begin(ctx, true);
-    if (phase === 'out') M.dim(ctx, t / FADE);
+    if (phase === 'out') { M.dim(ctx, t / FADE); ff(ctx, t / FADE, false); }
   }
   var GO_WORDS = { 'go in': 'GO IN', travel: 'TRAVEL', 'pay and travel': 'BUY & GO' };
 

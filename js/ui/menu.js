@@ -107,11 +107,19 @@ G.ui.menu = (function () {
     var U = G.ui.panel;
     buildItems();
     RH = U.rowH();
-    var foot = U.touch() ? U.PAD : U.KEY_H + U.PAD, fixed = U.TAB + U.PAD + 2 * U.ROW + foot + 1;
+    var foot = U.touch() ? U.PAD : U.KEY_H + U.PAD, fixed = U.TAB + U.PAD + 3 * U.ROW + foot + 1; // Phase 138: three lines at the foot
     SHOW = Math.max(3, Math.min(ITEMS.length, Math.floor((U.pic()[3] - 2 * U.MARGIN - fixed) / RH)));
     var h = fixed + SHOW * RH;
     U.place(PW, h, 'right', PRECT); PRECT[2] = PW; PRECT[3] = h; MSG_Y = U.TAB + U.PAD + SHOW * RH + 1;
     lv = U.ver();
+  }
+  // Phase 138: TAPE  3 FISH  +87c  26 cm (the longest), rebuilt when the card's tape changes; '' before a fish.
+  var tapeTxt = '', tapeVer = -1;
+  function tape() {
+    var T = G.ui.card.tape();
+    if (!T.fish) return '';
+    if (T.ver !== tapeVer) { tapeVer = T.ver; tapeTxt = 'TAPE  ' + T.fish + ' FISH  +' + T.coins + 'c  ' + Math.round(T.best) + ' cm'; } // the best length, whole cm, to fit the panel
+    return tapeTxt;
   }
   // Phase 132: PLAY, the clock and the water, as a VCR's status line; rebuilt only when they change.
   var stTxt = '', stMin = -1, stLoc = '';
@@ -319,7 +327,8 @@ G.ui.menu = (function () {
       if (!msgLines.length) { // Phase 132: the VCR's status line
         U.play(ctx, U.left(X) + 2, Y + MSG_Y + 2, 'neon_teal');
         F.drawText(ctx, status(), U.left(X) + 9, Y + MSG_Y + 2, 'fog_mid');
-        if (page === 'menu' && nextTxt) F.drawText(ctx, nextTxt, U.left(X) + 9, Y + MSG_Y + 2 + U.ROW, 'neon_teal'); // Phase 135: the goal to chase
+        if (page === 'menu' && tape()) F.drawText(ctx, tapeTxt, U.left(X) + 9, Y + MSG_Y + 2 + U.ROW, 'bone'); // Phase 138: this sitting's tape
+        if (page === 'menu' && nextTxt) F.drawText(ctx, nextTxt, U.left(X) + 9, Y + MSG_Y + 2 + (tape() ? 2 : 1) * U.ROW, 'neon_teal'); // Phase 135: the goal to chase
       }
       x = U.left(X);
       if (page !== 'menu') x += U.hint(ctx, 'ESC', 'back', x, Y + PRECT[3] - U.PAD - U.KEY_H);

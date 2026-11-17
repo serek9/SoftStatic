@@ -372,7 +372,7 @@ Report: what changed, the dbg/Node check output, any TODO stubs left.
 
 > The only living part of this plan: §0–§7 and Appendix V are the approved spec and do not change. Update this section at the end of every phase: the table in 8.1, anything new in 8.3 and 8.4, the baselines in 8.5, and the next task in 8.6.
 
-**Last updated:** 2026-11-17, after 135 Something to chase. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
+**Last updated:** 2026-11-17, after 138 This tape. **Repository:** github.com/serek9/SoftStatic, branch `main`. Setup and moving saves: [HANDOFF.md](HANDOFF.md). Working rules: [CLAUDE.md](CLAUDE.md).
 
 ### 8.1 Phases
 
@@ -524,6 +524,9 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 133 Fixes and a shop that finds things | Done | ✓ | The card's settled size medallion sits beside its NEW tab and its PC hint is a key cap; the pier panel wraps its line; chart names sit on plates; Rusty's Buy opens in five shelves (RODS, REEL & LINE, LURES, BAIT, GEAR) turned with A/D or the list's foot. |
 | 134 The tape's menu | Done | ✓ | The title shows a VCR menu under the letters: PLAY (CONTINUE once a fish is caught), SETTINGS, CONTROLS. One key or a tap off the rows still plays at once; the two pages open over the tape and return to it. |
 | 135 Something to chase | Done | ✓ | The catch card's foot shows the goal it counts toward (the water's fish, or the nearest milestone) with a bar, counting this fish; the MENU names the next goal; journal tiles of fish not caught that bite here at this hour say *now*. A fresh save's first pause no longer jumps to the export reminder. |
+| 136 One voice for the HUD | Done | ✓ | Passing messages (why a fish got away, a lure lost, the last pack) are OSD plates at the top centre where the tips speak, with a teal play mark; a tip steps aside while one shows; the milestone line sits under them on the same plate. |
+| 137 Fast-forward between waters | Done | ✓ | Travel's fade plays as a VCR fast-forward: rolling static lines, ▶▶ FF and a running tape counter, then the new water as a channel card (CH 02  BLACKWATER CREEK; the shop and cabin are AV). Same length; the plain fade under Reduce motion. |
+| 138 This tape | Done | ✓ | The MENU's foot shows this sitting's tape (TAPE  2 FISH  +76c  25 cm) above the next goal; the milestones page opens on the goal to chase, its row lit. |
 ### 8.2 Architecture as built
 
 The files that exist so far. §3 is the target tree; this is what is in it now.
@@ -1239,6 +1242,10 @@ These are interpretations and additions made while building, where the spec abov
 606. **The next goal (135):** `milestones.next(loc)` picks the water's milestone when its fish are not all caught, else the unfinished milestone nearest done by share (the sitting's pats, the hole and the pond's left out); worked out on a call (the card's first 0.15 s, the pause's open), never per frame. The card counts the catch on display (it is written to the journal only on Sell, Keep or Release): +1 for 'caught', and for 'species' or the water's when it is the species' first.
 607. **Here now (135):** `journal.hereNow(sp)`: a home at the boat's water whose hours hold the present part of the day (or any hour); drawn as *now* in `teal_lit` on a tile not caught yet.
 608. **The export reminder's week (135, fixes 91.2):** with neither `exportAt` nor `remindAt` set, the first check sets `remindAt` to now and does not remind, so a fresh save's first pause opens on MENU.
+609. **The HUD's plate (136):** `hud.say()` notes draw through `plate()` (`night_ink` at 0.72, a `neon_teal` play mark, `bone` words) at the picture's top centre, Y + 38, fading in over 0.25 s; the width is measured once per message. `tips.draw` returns while `hud.note()` is set. The milestone line moved to Y + 58 with the same plate height.
+610. **The fast-forward (137):** `map.ff(ctx, a, arriving)` draws over `M.dim` in both halves of the travel fade (FADE 0.35 s each way, unchanged): seven 1–2 px `fog_mid` lines placed by `S.hash` of the UI clock at 24 Hz, two play marks and FF, an SP counter at 9× the UI clock; on the way in, the channel card at the picture's centre (a water's number is its place in `G.data.locations`; the shop and the cabin are AV), its text built once per destination. Nothing under Reduce motion.
+611. **The tape (138):** `card.tape()` {fish, coins, best, ver}, counted in `commit()`: each fish settled adds one, the coins it brought (sale and first-catch bonus; a milestone's pay is not counted) and its length if the longest. Never saved. The MENU's foot is three lines now (`fixed` takes 3 rows); TAPE shows once a fish is in, its text rebuilt when `ver` changes.
+612. **The goal row (138):** `milestones.open` scrolls so the goal from `next(loc)` is the third row shown and lights it with `panel.row` (no cursor: the icon sits where it would).
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1325,7 +1332,7 @@ Run these after any change. A different result means something changed. Recorded
 The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
 
 ### 8.6 Next task
-Phase 135 is done, and with it UX round 1 (PLAN_UX.md, Phases 131–135). Next: the round-2 audit (PLAN_UX.md §3).
+Phase 138 is done, and with it UX round 2 (PLAN_UX.md, Phases 136–138). Next: the round-3 audit.
 
 ---
 

@@ -109,6 +109,18 @@ G.ui.hud = (function () {
   // Line tint for fight tension (7.4): plain, then amber, then red. Secondary to the line's shape.
   function tensionKey(T) { return T < 0.5 ? 'fog_light' : (T < 0.8 ? 'signal_amber' : 'neon_red'); }
 
+  // Phase 136 (PLAN_UX.md): a passing message as an OSD plate centred on cx: the dark plate the
+  // tips use, a teal play mark, the words. The width is measured once per message.
+  var plateFor = '', plateW = 0;
+  function plate(ctx, s, cx, y, a) {
+    if (plateFor !== s) { plateFor = s; plateW = F.measure(s) + 9; }
+    var x = Math.round(cx - plateW / 2);
+    ctx.globalAlpha = 0.72 * a; ctx.fillStyle = S.PALETTE.night_ink; ctx.fillRect(x - 6, y - 3, plateW + 12, G.ui.panel.KEY_H + 6);
+    ctx.globalAlpha = a; G.ui.panel.play(ctx, x, y + 2, 'neon_teal');
+    F.drawText(ctx, s, x + 9, y + 2, 'bone');
+    ctx.globalAlpha = 1;
+  }
+
   // Text with a 1 px ink shadow, so it reads over the fog and the sky.
   function label(ctx, s, x, y, key) {
     F.drawText(ctx, s, x + 1, y + 1, 'ink');
@@ -131,7 +143,7 @@ G.ui.hud = (function () {
       label(ctx, baitText(save, run.gearFx.bait), X + CHIP[0] + 3, Y + 14, 'fog_light');
       ctx.globalAlpha = 1;
     }
-    if (noteT > 0) { ctx.globalAlpha = Math.min(1, noteT); label(ctx, note, X, Y + 28, 'paper'); ctx.globalAlpha = 1; }
+    if (noteT > 0) plate(ctx, note, pic[0] + (pic[2] >> 1), Y + 38, Math.min(1, noteT, (NOTE - noteT) * 4)); // Phase 136: an OSD plate at the top centre, where the tips speak
     if (reachT > 0 && reachName) { ctx.globalAlpha = Math.min(1, reachT, (REACH - reachT) * 2) * 0.9; label(ctx, reachName, pic[0] + (pic[2] >> 1) - (reachW >> 1), Y + 22, 'bone'); ctx.globalAlpha = 1; } // Phase 75
 
     if (a > 0 && run.loc && G.data.locations[run.loc] && G.data.locations[run.loc].pond && save.pond) pondLine(ctx, save.pond, a, G.data.locations[run.loc], X, Y); // Phase 84
