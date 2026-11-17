@@ -1,62 +1,25 @@
-# SoftStatic: New Waters, Phases 74–79
+# SoftStatic: New Waters, Phases 74–79 (built)
 
-**Date:** 2026-11-02. **Repo state:** Phases 1–73 done (PLAN.md §8.1).
-**Status:** Asked for by the user on 2026-11-02. **Phases 74–79 done** (PLAN.md 8.3 #397–450). Each phase starts only when the user says so.
+Adds phases after the approved spec; decisions are in PLAN.md §8.3 #397–450. `node tools/balance.js --homes` reads §3 below and checks it against `data/fish.js`: keep its tables and headings exactly in this form.
 
-> keeping the same style of locations we have made, create all the locations in this list (dont give the same names, create new ones, but the aspect should be real like the ones in the list) then associate each species to the location, depth and time of the day you can find them — https://castnchill.unpack.wiki/docs/locations/
-
-The user's answers to the questions asked before planning:
-1. **Structure:** each of the reference's areas becomes **one water** (new name, real look), and its 2–3 named spots become **reaches** along it, each with its own fish. Like Fogbound or Blackwater today.
-2. **Old waters:** keep **Fogbound Lake, Blackwater Creek and The Pines**; **retire the Red Room Reservoir**. **Every water has a pier with the bait shop reachable from it.** Keep the ecosystem animals and the changing weather and time of day.
-3. **Species:** placed by **real habitat, with the reference as a guide**. Each species gets its depth and hours **per water**, and all 59 get at least one home (the 16 now waiting get theirs).
-4. **Ice fishing and the cabin valley's pond:** **not now.**
-
-**Read with:** PLAN.md §0 (conventions, required) and §8 (status). Like the other plan files, this one adds phases after the approved spec and does not edit §0–§7 or Appendix V. Where a phase changes something the spec describes (V6's four locations, V8's pacing step for location 4), the decision goes in §8.3 and the spec text stays as it is.
-
----
-
-## 1. The reference, as read on 2026-11-02
-
-Eight areas, sixteen spots. The pages give each spot's water type, its unlock and five species (with rarities, which we don't use). They have no descriptions, depths or hours, so those are ours. The scraped pages stay in the session scratchpad and are **not committed**.
-
-| Area | Type | Spots and their five species |
-|---|---|---|
-| Goldenfork River | river | **The Fork:** Bluegill, Brown Trout, Smallmouth Bass, Threadfin Shad, Walleye · **Beaver Dam:** Brown Trout, Bullhead, Crappie, Largemouth Bass, Longnose Sucker · **The Mistwood:** Burbot, Creek Chub, Rock Bass, Shorthead Redhorse, Steelhead |
-| Grizzlyridge River | river | **The Rapids:** Brook Trout, Chum, Coho, Mountain Whitefish, Muskie · **Eagles Nest:** Arctic Grayling, Cutthroat, Longnose Dace, Masu, Sockeye |
-| Fawnmirror Lake | lake | **Underwater Meadow:** Cisco, Northern Pike, Rainbow Trout, Tiger Trout, Yellow Perch · **Picnic Point:** Bluegill, Lake Trout, Lake Whitefish, Mooneye, Tiger Trout · **Fisherman's Rest:** Arctic Char, Common Carp, Goldeye, Round Whitefish, White Sucker |
-| Autumnwood Lake | lake | **Shallows Edge:** Channel Catfish, Hybrid Striped Bass, Northern Pikeminnow, Peamouth, White Bass · **Otter Cove:** Humpback Whitefish, Largescale Sucker, Northern Pikeminnow, Peamouth, White Sturgeon |
-| Icewater Sea | ocean | **Watchers Point:** American Shad, Atlantic Salmon, Lingcod, Pacific Herring, Yelloweye Rockfish · **Craggy Reef:** King, Coho, Lingcod, Masu, Pacific Herring · **Safety Cove:** American Shad, Atlantic Salmon, King, Pink, Steelhead |
-| Old Wreck Bay | ocean | **Divers Drop:** Dolly Varden, Eulachon, Pacific Halibut, Sockeye, Striped Bass · **Seals Rest:** Capelin, Chum, Dolly Varden, Greenland Halibut, Striped Bass |
-| Lake Hunkerdown | ice | Frostbite Flats (the ten "(Ice)" entries). **Not in this plan** (answer 4). |
-| Old Moose Valley | cabin | Old Moose Cabin, a private pond to clean and stock. **Not in this plan** (answer 4). |
-
----
+**The user's rules:** each new water has a new name and a real look, with 2–3 **reaches** along it, each with its own fish. Fogbound, Blackwater and The Pines stay; the Red Room was retired. Every water has a pier with the bait shop reachable from it. Species are placed by real habitat, with depth and hours per water.
 
 ## 2. The six new waters
 
-New names, real places. Each is built the way ours are: a `data/loc_<id>.js` (layers, landmarks, under water, spots, life, swell, current) and its scenery. **No new strange things:** the liminal layer (fog, owl, anomalies, unease) stays with Fogbound, Blackwater and The Pines. The new waters have the same day and night, weather, drizzle, storms and ecosystem as ours, with the animals that really live there.
+Each is a `data/loc_<id>.js` (layers, landmarks, under water, spots, life, swell, current) and its scenery. **No new strange things:** the liminal layer (fog, owl, anomalies, unease) stays with Fogbound, Blackwater and The Pines; the new waters share day and night, weather, storms and the ecosystem. Depths in metres (px = m × 4); the sea's real depths are pressed into 40 m.
 
-Depths are in metres (px = m × 4). The sea's real depths (halibut and rockfish to 90 m and more) are pressed into 40 m: deep-water species are fished on the bottom of the deepest reach.
+| Water (id) | What it is | Depth | Reaches |
+|---|---|---|---|
+| **Copperbend River** (`copper`) | A slow lowland river running to the Great Lakes through farmland and hardwoods: gravel bars, a wooden bridge, a beaver dam, a misty wooded bend. Current like Blackwater's, a little faster over the riffle | 10 m | **The Split** (two channels meet over a gravel riffle) · **Lodge Pool** (still water above a beaver dam, a lodge of sticks) · **Hollow Reach** (a deep bend under leaning maples, morning mist) |
+| **Stonehorn River** (`stone`) | A cold mountain river of the north Pacific slope: spruce and snowy peaks, boulders, white water, an osprey's nest on a bluff | 8 m | **Boulder Run** (rapids: a fast current, foam, standing waves) · **Osprey Bluff** (a deep green pool under a cliff with the nest on top) |
+| **Hartsmere Lake** (`harts`) | A clear, deep, cold lake in the northern woods: birches, a picnic table and a fire ring on the point, an old bench and a rowboat at the far end, weed beds you can see into | 32 m | **The Weedbed** (shallow flats of waving weed) · **Birch Point** (a point with a picnic table, dropping off steeply) · **The Old Bench** (the quiet far end, a soft bottom) |
+| **Russetwood Lake** (`russet`) | A big-river reservoir among oaks and maples in autumn colour: reed flats, a concrete dam far off, an otter's cove of fallen trees | 24 m | **Reed Flats** (shallow edge with reeds and stumps) · **Mink Cove** (a cove over the old river channel, the deepest water) |
+| **Coldharbor Sound** (`sound`) | A north Pacific coast: dark rock headlands, a white lighthouse, kelp, a breakwater and a few moored boats. Swell, not current | 40 m | **Lamplight Head** (the lighthouse's headland, rock to the bottom) · **Skerry Reef** (a reef of rocks awash, kelp forest) · **Harbour Cove** (behind the breakwater, calm, sand) |
+| **Wreckhollow Bay** (`wreck`) | A north Atlantic bay: a schooner's wreck on its side half out of the water, a shelf dropping into deep water, rocks where seals haul out | 40 m | **The Shelf** (the wreck and the drop beyond it) · **Haul-out Rocks** (low rocks and seals, kelp and sand) |
 
-| Water (id) | From | What it is | Depth | Reaches (from the reference's spots) |
-|---|---|---|---|---|
-| **Copperbend River** (`copper`) | Goldenfork River | A slow lowland river running to the Great Lakes through farmland and hardwoods: gravel bars, a wooden bridge, a beaver dam, a misty wooded bend. Current like Blackwater's, a little faster over the riffle | 10 m | **The Split** (two channels meet over a gravel riffle) · **Lodge Pool** (still water above a beaver dam, a lodge of sticks) · **Hollow Reach** (a deep bend under leaning maples, morning mist) |
-| **Stonehorn River** (`stone`) | Grizzlyridge River | A cold mountain river of the north Pacific slope: spruce and snowy peaks, boulders, white water, an osprey's nest on a bluff | 8 m | **Boulder Run** (rapids: a fast current, foam, standing waves) · **Osprey Bluff** (a deep green pool under a cliff with the nest on top) |
-| **Hartsmere Lake** (`harts`) | Fawnmirror Lake | A clear, deep, cold lake in the northern woods: birches, a picnic table and a fire ring on the point, an old bench and a rowboat at the far end, weed beds you can see into | 32 m | **The Weedbed** (shallow flats of waving weed) · **Birch Point** (a point with a picnic table, dropping off steeply) · **The Old Bench** (the quiet far end, a soft bottom) |
-| **Russetwood Lake** (`russet`) | Autumnwood Lake | A big-river reservoir among oaks and maples in autumn colour: reed flats, a concrete dam far off, an otter's cove of fallen trees | 24 m | **Reed Flats** (shallow edge with reeds and stumps) · **Mink Cove** (a cove over the old river channel, the deepest water) |
-| **Coldharbor Sound** (`sound`) | Icewater Sea | A north Pacific coast: dark rock headlands, a white lighthouse, kelp, a breakwater and a few moored boats. Swell, not current | 40 m | **Lamplight Head** (the lighthouse's headland, rock to the bottom) · **Skerry Reef** (a reef of rocks awash, kelp forest) · **Harbour Cove** (behind the breakwater, calm, sand) |
-| **Wreckhollow Bay** (`wreck`) | Old Wreck Bay | A north Atlantic bay: a schooner's wreck on its side half out of the water, a shelf dropping into deep water, rocks where seals haul out | 40 m | **The Shelf** (the wreck and the drop beyond it) · **Haul-out Rocks** (low rocks and seals, kelp and sand) |
+**Real-life placements:** Muskie stays out of mountain rivers. **Coldharbor Sound is the Pacific** (lingcod, yelloweye, Pacific herring and halibut, eulachon, Pacific salmon) and **Wreckhollow Bay the Atlantic** (Atlantic salmon, American shad, striped bass, capelin, Greenland halibut). Masu Salmon is kept in Stonehorn and Coldharbor ("rarely seen this side of the ocean"). Threadfin Shad lives in Russetwood's reed flats; Humpback Whitefish in Hartsmere's deep water.
 
-**Where the reference strays from real life, and what we do:**
-- Muskie in a mountain river: not real. Stonehorn's Boulder Run gets **Rainbow Trout** instead; Muskie stays in The Pines.
-- Atlantic Salmon, American Shad, Striped Bass, Capelin and Greenland Halibut are north Atlantic fish; Lingcod, Yelloweye, Pacific Herring, Pacific Halibut, Eulachon and the Pacific salmon are north Pacific fish. The reference mixes them in both seas. We split them: **Coldharbor Sound is the Pacific** (the reference's Icewater Sea has most of the Pacific fish) and **Wreckhollow Bay is the Atlantic**.
-- Masu Salmon lives on the Asian side of the Pacific. We keep it in Stonehorn and Coldharbor as the reference does; the journal calls it "a Pacific salmon, rarely seen this side of the ocean".
-- Threadfin Shad doesn't reach the Great Lakes; it goes to Russetwood's reed flats (a reservoir is where it lives).
-- Humpback Whitefish is a cold-water fish of the far north: it moves from The Pines (a warm woodland lake) to Hartsmere's deep water.
-
-**Costs** (first guesses; Phase 74 tunes them until `--pacing` passes): Fogbound 0, Blackwater 300, **Copperbend 800**, The Pines 1500, **Hartsmere 2400**, **Stonehorn 3400**, **Russetwood 4800** (in the Red Room's place), **Coldharbor 7000**, **Wreckhollow 9500**. Every reach of a water opens with it (the reference's "catch X to open the next spot" is not copied).
-
----
+**Costs** (tuned by `--pacing`): Fogbound 0, Blackwater 300, Copperbend 800, The Pines 1500, Hartsmere 2400, Stonehorn 3400, Russetwood 4800, Coldharbor 7000, Wreckhollow 9500. Every reach opens with its water.
 
 ## 3. Where each species lives
 
@@ -213,48 +176,8 @@ Every water gets a `dock` (its pier, at one end, with a signpost). Stopping besi
 ### 4.6 The chart
 The map grows to hold nine waters: the inland waters and rivers on the left, the coast and the two seas on the right, the old Red Room's corner becoming Russetwood's dam. Each stop shows its reaches as small labels. The arrows' nearest-stop-that-way rule (Phase 66) stays and `dbg.mapNav()` checks it.
 
----
-
 ## 5. Phases
-
-### Phase 74: Nine waters on the chart
-**74.1** Six new `data/loc_<id>.js` files with their reaches, depths, costs, docks and currents, painted for now with the existing layer kinds (rivers like Blackwater, lakes like The Pines and Fogbound, seas with the lake painters in sea colours) so they can be sailed and fished.
-**74.2** The Red Room retired (4.4); save v9.
-**74.3** The map's nine stops (4.6) and the costs tuned until `--pacing` passes.
-*Done when:* `--validate` (every water has reaches covering its width and a dock; no `red` left), `--saves` (every milestone loads into v9, a Red Room save is refunded and moved), `--pacing` PASS, `--replay` hash re-recorded, `dbg.mapNav()` ok, every water loads in headless Chromium at noon and midnight with no page errors.
-
-### Phase 75: Where each fish lives
-**75.1** `homes` (4.1) for all 59 species from §3; fish_ai picks by water, reach, depth and hour; the HUD names the reach.
-**75.2** The journal shows each species' homes; `dbg.who()` names the reach.
-*Done when:* `--validate` (every species has a home, every home's water and reaches exist, every depth fits the water's depth, every reach has a lure type that every one of its species takes), `--tackle` and `--fight` PASS, `--pacing` PASS, `--replay` re-recorded, a Node check that prints §3's tables from the data and matches them.
-
-### Phase 76: A pier in every water
-**76.1** THE PIER panel and signpost at each water's dock (4.3); the shop returns him to the pier he came from.
-*Done when:* `dbg.dock()` at each of the nine waters reports its pier; going to the shop and back from each works in headless Chromium with no page errors.
-
-### Phase 77: The rivers
-**77.1** Copperbend River's scenery: the riffle and gravel bars, the bridge, the beaver dam and lodge, the misty bend; per-reach current.
-**77.2** Stonehorn River's: snowy peaks, spruce, boulders and white water, the bluff and the osprey's nest; the fast current.
-**77.3** Their animals (4.5).
-*Done when:* both rivers render at dawn, noon, dusk, midnight and in a storm in headless Chromium with no page errors (screenshots for the user); `dbg.shore()` and `dbg.life()` list what each reach has; `dbg.lureBody()` reports the faster drift in Boulder Run.
-
-### Phase 78: The lakes
-**78.1** Hartsmere Lake: birches, the picnic point, the old bench and rowboat, clear water with visible weed beds and a steep drop.
-**78.2** Russetwood Lake: autumn hardwoods, reed flats and stumps, the dam far off, the otters' cove.
-**78.3** Their animals.
-*Done when:* as Phase 77.
-
-### Phase 79: The seas
-**79.1** Sea painters: headlands and cliffs, the lighthouse (its beam at night), the breakwater and moored boats, the wreck, the seals' rocks, kelp, sand and rock bottoms; the swell, whitecaps and tide (4.5).
-**79.2** Coldharbor Sound and Wreckhollow Bay built from them.
-**79.3** Sea life above and below.
-*Done when:* as Phase 77; plus `dbg.sea()` reports the swell, the tide's height and the lighthouse's beam; a phone's frame time measured at sea (Phase 60's check) stays above 50 fps on the 4× throttle.
-
----
-
-## 6. Risks
-- **Size of the map:** nine stops plus the shop and cabin on a 640×360 chart. If it crowds, the chart scrolls sideways (inland | coast) instead of shrinking the labels.
-- **Pacing:** six more waters and the sea's big fish (king salmon, halibut, lingcod) could break V8's targets. Phase 74 tunes the costs and Phase 75 the prices, and `--pacing` decides.
-- **Rods:** sturgeon and halibut reach 100 kg, past the strongest rod. As in PLAN_SPECIES.md, the biggest only bite on a rod that holds them. A heavier rod is a later choice for the user.
-- **Boot time:** six more baked waters. They bake on arrival, as now, so boot doesn't grow; arrival is measured in Phase 74.
-- **The sea's depth:** 40 m on screen (160 px) leaves the cross-section the same height as The Pines' 28 m plus 48 px; if it doesn't fit the view, the sea's px per metre drops to 3 for the cross-section only.
+- **74** Nine waters on the chart; the Red Room retired (save v9); costs tuned.
+- **75** `homes` for every species from §3; the HUD names the reach; the journal shows homes; `--homes` added.
+- **76** A pier in every water.
+- **77** The rivers' scenery and animals. **78** The lakes'. **79** The seas' (swell, whitecaps, tide, lighthouse; `dbg.sea()`).
