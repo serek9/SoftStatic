@@ -45,7 +45,7 @@ G.ui.dock = (function () {
     R[2] = w; R[3] = h;
     lv = U.ver();
   }
-  function open(loc) { M = where === 'stream' ? STREAM : menuOf(loc); msg = ''; ROWS = M.rows; DEST = M.dest; SAYS = M.says; layout(); on = true; sel = 0; armed = false; openT = G.ui.panel.now(); }
+  function open(loc) { M = where === 'stream' ? STREAM : menuOf(loc); msg = ''; ROWS = M.rows; DEST = M.dest; SAYS = M.says; layout(); on = true; sel = 0; armed = false; openT = G.ui.panel.now(); G.ui.panel.kick(); }
   function close() { on = false; }
 
   // One step from the sailing scene, before it casts or sails. Returns true while the dock has
@@ -120,7 +120,7 @@ G.ui.dock = (function () {
     U.frame(ctx, x, y, R[2], R[3], M.title || 'THE PIER');
     for (i = 0; i < ROWS.length; i++) {
       var ry = U.top(y) + i * RH + off, here = i === sel;
-      if (here) U.row(ctx, x + 3, ry + 1, R[2] - 6, RH);
+      if (here) U.row(ctx, x + 3, ry + 1, R[2] - 6, RH, true);
       F.drawText(ctx, ROWS[i], U.left(x) + 6, ry + 1, here ? 'signal_amber' : 'bone');
       if (M === WAIT && i < 4) G.ui.cabin.partIcon(ctx, G.ui.cabin.PARTS[i], x + R[2] - U.PAD - 10, ry + 1); // Phase 93: its mark
     }

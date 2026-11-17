@@ -44,7 +44,7 @@ G.ui.card = (function () {
   // Phase 129: the keys are named on the first FIRST_CARDS cards, then only with the Key hints setting.
   var FIRST_CARDS = 3, keysOn = true;
   function open(info) {
-    cur = info; sel = 0; t = 0; at = 0;
+    cur = info; sel = 0; t = 0; at = 0; G.ui.panel.kick(); // Phase 131
     var s = G.state.save, n = 0; for (var k in s.journal) n += s.journal[k].caught || 0;
     keysOn = !!s.settings.hints || n < FIRST_CARDS;
     if (info.trash === undefined) {

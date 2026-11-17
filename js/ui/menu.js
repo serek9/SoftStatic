@@ -41,6 +41,7 @@ G.ui.menu = (function () {
     cur = o; curName = name;
     if (G.ui.tips) G.ui.tips.opened(name); // the journal / chart tip is done when the page opens (the scene does not step under a menu)
     o.open(arg);
+    G.ui.panel.kick(); // Phase 131: the panel rolls in
     return true;
   }
 
@@ -247,9 +248,9 @@ G.ui.menu = (function () {
       for (var k = 0; k < SHOW && TOP + k < ITEMS.length; k++) {
         i = TOP + k;
         var y = U.top(Y) + k * RH + ((RH - U.ROW) >> 1), on = i === sel, key = on ? 'signal_amber' : 'fog_light';
-        if (on) U.row(ctx, X + 3, y, W - 6, RH);
+        if (on) U.row(ctx, X + 3, y, W - 6, RH, true);
         else if (U.hot([X + 3, y - 2 - ((RH - U.ROW) >> 1), W - 6, RH])) { ctx.fillStyle = P.night_deep; ctx.fillRect(X + 3, y - 2 - ((RH - U.ROW) >> 1), W - 6, RH - 1); } // 90.5: hover
-        F.drawText(ctx, ITEMS[i], U.left(X) + 3, y, key);
+        F.drawText(ctx, ITEMS[i], U.left(X) + 6, y, key);
         if (k === 0 && TOP > 0) F.drawText(ctx, '^', X + W - U.PAD - 6, y, 'fog_mid');
         if (k === SHOW - 1 && TOP + SHOW < ITEMS.length) F.drawText(ctx, 'v', X + W - U.PAD - 6, y, 'fog_mid');
         if (SLIDER[ITEMS[i]]) {
