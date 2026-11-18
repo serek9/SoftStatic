@@ -199,6 +199,7 @@
       V.begin(ctx, G.core.state.native()); G.core.state.draw(ctx);
       G.ui.panel.screen(ctx); // Phase 140: the Tape look, when it is on
       V.begin(ctx, G.ui.menu.native()); G.ui.menu.draw(ctx);
+      G.ui.panel.post(); // the CRT over every panel drawn this frame
       V.begin(ctx, false); G.ui.hud.drawButtons(ctx);
       V.begin(ctx, true); G.core.device.drawNotice(ctx); // 57.3: portrait on a phone
       if (!warmed) warmed = G.ui.journal.warm(1); // 8.4 #24: the journal's pictures, one a frame, off screen

@@ -534,6 +534,7 @@ Every task in Phases 1–12 met its "Done when" check from §4. Each check was r
 | 143 How to play first | Done | ✓ | On a phone, the Add-to-Home-Screen note (91.2) waits until the first fish is landed, so the first line a new player sees is how to cast. |
 | 144 Tips take turns | Done | ✓ | A first-time tip other than the basics steps aside after 25 s on screen, so one left undone (the journal's) no longer hides the tips about the tackle, Rusty's and the chart. |
 | 145 Always sideways | Done | ✓ | On a phone held upright the game no longer shows the turn-your-phone notice: the page is turned a quarter, so the game always starts and plays sideways; touches are turned back to match. |
+| 146 The CRT menus | Done | ✓ | Every panel reads as a CRT playing a tape: a lit teal glass with scanlines through the text, the tube's darker corners, a red/teal glow on everything light, a tracking band that drifts down shifting rows, specks of static, and a power-on from a pale line when a panel opens. The world behind an open menu shows as a paused tape (scanlines, vignette, the pause bar). Still parts only under Reduce motion. |
 ### 8.2 Architecture as built
 
 The files that exist so far. §3 is the target tree; this is what is in it now.
@@ -1260,6 +1261,7 @@ These are interpretations and additions made while building, where the spec abov
 617. **The home-screen note's moment (143):** `tips.homeStep` also waits for `caught(save) >= 1`; it took the cast tip's place on a fresh save's first screen. Checked by a scripted phone session with CDP touch events (title tap, CAST hold, HOOK tap, REEL hold, SELL tap): 2 of 2 landed, the cast tip first.
 618. **Tips take turns (144):** `tips.js` `SHOW_MAX` 25 s: the time a non-basic tip has been the one to show (no overlay, card or HUD note up) is counted in memory (`seen`); past it the tip is marked done in `save.tipsDone` and the next one speaks. The basics (`BASICS`) stay until done.
 619. **Always sideways (145, replaces 57.3's notice):** a page cannot lock a phone's orientation in the browser (only full screen on Android, or the installed app's manifest), so in touch mode with the screen taller than wide `device.fit` turns the body a quarter clockwise (`translate(screenW, 0) rotate(90deg)`, origin 0 0, fixed at the screen's size swapped) and lays out the canvas, the UI layer and the controls in that landscape space (the insets turned with it: the screen's top becomes the left). `device.toVirtual` turns a touch back (x = clientY, y = screenW − clientX) and `input.gamePt` reads the canvas's box from `device.box()` while turned. `info.portrait` stays false; `drawNotice` draws only for the gallery. Checked on an emulated iPhone 13 upright and sideways: the title tap, the CAST hold and the Menu key all land.
+620. **The CRT menus (146, the user's request of 2026-11-18):** `panel.frame` lays `glass()` under the body (every other row `crt_dark` at 0.5, three inset steps at 0.16 lighter towards the middle) and records the panel (ctx, bounds, alpha) in fixed arrays (16 at most; `frameStart` clears them). `panel.post()`, called once in the boot draw after `menu.draw`, then over each body: the tracking band (5 rows, a 6.5 s period, each row copied onto itself shifted −2..2 px, a `fog_light` wash at 0.06 and dashes at 0.22), `fringe()` (the body copied onto one scratch canvas made once, multiplied by `neon_red` / `neon_teal` and added back `lighter` at 0.5, a pixel left / right), `ink` scanlines at 0.34 on the rows the glass leaves unlit, darker edge rows and stepped corners, a 1 px red/teal fringe outside the side rims, 5 specks of static, and for 0.24 s after `kick()` the power-on (the body `night_ink` but a pale line widening at its middle, then opening out; the line at 0.55, 0.25 under Reduce flashes). The noise is a hash of the UI clock, never `G.vrng`. Phase 131's under-text `scan()` and the roll-in band (`track`) are replaced by it. `panel.paused(ctx)` (from `menu.draw` for every overlay but the title) draws the Tape look's baked layer unless the Tape look is on, and a VCR pause bar (9 px of `ink` at 0.22 near y 322 with 34 dashes of static). Under Reduce motion: no band, static, wobble or power-on. Measured in headless Chromium (software, no GPU): +0.6 ms a frame on the pause menu, +2.2–2.4 ms on the full-screen journal and map.
 ### 8.4 Known bugs and pending issues
 
 No crashes or failing checks are known. Open items, roughly by importance:
@@ -1346,7 +1348,7 @@ Run these after any change. A different result means something changed. Recorded
 The replay hash changes legitimately whenever sim code or data changes (fish, gear, fight, AI). When that is intended, record the new hash here.
 
 ### 8.6 Next task
-Phase 145 is done (the user's request of 2026-11-18). Next: the round-7 audit (PLAN_UX.md).
+Phase 146 is done (the user's request of 2026-11-18: the CRT menus). Next: the round-7 audit (PLAN_UX.md).
 
 ---
 
