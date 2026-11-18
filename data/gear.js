@@ -85,14 +85,17 @@ G.data.gear = {
   // shiver, dropping on a slack line) or 'kick' (a swimbait's paddle tail, beating with speed).
   // Costs are the reference's order at about 0.45 of its numbers (the Bobber 6, not free).
   // Phase 73: each lure's art is its look in data/lurelooks.js (painted by js/gfx/luregen.js).
+  // The user (2026-11-18): the big lures fished on a steady reel (dive, mid, glide at XL-XXL) are
+  // heavy, and a heavy lure carries, so they cast farther, as in reality: castK × the rod's castMax
+  // (open water only; on the ice everything drops down the hole).
   lures: [
     { id: 'bobber', name: 'Bobber', type: 'float', sizes: ['S', 'M'], cost: 6, pack: 2, attract: 1.2, swim: 'float', sink: 1, maxDepthM: 1.5, carries: 'worm' },
     { id: 'deep_bobber', name: 'Deep Bobber', type: 'float', sizes: ['S', 'M', 'L'], cost: 14, pack: 2, attract: 1.2, swim: 'float', sink: 1, maxDepthM: 5, carries: 'worm' },
     { id: 'crankbait', name: 'Crankbait', type: 'crank', sizes: ['S', 'M'], cost: 7, pack: 2, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 1.5 },
-    { id: 'big_crankbait', name: 'Big Crankbait', type: 'crank', sizes: ['L', 'XL'], cost: 22, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 3 },
-    { id: 'deep_crankbait', name: 'Deep Crankbait', type: 'crank', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 6 },
+    { id: 'big_crankbait', name: 'Big Crankbait', type: 'crank', sizes: ['L', 'XL'], cost: 22, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 3, castK: 1.15 },
+    { id: 'deep_crankbait', name: 'Deep Crankbait', type: 'crank', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.35, swim: 'dive', sink: 0, maxDepthM: 6, castK: 1.25 },
     { id: 'spinnerbait', name: 'Spinnerbait', type: 'spinner', sizes: ['S', 'M', 'L'], cost: 14, pack: 2, attract: 1.3, swim: 'mid', sink: 0.6, maxDepthM: 7 },
-    { id: 'big_spinnerbait', name: 'Big Spinnerbait', type: 'spinner', sizes: ['XL', 'XXL'], cost: 27, pack: 1, attract: 1.3, swim: 'mid', sink: 0.8, maxDepthM: 10 },
+    { id: 'big_spinnerbait', name: 'Big Spinnerbait', type: 'spinner', sizes: ['XL', 'XXL'], cost: 27, pack: 1, attract: 1.3, swim: 'mid', sink: 0.8, maxDepthM: 10, castK: 1.25 },
     { id: 'small_spoon', name: 'Small Spoonbait', type: 'spoon', sizes: ['S', 'M', 'L'], cost: 11, pack: 2, attract: 1.3, swim: 'flutter', sink: 1.4, maxDepthM: 99 },
     { id: 'heavy_spoon', name: 'Heavy Spoonbait', type: 'spoon', sizes: ['L', 'XL'], cost: 27, pack: 1, attract: 1.3, swim: 'flutter', sink: 1.8, maxDepthM: 99 },
     { id: 'huge_spoon', name: 'Huge Spoonbait', type: 'spoon', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'flutter', sink: 2.2, maxDepthM: 99 },
@@ -106,9 +109,9 @@ G.data.gear = {
     { id: 'large_blade', name: 'Large Bladebait', type: 'blade', sizes: ['L', 'XL'], cost: 27, pack: 1, attract: 1.3, swim: 'lift', vary: 'rattle', sink: 2.3, maxDepthM: 99 },
     { id: 'heavy_blade', name: 'Heavy Bladebait', type: 'blade', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'lift', vary: 'rattle', sink: 2.6, maxDepthM: 99 },
     { id: 'glidebait', name: 'Glidebait', type: 'glide', sizes: ['M', 'L'], cost: 45, pack: 1, attract: 1.3, swim: 'glide', sink: 0.8, maxDepthM: 5 },
-    { id: 'deep_glidebait', name: 'Deep Glidebait', type: 'glide', sizes: ['XL', 'XXL'], cost: 90, pack: 1, attract: 1.3, swim: 'glide', sink: 1, maxDepthM: 9 },
+    { id: 'deep_glidebait', name: 'Deep Glidebait', type: 'glide', sizes: ['XL', 'XXL'], cost: 90, pack: 1, attract: 1.3, swim: 'glide', sink: 1, maxDepthM: 9, castK: 1.25 },
     { id: 'minnow_swimbait', name: 'Minnow Swimbait', type: 'swim', sizes: ['S', 'M', 'L'], cost: 27, pack: 1, attract: 1.3, swim: 'mid', vary: 'kick', sink: 0.9, maxDepthM: 6 },
-    { id: 'bluegill_swimbait', name: 'Bluegill Swimbait', type: 'swim', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'mid', vary: 'kick', sink: 1.1, maxDepthM: 10 }
+    { id: 'bluegill_swimbait', name: 'Bluegill Swimbait', type: 'swim', sizes: ['XL', 'XXL'], cost: 68, pack: 1, attract: 1.3, swim: 'mid', vary: 'kick', sink: 1.1, maxDepthM: 10, castK: 1.25 }
   ],
   // Phase 69: an old save's lure counts go to the nearest new lure (core/save.js v7 -> v8).
   oldLures: { spinner: 'spinnerbait', plug: 'crankbait', grub: 'wacky_worm', popper: 'topwater', jig: 'jighead', bobber: 'bobber', spoon: 'small_spoon' },

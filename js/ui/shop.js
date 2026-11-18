@@ -332,7 +332,7 @@ G.ui.shop = (function () {
       if (b.unlimited) desc = 'Free, and they never run out. Most fish take them.';
       else if (b.swim) { // Phase 43: a lure
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
-        desc = SWIM_SAYS[b.vary || b.swim] + ' ' + (G.ui.tips && RETRIEVE_OF[b.swim] ? G.ui.tips.RETRIEVE[RETRIEVE_OF[b.swim]] + ' ' : '') + (b.sizes.length > 1 ? 'Sizes ' + b.sizes[0] + '-' + b.sizes[b.sizes.length - 1] : 'Size ' + b.sizes[0]) + '. Lost if the line snaps.'; // Phase 69: its action and the fish sizes it is made for
+        desc = SWIM_SAYS[b.vary || b.swim] + ' ' + (G.ui.tips && RETRIEVE_OF[b.swim] ? G.ui.tips.RETRIEVE[RETRIEVE_OF[b.swim]] + ' ' : '') + (b.castK ? 'Heavy: casts ' + pct(b.castK) + '% farther. ' : '') + (b.sizes.length > 1 ? 'Sizes ' + b.sizes[0] + '-' + b.sizes[b.sizes.length - 1] : 'Size ' + b.sizes[0]) + '. Lost if the line snaps.'; // Phase 69: its action and the fish sizes it is made for
       } else {
         txt.price = b.pack + ' for ' + b.pack * b.cost + 'c';
         if (b.label === false) desc = 'No label. The jar is warm.';

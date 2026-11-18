@@ -177,11 +177,11 @@ G.sim.economy = (function () {
   // Fills out (reused object) with everything the equipped gear does.
   function effects(save, data, out) {
     var g = data.gear, s = save.gear, rod = g.rods[rodInHand(save, data)], bait = baitInUse(save, data);
-    out.castMax = rod.castMax;
+    out.lure = isLure(bait.id, data);
+    out.castMax = rod.castMax * (out.lure && bait.castK && !rod.ice ? bait.castK : 1); // the user 2026-11-18: big steady lures carry farther
     out.maxMass = rod.maxMass;
     out.rodAction = rod.action;                                         // Phase 43
     out.smallHook = rod.smallHook; out.smallBoost = rod.smallBoost; out.smallMass = g.rodSmall.mass;
-    out.lure = isLure(bait.id, data);
     out.swim = out.lure ? bait.swim : ''; out.sink = out.lure ? bait.sink : 1; out.maxDepthM = out.lure ? bait.maxDepthM : 99;
     out.vary = out.lure && bait.vary ? bait.vary : ''; out.dropM = out.lure && bait.dropM ? bait.dropM : 0; // Phase 69: rattle or kick; a dropshot's hook over its weight
     out.topDepthM = g.topDepthM;
