@@ -19,7 +19,7 @@ Saves live in each browser (localStorage `softstatic_save_v1`, format `SS1.<base
 
 The phone and the computer must be on the same network.
 - Serve to the network: `python3 -m http.server 5517 --bind 0.0.0.0`. Anyone on the network can open it, so stop it when done.
-- Find the computer's address (Windows `ipconfig`, macOS Wi-Fi details, Linux `hostname -I`), e.g. `192.168.1.20`, and open `http://192.168.1.20:5517/` on the phone, held sideways.
+- Find the computer's address (Windows `ipconfig`, macOS Wi-Fi details, Linux `hostname -I`), e.g. `192.168.1.20`, and open `http://192.168.1.20:5517/` on the phone. It always plays sideways: held upright, the game is drawn turned a quarter, so just turn the phone.
 - For full screen without browser bars, add it to the home screen (iOS: Share → Add to Home Screen; Android: browser menu → Add to Home screen). It opens full screen and landscape (`manifest.webmanifest`).
 - Controls: the arrows bottom left steer; the round button bottom right does what its word says (CAST, REEL, HOOK, SELL…); J M S P at the top right; in menus tap a row to select it and again to choose. The full key table is PLAN_MOBILE.md §2b.
 - Over plain `http://` the clipboard is not allowed, so Export save shows the string in a box.

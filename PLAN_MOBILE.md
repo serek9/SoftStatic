@@ -9,7 +9,7 @@ Adds phases after the approved spec; decisions are in PLAN.md §8.3.
 ### Phase 57: The page on a phone
 - **57.1** Touch mode fills the safe area: whole-number scale if it fills ≥95% of the limiting side, else fractional (nearest-neighbour). Safe-area insets respected; refits on resize, rotation, visual viewport and full-screen changes.
 - **57.2** Behaves like an app: no zoom, overscroll, selection or callout; full screen and landscape lock on the first tap (once per load); `manifest.webmanifest` and iOS web-app metas.
-- **57.3** Portrait keeps running with input and draws a large "turn the phone" notice.
+- **57.3** Portrait keeps running with input and draws a large "turn the phone" notice. (Replaced in Phase 145: an upright phone gets the game turned a quarter, always sideways, with no notice.)
 - **57.4** "Fishing in another tab" is taken back by a tap; audio unlocks on `touchend`/`pointerup`/`click` and resumes from iOS's `interrupted` state.
 - **57.5** `dbg.device()` and an overlay line.
 

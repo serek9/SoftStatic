@@ -62,6 +62,20 @@ G.core.device = (function () {
     var dpr = window.devicePixelRatio || 1, vw = window.innerWidth, vh = window.innerHeight, ins = info.insets;
     var t = touch();
     if (t) insets(ins); else { ins[0] = ins[1] = ins[2] = ins[3] = 0; }
+    // Phase 145: a phone held upright still plays sideways. The page is turned a quarter turn
+    // clockwise (the body, so the game canvas and the UI layer turn together) and everything
+    // below is laid out in that turned, landscape space: vw × vh swap, and so do the insets
+    // (the screen's top becomes the left). toVirtual() turns a touch back into it.
+    info.rot = t && vh > vw;
+    var B = document.body.style;
+    if (info.rot) {
+      var sw = vw; vw = vh; vh = sw;
+      var i0 = ins[0], i1 = ins[1], i2 = ins[2], i3 = ins[3];
+      ins[3] = i0; ins[1] = i2; ins[0] = i1; ins[2] = i3;
+      B.position = 'fixed'; B.left = '0px'; B.top = '0px'; B.width = vw + 'px'; B.height = vh + 'px'; B.margin = '0';
+      B.transformOrigin = '0 0'; B.transform = 'translate(' + vh + 'px, 0) rotate(90deg)';
+      info.rotW = vh; // the screen's width, for toVirtual
+    } else if (B.transform) { B.transform = ''; B.transformOrigin = ''; B.position = ''; B.left = ''; B.top = ''; B.width = ''; B.height = ''; B.margin = ''; }
     var aw = Math.max(1, vw - ins[1] - ins[3]), ah = Math.max(1, vh - ins[0] - ins[2]);
     var fitScale = Math.min(aw * dpr / W, ah * dpr / H);
     var scale = fitScale >= 1 ? Math.floor(fitScale) : fitScale;
@@ -83,7 +97,7 @@ G.core.device = (function () {
     info.touch = t; info.coarse = coarse; info.vw = vw; info.vh = vh; info.dpr = dpr;
     info.scale = scale / dpr; info.whole = scale === Math.floor(scale); info.cssW = cw; info.cssH = ch;
     info.fill = Math.max(cw / aw, ch / ah);
-    info.portrait = t && vh > vw;
+    info.portrait = false; // Phase 145: never upright any more: an upright phone is turned (info.rot)
     info.fullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
     info.fits++;
     // Phase 90.1: the UI layer, sized from the same measures.
@@ -218,10 +232,19 @@ G.core.device = (function () {
     fit();
   }
 
+  // Phase 145: a point on the screen (client px) in the page's own space: the same point when the
+  // page is not turned, turned back a quarter when it is. out = [x, y]; returns out.
+  function toVirtual(cx, cy, out) {
+    if (info.rot) { out[0] = cy; out[1] = info.rotW - cx; } else { out[0] = cx; out[1] = cy; }
+    return out;
+  }
+  // The game canvas's box in the page's own space (CSS px): left, top, width, height.
+  function box() { return [info.left, info.top, info.cssW, info.cssH]; }
+
   // 57.3: the portrait notice, over the running game (input still goes through), in the
   // bitmap font at NOTICE_S× in the 640×360 view. Drawing only. force: drawn anyway (the gallery).
   function drawNotice(ctx, force) {
-    if ((!info.portrait && !force) || !G.ui || !G.ui.panel) return;
+    if (!force || !G.ui || !G.ui.panel) return; // Phase 145: an upright phone is turned to play sideways; the notice is only the gallery's now
     var F = G.gfx.sprites.fine, Pn = G.ui.panel, s = NOTICE_S;
     if (Pn.on() && !force) { // Phase 90: over the UI layer, at 2 UI px a pixel in the middle of the screen
       var c = Pn.begin(ctx), m0 = Pn.PAD + 2, w0 = Math.max(F.measureBold(NOTICE_A), F.measure(NOTICE_B)) + 2 * m0 + 2, h0 = Pn.TAB + 2 * m0 + 2 * F.LINE_H + 3;
@@ -264,7 +287,7 @@ G.core.device = (function () {
   }
 
   return {
-    attach: attach, fit: fit, touch: touch, drawNotice: drawNotice, report: report,
+    attach: attach, fit: fit, touch: touch, drawNotice: drawNotice, report: report, toVirtual: toVirtual, box: box, rotated: function () { return !!info.rot; },
     ios: ios, wantsHomeScreen: wantsHomeScreen, buzz: buzz, canVibrate: canVibrate, persisted: function () { return info.persisted; }, // Phase 91
     canFullscreen: canFullscreen, isFullscreen: isFullscreen, setFullscreen: setFullscreen, budget: budget, paintIcon: paintIcon, ICON: ICON,
     portrait: function () { return info.portrait; },
