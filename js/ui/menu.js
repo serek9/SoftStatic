@@ -63,7 +63,12 @@ G.ui.menu = (function () {
     return false;
   }
 
-  function draw(ctx) { if (cur) cur.draw(ctx); }
+  // The world waits while a menu is open, so it is drawn as a paused tape behind it (the title has its own tape).
+  function draw(ctx) {
+    if (!cur) return;
+    if (curName !== 'title') { G.ui.panel.paused(ctx); G.core.view.begin(ctx, !!cur.native); }
+    cur.draw(ctx);
+  }
 
   // ---- Pause menu ------------------------------------------------------------------------
 
