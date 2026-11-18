@@ -261,7 +261,16 @@ G.core.input = (function () {
     release('touch' + id);
   }
 
+  // Phase 145: through G.core.device, which knows when the page is turned a quarter for an
+  // upright phone (the canvas's on-screen box is then turned too, so it is not used).
+  var vpt = [0, 0];
   function gamePt(canvas, cx, cy, out) {
+    var D = G.core.device;
+    if (D && D.rotated && D.rotated()) {
+      D.toVirtual(cx, cy, vpt); var b = D.box();
+      out[0] = (vpt[0] - b[0]) / b[2] * 640; out[1] = (vpt[1] - b[1]) / b[3] * 360;
+      return out;
+    }
     var r = canvas.getBoundingClientRect();
     out[0] = (cx - r.left) / r.width * 640; out[1] = (cy - r.top) / r.height * 360;
     return out;
