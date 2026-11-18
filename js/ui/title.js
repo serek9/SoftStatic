@@ -4,9 +4,9 @@ var G = (typeof G !== 'undefined') ? G : (globalThis.G = {});
 // game, related to the static of VHS, for the beginning of the game; always compatible with the
 // phone"). An overlay (G.ui.menu, so the world waits under it) opened once at boot: the lake's
 // first frame under a tape's playback. It comes up out of snow with TRACKING in the corner, then
-// SOFTSTATIC in tall hollow serif capitals, wide apart, pale with a cyan glow and the red and
-// cyan of a tape's colour bleed, a band of tracking noise rolling down through it, and now and
-// then a glitch that slides strips of the letters sideways. The deck's on-screen display: PLAY
+// SOFTSTATIC in tall hollow serif capitals, wide apart, pale with a soft cyan glow, steady and
+// still (the user 2026-11-18: no jitter in the letters), the tracking noise rolling down behind
+// them. The deck's on-screen display: PLAY
 // and its arrow, SP and the tape's counter, the clock blinking 12:00 as an unset VCR's does.
 // Space, Esc, any key or a tap (the phone) and the snow swells and clears into the lake.
 // Everything is in the picture's own 640×360 pixels (so a phone shows it whole, scaled), palette
@@ -192,20 +192,14 @@ G.ui.title = (function () {
     ctx.globalAlpha = 0.3 * cover; ctx.fillStyle = P.fog_light; ctx.fillRect(0, by + bh - 2, 640, 1);
     ctx.globalAlpha = 0.22 * cover; ctx.drawImage(lines, 0, 0);
     ctx.globalAlpha = 1;
-    // The letters: in from the snow, the glow, the colour bleed, the strips a glitch slides.
+    // The letters: in from the snow, then still.
     var a = ease((t - 0.7) / 1.4) * cover;
     if (a > 0) {
-      var x = (640 - word.w) >> 1, y = TY, gl = glitch(t), split = 1 + (gl > 0 ? 2 : 0) + Math.round(1 - settle);
+      // The letters sit still and solid: no glitch slide, no band drag, no colour split, no flicker.
+      var x = (640 - word.w) >> 1, y = TY;
       ctx.globalAlpha = 0.55 * a; ctx.drawImage(word.fill, x, y);
-      ctx.globalAlpha = (0.1 + 0.04 * Math.sin(t * 2.3)) * a; ctx.drawImage(word.glow, x, y);
-      for (var sy = 0; sy < word.h; sy += 3) {
-        var off = 0, row = y + sy;
-        if (gl > 0) off = (S.hash(sy, Math.floor(t * 20)) % 9) - 4;
-        if (row >= by && row < by + bh) off += 2;                                                       // the band drags the letters
-        ctx.globalAlpha = 0.45 * a; ctx.drawImage(word.line.neon_red, 0, sy, word.w, 3, x + off - split, row, word.w, 3);
-        ctx.globalAlpha = 0.4 * a; ctx.drawImage(word.line.neon_teal, 0, sy, word.w, 3, x + off + split, row, word.w, 3);
-        ctx.globalAlpha = (0.85 + 0.15 * Math.sin(t * 7 + sy)) * a; ctx.drawImage(word.line.bone, 0, sy, word.w, 3, x + off, row, word.w, 3);
-      }
+      ctx.globalAlpha = 0.12 * a; ctx.drawImage(word.glow, x, y);
+      ctx.globalAlpha = a; ctx.drawImage(word.line.bone, 0, 0, word.w, word.h, x, y, word.w, word.h);
       ctx.globalAlpha = 1;
       // A line under it, spaced like the letters.
       var sub = 'A  TAPE  FOUND  BY  THE  LAKE', sw = F.measure(sub);
@@ -235,8 +229,6 @@ G.ui.title = (function () {
     }
     ctx.globalAlpha = 1;
   }
-  // A glitch now and then: a fifth of a second every 5-9 s (from the time alone).
-  function glitch(tt) { var n = Math.floor(tt / 7), u = tt - n * 7, at = 2.6 + (S.hash(n, 71) % 40) / 10; return u > at && u < at + 0.2 ? 1 : 0; }
 
   return {
     native: true, open: open, update: update, draw: draw,

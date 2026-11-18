@@ -522,21 +522,14 @@ G.gfx.sprites = (function () {
     }
 
     // Draws str with its top-left at x, y. '\n' starts a new line.
-    // jitter 0..1 is the "handwriting" amount: glyphs wander up to one step (two above 0.66)
-    // and spacing loosens. The same str, seed and jitter always give the same pixels.
+    // jitter and seed are accepted for old callers but ignored: every letter sits on its line.
     // extra widens each glyph by drawing it again 1 px to the right (bold).
     function draw(ctx, str, x, y, colorKey, jitter, seed, extra) {
       var img = fontIn(colorKey || 'bone'), cx = x | 0, cy = y | 0;
       jitter = jitter || 0; seed = seed | 0; extra = extra | 0;
       for (var i = 0; i < str.length; i++) {
         if (str.charCodeAt(i) === 10) { cx = x | 0; cy += lineH; continue; }
-        var c = code(str, i), dx = 0, dy = 0;
-        if (jitter > 0) {
-          var hh = hash(seed, i);
-          if ((hh & 1023) < jitter * 1024) dy = (hh & 1024) ? wander : -wander;
-          if (jitter > 0.66 && ((hh >>> 11) & 1023) < (jitter - 0.66) * 3 * 1024) dy *= 2;
-          if (((hh >>> 21) & 255) < jitter * 96) dx = (hh & (1 << 30)) ? 1 : 0;
-        }
+        var c = code(str, i), dx = 0, dy = 0; // text is always drawn straight: the handwriting jitter is gone
         ctx.drawImage(img, gx[c], 0, gw[c], h, cx + dx, cy + dy, gw[c], h);
         if (extra) ctx.drawImage(img, gx[c], 0, gw[c], h, cx + dx + 1, cy + dy, gw[c], h);
         cx += gw[c] + 1 + extra + dx;
